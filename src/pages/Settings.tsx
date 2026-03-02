@@ -145,7 +145,9 @@ export function Settings() {
     const passphrase = updateTokenPassphrase.trim()
     const newToken = updateTokenNewToken.trim()
     if (!passphrase || !newToken) {
-      setUpdateTokenError('Please enter your passphrase and new API token.')
+      setUpdateTokenError(
+        'Please enter your passphrase and new Personal Access Token.'
+      )
       return
     }
     setUpdateTokenLoading(true)
@@ -163,7 +165,9 @@ export function Settings() {
       await decryptToken(encrypted, key)
       const valid = await validateUpBankToken(newToken)
       if (!valid) {
-        setUpdateTokenError('Invalid API token. Please check and try again.')
+        setUpdateTokenError(
+          'Invalid Personal Access Token. Please check and try again.'
+        )
         setUpdateTokenLoading(false)
         return
       }
@@ -175,7 +179,7 @@ export function Settings() {
       setUpdateTokenError(null)
       setShowUpdateTokenModal(false)
       setUpdateTokenSuccess(true)
-      toast.success('API token updated.')
+      toast.success('Personal Access Token updated.')
       setLastSync(getAppSetting('last_sync'))
       setTimeout(() => setUpdateTokenSuccess(false), 5000)
     } catch (err) {
@@ -488,7 +492,7 @@ export function Settings() {
 
           {!isDemoMode && (
             <div className="mb-4">
-              <h6 className="text-muted mb-2">API token</h6>
+              <h6 className="text-muted mb-2">Personal Access Token</h6>
               <p className="small text-muted mb-2">
                 If your token has expired (e.g. 48-hour token from Up Bank),
                 update it here. Your passphrase is required; other data is not
@@ -501,13 +505,13 @@ export function Settings() {
                   setUpdateTokenError(null)
                   setShowUpdateTokenModal(true)
                 }}
-                aria-label="Update API token"
+                aria-label="Update Personal Access Token"
               >
-                Update API token
+                Update Personal Access Token
               </Button>
               {updateTokenSuccess && (
                 <span className="d-block mt-2 text-success small" role="status">
-                  API token updated. You can re-sync now.
+                  Personal Access Token updated. You can re-sync now.
                 </span>
               )}
             </div>
@@ -519,7 +523,7 @@ export function Settings() {
             <h6 className="text-muted mb-2">Clear all data</h6>
             <p className="small text-muted mb-2">
               Permanently delete all local data. You will need to re-enter your
-              passphrase and API token (re-onboard).
+              passphrase and Personal Access Token (re-onboard).
             </p>
             <Button
               variant="outline-danger"
@@ -545,8 +549,8 @@ export function Settings() {
         </Modal.Header>
         <Modal.Body id="clear-data-modal-description">
           All local data will be permanently deleted, including your encrypted
-          API token. You will need to re-enter your passphrase and API token to
-          use the app again. This cannot be undone.
+          Personal Access Token. You will need to re-enter your passphrase and
+          Personal Access Token to use the app again. This cannot be undone.
         </Modal.Body>
         <Modal.Footer>
           <Button
@@ -589,14 +593,15 @@ export function Settings() {
       >
         <Modal.Header closeButton={!updateTokenLoading}>
           <Modal.Title id="update-token-modal-title">
-            Update API token
+            Update Personal Access Token
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleUpdateTokenSubmit}>
           <Modal.Body id="update-token-modal-description">
             <p className="small text-muted mb-3">
-              Enter your passphrase and a new API token from the Up Bank app.
-              Your existing data (savers, trackers, etc.) will be kept.
+              Enter your passphrase and a new Personal Access Token from the Up
+              Bank app. Your existing data (savers, trackers, etc.) will be
+              kept.
             </p>
             <Form.Group className="mb-3">
               <Form.Label htmlFor="update-token-passphrase">
@@ -613,7 +618,9 @@ export function Settings() {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label htmlFor="update-token-new">New API token</Form.Label>
+              <Form.Label htmlFor="update-token-new">
+                New Personal Access Token
+              </Form.Label>
               <Form.Control
                 id="update-token-new"
                 type="password"

@@ -9,6 +9,14 @@ import { getAppSetting } from '@/db'
 const SIDEBAR_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 70
 
+interface NavItem {
+  to: string
+  label: string
+  icon: string
+  short: string
+  badge?: string
+}
+
 interface SidebarProps {
   collapsed: boolean
   /** When true, sidebar is an overlay drawer (mobile); width is full, labels shown. */
@@ -33,13 +41,14 @@ export function Sidebar({
       : SIDEBAR_WIDTH
   const showLabels = overlay || !collapsed
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { to: '/', label: 'Dashboard', icon: 'mdi-home', short: 'D' },
     {
       to: '/analytics',
       label: 'Analytics',
       icon: 'mdi-chart-box',
       short: 'A',
+      badge: 'Coming soon',
     },
     {
       to: '/transactions',
@@ -141,6 +150,11 @@ export function Sidebar({
                   <span className="menu-title">
                     {showLabels ? item.label : item.short}
                   </span>
+                  {showLabels && item.badge && (
+                    <span className="sidebar-nav-badge" aria-hidden>
+                      {item.badge}
+                    </span>
+                  )}
                   <i className={`mdi ${item.icon} menu-icon`} aria-hidden />
                 </Link>
               </li>

@@ -211,13 +211,22 @@ export function TrackersSection() {
                   />
                 </div>
                 <div className="d-flex gap-1">
-                  <Link
-                    to="/analytics/trackers"
-                    className="btn btn-outline-secondary btn-sm"
-                    aria-label="View trackers analytics"
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id="trackers-analytics-header-tooltip">
+                        Analytics coming soon
+                      </Tooltip>
+                    }
                   >
-                    <i className="mdi mdi-chart-box" aria-hidden />
-                  </Link>
+                    <Link
+                      to="/analytics"
+                      className="btn btn-outline-secondary btn-sm"
+                      aria-label="Analytics coming soon"
+                    >
+                      <i className="mdi mdi-chart-box" aria-hidden />
+                    </Link>
+                  </OverlayTrigger>
                   <OverlayTrigger
                     placement="top"
                     overlay={
@@ -329,13 +338,22 @@ export function TrackersSection() {
                       <i className="mdi mdi-chevron-right" aria-hidden />
                     </Button>
                   </OverlayTrigger>
-                  <Link
-                    to="/analytics/trackers"
-                    className="btn btn-outline-secondary btn-sm me-1"
-                    aria-label="View trackers analytics"
+                  <OverlayTrigger
+                    placement="top"
+                    overlay={
+                      <Tooltip id="trackers-analytics-header-tooltip-desktop">
+                        Analytics coming soon
+                      </Tooltip>
+                    }
                   >
-                    <i className="mdi mdi-chart-box" aria-hidden />
-                  </Link>
+                    <Link
+                      to="/analytics"
+                      className="btn btn-outline-secondary btn-sm me-1"
+                      aria-label="Analytics coming soon"
+                    >
+                      <i className="mdi mdi-chart-box" aria-hidden />
+                    </Link>
+                  </OverlayTrigger>
                   <OverlayTrigger
                     placement="top"
                     overlay={
@@ -439,15 +457,15 @@ export function TrackersSection() {
                               placement="top"
                               overlay={
                                 <Tooltip id={`trackers-analytics-${t.id}`}>
-                                  View analytics
+                                  Analytics coming soon
                                 </Tooltip>
                               }
                             >
                               <Link
-                                to={`/analytics/trackers/${t.id}`}
+                                to="/analytics"
                                 className="btn btn-link btn-sm p-0 text-primary"
                                 onClick={(e) => e.stopPropagation()}
-                                aria-label={`View analytics for ${t.name}`}
+                                aria-label={`Analytics coming soon for ${t.name}`}
                               >
                                 <i className="mdi mdi-chart-line" aria-hidden />
                               </Link>

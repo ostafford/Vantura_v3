@@ -50,9 +50,9 @@ export function Help() {
             passphrase-derived key before being stored.
           </p>
           <p className="mb-2">
-            To get an API token: in the Up Bank app go to Profile → Data sharing
-            → Personal access tokens, create a new token, and paste it into
-            Vantura during onboarding or in Settings when updating.
+            To get a Personal Access Token: in the Up Bank app go to Profile →
+            Data sharing → Personal access tokens, create a new token, and paste
+            it into Vantura during onboarding or in Settings when updating.
           </p>
           <p className="mb-0">
             <a
@@ -60,7 +60,7 @@ export function Help() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Learn more about Up Bank API tokens
+              Learn more about Up Bank Personal Access Tokens
             </a>
           </p>
         </Card.Body>
@@ -161,9 +161,10 @@ export function Help() {
         <Card.Body>
           <p className="mb-2">
             In Settings you can re-sync with Up Bank (to pull the latest
-            transactions and category changes), update your API token (e.g. if
-            it expired), change your payday schedule and pay amount, and clear
-            all data (which deletes the database and returns you to onboarding).
+            transactions and category changes), update your Personal Access
+            Token (e.g. if it expired), change your payday schedule and pay
+            amount, and clear all data (which deletes the database and returns
+            you to onboarding).
           </p>
           <p className="mb-2">
             You can also run the dashboard tour again from Settings to be

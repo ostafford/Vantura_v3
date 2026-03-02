@@ -12,7 +12,7 @@ const BASE_URL = 'https://api.up.com.au'
 export class UpBankUnauthorizedError extends Error {
   override name = 'UpBankUnauthorizedError'
   constructor(
-    message = 'Up Bank API returned 401. Your API token may have expired or been revoked.'
+    message = 'Up Bank API returned 401. Your Personal Access Token may have expired or been revoked.'
   ) {
     super(message)
     Object.setPrototypeOf(this, UpBankUnauthorizedError.prototype)
@@ -21,7 +21,7 @@ export class UpBankUnauthorizedError extends Error {
 
 /** Message shown when sync fails due to 401 (expired/revoked token). */
 export const SYNC_401_MESSAGE =
-  'Your API token may have expired. Update it in Settings.'
+  'Your Personal Access Token may have expired. Update it in Settings.'
 
 export interface UpAccount {
   id: string

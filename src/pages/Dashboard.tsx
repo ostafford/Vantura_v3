@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { Row, Col, Modal, Button, Form } from 'react-bootstrap'
 import { useStore } from 'zustand'
 import {
@@ -125,15 +124,8 @@ export function Dashboard() {
         </h3>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb">
-            <li className="breadcrumb-item">
-              <Link to="/">Dashboard</Link>
-            </li>
             <li className="breadcrumb-item active" aria-current="page">
-              Overview{' '}
-              <i
-                className="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"
-                aria-hidden
-              />
+              Dashboard
             </li>
           </ol>
         </nav>

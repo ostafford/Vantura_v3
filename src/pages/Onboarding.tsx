@@ -53,7 +53,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     try {
       const valid = await validateUpBankToken(apiToken)
       if (!valid) {
-        setError('Invalid API token. Please check and try again.')
+        setError('Invalid Personal Access Token. Please check and try again.')
         return
       }
       const salt = getAppSetting('encryption_salt') ?? generateSalt()
@@ -94,6 +94,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         setAppSetting('pay_amount_cents', String(cents))
       }
     }
+    setStep(5)
+    startInitialSync(apiToken)
+  }
+
+  function handleStep4Skip() {
+    setError(null)
     setStep(5)
     startInitialSync(apiToken)
   }
@@ -201,10 +207,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <Form onSubmit={handleStep2Submit}>
               <h6 className="mb-2">Create a passphrase</h6>
               <p className="text-muted small mb-3">
-                This passphrase protects your API token and is never stored. You
-                must enter it each time you open the app to unlock. If you
-                forget it, you will need to re-onboard and create a new API
-                token in Up Bank.
+                This passphrase protects your Personal Access Token and is never
+                stored. You must enter it each time you open the app to unlock.
+                If you forget it, you will need to re-onboard and create a new
+                Personal Access Token in Up Bank.
               </p>
               <Form.Group className="mb-2">
                 <Form.Label htmlFor="onboarding-passphrase">
@@ -273,7 +279,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </p>
               <Form.Group className="mb-3">
                 <Form.Label htmlFor="onboarding-api-token">
-                  API Token
+                  Personal Access Token
                 </Form.Label>
                 <Form.Control
                   id="onboarding-api-token"
@@ -291,7 +297,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Learn more about API tokens
+                    Learn more about Personal Access Tokens
                   </a>
                 </Form.Text>
               </Form.Group>
@@ -405,13 +411,23 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     setError(null)
                     setStep(3)
                   }}
-                  aria-label="Back to API token"
+                  aria-label="Back to Personal Access Token"
                 >
                   Back
                 </Button>
-                <Button type="submit" className="btn-gradient-primary">
-                  Continue
-                </Button>
+                <div className="d-flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline-secondary"
+                    onClick={handleStep4Skip}
+                    aria-label="Skip payday setup"
+                  >
+                    Skip
+                  </Button>
+                  <Button type="submit" className="btn-gradient-primary">
+                    Continue
+                  </Button>
+                </div>
               </div>
             </Form>
           )}

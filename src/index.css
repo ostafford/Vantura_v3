@@ -434,6 +434,18 @@ body {
   line-height: 1;
   vertical-align: middle;
 }
+.sidebar .sidebar-nav-badge {
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15em 0.4em;
+  margin-left: 0.4rem;
+  border-radius: 4px;
+  background: var(--vantura-primary-gradient);
+  color: white;
+  white-space: nowrap;
+}
 .sidebar .sidebar-brand {
   min-height: 70px;
   padding: 0.25rem 0;
@@ -504,7 +516,8 @@ body {
   justify-content: center;
   padding: 0.8125rem 1rem;
 }
-.sidebar.collapsed .menu-title {
+.sidebar.collapsed .menu-title,
+.sidebar.collapsed .sidebar-nav-badge {
   display: none;
 }
 .sidebar.collapsed .menu-icon {

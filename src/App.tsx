@@ -11,10 +11,7 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { Dashboard } from '@/pages/Dashboard'
 import { Transactions } from '@/pages/Transactions'
 import { AnalyticsLayout } from '@/pages/analytics/AnalyticsLayout'
-import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
-import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
-import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
-import { AnalyticsInsights } from '@/pages/analytics/AnalyticsInsights'
+import { AnalyticsComingSoon } from '@/pages/analytics/AnalyticsComingSoon'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { Unlock } from '@/pages/Unlock'
@@ -196,17 +193,23 @@ function AppContent() {
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="analytics" element={<AnalyticsLayout />}>
+              <Route index element={<AnalyticsComingSoon />} />
               <Route
-                index
-                element={<Navigate to="/analytics/trackers" replace />}
+                path="trackers"
+                element={<Navigate to="/analytics" replace />}
               />
-              <Route path="trackers" element={<AnalyticsTrackers />} />
               <Route
                 path="trackers/:trackerId"
-                element={<AnalyticsTrackersDetail />}
+                element={<Navigate to="/analytics" replace />}
               />
-              <Route path="savers" element={<AnalyticsSavers />} />
-              <Route path="insights" element={<AnalyticsInsights />} />
+              <Route
+                path="savers"
+                element={<Navigate to="/analytics" replace />}
+              />
+              <Route
+                path="insights"
+                element={<Navigate to="/analytics" replace />}
+              />
             </Route>
             <Route path="settings" element={<Settings />} />
             <Route path="help" element={<Help />} />
