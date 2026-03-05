@@ -6,6 +6,10 @@ import {
   encryptExportPayload,
   decryptImportFile,
   parseImportFile,
+  previewImportProfile,
+  applySettings,
+  IMPORT_ERROR_INVALID_FILE,
+  IMPORT_ERROR_WRONG_PASSPHRASE,
   type ExportPayload,
 } from './profileExport'
 
@@ -68,7 +72,7 @@ describe('profileExport', () => {
       expect(decrypted.upcomingCharges).toEqual(payload.upcomingCharges)
     })
 
-    it('decryptImportFile throws on wrong passphrase', async () => {
+    it('decryptImportFile throws IMPORT_ERROR_WRONG_PASSPHRASE on wrong passphrase', async () => {
       const payload: ExportPayload = {
         version: 1,
         exportedAt: new Date().toISOString(),
@@ -79,7 +83,9 @@ describe('profileExport', () => {
         upcomingCharges: [],
       }
       const wrapper = await encryptExportPayload(payload, 'correct-pass')
-      await expect(decryptImportFile(wrapper, 'wrong-pass')).rejects.toThrow()
+      await expect(decryptImportFile(wrapper, 'wrong-pass')).rejects.toThrow(
+        IMPORT_ERROR_WRONG_PASSPHRASE
+      )
     })
 
     it('decryptImportFile throws when appSchemaVersion exceeds current', async () => {
@@ -100,7 +106,7 @@ describe('profileExport', () => {
   })
 
   describe('parseImportFile', () => {
-    it('throws when salt is missing', () => {
+    it('throws IMPORT_ERROR_INVALID_FILE when salt is missing', () => {
       expect(() =>
         parseImportFile({
           salt: '',
@@ -108,10 +114,10 @@ describe('profileExport', () => {
           ciphertext: 'abc',
           formatVersion: 1,
         })
-      ).toThrow('missing salt, ciphertext, or iterations')
+      ).toThrow(IMPORT_ERROR_INVALID_FILE)
     })
 
-    it('throws when ciphertext is missing', () => {
+    it('throws IMPORT_ERROR_INVALID_FILE when ciphertext is missing', () => {
       expect(() =>
         parseImportFile({
           salt: 'abc',
@@ -119,10 +125,10 @@ describe('profileExport', () => {
           ciphertext: '',
           formatVersion: 1,
         })
-      ).toThrow('missing salt, ciphertext, or iterations')
+      ).toThrow(IMPORT_ERROR_INVALID_FILE)
     })
 
-    it('throws when iterations is not a number', () => {
+    it('throws IMPORT_ERROR_INVALID_FILE when iterations is not a number', () => {
       expect(() =>
         parseImportFile({
           salt: 'abc',
@@ -130,7 +136,7 @@ describe('profileExport', () => {
           ciphertext: 'xyz',
           formatVersion: 1,
         })
-      ).toThrow('missing salt, ciphertext, or iterations')
+      ).toThrow(IMPORT_ERROR_INVALID_FILE)
     })
   })
 
@@ -163,6 +169,87 @@ describe('profileExport', () => {
       expect(payload.settings.theme).toBe('dark')
       expect(payload.settings.payday_frequency).toBe('MONTHLY')
       expect(payload.settings.api_token_encrypted).toBeUndefined()
+    })
+  })
+
+  describe('previewImportProfile', () => {
+    it('returns decrypted payload without writing', async () => {
+      const payload: ExportPayload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        appSchemaVersion: 2,
+        settings: { theme: 'light' },
+        trackers: [],
+        trackerCategories: [],
+        upcomingCharges: [],
+      }
+      const wrapper = await encryptExportPayload(payload, 'secret')
+      const json = JSON.stringify(wrapper)
+      const file = new File([json], 'test.json', {
+        type: 'application/json',
+      })
+
+      const result = await previewImportProfile(file, 'secret')
+
+      expect(result.settings).toEqual(payload.settings)
+      expect(result.trackers).toEqual([])
+    })
+
+    it('throws IMPORT_ERROR_WRONG_PASSPHRASE on wrong passphrase', async () => {
+      const payload: ExportPayload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        appSchemaVersion: 2,
+        settings: {},
+        trackers: [],
+        trackerCategories: [],
+        upcomingCharges: [],
+      }
+      const wrapper = await encryptExportPayload(payload, 'correct')
+      const file = new File([JSON.stringify(wrapper)], 'test.json', {
+        type: 'application/json',
+      })
+
+      await expect(previewImportProfile(file, 'wrong')).rejects.toThrow(
+        IMPORT_ERROR_WRONG_PASSPHRASE
+      )
+    })
+
+    it('throws IMPORT_ERROR_INVALID_FILE for invalid JSON file', async () => {
+      const file = new File(['not valid json'], 'test.json', {
+        type: 'application/json',
+      })
+
+      await expect(previewImportProfile(file, 'any')).rejects.toThrow(
+        IMPORT_ERROR_INVALID_FILE
+      )
+    })
+  })
+
+  describe('importPayloadWithOptions and applySettings', () => {
+    it('applySettings updates only whitelisted keys', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      applySettings({ theme: 'dark', payday_frequency: 'WEEKLY' })
+      expect(setAppSettingMock).toHaveBeenCalledWith('theme', 'dark')
+      expect(setAppSettingMock).toHaveBeenCalledWith(
+        'payday_frequency',
+        'WEEKLY'
+      )
+    })
+
+    it('applySettings ignores non-whitelisted keys', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      applySettings({
+        theme: 'dark',
+        api_token_encrypted: 'evil',
+      } as Record<string, string>)
+      expect(setAppSettingMock).toHaveBeenCalledWith('theme', 'dark')
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
+        'api_token_encrypted',
+        expect.anything()
+      )
     })
   })
 })

@@ -244,8 +244,16 @@ export async function exportProfile(passphrase: string): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+/** User-facing error when the import file format is invalid. */
+export const IMPORT_ERROR_INVALID_FILE =
+  'This file is not a valid Vantura settings export.'
+
+/** User-facing error when the passphrase does not match the file. */
+export const IMPORT_ERROR_WRONG_PASSPHRASE =
+  'Incorrect passphrase for this settings file. Please try again.'
+
 /**
- * Read and parse an import file. Throws if invalid JSON.
+ * Read and parse an import file. Throws if invalid structure.
  */
 export function parseImportFile(file: ExportFileWrapper): ExportFileWrapper {
   if (
@@ -255,9 +263,7 @@ export function parseImportFile(file: ExportFileWrapper): ExportFileWrapper {
     file.ciphertext === '' ||
     typeof file.iterations !== 'number'
   ) {
-    throw new Error(
-      'Invalid import file: missing salt, ciphertext, or iterations'
-    )
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
   }
   return file
 }
@@ -274,11 +280,30 @@ export async function importProfile(
   try {
     wrapper = JSON.parse(text) as ExportFileWrapper
   } catch {
-    throw new Error('Invalid import file: not valid JSON')
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
   }
   parseImportFile(wrapper)
   const payload = await decryptImportFile(wrapper, passphrase)
   importPayload(payload)
+}
+
+/**
+ * Decrypt and parse an import file without writing to the database.
+ * Use for preview before applying selective import.
+ */
+export async function previewImportProfile(
+  file: File,
+  passphrase: string
+): Promise<ExportPayload> {
+  const text = await file.text()
+  let wrapper: ExportFileWrapper
+  try {
+    wrapper = JSON.parse(text) as ExportFileWrapper
+  } catch {
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
+  }
+  parseImportFile(wrapper)
+  return decryptImportFile(wrapper, passphrase)
 }
 
 /**
@@ -290,23 +315,31 @@ export async function decryptImportFile(
 ): Promise<ExportPayload> {
   const { salt, iterations, ciphertext } = wrapper
   if (!salt || !ciphertext || typeof iterations !== 'number') {
-    throw new Error(
-      'Invalid import file: missing salt, ciphertext, or iterations'
-    )
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
   }
   const key = await deriveKeyFromPassphrase(passphrase, salt)
-  const json = await decryptToken(ciphertext, key)
-  const payload = JSON.parse(json) as ExportPayload
+  let json: string
+  try {
+    json = await decryptToken(ciphertext, key)
+  } catch {
+    throw new Error(IMPORT_ERROR_WRONG_PASSPHRASE)
+  }
+  let payload: ExportPayload
+  try {
+    payload = JSON.parse(json) as ExportPayload
+  } catch {
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
+  }
 
   if (
     typeof payload.version !== 'number' ||
     typeof payload.appSchemaVersion !== 'number'
   ) {
-    throw new Error('Invalid import file: corrupted payload')
+    throw new Error(IMPORT_ERROR_INVALID_FILE)
   }
   if (payload.appSchemaVersion > SCHEMA_VERSION) {
     throw new Error(
-      `Import file was created with a newer app version. Please update Vantura and try again.`
+      'Import file was created with a newer app version. Please update Vantura and try again.'
     )
   }
 
@@ -325,17 +358,17 @@ function categoryExists(
   return found
 }
 
-/**
- * Import payload into the database. Overwrites trackers, tracker_categories,
- * and upcoming_charges. Merges whitelisted settings.
- */
-export function importPayload(payload: ExportPayload): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
+/** Options for selective import; each section controls whether to overwrite that data. */
+export interface ImportOptions {
+  settings: boolean
+  trackers: boolean
+  upcomingCharges: boolean
+}
 
-  // Apply settings (only whitelisted keys)
+/** Apply whitelisted settings from payload. */
+export function applySettings(settings: Record<string, string>): void {
   const whitelist = new Set(SETTINGS_WHITELIST)
-  for (const [key, value] of Object.entries(payload.settings ?? {})) {
+  for (const [key, value] of Object.entries(settings ?? {})) {
     if (
       whitelist.has(key as (typeof SETTINGS_WHITELIST)[number]) &&
       typeof value === 'string'
@@ -343,18 +376,22 @@ export function importPayload(payload: ExportPayload): void {
       setAppSetting(key, value)
     }
   }
+}
 
-  // Delete existing trackers and tracker_categories (order due to FK)
+/** Replace trackers and tracker_categories with imported data. */
+export function replaceTrackers(
+  trackers: TrackerExportRow[],
+  trackerCategories: { tracker_id: number; category_id: string }[]
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
   db.run(`DELETE FROM tracker_categories`)
   db.run(`DELETE FROM trackers`)
-  db.run(`DELETE FROM upcoming_charges`)
 
   const now = new Date().toISOString()
-
-  // Map old tracker id -> new tracker id
   const trackerIdMap = new Map<number, number>()
-  const trackers = Array.isArray(payload.trackers) ? payload.trackers : []
-  for (const t of trackers) {
+  const trackersArr = Array.isArray(trackers) ? trackers : []
+  for (const t of trackersArr) {
     if (
       typeof t.name !== 'string' ||
       typeof t.budget_amount !== 'number' ||
@@ -399,15 +436,12 @@ export function importPayload(payload: ExportPayload): void {
     )
     const result = db.exec('SELECT last_insert_rowid()')
     const newId = (result[0]?.values?.[0]?.[0] as number) ?? 0
-    const oldId = typeof t.id === 'number' ? t.id : trackers.indexOf(t) + 1
+    const oldId = typeof t.id === 'number' ? t.id : trackersArr.indexOf(t) + 1
     trackerIdMap.set(oldId, newId)
   }
 
-  // Import tracker_categories (only if category exists)
-  const trackerCategories = Array.isArray(payload.trackerCategories)
-    ? payload.trackerCategories
-    : []
-  for (const tc of trackerCategories) {
+  const tcArr = Array.isArray(trackerCategories) ? trackerCategories : []
+  for (const tc of tcArr) {
     if (
       typeof tc.tracker_id !== 'number' ||
       typeof tc.category_id !== 'string' ||
@@ -423,12 +457,19 @@ export function importPayload(payload: ExportPayload): void {
       [newTrackerId, tc.category_id]
     )
   }
+}
 
-  // Import upcoming_charges
-  const upcomingCharges = Array.isArray(payload.upcomingCharges)
-    ? payload.upcomingCharges
-    : []
-  for (const uc of upcomingCharges) {
+/** Replace upcoming_charges with imported data. */
+export function replaceUpcomingCharges(
+  upcomingCharges: UpcomingChargeExportRow[]
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM upcoming_charges`)
+
+  const now = new Date().toISOString()
+  const charges = Array.isArray(upcomingCharges) ? upcomingCharges : []
+  for (const uc of charges) {
     if (
       typeof uc.name !== 'string' ||
       typeof uc.amount !== 'number' ||
@@ -460,6 +501,39 @@ export function importPayload(payload: ExportPayload): void {
       ]
     )
   }
+}
 
+/**
+ * Import payload into the database with optional section selection.
+ * Only sections with options set to true will be applied; others are left unchanged.
+ */
+export function importPayloadWithOptions(
+  payload: ExportPayload,
+  options: ImportOptions
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+
+  if (options.settings) {
+    applySettings(payload.settings ?? {})
+  }
+  if (options.trackers) {
+    replaceTrackers(payload.trackers ?? [], payload.trackerCategories ?? [])
+  }
+  if (options.upcomingCharges) {
+    replaceUpcomingCharges(payload.upcomingCharges ?? [])
+  }
   schedulePersist()
+}
+
+/**
+ * Import payload into the database. Overwrites trackers, tracker_categories,
+ * and upcoming_charges. Merges whitelisted settings.
+ */
+export function importPayload(payload: ExportPayload): void {
+  importPayloadWithOptions(payload, {
+    settings: true,
+    trackers: true,
+    upcomingCharges: true,
+  })
 }

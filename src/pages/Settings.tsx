@@ -21,7 +21,16 @@ import {
 } from '@/api/upBank'
 import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
-import { exportProfile, importProfile } from '@/services/profileExport'
+import {
+  exportProfile,
+  previewImportProfile,
+  importPayloadWithOptions,
+  buildExportPayload,
+  type ExportPayload,
+  type TrackerExportRow,
+  type UpcomingChargeExportRow,
+  IMPORT_ERROR_WRONG_PASSPHRASE,
+} from '@/services/profileExport'
 
 function formatLastSync(iso: string | null): string {
   if (!iso) return 'Never'
@@ -34,6 +43,43 @@ function formatLastSync(iso: string | null): string {
   } catch {
     return 'Unknown'
   }
+}
+
+function formatSettingsSummary(settings: Record<string, string>): string {
+  if (!settings || Object.keys(settings).length === 0) return 'None'
+  const parts: string[] = []
+  const theme = settings.theme
+  if (theme) parts.push(theme === 'light' ? 'Light theme' : 'Dark theme')
+  const accent = settings.accent_color
+  if (accent && ACCENT_PALETTES[accent as AccentId]) {
+    parts.push(ACCENT_PALETTES[accent as AccentId].label + ' accent')
+  }
+  const freq = settings.payday_frequency
+  if (freq) {
+    const label =
+      freq === 'WEEKLY'
+        ? 'Weekly'
+        : freq === 'FORTNIGHTLY'
+          ? 'Fortnightly'
+          : freq === 'MONTHLY'
+            ? 'Monthly'
+            : freq
+    const day = settings.payday_day
+    parts.push(day ? `${label} payday (day ${day})` : `${label} payday`)
+  }
+  return parts.length > 0 ? parts.join(', ') : 'Some settings'
+}
+
+function formatTrackersSummary(trackers: TrackerExportRow[]): string {
+  if (!Array.isArray(trackers) || trackers.length === 0) return 'None'
+  const names = trackers.slice(0, 3).map((t) => t.name)
+  const more = trackers.length > 3 ? ` +${trackers.length - 3} more` : ''
+  return `${trackers.length} trackers (${names.join(', ')}${more})`
+}
+
+function formatUpcomingSummary(charges: UpcomingChargeExportRow[]): string {
+  if (!Array.isArray(charges) || charges.length === 0) return 'None'
+  return `${charges.length} upcoming charge${charges.length !== 1 ? 's' : ''}`
 }
 
 export function Settings() {
@@ -65,7 +111,17 @@ export function Settings() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importPassphrase, setImportPassphrase] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
+  const [importErrorField, setImportErrorField] = useState<
+    'file' | 'passphrase' | null
+  >(null)
   const [importing, setImporting] = useState(false)
+  const [importStep, setImportStep] = useState<1 | 2>(1)
+  const [importPreview, setImportPreview] = useState<ExportPayload | null>(null)
+  const [importOptions, setImportOptions] = useState({
+    settings: true,
+    trackers: true,
+    upcomingCharges: true,
+  })
   const accent = useStore(accentStore, (s) => s.accent)
   const setAccent = useStore(accentStore, (s) => s.setAccent)
   const navigate = useNavigate()
@@ -288,30 +344,71 @@ export function Settings() {
   async function handleImportSubmit(e: React.FormEvent) {
     e.preventDefault()
     setImportError(null)
+    setImportErrorField(null)
     if (!importFile) {
       setImportError('Please choose a settings file.')
+      setImportErrorField('file')
       return
     }
     if (!importPassphrase.trim()) {
       setImportError('Please enter the passphrase used when exporting.')
+      setImportErrorField('passphrase')
       return
     }
     setImporting(true)
     try {
-      await importProfile(importFile, importPassphrase.trim())
+      const payload = await previewImportProfile(
+        importFile,
+        importPassphrase.trim()
+      )
+      setImportPreview(payload)
+      setImportOptions({
+        settings: true,
+        trackers: true,
+        upcomingCharges: true,
+      })
+      setImportStep(2)
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Import failed. Please try again.'
+      setImportError(msg)
+      setImportErrorField(
+        msg === IMPORT_ERROR_WRONG_PASSPHRASE ||
+          msg.includes('passphrase') ||
+          msg.includes('newer app version')
+          ? 'passphrase'
+          : 'file'
+      )
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function handleImportConfirm(e: React.FormEvent) {
+    e.preventDefault()
+    if (!importPreview) return
+    setImporting(true)
+    try {
+      importPayloadWithOptions(importPreview, importOptions)
+      setImportPreview(null)
+      setImportStep(1)
       setImportFile(null)
       setImportPassphrase('')
-      setImportError(null)
       setShowImportModal(false)
       toast.success('Settings imported successfully.')
       window.location.reload()
     } catch (err) {
-      setImportError(
+      toast.error(
         err instanceof Error ? err.message : 'Import failed. Please try again.'
       )
     } finally {
       setImporting(false)
     }
+  }
+
+  function handleImportBack() {
+    setImportStep(1)
+    setImportPreview(null)
   }
 
   function closeImportModal() {
@@ -320,6 +417,9 @@ export function Settings() {
       setImportFile(null)
       setImportPassphrase('')
       setImportError(null)
+      setImportErrorField(null)
+      setImportStep(1)
+      setImportPreview(null)
     }
   }
 
@@ -327,6 +427,15 @@ export function Settings() {
     const file = e.target.files?.[0]
     setImportFile(file ?? null)
     setImportError(null)
+    setImportErrorField(null)
+  }
+
+  function handleImportPassphraseChange(value: string) {
+    setImportPassphrase(value)
+    if (importErrorField === 'passphrase') {
+      setImportError(null)
+      setImportErrorField(null)
+    }
   }
 
   return (
@@ -912,79 +1021,231 @@ export function Settings() {
             Import profile settings
           </Modal.Title>
         </Modal.Header>
-        <Form onSubmit={handleImportSubmit}>
-          <Modal.Body id="import-modal-description">
-            <p className="small text-muted mb-3">
-              Imports settings, trackers, and upcoming charges into this device.
-              Will not import transactions or API tokens.
-            </p>
-            <Form.Group className="mb-3">
-              <Form.Label>Settings file</Form.Label>
-              <Form.Control
-                type="file"
-                accept=".json,application/json"
-                onChange={handleImportFileChange}
-                disabled={importing}
-                aria-label="Choose settings file"
-              />
-              {importFile && (
-                <Form.Text className="text-muted">
-                  Selected: {importFile.name}
+        {importStep === 1 ? (
+          <Form onSubmit={handleImportSubmit}>
+            <Modal.Body id="import-modal-description">
+              <p className="small text-muted mb-3">
+                Imports settings, trackers, and upcoming charges into this
+                device. Will not import transactions or API tokens.
+              </p>
+              <Form.Group className="mb-3">
+                <Form.Label>Settings file</Form.Label>
+                <Form.Control
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportFileChange}
+                  disabled={importing}
+                  aria-label="Choose settings file"
+                  aria-invalid={importErrorField === 'file'}
+                  aria-errormessage={
+                    importErrorField === 'file'
+                      ? 'import-file-error'
+                      : undefined
+                  }
+                />
+                {importFile && (
+                  <Form.Text className="text-muted">
+                    Selected: {importFile.name}
+                  </Form.Text>
+                )}
+                {importError && importErrorField === 'file' && (
+                  <div
+                    id="import-file-error"
+                    className="text-danger small mt-1"
+                    role="alert"
+                  >
+                    {importError}
+                  </div>
+                )}
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label htmlFor="import-passphrase">
+                  Passphrase (used when exporting)
+                </Form.Label>
+                <Form.Control
+                  id="import-passphrase"
+                  type="password"
+                  value={importPassphrase}
+                  onChange={(e) => handleImportPassphraseChange(e.target.value)}
+                  placeholder="Enter passphrase"
+                  autoComplete="current-password"
+                  disabled={importing}
+                  aria-invalid={importErrorField === 'passphrase'}
+                  aria-errormessage={
+                    importErrorField === 'passphrase'
+                      ? 'import-passphrase-error'
+                      : undefined
+                  }
+                />
+                <Form.Text className="text-muted d-block mt-1">
+                  If the passphrase or file is incorrect, we&apos;ll show an
+                  error here and nothing will be changed.
                 </Form.Text>
-              )}
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label htmlFor="import-passphrase">
-                Passphrase (used when exporting)
-              </Form.Label>
-              <Form.Control
-                id="import-passphrase"
-                type="password"
-                value={importPassphrase}
-                onChange={(e) => setImportPassphrase(e.target.value)}
-                placeholder="Enter passphrase"
-                autoComplete="current-password"
+                {importError && importErrorField === 'passphrase' && (
+                  <div
+                    id="import-passphrase-error"
+                    className="text-danger small mt-1"
+                    role="alert"
+                  >
+                    {importError}
+                  </div>
+                )}
+              </Form.Group>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={closeImportModal}
                 disabled={importing}
-              />
-            </Form.Group>
-            {importError && (
-              <div className="text-danger small mb-2" role="alert">
-                {importError}
-              </div>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={closeImportModal}
-              disabled={importing}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="btn-gradient-primary"
-              disabled={importing || !importFile}
-              aria-busy={importing}
-            >
-              {importing ? (
-                <>
-                  <Spinner
-                    animation="border"
-                    size="sm"
-                    className="me-1"
-                    role="status"
-                    aria-hidden="true"
-                  />
-                  Importing…
-                </>
-              ) : (
-                'Import'
-              )}
-            </Button>
-          </Modal.Footer>
-        </Form>
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="btn-gradient-primary"
+                disabled={importing || !importFile}
+                aria-busy={importing}
+              >
+                {importing ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-1"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Continue…
+                  </>
+                ) : (
+                  'Continue'
+                )}
+              </Button>
+            </Modal.Footer>
+          </Form>
+        ) : (
+          <Form onSubmit={handleImportConfirm}>
+            <Modal.Body id="import-modal-description">
+              <p className="small text-muted mb-3">
+                Choose which sections to import. Trackers and upcoming charges
+                in this browser will be overwritten only if their sections are
+                selected. Unselected sections will be left unchanged.
+              </p>
+              {importPreview &&
+                (() => {
+                  const current = buildExportPayload()
+                  return (
+                    <div className="mb-3">
+                      <div className="mb-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="import-opt-settings"
+                          label="Settings and appearance"
+                          checked={importOptions.settings}
+                          onChange={(e) =>
+                            setImportOptions((o) => ({
+                              ...o,
+                              settings: e.target.checked,
+                            }))
+                          }
+                          aria-label="Import settings and appearance"
+                        />
+                        <div className="small text-muted ms-4 mt-1">
+                          Current: {formatSettingsSummary(current.settings)}
+                          {' → '}
+                          New:{' '}
+                          {formatSettingsSummary(importPreview.settings ?? {})}
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="import-opt-trackers"
+                          label="Trackers"
+                          checked={importOptions.trackers}
+                          onChange={(e) =>
+                            setImportOptions((o) => ({
+                              ...o,
+                              trackers: e.target.checked,
+                            }))
+                          }
+                          aria-label="Import trackers"
+                        />
+                        <div className="small text-muted ms-4 mt-1">
+                          Current: {formatTrackersSummary(current.trackers)}
+                          {' → '}
+                          New:{' '}
+                          {formatTrackersSummary(importPreview.trackers ?? [])}
+                        </div>
+                      </div>
+                      <div>
+                        <Form.Check
+                          type="checkbox"
+                          id="import-opt-upcoming"
+                          label="Upcoming charges"
+                          checked={importOptions.upcomingCharges}
+                          onChange={(e) =>
+                            setImportOptions((o) => ({
+                              ...o,
+                              upcomingCharges: e.target.checked,
+                            }))
+                          }
+                          aria-label="Import upcoming charges"
+                        />
+                        <div className="small text-muted ms-4 mt-1">
+                          Current:{' '}
+                          {formatUpcomingSummary(current.upcomingCharges)}
+                          {' → '}
+                          New:{' '}
+                          {formatUpcomingSummary(
+                            importPreview.upcomingCharges ?? []
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleImportBack}
+                disabled={importing}
+              >
+                Back
+              </Button>
+              <Button
+                type="submit"
+                className="btn-gradient-primary"
+                disabled={
+                  importing ||
+                  !importPreview ||
+                  (!importOptions.settings &&
+                    !importOptions.trackers &&
+                    !importOptions.upcomingCharges)
+                }
+                aria-busy={importing}
+              >
+                {importing ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-1"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Importing…
+                  </>
+                ) : (
+                  'Import'
+                )}
+              </Button>
+            </Modal.Footer>
+          </Form>
+        )}
       </Modal>
     </div>
   )
