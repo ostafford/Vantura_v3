@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- (No changes yet)
+- **Profile export/import:** Export settings, trackers, and upcoming charges to a passphrase-encrypted file (Settings > Data). Import on another device to restore your setup. Never exports transactions, API tokens, or bank data. Uses PBKDF2 + AES-GCM; file format versioned for forward compatibility. See `src/services/profileExport.ts`, `src/pages/Settings.tsx`.
 
 ## [0.0.2] - 2025-03-03
 

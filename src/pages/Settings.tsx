@@ -21,6 +21,7 @@ import {
 } from '@/api/upBank'
 import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
+import { exportProfile, importProfile } from '@/services/profileExport'
 
 function formatLastSync(iso: string | null): string {
   if (!iso) return 'Never'
@@ -55,6 +56,16 @@ export function Settings() {
   const [paydayPayAmount, setPaydayPayAmount] = useState('')
   const [paydayError, setPaydayError] = useState<string | null>(null)
   const [paydaySuccess, setPaydaySuccess] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportPassphrase, setExportPassphrase] = useState('')
+  const [exportPassphraseConfirm, setExportPassphraseConfirm] = useState('')
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importPassphrase, setImportPassphrase] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const accent = useStore(accentStore, (s) => s.accent)
   const setAccent = useStore(accentStore, (s) => s.setAccent)
   const navigate = useNavigate()
@@ -233,6 +244,89 @@ export function Settings() {
     setPaydaySuccess(true)
     toast.success('Payday schedule updated.')
     setTimeout(() => setPaydaySuccess(false), 5000)
+  }
+
+  async function handleExportSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setExportError(null)
+    const passphrase = exportPassphrase.trim()
+    const confirmVal = exportPassphraseConfirm.trim()
+    if (!passphrase) {
+      setExportError('Please enter a passphrase.')
+      return
+    }
+    if (passphrase !== confirmVal) {
+      setExportError('Passphrases do not match.')
+      return
+    }
+    setExporting(true)
+    try {
+      await exportProfile(passphrase)
+      setExportPassphrase('')
+      setExportPassphraseConfirm('')
+      setExportError(null)
+      setShowExportModal(false)
+      toast.success('Settings exported. Save the file securely.')
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : 'Export failed. Please try again.'
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function closeExportModal() {
+    if (!exporting) {
+      setShowExportModal(false)
+      setExportPassphrase('')
+      setExportPassphraseConfirm('')
+      setExportError(null)
+    }
+  }
+
+  async function handleImportSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setImportError(null)
+    if (!importFile) {
+      setImportError('Please choose a settings file.')
+      return
+    }
+    if (!importPassphrase.trim()) {
+      setImportError('Please enter the passphrase used when exporting.')
+      return
+    }
+    setImporting(true)
+    try {
+      await importProfile(importFile, importPassphrase.trim())
+      setImportFile(null)
+      setImportPassphrase('')
+      setImportError(null)
+      setShowImportModal(false)
+      toast.success('Settings imported successfully.')
+      window.location.reload()
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : 'Import failed. Please try again.'
+      )
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function closeImportModal() {
+    if (!importing) {
+      setShowImportModal(false)
+      setImportFile(null)
+      setImportPassphrase('')
+      setImportError(null)
+    }
+  }
+
+  function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    setImportFile(file ?? null)
+    setImportError(null)
   }
 
   return (
@@ -520,6 +614,49 @@ export function Settings() {
 
           {!isDemoMode && <hr />}
 
+          <div className="mb-4">
+            <h6 className="text-muted mb-2">Export profile settings</h6>
+            <p className="small text-muted mb-2">
+              Exports only appearance and configuration (colors, payday setup,
+              trackers, upcoming charges, chart preferences). Does not export
+              bank transactions, account numbers, or API tokens. The file is
+              encrypted with the passphrase you choose.
+            </p>
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() => {
+                setExportError(null)
+                setShowExportModal(true)
+              }}
+              aria-label="Export settings to file"
+            >
+              Export settings to file
+            </Button>
+          </div>
+
+          <div className="mb-4">
+            <h6 className="text-muted mb-2">Import profile settings</h6>
+            <p className="small text-muted mb-2">
+              Imports appearance and configuration into this browser. Does not
+              import transactions or API tokens. Use to restore your setup on a
+              new device.
+            </p>
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() => {
+                setImportError(null)
+                setShowImportModal(true)
+              }}
+              aria-label="Import settings from file"
+            >
+              Choose settings file
+            </Button>
+          </div>
+
+          <hr />
+
           <div>
             <h6 className="text-muted mb-2">Clear all data</h6>
             <p className="small text-muted mb-2">
@@ -672,6 +809,178 @@ export function Settings() {
                 </>
               ) : (
                 'Update token'
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      <Modal
+        show={showExportModal}
+        onHide={closeExportModal}
+        aria-labelledby="export-modal-title"
+        aria-describedby="export-modal-description"
+        centered
+      >
+        <Modal.Header closeButton={!exporting}>
+          <Modal.Title id="export-modal-title">
+            Export settings to file
+          </Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleExportSubmit}>
+          <Modal.Body id="export-modal-description">
+            <p className="small text-muted mb-3">
+              Only settings and configuration will be exported (no transactions,
+              no API keys, no bank data). Choose a passphrase to encrypt the
+              file. You will need this passphrase to import on another device.
+            </p>
+            <Form.Group className="mb-3">
+              <Form.Label htmlFor="export-passphrase">Passphrase</Form.Label>
+              <Form.Control
+                id="export-passphrase"
+                type="password"
+                value={exportPassphrase}
+                onChange={(e) => setExportPassphrase(e.target.value)}
+                placeholder="Enter passphrase"
+                autoComplete="new-password"
+                disabled={exporting}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label htmlFor="export-passphrase-confirm">
+                Confirm passphrase
+              </Form.Label>
+              <Form.Control
+                id="export-passphrase-confirm"
+                type="password"
+                value={exportPassphraseConfirm}
+                onChange={(e) => setExportPassphraseConfirm(e.target.value)}
+                placeholder="Confirm passphrase"
+                autoComplete="new-password"
+                disabled={exporting}
+              />
+            </Form.Group>
+            {exportError && (
+              <div className="text-danger small mb-2" role="alert">
+                {exportError}
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={closeExportModal}
+              disabled={exporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="btn-gradient-primary"
+              disabled={exporting}
+              aria-busy={exporting}
+            >
+              {exporting ? (
+                <>
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    className="me-1"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Exporting…
+                </>
+              ) : (
+                'Export'
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      <Modal
+        show={showImportModal}
+        onHide={closeImportModal}
+        aria-labelledby="import-modal-title"
+        aria-describedby="import-modal-description"
+        centered
+      >
+        <Modal.Header closeButton={!importing}>
+          <Modal.Title id="import-modal-title">
+            Import profile settings
+          </Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleImportSubmit}>
+          <Modal.Body id="import-modal-description">
+            <p className="small text-muted mb-3">
+              Imports settings, trackers, and upcoming charges into this device.
+              Will not import transactions or API tokens.
+            </p>
+            <Form.Group className="mb-3">
+              <Form.Label>Settings file</Form.Label>
+              <Form.Control
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImportFileChange}
+                disabled={importing}
+                aria-label="Choose settings file"
+              />
+              {importFile && (
+                <Form.Text className="text-muted">
+                  Selected: {importFile.name}
+                </Form.Text>
+              )}
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label htmlFor="import-passphrase">
+                Passphrase (used when exporting)
+              </Form.Label>
+              <Form.Control
+                id="import-passphrase"
+                type="password"
+                value={importPassphrase}
+                onChange={(e) => setImportPassphrase(e.target.value)}
+                placeholder="Enter passphrase"
+                autoComplete="current-password"
+                disabled={importing}
+              />
+            </Form.Group>
+            {importError && (
+              <div className="text-danger small mb-2" role="alert">
+                {importError}
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={closeImportModal}
+              disabled={importing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="btn-gradient-primary"
+              disabled={importing || !importFile}
+              aria-busy={importing}
+            >
+              {importing ? (
+                <>
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    className="me-1"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Importing…
+                </>
+              ) : (
+                'Import'
               )}
             </Button>
           </Modal.Footer>

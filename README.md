@@ -52,6 +52,7 @@ User- and developer-visible changes are listed in [CHANGELOG.md](CHANGELOG.md). 
 ### Phase 7: Settings — Implemented
 
 - **Settings page:** Re-sync (button, Last synced, error state); theme and accent colour options; "Show dashboard tour again" button; Clear all data (confirmation; deletes database, reloads to Onboarding). See `src/pages/Settings.tsx`, `src/db/index.ts`.
+- **Profile export/import:** Export settings, trackers, and upcoming charges to an encrypted file; import on another device. No transactions, API tokens, or bank data are ever exported. File is encrypted with a passphrase you choose. See Settings > Data section.
 
 ## Security
 
