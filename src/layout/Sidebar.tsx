@@ -48,7 +48,6 @@ export function Sidebar({
       label: 'Analytics',
       icon: 'mdi-chart-box',
       short: 'A',
-      badge: 'Coming soon',
     },
     {
       to: '/transactions',

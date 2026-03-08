@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, Row, Col, Form } from 'react-bootstrap'
 import {
   getSaversWithProgress,
@@ -88,72 +89,103 @@ export function AnalyticsSavers() {
   }
 
   return (
-    <Card className="grid-margin">
-      <Card.Header>
-        <Card.Title className="mb-0">Savers Balance Over Time</Card.Title>
-        <Card.Text as="div" className="small text-muted mt-1">
-          Contribution and balance timeline for each saver. Toggle savers below
-          to compare.
-        </Card.Text>
-      </Card.Header>
-      <Card.Body>
-        <Row className="mb-3">
-          <Col md={4}>
-            <Form.Select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              aria-label="Time range"
-            >
-              {TIME_RANGES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </Form.Select>
-          </Col>
-        </Row>
-        {savers.length > 0 && (
-          <div className="mb-3">
-            <Form.Label className="small text-muted">Savers to show</Form.Label>
-            <div className="d-flex flex-wrap gap-2">
-              {savers.map((s) => {
-                const isSelected =
-                  selectedSaverIds.size === 0 || selectedSaverIds.has(s.id)
-                return (
-                  <Form.Check
-                    key={s.id}
-                    type="checkbox"
-                    id={`saver-${s.id}`}
-                    label={s.name}
-                    checked={isSelected}
-                    onChange={() => toggleSaver(s.id)}
-                  />
-                )
-              })}
+    <>
+      <Card className="grid-margin">
+        <Card.Header>
+          <Card.Title className="mb-0">Savers Balance Over Time</Card.Title>
+          <Card.Text as="div" className="small text-muted mt-1">
+            Contribution and balance timeline for each saver. Toggle savers
+            below to compare.
+          </Card.Text>
+        </Card.Header>
+        <Card.Body>
+          <Row className="mb-3">
+            <Col md={4}>
+              <Form.Select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                aria-label="Time range"
+              >
+                {TIME_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+          </Row>
+          {savers.length > 0 && (
+            <div className="mb-3">
+              <Form.Label className="small text-muted">
+                Savers to show
+              </Form.Label>
+              <div className="d-flex flex-wrap gap-2">
+                {savers.map((s) => {
+                  const isSelected =
+                    selectedSaverIds.size === 0 || selectedSaverIds.has(s.id)
+                  return (
+                    <Form.Check
+                      key={s.id}
+                      type="checkbox"
+                      id={`saver-${s.id}`}
+                      label={s.name}
+                      checked={isSelected}
+                      onChange={() => toggleSaver(s.id)}
+                    />
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
-        {series.length === 0 ? (
-          <p className="text-muted mb-0">
-            {savers.length === 0
-              ? 'No savers yet. Add accounts from the bank connection to see saver analytics.'
-              : 'No transaction history in the selected range. Try a longer time range.'}
-          </p>
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              height: isMobile ? 220 : 280,
-            }}
-          >
-            <SaversHistoryChart
-              series={series}
-              maxDomain={maxDomain}
-              aria-label="Saver balance over time"
-            />
-          </div>
-        )}
-      </Card.Body>
-    </Card>
+          )}
+          {series.length === 0 ? (
+            <p className="text-muted mb-0">
+              {savers.length === 0
+                ? 'No savers yet. Add accounts from the bank connection to see saver analytics.'
+                : 'No transaction history in the selected range. Try a longer time range.'}
+            </p>
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: isMobile ? 220 : 280,
+              }}
+            >
+              <SaversHistoryChart
+                series={series}
+                maxDomain={maxDomain}
+                aria-label="Saver balance over time"
+              />
+            </div>
+          )}
+        </Card.Body>
+      </Card>
+      {savers.length > 0 && (
+        <Card className="mt-3">
+          <Card.Header>
+            <Card.Title className="mb-0">Individual Savers</Card.Title>
+            <Card.Text as="div" className="small text-muted mt-1">
+              View detailed growth and contribution history for each saver.
+            </Card.Text>
+          </Card.Header>
+          <Card.Body>
+            <div className="d-flex flex-wrap gap-2">
+              {savers.map((s) => (
+                <Link
+                  key={s.id}
+                  to={`/analytics/savers/${s.id}`}
+                  className="btn btn-outline-secondary btn-sm"
+                >
+                  {(s.user_icon ?? s.icon) ? (
+                    <span className="me-1">{s.user_icon ?? s.icon}</span>
+                  ) : null}
+                  {s.name}
+                  <i className="mdi mdi-chevron-right ms-1" aria-hidden />
+                </Link>
+              ))}
+            </div>
+          </Card.Body>
+        </Card>
+      )}
+    </>
   )
 }

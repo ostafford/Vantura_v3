@@ -9,8 +9,16 @@ import {
   DEFAULT_PAGE_SIZE,
   type TransactionFilters,
   type TransactionSort,
+  type TransactionRow,
 } from '@/services/transactions'
 import { getCategories } from '@/services/categories'
+import {
+  getTransactionUserDataMap,
+  setTransactionUserNote,
+  setTransactionUserCategoryOverride,
+  suggestCategoryFromRules,
+  learnCategoryFromOverride,
+} from '@/services/transactionUserData'
 import { syncStore } from '@/stores/syncStore'
 import {
   formatMoney,
@@ -126,6 +134,40 @@ export function Transactions() {
     () => getRoundUpsByParentIds(parentIdsByDate),
     [parentIdsByDate]
   )
+
+  const [userDataVersion, setUserDataVersion] = useState(0)
+  const userDataMap = useMemo(() => {
+    void userDataVersion // invalidate when user saves note/override
+    return getTransactionUserDataMap(parentIdsByDate)
+  }, [parentIdsByDate, userDataVersion])
+
+  const [editTxId, setEditTxId] = useState<string | null>(null)
+  const [editNote, setEditNote] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState('')
+  const editTxRow = useMemo(() => {
+    if (!editTxId) return null
+    for (const rows of Object.values(grouped)) {
+      const r = rows.find((x) => x.id === editTxId)
+      if (r) return r
+    }
+    return null
+  }, [editTxId, grouped])
+  const openEditModal = (row: TransactionRow) => {
+    const ud = userDataMap[row.id]
+    setEditTxId(row.id)
+    setEditNote(ud?.user_notes ?? '')
+    setEditCategoryId(ud?.user_category_override ?? '')
+  }
+  const saveEditModal = () => {
+    if (!editTxId) return
+    setTransactionUserNote(editTxId, editNote.trim() || null)
+    setTransactionUserCategoryOverride(editTxId, editCategoryId.trim() || null)
+    if (editCategoryId.trim() && editTxRow) {
+      learnCategoryFromOverride(editTxRow.description, editCategoryId.trim())
+    }
+    setEditTxId(null)
+    setUserDataVersion((v) => v + 1)
+  }
 
   useEffect(() => {
     setPage(0)
@@ -540,7 +582,16 @@ export function Transactions() {
               const roundUps = roundUpsByParent.get(row.id) ?? []
               return (
                 <Card key={row.id} className="mb-2 transactions-card">
-                  <Card.Body className="py-2 px-3">
+                  <Card.Body
+                    className="py-2 px-3"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEditModal(row)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') openEditModal(row)
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div className="d-flex justify-content-between align-items-start gap-2">
                       <div className="flex-grow-1 min-width-0">
                         <div className="fw-medium text-break">
@@ -548,8 +599,27 @@ export function Transactions() {
                         </div>
                         <div className="small text-muted">
                           {displayDate}
-                          {row.category_name ? ` · ${row.category_name}` : ''}
+                          {(() => {
+                            const ud = userDataMap[row.id]
+                            const overrideCat = ud?.user_category_override
+                            const suggested = suggestCategoryFromRules(
+                              row.description || row.raw_text || ''
+                            )
+                            const effective = overrideCat
+                              ? (categories.find((c) => c.id === overrideCat)
+                                  ?.name ?? overrideCat)
+                              : suggested
+                                ? (categories.find((c) => c.id === suggested)
+                                    ?.name ?? 'Suggested')
+                                : row.category_name
+                            return effective ? ` · ${effective}` : ''
+                          })()}
                         </div>
+                        {userDataMap[row.id]?.user_notes && (
+                          <div className="small text-muted mt-1">
+                            Note: {userDataMap[row.id].user_notes}
+                          </div>
+                        )}
                         <span
                           className={`badge mt-1 ${
                             row.status === 'HELD'
@@ -631,7 +701,17 @@ export function Transactions() {
                       const isDebit = row.amount < 0
                       const absCents = Math.abs(row.amount)
                       const mainRow = (
-                        <tr key={row.id}>
+                        <tr
+                          key={row.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => openEditModal(row)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ')
+                              openEditModal(row)
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <td>{displayDate}</td>
                           <td
                             className={`text-center align-middle ${row.status === 'HELD' ? 'status-held' : ''}`}
@@ -641,7 +721,33 @@ export function Transactions() {
                           <td>
                             {row.description || row.raw_text || 'Unknown'}
                           </td>
-                          <td>{row.category_name ?? ''}</td>
+                          <td>
+                            {(() => {
+                              const ud = userDataMap[row.id]
+                              const overrideCat = ud?.user_category_override
+                              const suggested = suggestCategoryFromRules(
+                                row.description || row.raw_text || ''
+                              )
+                              if (overrideCat) {
+                                return (
+                                  categories.find((c) => c.id === overrideCat)
+                                    ?.name ?? overrideCat
+                                )
+                              }
+                              if (suggested) {
+                                return (
+                                  (categories.find((c) => c.id === suggested)
+                                    ?.name ?? suggested) + ' (suggested)'
+                                )
+                              }
+                              return row.category_name ?? ''
+                            })()}
+                            {userDataMap[row.id]?.user_notes && (
+                              <div className="small text-muted">
+                                Note: {userDataMap[row.id].user_notes}
+                              </div>
+                            )}
+                          </td>
                           <td
                             className={`text-end ${isDebit ? '' : 'text-success'}`}
                           >
@@ -695,6 +801,63 @@ export function Transactions() {
           )}
         </>
       )}
+
+      <Modal
+        show={editTxId != null}
+        onHide={() => setEditTxId(null)}
+        centered
+        aria-labelledby="transaction-edit-modal-title"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title id="transaction-edit-modal-title">
+            Transaction note &amp; category
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editTxRow && (
+            <>
+              <p className="small text-muted mb-2">
+                {editTxRow.description || editTxRow.raw_text || 'Unknown'}
+              </p>
+              <Form.Group className="mb-2">
+                <Form.Label>Note (local only)</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  placeholder="Optional note for this transaction"
+                />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Category override (local only)</Form.Label>
+                <Form.Select
+                  value={editCategoryId}
+                  onChange={(e) => setEditCategoryId(e.target.value)}
+                >
+                  <option value="">Use bank category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Form.Select>
+                <Form.Text className="text-muted">
+                  Overrides the category from Up Bank for display only.
+                </Form.Text>
+              </Form.Group>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setEditTxId(null)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={saveEditModal}>
+            Save
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   )
 }

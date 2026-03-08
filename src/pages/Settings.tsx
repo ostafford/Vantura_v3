@@ -22,6 +22,19 @@ import {
 import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
 import {
+  getDashboardSectionOrder,
+  setDashboardSectionOrder,
+  DEFAULT_DASHBOARD_SECTION_ORDER,
+  DASHBOARD_SECTION_LABELS,
+  type DashboardSectionId,
+} from '@/lib/dashboardSections'
+import {
+  getCategorizationRules,
+  setCategorizationRules,
+  type CategorizationRule,
+} from '@/services/transactionUserData'
+import { getCategories } from '@/services/categories'
+import {
   exportProfile,
   previewImportProfile,
   importPayloadWithOptions,
@@ -31,6 +44,13 @@ import {
   type UpcomingChargeExportRow,
   IMPORT_ERROR_WRONG_PASSPHRASE,
 } from '@/services/profileExport'
+import {
+  isNotificationSupported,
+  getNotificationsEnabled,
+  setNotificationsEnabled,
+  getNotificationPermission,
+  requestNotificationPermission,
+} from '@/lib/notifications'
 
 function formatLastSync(iso: string | null): string {
   if (!iso) return 'Never'
@@ -82,6 +102,161 @@ function formatUpcomingSummary(charges: UpcomingChargeExportRow[]): string {
   return `${charges.length} upcoming charge${charges.length !== 1 ? 's' : ''}`
 }
 
+function CategorizationRulesForm() {
+  const [rules, setRules] = useState<CategorizationRule[]>(() =>
+    getCategorizationRules()
+  )
+  const [newPattern, setNewPattern] = useState('')
+  const [newCategoryId, setNewCategoryId] = useState('')
+  const categories = getCategories()
+
+  const addRule = () => {
+    const pattern = newPattern.trim()
+    if (!pattern || !newCategoryId) return
+    const rule: CategorizationRule = {
+      id: `rule-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      pattern,
+      categoryId: newCategoryId,
+    }
+    const next = [...rules, rule]
+    setRules(next)
+    setCategorizationRules(next)
+    setNewPattern('')
+    setNewCategoryId('')
+  }
+  const removeRule = (id: string) => {
+    const next = rules.filter((r) => r.id !== id)
+    setRules(next)
+    setCategorizationRules(next)
+  }
+
+  return (
+    <div>
+      <p className="small text-muted mb-3">
+        When a transaction description contains the pattern (case-insensitive),
+        that category is suggested on the Transactions page. No AI; rules only.
+      </p>
+      <div className="d-flex flex-wrap gap-2 mb-3">
+        <Form.Control
+          type="text"
+          placeholder="Pattern (e.g. COLES)"
+          value={newPattern}
+          onChange={(e) => setNewPattern(e.target.value)}
+          style={{ maxWidth: 200 }}
+        />
+        <Form.Select
+          value={newCategoryId}
+          onChange={(e) => setNewCategoryId(e.target.value)}
+          style={{ maxWidth: 200 }}
+        >
+          <option value="">Category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Form.Select>
+        <Button variant="outline-primary" size="sm" onClick={addRule}>
+          Add rule
+        </Button>
+      </div>
+      <ul className="list-group list-group-flush">
+        {rules.map((r) => (
+          <li
+            key={r.id}
+            className="list-group-item d-flex justify-content-between align-items-center"
+          >
+            <span className="text-break">
+              &quot;{r.pattern}&quot; →{' '}
+              {categories.find((c) => c.id === r.categoryId)?.name ??
+                r.categoryId}
+            </span>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={() => removeRule(r.id)}
+              aria-label={`Remove rule for ${r.pattern}`}
+            >
+              <i className="mdi mdi-delete" aria-hidden />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {rules.length === 0 && (
+        <p className="small text-muted mb-0 mt-2">No rules yet.</p>
+      )}
+    </div>
+  )
+}
+
+function DashboardSectionOrderForm() {
+  const [order, setOrder] = useState<DashboardSectionId[]>(() =>
+    getDashboardSectionOrder()
+  )
+
+  const moveUp = (index: number) => {
+    if (index <= 0) return
+    const next = [...order]
+    ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+    setOrder(next)
+    setDashboardSectionOrder(next)
+  }
+  const moveDown = (index: number) => {
+    if (index >= order.length - 1) return
+    const next = [...order]
+    ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+    setOrder(next)
+    setDashboardSectionOrder(next)
+  }
+  const resetToDefault = () => {
+    setOrder([...DEFAULT_DASHBOARD_SECTION_ORDER])
+    setDashboardSectionOrder([...DEFAULT_DASHBOARD_SECTION_ORDER])
+  }
+
+  return (
+    <div>
+      <ul className="list-group list-group-flush mb-3">
+        {order.map((id, index) => (
+          <li
+            key={id}
+            className="list-group-item d-flex justify-content-between align-items-center"
+          >
+            <span>{DASHBOARD_SECTION_LABELS[id]}</span>
+            <div className="btn-group btn-group-sm">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => moveUp(index)}
+                disabled={index === 0}
+                aria-label={`Move ${DASHBOARD_SECTION_LABELS[id]} up`}
+              >
+                <i className="mdi mdi-chevron-up" aria-hidden />
+              </Button>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => moveDown(index)}
+                disabled={index === order.length - 1}
+                aria-label={`Move ${DASHBOARD_SECTION_LABELS[id]} down`}
+              >
+                <i className="mdi mdi-chevron-down" aria-hidden />
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Button
+        variant="outline-secondary"
+        size="sm"
+        onClick={resetToDefault}
+        aria-label="Reset dashboard section order to default"
+      >
+        Reset to default order
+      </Button>
+    </div>
+  )
+}
+
 export function Settings() {
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -121,6 +296,7 @@ export function Settings() {
     settings: true,
     trackers: true,
     upcomingCharges: true,
+    goals: true,
   })
   const accent = useStore(accentStore, (s) => s.accent)
   const setAccent = useStore(accentStore, (s) => s.setAccent)
@@ -366,6 +542,7 @@ export function Settings() {
         settings: true,
         trackers: true,
         upcomingCharges: true,
+        goals: true,
       })
       setImportStep(2)
     } catch (err) {
@@ -618,6 +795,68 @@ export function Settings() {
           </Form>
         </Card.Body>
       </Card>
+
+      <Card className="grid-margin">
+        <Card.Header as="h5" className="mb-0">
+          Categorization rules
+        </Card.Header>
+        <Card.Body>
+          <CategorizationRulesForm />
+        </Card.Body>
+      </Card>
+
+      <Card className="grid-margin">
+        <Card.Header as="h5" className="mb-0">
+          Dashboard sections
+        </Card.Header>
+        <Card.Body>
+          <p className="small text-muted mb-3">
+            Reorder sections on the Dashboard. You can also drag sections to
+            reorder on the Dashboard itself.
+          </p>
+          <DashboardSectionOrderForm />
+        </Card.Body>
+      </Card>
+
+      {isNotificationSupported() && (
+        <Card className="grid-margin">
+          <Card.Header as="h5" className="mb-0">
+            Notifications
+          </Card.Header>
+          <Card.Body>
+            <p className="small text-muted mb-3">
+              Get a browser notification when upcoming charges are due soon
+              (within their reminder window). Requires browser permission.
+            </p>
+            <Form.Check
+              type="switch"
+              id="settings-notifications-toggle"
+              label="Enable bill reminders"
+              checked={getNotificationsEnabled()}
+              onChange={async (e) => {
+                if (e.target.checked) {
+                  const perm = getNotificationPermission()
+                  if (perm !== 'granted') {
+                    const granted = await requestNotificationPermission()
+                    if (!granted) {
+                      toast.error(
+                        'Notification permission denied. Enable in browser settings.'
+                      )
+                      return
+                    }
+                  }
+                }
+                setNotificationsEnabled(e.target.checked)
+                toast.success(
+                  e.target.checked
+                    ? 'Bill reminders enabled.'
+                    : 'Bill reminders disabled.'
+                )
+              }}
+            />
+          </Card.Body>
+        </Card>
+      )}
 
       <Card className="grid-margin">
         <Card.Header as="h5" className="mb-0">
@@ -1203,6 +1442,24 @@ export function Settings() {
                           )}
                         </div>
                       </div>
+                      <div>
+                        <Form.Check
+                          type="checkbox"
+                          id="import-opt-goals"
+                          label="Goals"
+                          checked={importOptions.goals}
+                          onChange={(e) =>
+                            setImportOptions((o) => ({
+                              ...o,
+                              goals: e.target.checked,
+                            }))
+                          }
+                          aria-label="Import goals"
+                        />
+                        <div className="small text-muted ms-4 mt-1">
+                          {(importPreview.goals ?? []).length} goal(s) in file
+                        </div>
+                      </div>
                     </div>
                   )
                 })()}
@@ -1224,7 +1481,8 @@ export function Settings() {
                   !importPreview ||
                   (!importOptions.settings &&
                     !importOptions.trackers &&
-                    !importOptions.upcomingCharges)
+                    !importOptions.upcomingCharges &&
+                    !importOptions.goals)
                 }
                 aria-busy={importing}
               >

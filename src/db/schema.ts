@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 7
 
 const DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS accounts (
@@ -87,6 +87,8 @@ const DDL_STATEMENTS = [
     auto_transfer_day INTEGER,
     is_goal_based INTEGER DEFAULT 0,
     interest_rate REAL,
+    completed_at TEXT,
+    user_icon TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
@@ -98,12 +100,56 @@ const DDL_STATEMENTS = [
     next_charge_date TEXT NOT NULL,
     category_id TEXT,
     is_reserved INTEGER DEFAULT 1,
+    reminder_days_before INTEGER,
+    is_subscription INTEGER DEFAULT 0,
+    cancel_by_date TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+    snapshot_date TEXT PRIMARY KEY,
+    total_balance_cents INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS transaction_user_data (
+    transaction_id TEXT PRIMARY KEY,
+    user_notes TEXT,
+    user_category_override TEXT,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS net_worth_type_snapshots (
+    snapshot_date TEXT NOT NULL,
+    account_type TEXT NOT NULL,
+    total_balance_cents INTEGER NOT NULL,
+    PRIMARY KEY (snapshot_date, account_type)
+  )`,
+  `CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    target_amount INTEGER NOT NULL,
+    current_amount INTEGER NOT NULL DEFAULT 0,
+    monthly_contribution INTEGER,
+    target_date TEXT,
+    icon TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
+    saver_id TEXT NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    balance_cents INTEGER NOT NULL,
+    PRIMARY KEY (saver_id, snapshot_date)
+  )`,
+  `CREATE TABLE IF NOT EXISTS goal_snapshots (
+    goal_id INTEGER NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    current_amount INTEGER NOT NULL,
+    target_amount INTEGER NOT NULL,
+    PRIMARY KEY (goal_id, snapshot_date)
   )`,
 ]
 
@@ -136,6 +182,98 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['2']
+    )
+  }
+  if (version < 3) {
+    database.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN reminder_days_before INTEGER`
+    )
+    database.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN is_subscription INTEGER DEFAULT 0`
+    )
+    database.run(`ALTER TABLE upcoming_charges ADD COLUMN cancel_by_date TEXT`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['3']
+    )
+  }
+  if (version < 4) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+        snapshot_date TEXT PRIMARY KEY,
+        total_balance_cents INTEGER NOT NULL
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['4']
+    )
+  }
+  if (version < 5) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS transaction_user_data (
+        transaction_id TEXT PRIMARY KEY,
+        user_notes TEXT,
+        user_category_override TEXT,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['5']
+    )
+  }
+  if (version < 6) {
+    database.run(`ALTER TABLE savers ADD COLUMN completed_at TEXT`)
+    database.run(`ALTER TABLE savers ADD COLUMN user_icon TEXT`)
+    database.run(
+      `CREATE TABLE IF NOT EXISTS net_worth_type_snapshots (
+        snapshot_date TEXT NOT NULL,
+        account_type TEXT NOT NULL,
+        total_balance_cents INTEGER NOT NULL,
+        PRIMARY KEY (snapshot_date, account_type)
+      )`
+    )
+    database.run(
+      `CREATE TABLE IF NOT EXISTS goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        target_amount INTEGER NOT NULL,
+        current_amount INTEGER NOT NULL DEFAULT 0,
+        monthly_contribution INTEGER,
+        target_date TEXT,
+        icon TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['6']
+    )
+  }
+  if (version < 7) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
+        saver_id TEXT NOT NULL,
+        snapshot_date TEXT NOT NULL,
+        balance_cents INTEGER NOT NULL,
+        PRIMARY KEY (saver_id, snapshot_date)
+      )`
+    )
+    database.run(
+      `CREATE TABLE IF NOT EXISTS goal_snapshots (
+        goal_id INTEGER NOT NULL,
+        snapshot_date TEXT NOT NULL,
+        current_amount INTEGER NOT NULL,
+        target_amount INTEGER NOT NULL,
+        PRIMARY KEY (goal_id, snapshot_date)
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['7']
     )
   }
 }

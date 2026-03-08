@@ -90,6 +90,8 @@ export interface SaverRow {
   goal_amount: number | null
   target_date: string | null
   monthly_transfer: number | null
+  completed_at: string | null
+  user_icon: string | null
 }
 
 export interface SaverWithProgress extends SaverRow {
@@ -111,8 +113,8 @@ export function getSaversWithProgress(): SaverWithProgress[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, icon, current_balance, goal_amount, target_date, monthly_transfer
-     FROM savers ORDER BY name`
+    `SELECT id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, completed_at, user_icon
+     FROM savers ORDER BY completed_at IS NOT NULL, name`
   )
   const list: SaverWithProgress[] = []
   const today = new Date()
@@ -125,6 +127,8 @@ export function getSaversWithProgress(): SaverWithProgress[] {
       number | null,
       string | null,
       number | null,
+      string | null,
+      string | null,
     ]
     const current_balance = row[3]
     const goal_amount = row[4]
@@ -151,6 +155,8 @@ export function getSaversWithProgress(): SaverWithProgress[] {
       goal_amount: row[4],
       target_date: row[5],
       monthly_transfer: row[6],
+      completed_at: row[7],
+      user_icon: row[8],
       progress,
       remaining,
       monthsRemaining,
@@ -184,4 +190,90 @@ export function updateSaverGoals(
     ]
   )
   schedulePersist()
+}
+
+export function markSaverGoalComplete(id: string): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  const now = new Date().toISOString()
+  db.run(`UPDATE savers SET completed_at = ? WHERE id = ?`, [now, id])
+  schedulePersist()
+}
+
+export function reopenSaverGoal(id: string): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`UPDATE savers SET completed_at = NULL WHERE id = ?`, [id])
+  schedulePersist()
+}
+
+export function updateSaverIcon(id: string, userIcon: string | null): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`UPDATE savers SET user_icon = ? WHERE id = ?`, [userIcon, id])
+  schedulePersist()
+}
+
+export interface SaverBalanceSnapshot {
+  snapshot_date: string
+  balance_cents: number
+}
+
+/**
+ * Record today's balance for every saver into saver_balance_snapshots.
+ * Called after sync to capture the API-reported balance as a daily snapshot.
+ */
+export function recordSaverBalanceSnapshots(): void {
+  const db = getDb()
+  if (!db) return
+  const today = new Date().toISOString().slice(0, 10)
+  const stmt = db.prepare(`SELECT id, current_balance FROM savers`)
+  const rows: [string, number][] = []
+  while (stmt.step()) {
+    rows.push(stmt.get() as [string, number])
+  }
+  stmt.free()
+  for (const [saverId, balance] of rows) {
+    db.run(
+      `INSERT OR REPLACE INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents) VALUES (?, ?, ?)`,
+      [saverId, today, balance]
+    )
+  }
+  schedulePersist()
+}
+
+/**
+ * Get balance snapshots for a specific saver, oldest first.
+ */
+export function getSaverBalanceSnapshots(
+  saverId: string,
+  options?: { dateFrom?: string; dateTo?: string; limit?: number }
+): SaverBalanceSnapshot[] {
+  const db = getDb()
+  if (!db) return []
+  const limit = options?.limit ?? 365
+  let sql = `SELECT snapshot_date, balance_cents FROM saver_balance_snapshots WHERE saver_id = ?`
+  const params: (string | number)[] = [saverId]
+  if (options?.dateFrom) {
+    sql += ` AND snapshot_date >= ?`
+    params.push(options.dateFrom)
+  }
+  if (options?.dateTo) {
+    sql += ` AND snapshot_date <= ?`
+    params.push(options.dateTo)
+  }
+  sql += ` ORDER BY snapshot_date ASC`
+  if (limit > 0) {
+    sql += ` LIMIT ?`
+    params.push(limit)
+  }
+  const stmt = db.prepare(sql)
+  stmt.bind(params)
+  const list: SaverBalanceSnapshot[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [string, number]
+    list.push({ snapshot_date: row[0], balance_cents: row[1] })
+  }
+  stmt.free()
+  return list
 }

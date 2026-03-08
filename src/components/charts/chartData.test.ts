@@ -71,6 +71,7 @@ function buildSaversChartData(
         goal_amount: s.goal_amount,
         target_date: null,
         monthly_transfer: null,
+        user_icon: null,
       },
       currentFill: saverColors[s.id] ?? defaultFill,
     }

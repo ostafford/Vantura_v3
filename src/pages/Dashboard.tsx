@@ -14,11 +14,25 @@ import { SaversSection } from '@/components/dashboard/SaversSection'
 import { InsightsSection } from '@/components/dashboard/InsightsSection'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
+import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
+import { GoalsSection } from '@/components/dashboard/GoalsSection'
 import { StatCard } from '@/components/StatCard'
 import {
   shouldShowDashboardTour,
   startDashboardTour,
 } from '@/lib/dashboardTour'
+import {
+  getDashboardSectionOrder,
+  setDashboardSectionOrder,
+  type DashboardSectionId,
+} from '@/lib/dashboardSections'
+import { getDueSoonCharges } from '@/services/upcoming'
+import {
+  getNotificationsEnabled,
+  hasNotifiedToday,
+  markNotifiedToday,
+  showNotification,
+} from '@/lib/notifications'
 import { useEffect } from 'react'
 
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
@@ -26,7 +40,11 @@ const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
 
 export function Dashboard() {
   useStore(syncStore, (s) => s.lastSyncCompletedAt)
-  const [, setDataVersion] = useState(0)
+  const [dataVersion, setDataVersion] = useState(0)
+  const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>(() =>
+    getDashboardSectionOrder()
+  )
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [showThresholdModal, setShowThresholdModal] = useState(false)
   const [thresholdDollars, setThresholdDollars] = useState('')
   const [thresholdPctPay, setThresholdPctPay] = useState('')
@@ -112,6 +130,172 @@ export function Dashboard() {
       return () => clearTimeout(t)
     }
   }, [])
+
+  useEffect(() => {
+    if (!getNotificationsEnabled() || hasNotifiedToday()) return
+    const dueSoon = getDueSoonCharges()
+    if (dueSoon.length > 0) {
+      const names = dueSoon
+        .map((c) => `${c.name} ($${formatMoney(c.amount)})`)
+        .join(', ')
+      showNotification('Bills due soon', names)
+      markNotifiedToday()
+    }
+  }, [])
+
+  useEffect(() => {
+    setSectionOrder(getDashboardSectionOrder())
+  }, [dataVersion])
+
+  const handleSectionDragStart = useCallback(
+    (e: React.DragEvent, id: DashboardSectionId) => {
+      e.dataTransfer.setData('text/plain', id)
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    []
+  )
+  const handleSectionDragOver = useCallback(
+    (e: React.DragEvent, id: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      setDragOverId(id)
+    },
+    []
+  )
+  const handleSectionDragLeave = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+  const handleSectionDrop = useCallback(
+    (e: React.DragEvent, targetId: DashboardSectionId) => {
+      e.preventDefault()
+      setDragOverId(null)
+      const sourceId = e.dataTransfer.getData(
+        'text/plain'
+      ) as DashboardSectionId
+      if (!sourceId || sourceId === targetId) return
+      const order = getDashboardSectionOrder()
+      const from = order.indexOf(sourceId)
+      const to = order.indexOf(targetId)
+      if (from === -1 || to === -1) return
+      const next = [...order]
+      next.splice(from, 1)
+      next.splice(to, 0, sourceId)
+      setDashboardSectionOrder(next)
+      setSectionOrder(next)
+    },
+    []
+  )
+  const handleSectionDragEnd = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
+  const renderSection = useCallback(
+    (id: DashboardSectionId) => {
+      const isDragOver = dragOverId === id
+      const sectionProps = {
+        'data-section-id': id,
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => handleSectionDragStart(e, id),
+        onDragOver: (e: React.DragEvent) => handleSectionDragOver(e, id),
+        onDragLeave: handleSectionDragLeave,
+        onDrop: (e: React.DragEvent) => handleSectionDrop(e, id),
+        onDragEnd: handleSectionDragEnd,
+        className: 'dashboard-section-draggable',
+        style: {
+          outline: isDragOver ? '2px dashed var(--vantura-primary)' : undefined,
+          borderRadius: 4,
+        } as React.CSSProperties,
+      }
+      const dragHandle = (
+        <span
+          className="dashboard-drag-handle text-muted"
+          aria-label="Drag to reorder section"
+        >
+          <i className="mdi mdi-drag-vertical" aria-hidden />
+        </span>
+      )
+      switch (id) {
+        case 'month_summary':
+          return (
+            <div key={id} {...sectionProps}>
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <MonthSummarySection />
+                </div>
+              </div>
+            </div>
+          )
+        case 'savers':
+          return (
+            <div key={id} {...sectionProps} data-tour="savers">
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <SaversSection />
+                </div>
+              </div>
+            </div>
+          )
+        case 'goals':
+          return (
+            <div key={id} {...sectionProps}>
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <GoalsSection />
+                </div>
+              </div>
+            </div>
+          )
+        case 'insights':
+          return (
+            <div key={id} {...sectionProps} data-tour="insights">
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <InsightsSection />
+                </div>
+              </div>
+            </div>
+          )
+        case 'trackers':
+          return (
+            <div key={id} {...sectionProps} data-tour="trackers">
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <TrackersSection />
+                </div>
+              </div>
+            </div>
+          )
+        case 'upcoming':
+          return (
+            <div key={id} {...sectionProps} data-tour="upcoming">
+              <div className="d-flex gap-2 align-items-start">
+                {dragHandle}
+                <div className="flex-grow-1 min-w-0">
+                  <UpcomingSection
+                    onUpcomingChange={() => setDataVersion((v) => v + 1)}
+                  />
+                </div>
+              </div>
+            </div>
+          )
+        default:
+          return null
+      }
+    },
+    [
+      dragOverId,
+      handleSectionDragStart,
+      handleSectionDragOver,
+      handleSectionDragLeave,
+      handleSectionDrop,
+      handleSectionDragEnd,
+    ]
+  )
 
   return (
     <div>
@@ -228,26 +412,13 @@ export function Dashboard() {
           </Button>
         </Modal.Footer>
       </Modal>
-      <Row className="grid-margin">
-        <Col md={7} className="grid-margin stretch-card" data-tour="savers">
-          <SaversSection />
-        </Col>
-        <Col md={5} className="grid-margin stretch-card" data-tour="trackers">
-          <TrackersSection />
-        </Col>
-      </Row>
-      <Row className="grid-margin">
-        <Col xs={12} className="grid-margin" data-tour="insights">
-          <InsightsSection />
-        </Col>
-      </Row>
-      <Row className="grid-margin">
-        <Col xs={12} className="grid-margin" data-tour="upcoming">
-          <UpcomingSection
-            onUpcomingChange={() => setDataVersion((v) => v + 1)}
-          />
-        </Col>
-      </Row>
+      {sectionOrder.map((id) => (
+        <Row key={id} className="grid-margin">
+          <Col xs={12} className="grid-margin stretch-card">
+            {renderSection(id)}
+          </Col>
+        </Row>
+      ))}
     </div>
   )
 }

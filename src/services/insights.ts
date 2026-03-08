@@ -305,3 +305,127 @@ export function getWeeklyCategoryBreakdown(
   stmt.free()
   return list
 }
+
+/**
+ * Spending by category for an arbitrary date range. Same filter as Money Out.
+ * Used for Reports page.
+ */
+export function getCategoryBreakdownForDateRange(
+  dateFrom: string,
+  dateTo: string
+): CategoryBreakdownRow[] {
+  const db = getDb()
+  if (!db) return []
+  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
+  const stmt = db.prepare(
+    `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
+     FROM transactions t
+     LEFT JOIN categories c ON t.category_id = c.id
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL
+     AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
+     GROUP BY t.category_id ORDER BY total DESC LIMIT 20`
+  )
+  stmt.bind([dateFrom, endStr])
+  const list: CategoryBreakdownRow[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [string, string | null, number]
+    list.push({
+      category_id: row[0],
+      category_name: row[1] ?? 'Uncategorised',
+      total: row[2],
+    })
+  }
+  stmt.free()
+  return list
+}
+
+/**
+ * Money In (real income, no internal transfers) for a date range. For Reports Sankey.
+ */
+export function getMoneyInForDateRange(
+  dateFrom: string,
+  dateTo: string
+): number {
+  const db = getDb()
+  if (!db) return 0
+  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
+  const stmt = db.prepare(
+    `SELECT COALESCE(SUM(amount), 0) FROM transactions
+     WHERE amount > 0 AND transfer_account_id IS NULL
+     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
+  )
+  stmt.bind([dateFrom, endStr])
+  stmt.step()
+  const row = stmt.get()
+  stmt.free()
+  return row ? Number(row[0]) : 0
+}
+
+/**
+ * Data for Reports Sankey: income and spending by category in a date range.
+ */
+export interface ReportsSankeyData {
+  moneyIn: number
+  categories: CategoryBreakdownRow[]
+}
+
+export function getReportsSankeyData(
+  dateFrom: string,
+  dateTo: string
+): ReportsSankeyData {
+  return {
+    moneyIn: getMoneyInForDateRange(dateFrom, dateTo),
+    categories: getCategoryBreakdownForDateRange(dateFrom, dateTo),
+  }
+}
+
+/**
+ * Insight metrics for an arbitrary date range (e.g. a month). Same definitions as WeeklyInsightsData.
+ */
+export function getInsightsForDateRange(
+  dateFrom: string,
+  dateTo: string
+): WeeklyInsightsData {
+  const db = getDb()
+  if (!db)
+    return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0, payments: 0 }
+  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
+
+  const runOne = (sql: string, params: (string | number)[]): number => {
+    const stmt = db.prepare(sql)
+    stmt.bind(params)
+    stmt.step()
+    const row = stmt.get()
+    stmt.free()
+    return row ? Number(row[0]) : 0
+  }
+
+  const moneyIn = runOne(
+    `SELECT COALESCE(SUM(amount), 0) FROM transactions
+     WHERE amount > 0 AND transfer_account_id IS NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  const moneyOut = runOne(
+    `SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions
+     WHERE amount < 0 AND transfer_account_id IS NULL
+     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  const saverChanges = runOne(
+    `SELECT COALESCE(SUM(amount), 0) FROM transactions
+     WHERE transfer_account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
+     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  const charges = runOne(
+    `SELECT COUNT(*) FROM transactions
+     WHERE amount < 0 AND transfer_account_id IS NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  const payments = runOne(
+    `SELECT COUNT(*) FROM transactions
+     WHERE transfer_type IS NOT NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  return { moneyIn, moneyOut, saverChanges, charges, payments }
+}

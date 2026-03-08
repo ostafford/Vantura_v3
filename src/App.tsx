@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { themeStore } from '@/stores/themeStore'
@@ -11,7 +11,17 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { Dashboard } from '@/pages/Dashboard'
 import { Transactions } from '@/pages/Transactions'
 import { AnalyticsLayout } from '@/pages/analytics/AnalyticsLayout'
-import { AnalyticsComingSoon } from '@/pages/analytics/AnalyticsComingSoon'
+import { AnalyticsIndex } from '@/pages/analytics/AnalyticsIndex'
+import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
+import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
+import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
+import { AnalyticsInsights } from '@/pages/analytics/AnalyticsInsights'
+import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
+import { AnalyticsNetWorth } from '@/pages/analytics/AnalyticsNetWorth'
+import { AnalyticsMonthlyReview } from '@/pages/analytics/AnalyticsMonthlyReview'
+import { AnalyticsSaverDetail } from '@/pages/analytics/AnalyticsSaverDetail'
+import { AnalyticsGoals } from '@/pages/analytics/AnalyticsGoals'
+import { AnalyticsGoalDetail } from '@/pages/analytics/AnalyticsGoalDetail'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { Unlock } from '@/pages/Unlock'
@@ -193,22 +203,25 @@ function AppContent() {
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="analytics" element={<AnalyticsLayout />}>
-              <Route index element={<AnalyticsComingSoon />} />
-              <Route
-                path="trackers"
-                element={<Navigate to="/analytics" replace />}
-              />
+              <Route index element={<AnalyticsIndex />} />
+              <Route path="trackers" element={<AnalyticsTrackers />} />
               <Route
                 path="trackers/:trackerId"
-                element={<Navigate to="/analytics" replace />}
+                element={<AnalyticsTrackersDetail />}
               />
+              <Route path="savers" element={<AnalyticsSavers />} />
               <Route
-                path="savers"
-                element={<Navigate to="/analytics" replace />}
+                path="savers/:saverId"
+                element={<AnalyticsSaverDetail />}
               />
+              <Route path="goals" element={<AnalyticsGoals />} />
+              <Route path="goals/:goalId" element={<AnalyticsGoalDetail />} />
+              <Route path="insights" element={<AnalyticsInsights />} />
+              <Route path="reports" element={<AnalyticsReports />} />
+              <Route path="net-worth" element={<AnalyticsNetWorth />} />
               <Route
-                path="insights"
-                element={<Navigate to="/analytics" replace />}
+                path="monthly-review"
+                element={<AnalyticsMonthlyReview />}
               />
             </Route>
             <Route path="settings" element={<Settings />} />

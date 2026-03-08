@@ -50,6 +50,11 @@ import {
   type UpTransaction,
   type UpCategory,
 } from '@/api/upBank'
+import {
+  recordNetWorthSnapshot,
+  recordNetWorthSnapshotByType,
+} from '@/services/netWorth'
+import { recordSaverBalanceSnapshots } from '@/services/savers'
 
 export type SyncProgress = {
   phase: 'accounts' | 'transactions' | 'categories' | 'savers' | 'done'
@@ -139,6 +144,20 @@ function upsertCategory(cat: UpCategory): void {
     `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
     [cat.id, cat.attributes?.name ?? cat.id, parentId]
   )
+}
+
+function recordNetWorthByAccountType(): void {
+  const db = getDb()
+  if (!db) return
+  const stmt = db.prepare(
+    `SELECT account_type, COALESCE(SUM(balance), 0)
+     FROM accounts GROUP BY account_type`
+  )
+  while (stmt.step()) {
+    const row = stmt.get() as [string, number]
+    recordNetWorthSnapshotByType(row[0], row[1])
+  }
+  stmt.free()
 }
 
 function setupSavers(accounts: UpAccount[]): void {
@@ -241,8 +260,19 @@ export async function performInitialSync(
   for (const c of categories) upsertCategory(c)
   progressCallback({ phase: 'savers' })
   setupSavers(accounts)
+  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   setAppSetting('onboarding_complete', '1')
+  const db = getDb()
+  if (db) {
+    const stmt = db.prepare('SELECT COALESCE(SUM(balance), 0) FROM accounts')
+    stmt.step()
+    const row = stmt.get()
+    stmt.free()
+    const total = row ? Number(row[0]) : 0
+    recordNetWorthSnapshot(total)
+    recordNetWorthByAccountType()
+  }
   progressCallback({ phase: 'done' })
 }
 
@@ -273,8 +303,19 @@ export async function performSync(
   for (const c of categories) upsertCategory(c)
   progressCallback({ phase: 'savers' })
   updateSavers(accounts)
+  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
+  const db = getDb()
+  if (db) {
+    const stmt = db.prepare('SELECT COALESCE(SUM(balance), 0) FROM accounts')
+    stmt.step()
+    const row = stmt.get()
+    stmt.free()
+    const total = row ? Number(row[0]) : 0
+    recordNetWorthSnapshot(total)
+    recordNetWorthByAccountType()
+  }
   progressCallback({ phase: 'done' })
 }
 
@@ -306,7 +347,20 @@ export async function performFullSync(
   for (const c of categories) upsertCategory(c)
   progressCallback({ phase: 'savers' })
   updateSavers(accounts)
+  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
+  const dbFull = getDb()
+  if (dbFull) {
+    const stmt = dbFull.prepare(
+      'SELECT COALESCE(SUM(balance), 0) FROM accounts'
+    )
+    stmt.step()
+    const row = stmt.get()
+    stmt.free()
+    const total = row ? Number(row[0]) : 0
+    recordNetWorthSnapshot(total)
+    recordNetWorthByAccountType()
+  }
   progressCallback({ phase: 'done' })
 }

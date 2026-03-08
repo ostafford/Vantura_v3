@@ -87,11 +87,22 @@ function run(sql: string, params: (string | number | null)[] = []): void {
   schedulePersist()
 }
 
+function daysAgoStr(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
+
+function daysAheadStr(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 export function seedDemoData(): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
 
-  // Payday defaults: monthly, 15th, next payday in 2 weeks
   const nextPay = new Date()
   nextPay.setDate(nextPay.getDate() + 14)
   const nextPayday = nextPay.toISOString().slice(0, 10)
@@ -104,6 +115,14 @@ export function seedDemoData(): void {
   setAppSetting('last_sync', NOW)
   setAppSetting('onboarding_complete', '1')
   setAppSetting('demo_mode', '1')
+  setAppSetting(
+    'categorization_rules',
+    JSON.stringify([
+      { id: 'rule-1', pattern: 'woolworths', categoryId: 'demo-cat-groceries' },
+      { id: 'rule-2', pattern: 'uber eats', categoryId: 'demo-cat-dining' },
+      { id: 'rule-3', pattern: 'netflix', categoryId: 'demo-cat-subs' },
+    ])
+  )
 
   // Accounts: one transactional, two savers
   run(
@@ -122,13 +141,17 @@ export function seedDemoData(): void {
     [DEMO_SAVER_2_ID, 'Holiday Fund', 'SAVER', 200000, NOW, NOW, NOW]
   )
 
-  // Categories (UUID-like; some parent/child for insights)
+  // Categories: parent + children (expanded)
   const catGroceries = 'demo-cat-groceries'
   const catDining = 'demo-cat-dining'
   const catTransport = 'demo-cat-transport'
   const catSubscriptions = 'demo-cat-subs'
   const catShopping = 'demo-cat-shopping'
   const catParentSpending = 'demo-cat-spending'
+  const catCoffee = 'demo-cat-coffee'
+  const catEntertainment = 'demo-cat-entertainment'
+  const catHealth = 'demo-cat-health'
+  const catUtilities = 'demo-cat-utilities'
 
   run(
     `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
@@ -154,8 +177,24 @@ export function seedDemoData(): void {
     `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
     [catShopping, 'Shopping', catParentSpending]
   )
+  run(
+    `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
+    [catCoffee, 'Coffee', catParentSpending]
+  )
+  run(
+    `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
+    [catEntertainment, 'Entertainment', catParentSpending]
+  )
+  run(
+    `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
+    [catHealth, 'Health & Fitness', catParentSpending]
+  )
+  run(
+    `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
+    [catUtilities, 'Utilities', catParentSpending]
+  )
 
-  // Spending transactions: last ~55 days, varied merchants and amounts (cents, negative = outflow)
+  // Spending transactions: last ~180 days, varied merchants and amounts (cents, negative = outflow)
   const spendingDescriptions: [string, string][] = [
     ['Woolworths', catGroceries],
     ['Coles', catGroceries],
@@ -179,13 +218,23 @@ export function seedDemoData(): void {
     ['Chemist Warehouse', catShopping],
     ['Officeworks', catShopping],
     ['David Jones', catShopping],
+    ['Starbucks', catCoffee],
+    ['Seven Seeds', catCoffee],
+    ['Hoyts Cinema', catEntertainment],
+    ['Steam Games', catEntertainment],
+    ['Village Cinemas', catEntertainment],
+    ['Anytime Fitness', catHealth],
+    ['Pharmacy 4 Less', catHealth],
+    ['AGL Energy', catUtilities],
+    ['Telstra', catUtilities],
   ]
   const spendingAmounts = [
     800, 4500, 12000, 3500, 850, 2800, 2400, 1850, 650, 7200, 5800, 2500, 1999,
-    1299, 1500, 3500, 8900, 12000, 4500, 2800, 1500, 8900,
+    1299, 1500, 3500, 8900, 12000, 4500, 2800, 1500, 8900, 550, 700, 1800, 2200,
+    2500, 4500, 3200, 12000, 9500,
   ]
 
-  for (let d = 0; d < 55; d++) {
+  for (let d = 0; d < 180; d++) {
     const date = new Date()
     date.setDate(date.getDate() - d)
     const dateStr = date.toISOString().slice(0, 10)
@@ -226,7 +275,7 @@ export function seedDemoData(): void {
     )
   }
 
-  // Income transactions: 2-3 per week for last 8 weeks (Money In)
+  // Income transactions: 2-3 per week for last 26 weeks
   const incomeItems: [string, number][] = [
     ['Salary credit', 350000],
     ['Transfer from Mum', 50000],
@@ -238,7 +287,7 @@ export function seedDemoData(): void {
     ['Freelance', 22000],
   ]
   let incomeIdx = 0
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < 26; w++) {
     const weekStart = new Date()
     weekStart.setDate(weekStart.getDate() - w * 7 - 3)
     for (let i = 0; i < 2 + (w % 2); i++) {
@@ -278,9 +327,9 @@ export function seedDemoData(): void {
     }
   }
 
-  // Saver transfer transactions: 2-4 per week to Rainy Day (Savers metric)
+  // Saver transfer transactions to Rainy Day: 2-4 per week for 26 weeks
   let transferIdx = 0
-  for (let w = 0; w < 8; w++) {
+  for (let w = 0; w < 26; w++) {
     const count = 2 + (w % 3)
     const weekStart = new Date()
     weekStart.setDate(weekStart.getDate() - w * 7 - 1)
@@ -321,7 +370,43 @@ export function seedDemoData(): void {
     }
   }
 
-  // Round-up transactions: 7 parents from last 2 weeks (demo-tx-0..13)
+  // Saver transfer transactions to Holiday Fund: ~1 per week for 26 weeks
+  for (let w = 0; w < 26; w++) {
+    const date = new Date()
+    date.setDate(date.getDate() - w * 7 - 4)
+    const dateStr = date.toISOString().slice(0, 10)
+    const iso = dateStr + 'T15:00:00.000Z'
+    const amount = -(3000 + (w % 4) * 2000)
+    run(
+      `INSERT OR REPLACE INTO transactions (
+        id, account_id, status, raw_text, description, message, is_categorizable,
+        category_id, parent_category_id, amount, currency, settled_at, created_at,
+        is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `demo-transfer-hol-${w}`,
+        DEMO_ACCOUNT_ID,
+        'SETTLED',
+        null,
+        'Transfer to Holiday Fund',
+        null,
+        1,
+        null,
+        null,
+        amount,
+        'AUD',
+        dateStr,
+        iso,
+        0,
+        null,
+        DEMO_SAVER_2_ID,
+        'MANUAL',
+        NOW,
+      ]
+    )
+  }
+
+  // Round-up transactions: 7 parents from last 2 weeks
   const roundUpParents = [0, 2, 4, 6, 8, 10, 12]
   const roundUpCents = [23, 47, 12, 88, 56, 31, 94]
   roundUpParents.forEach((parentD, ruIdx) => {
@@ -358,15 +443,16 @@ export function seedDemoData(): void {
     )
   })
 
-  // Savers with goals
+  // Savers with goals and user icons
   run(
-    `INSERT INTO savers (id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, auto_transfer_day, is_goal_based, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO savers (id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, auto_transfer_day, is_goal_based, user_icon, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        current_balance = excluded.current_balance,
        goal_amount = excluded.goal_amount,
        target_date = excluded.target_date,
+       user_icon = excluded.user_icon,
        updated_at = excluded.updated_at`,
     [
       DEMO_SAVER_ID,
@@ -380,18 +466,20 @@ export function seedDemoData(): void {
       20000,
       null,
       1,
+      '\u2602\uFE0F',
       NOW,
       NOW,
     ]
   )
   run(
-    `INSERT INTO savers (id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, auto_transfer_day, is_goal_based, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO savers (id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, auto_transfer_day, is_goal_based, user_icon, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        current_balance = excluded.current_balance,
        goal_amount = excluded.goal_amount,
        target_date = excluded.target_date,
+       user_icon = excluded.user_icon,
        updated_at = excluded.updated_at`,
     [
       DEMO_SAVER_2_ID,
@@ -405,6 +493,7 @@ export function seedDemoData(): void {
       15000,
       null,
       1,
+      '\uD83C\uDF34',
       NOW,
       NOW,
     ]
@@ -474,7 +563,7 @@ export function seedDemoData(): void {
   const tracker3Id = (tracker3Result[0]?.values?.[0]?.[0] as number) ?? 3
   run(
     `INSERT OR IGNORE INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
-    [tracker3Id, catDining]
+    [tracker3Id, catCoffee]
   )
 
   run(
@@ -495,10 +584,10 @@ export function seedDemoData(): void {
   const tracker4Id = (tracker4Result[0]?.values?.[0]?.[0] as number) ?? 4
   run(
     `INSERT OR IGNORE INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
-    [tracker4Id, catShopping]
+    [tracker4Id, catEntertainment]
   )
 
-  // Upcoming charges: MONTHLY, WEEKLY, QUARTERLY, YEARLY for proration variety
+  // Upcoming charges with bill reminders
   run(
     `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain')`
   )
@@ -511,14 +600,16 @@ export function seedDemoData(): void {
   const insuranceNext = new Date()
   insuranceNext.setMonth(insuranceNext.getMonth() + 2)
   insuranceNext.setDate(15)
+  const insuranceCancelBy = new Date(insuranceNext)
+  insuranceCancelBy.setDate(insuranceCancelBy.getDate() - 14)
   const domainNext = new Date()
   domainNext.setFullYear(domainNext.getFullYear() + 1)
   domainNext.setMonth(2)
   domainNext.setDate(1)
 
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Netflix',
       1999,
@@ -526,22 +617,36 @@ export function seedDemoData(): void {
       nextCharge1.toISOString().slice(0, 10),
       catSubscriptions,
       1,
+      3,
+      1,
+      null,
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['Rent', 180000, 'MONTHLY', rentNextChargeDate, null, 1, NOW]
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['Rent', 180000, 'MONTHLY', rentNextChargeDate, null, 1, 5, 0, null, NOW]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['Gym', 2500, 'WEEKLY', gymNext.toISOString().slice(0, 10), null, 1, NOW]
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'Gym',
+      2500,
+      'WEEKLY',
+      gymNext.toISOString().slice(0, 10),
+      catHealth,
+      1,
+      1,
+      0,
+      null,
+      NOW,
+    ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Insurance',
       45000,
@@ -549,12 +654,15 @@ export function seedDemoData(): void {
       insuranceNext.toISOString().slice(0, 10),
       null,
       1,
+      7,
+      0,
+      insuranceCancelBy.toISOString().slice(0, 10),
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Domain',
       1500,
@@ -562,7 +670,214 @@ export function seedDemoData(): void {
       domainNext.toISOString().slice(0, 10),
       null,
       0,
+      null,
+      0,
+      null,
       NOW,
     ]
+  )
+
+  // Goals at different progress stages
+  const goalCreatedAt1 = new Date(
+    Date.now() - 150 * 24 * 60 * 60 * 1000
+  ).toISOString()
+  const goalCreatedAt2 = new Date(
+    Date.now() - 120 * 24 * 60 * 60 * 1000
+  ).toISOString()
+  const goalCreatedAt3 = new Date(
+    Date.now() - 90 * 24 * 60 * 60 * 1000
+  ).toISOString()
+  const goalCreatedAt4 = new Date(
+    Date.now() - 60 * 24 * 60 * 60 * 1000
+  ).toISOString()
+
+  run(
+    `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'Emergency Fund',
+      1000000,
+      420000,
+      30000,
+      daysAheadStr(365),
+      '\uD83D\uDEE1\uFE0F',
+      null,
+      goalCreatedAt1,
+      NOW,
+    ]
+  )
+  const goal1Result = db.exec('SELECT last_insert_rowid()')
+  const goal1Id = (goal1Result[0]?.values?.[0]?.[0] as number) ?? 1
+
+  run(
+    `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'New Laptop',
+      250000,
+      215000,
+      20000,
+      daysAheadStr(60),
+      '\uD83D\uDCBB',
+      null,
+      goalCreatedAt2,
+      NOW,
+    ]
+  )
+  const goal2Result = db.exec('SELECT last_insert_rowid()')
+  const goal2Id = (goal2Result[0]?.values?.[0]?.[0] as number) ?? 2
+
+  run(
+    `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'Car Deposit',
+      2500000,
+      375000,
+      50000,
+      daysAheadStr(1095),
+      '\uD83D\uDE97',
+      null,
+      goalCreatedAt3,
+      NOW,
+    ]
+  )
+  const goal3Result = db.exec('SELECT last_insert_rowid()')
+  const goal3Id = (goal3Result[0]?.values?.[0]?.[0] as number) ?? 3
+
+  run(
+    `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'Weekend Getaway',
+      80000,
+      80000,
+      null,
+      daysAgoStr(30),
+      '\u2708\uFE0F',
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      goalCreatedAt4,
+      NOW,
+    ]
+  )
+  const goal4Result = db.exec('SELECT last_insert_rowid()')
+  const goal4Id = (goal4Result[0]?.values?.[0]?.[0] as number) ?? 4
+
+  // Goal snapshots: progressive growth every ~5 days
+  const goalConfigs: [number, number, number, number][] = [
+    [goal1Id, 150, 420000, 1000000],
+    [goal2Id, 120, 215000, 250000],
+    [goal3Id, 90, 375000, 2500000],
+    [goal4Id, 60, 80000, 80000],
+  ]
+  for (const [goalId, totalDays, finalAmount, targetAmount] of goalConfigs) {
+    for (let step = 0; step <= totalDays; step += 5) {
+      const dayOffset = totalDays - step
+      const progress = step / totalDays
+      const baseAmount = Math.round(finalAmount * progress)
+      const variance = seededAmount(goalId * 1000 + step, -500, 500)
+      const amount = Math.max(0, Math.min(finalAmount, baseAmount + variance))
+      run(
+        `INSERT OR REPLACE INTO goal_snapshots (goal_id, snapshot_date, current_amount, target_amount)
+         VALUES (?, ?, ?, ?)`,
+        [goalId, daysAgoStr(dayOffset), amount, targetAmount]
+      )
+    }
+  }
+
+  // Net worth snapshots: 180 days of daily history
+  const nwStart = 600000
+  const nwEnd = 777300
+  const nwRange = nwEnd - nwStart
+  for (let d = 180; d >= 0; d--) {
+    const progress = (180 - d) / 180
+    const base = Math.round(nwStart + nwRange * progress)
+    const variance = seededAmount(d * 7 + 3, -20000, 20000)
+    const total = Math.max(nwStart, base + variance)
+    run(
+      `INSERT OR REPLACE INTO net_worth_snapshots (snapshot_date, total_balance_cents)
+       VALUES (?, ?)`,
+      [daysAgoStr(d), total]
+    )
+  }
+
+  // Net worth type snapshots: TRANSACTIONAL + SAVER per day
+  const saverNwStart = 200000
+  const saverNwEnd = 325000
+  const saverNwRange = saverNwEnd - saverNwStart
+  for (let d = 180; d >= 0; d--) {
+    const progress = (180 - d) / 180
+    const saverBase = Math.round(saverNwStart + saverNwRange * progress)
+    const saverVariance = seededAmount(d * 11 + 1, -5000, 5000)
+    const saverTotal = Math.max(saverNwStart, saverBase + saverVariance)
+
+    const nwBase = Math.round(nwStart + nwRange * progress)
+    const nwVariance = seededAmount(d * 7 + 3, -20000, 20000)
+    const totalNw = Math.max(nwStart, nwBase + nwVariance)
+    const transactionalTotal = totalNw - saverTotal
+
+    const snapDate = daysAgoStr(d)
+    run(
+      `INSERT OR REPLACE INTO net_worth_type_snapshots (snapshot_date, account_type, total_balance_cents)
+       VALUES (?, ?, ?)`,
+      [snapDate, 'TRANSACTIONAL', Math.max(0, transactionalTotal)]
+    )
+    run(
+      `INSERT OR REPLACE INTO net_worth_type_snapshots (snapshot_date, account_type, total_balance_cents)
+       VALUES (?, ?, ?)`,
+      [snapDate, 'SAVER', saverTotal]
+    )
+  }
+
+  // Saver balance snapshots: 180 days for both savers
+  const rainyStart = 20000
+  const rainyEnd = 125000
+  const rainyRange = rainyEnd - rainyStart
+  const holidayStart = 50000
+  const holidayEnd = 200000
+  const holidayRange = holidayEnd - holidayStart
+  for (let d = 180; d >= 0; d--) {
+    const progress = (180 - d) / 180
+    const snapDate = daysAgoStr(d)
+
+    const rainyBase = Math.round(rainyStart + rainyRange * progress)
+    const rainyVariance = seededAmount(d * 13 + 5, -2000, 2000)
+    const rainyBalance = Math.max(rainyStart, rainyBase + rainyVariance)
+    run(
+      `INSERT OR REPLACE INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents)
+       VALUES (?, ?, ?)`,
+      [DEMO_SAVER_ID, snapDate, rainyBalance]
+    )
+
+    const holidayBase = Math.round(holidayStart + holidayRange * progress)
+    const holidayVariance = seededAmount(d * 17 + 7, -3000, 3000)
+    const holidayBalance = Math.max(holidayStart, holidayBase + holidayVariance)
+    run(
+      `INSERT OR REPLACE INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents)
+       VALUES (?, ?, ?)`,
+      [DEMO_SAVER_2_ID, snapDate, holidayBalance]
+    )
+  }
+
+  // Transaction user data: example notes and category overrides
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-tx-5', 'Birthday dinner with Sarah', null]
+  )
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-tx-10', 'Work reimbursable', null]
+  )
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-tx-15', null, catGroceries]
+  )
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-income-0-0', 'Monthly salary - March', null]
   )
 }

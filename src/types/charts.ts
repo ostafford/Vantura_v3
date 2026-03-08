@@ -23,6 +23,7 @@ export type SaversChartRow = {
     goal_amount: number | null
     target_date: string | null
     monthly_transfer: number | null
+    user_icon: string | null
   }
   currentFill: string
 }

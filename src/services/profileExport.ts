@@ -15,7 +15,7 @@ import {
 import { SCHEMA_VERSION } from '@/db/schema'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 1
+const EXPORT_PAYLOAD_VERSION = 2
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -36,6 +36,8 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'saver_chart_colors',
   'insights_category_colors',
   'dashboard_tour_completed',
+  'dashboard_section_order',
+  'categorization_rules',
 ] as const
 
 /**
@@ -56,6 +58,7 @@ export interface ExportPayload {
   trackers: TrackerExportRow[]
   trackerCategories: { tracker_id: number; category_id: string }[]
   upcomingCharges: UpcomingChargeExportRow[]
+  goals?: GoalExportRow[]
 }
 
 export interface TrackerExportRow {
@@ -78,6 +81,19 @@ export interface UpcomingChargeExportRow {
   next_charge_date: string
   category_id: string | null
   is_reserved: number
+  reminder_days_before?: number | null
+  is_subscription?: number
+  cancel_by_date?: string | null
+}
+
+export interface GoalExportRow {
+  name: string
+  target_amount: number
+  current_amount: number
+  monthly_contribution: number | null
+  target_date: string | null
+  icon: string | null
+  completed_at: string | null
 }
 
 export interface ExportFileWrapper {
@@ -160,7 +176,8 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved
+    `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
+      reminder_days_before, is_subscription, cancel_by_date
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -172,6 +189,9 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string,
       string | null,
       number,
+      number | null,
+      number,
+      string | null,
     ]
     rows.push({
       name: r[0],
@@ -180,6 +200,42 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       next_charge_date: r[3],
       category_id: r[4],
       is_reserved: r[5],
+      reminder_days_before: r[6] ?? null,
+      is_subscription: r[7] ?? 0,
+      cancel_by_date: r[8] ?? null,
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+function collectGoals(): GoalExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT name, target_amount, current_amount, monthly_contribution,
+            target_date, icon, completed_at
+     FROM goals ORDER BY id`
+  )
+  const rows: GoalExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      number,
+      number,
+      number | null,
+      string | null,
+      string | null,
+      string | null,
+    ]
+    rows.push({
+      name: r[0],
+      target_amount: r[1],
+      current_amount: r[2],
+      monthly_contribution: r[3],
+      target_date: r[4],
+      icon: r[5],
+      completed_at: r[6],
     })
   }
   stmt.free()
@@ -194,6 +250,7 @@ export function buildExportPayload(): ExportPayload {
   const trackers = collectTrackers()
   const trackerCategories = collectTrackerCategories()
   const upcomingCharges = collectUpcomingCharges()
+  const goals = collectGoals()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -203,6 +260,7 @@ export function buildExportPayload(): ExportPayload {
     trackers,
     trackerCategories,
     upcomingCharges,
+    goals,
   }
 }
 
@@ -363,6 +421,7 @@ export interface ImportOptions {
   settings: boolean
   trackers: boolean
   upcomingCharges: boolean
+  goals: boolean
 }
 
 /** Apply whitelisted settings from payload. */
@@ -487,9 +546,19 @@ export function replaceUpcomingCharges(
         ? uc.category_id
         : null
     const isReserved = typeof uc.is_reserved === 'number' ? uc.is_reserved : 1
+    const reminderDaysBefore =
+      typeof uc.reminder_days_before === 'number'
+        ? uc.reminder_days_before
+        : null
+    const isSubscription =
+      typeof uc.is_subscription === 'number' ? uc.is_subscription : 0
+    const cancelByDate =
+      typeof uc.cancel_by_date === 'string' && uc.cancel_by_date
+        ? uc.cancel_by_date.slice(0, 10)
+        : null
     db.run(
-      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -497,6 +566,55 @@ export function replaceUpcomingCharges(
         nextCharge,
         categoryId,
         isReserved,
+        reminderDaysBefore,
+        isSubscription,
+        cancelByDate,
+        now,
+      ]
+    )
+  }
+}
+
+/** Replace goals with imported data. */
+export function replaceGoals(goals: GoalExportRow[]): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM goal_snapshots`)
+  db.run(`DELETE FROM goals`)
+
+  const now = new Date().toISOString()
+  const goalsArr = Array.isArray(goals) ? goals : []
+  for (const g of goalsArr) {
+    if (
+      typeof g.name !== 'string' ||
+      typeof g.target_amount !== 'number' ||
+      typeof g.current_amount !== 'number'
+    ) {
+      continue
+    }
+    const monthlyContribution =
+      typeof g.monthly_contribution === 'number' ? g.monthly_contribution : null
+    const targetDate =
+      typeof g.target_date === 'string' && g.target_date
+        ? g.target_date.slice(0, 10)
+        : null
+    const icon = g.icon != null && typeof g.icon === 'string' ? g.icon : null
+    const completedAt =
+      typeof g.completed_at === 'string' && g.completed_at
+        ? g.completed_at
+        : null
+    db.run(
+      `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        g.name,
+        g.target_amount,
+        g.current_amount,
+        monthlyContribution,
+        targetDate,
+        icon,
+        completedAt,
+        now,
         now,
       ]
     )
@@ -523,6 +641,9 @@ export function importPayloadWithOptions(
   if (options.upcomingCharges) {
     replaceUpcomingCharges(payload.upcomingCharges ?? [])
   }
+  if (options.goals) {
+    replaceGoals(payload.goals ?? [])
+  }
   schedulePersist()
 }
 
@@ -535,5 +656,6 @@ export function importPayload(payload: ExportPayload): void {
     settings: true,
     trackers: true,
     upcomingCharges: true,
+    goals: true,
   })
 }
