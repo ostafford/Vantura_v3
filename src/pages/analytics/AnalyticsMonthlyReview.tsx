@@ -53,10 +53,18 @@ function DeltaBadge({
   const isCount = Number.isInteger(delta.current) && absDelta < 10000
   const label = isCount ? String(absDelta) : `$${formatMoney(absDelta)}`
   return (
-    <span className={`small ${cls} ms-1`}>
-      <i className={`mdi ${icon}`} aria-hidden style={{ fontSize: '0.7rem' }} />{' '}
+    <div
+      className={`small ${cls}`}
+      aria-label={`${delta.direction} ${label} vs last month`}
+      style={{ fontSize: '0.75rem', lineHeight: 1.3 }}
+    >
+      <i
+        className={`mdi ${icon}`}
+        aria-hidden
+        style={{ fontSize: '0.65rem' }}
+      />{' '}
       {label}
-    </span>
+    </div>
   )
 }
 
@@ -150,28 +158,26 @@ export function AnalyticsMonthlyReview() {
               <div className="small text-muted">Money in</div>
               <div className="fw-semibold text-success">
                 ${formatMoney(comparison.moneyIn.current)}
-                {comparison.hasPreviousData && (
-                  <DeltaBadge delta={comparison.moneyIn} />
-                )}
               </div>
+              {comparison.hasPreviousData && (
+                <DeltaBadge delta={comparison.moneyIn} />
+              )}
             </Col>
             <Col xs={6} md={3}>
               <div className="small text-muted">Money out</div>
               <div className="fw-semibold text-danger">
                 ${formatMoney(comparison.moneyOut.current)}
-                {comparison.hasPreviousData && (
-                  <DeltaBadge delta={comparison.moneyOut} invert />
-                )}
               </div>
+              {comparison.hasPreviousData && (
+                <DeltaBadge delta={comparison.moneyOut} invert />
+              )}
             </Col>
             <Col xs={6} md={3}>
               <div className="small text-muted">Charges (count)</div>
-              <div className="fw-semibold">
-                {comparison.charges.current}
-                {comparison.hasPreviousData && (
-                  <DeltaBadge delta={comparison.charges} invert />
-                )}
-              </div>
+              <div className="fw-semibold">{comparison.charges.current}</div>
+              {comparison.hasPreviousData && (
+                <DeltaBadge delta={comparison.charges} invert />
+              )}
             </Col>
             {comparison.currentTopCategory && (
               <Col xs={6} md={3}>

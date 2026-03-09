@@ -1,6 +1,11 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Card } from 'react-bootstrap'
+import {
+  Card,
+  Button,
+  OverlayTrigger,
+  Tooltip as BSTooltip,
+} from 'react-bootstrap'
 import {
   getMonthComparison,
   type MonthDelta,
@@ -8,14 +13,20 @@ import {
 } from '@/services/insights'
 import { formatMoney } from '@/lib/format'
 
-function getCurrentMonthBounds(): { from: string; to: string } {
+function getMonthBoundsForOffset(offset: number): {
+  from: string
+  to: string
+  year: number
+  month: number
+} {
   const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth() + 1
+  const target = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  const y = target.getFullYear()
+  const m = target.getMonth() + 1
   const from = `${y}-${String(m).padStart(2, '0')}-01`
   const lastDay = new Date(y, m, 0).getDate()
   const to = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  return { from, to }
+  return { from, to, year: y, month: m }
 }
 
 const MONTH_NAMES = [
@@ -49,13 +60,18 @@ function DeltaBadge({
   const isCount = Number.isInteger(delta.current) && absDelta < 10000
   const label = isCount ? String(absDelta) : `$${formatMoney(absDelta)}`
   return (
-    <span
-      className={`small ${cls} ms-1`}
-      aria-label={`${delta.direction} ${label}`}
+    <div
+      className={`small ${cls}`}
+      aria-label={`${delta.direction} ${label} vs prev month`}
+      style={{ fontSize: '0.75rem', lineHeight: 1.3 }}
     >
-      <i className={`mdi ${icon}`} aria-hidden style={{ fontSize: '0.7rem' }} />{' '}
+      <i
+        className={`mdi ${icon}`}
+        aria-hidden
+        style={{ fontSize: '0.65rem' }}
+      />{' '}
       {label}
-    </span>
+    </div>
   )
 }
 
@@ -72,9 +88,15 @@ const NARRATIVE_COLORS: Record<NarrativeInsight['type'], string> = {
 }
 
 export function MonthSummarySection() {
-  const { from, to } = useMemo(() => getCurrentMonthBounds(), [])
+  const [monthOffset, setMonthOffset] = useState(0)
+
+  const { from, to, year, month } = useMemo(
+    () => getMonthBoundsForOffset(monthOffset),
+    [monthOffset]
+  )
   const comparison = useMemo(() => getMonthComparison(from, to), [from, to])
-  const monthLabel = MONTH_NAMES[new Date().getMonth()]
+  const monthLabel = MONTH_NAMES[month - 1]
+  const showYear = year !== new Date().getFullYear()
 
   return (
     <Card>
@@ -83,44 +105,76 @@ export function MonthSummarySection() {
           <span className="page-title-icon bg-gradient-primary text-white mr-2">
             <i className="mdi mdi-calendar-month" aria-hidden />
           </span>
-          <span>{monthLabel} at a glance</span>
+          <div className="d-flex flex-column">
+            <span>{monthLabel} at a glance</span>
+            {showYear && <span className="small text-muted">{year}</span>}
+          </div>
         </div>
-        <Link
-          to="/analytics/monthly-review"
-          className="btn btn-outline-secondary btn-sm"
-          aria-label="View full monthly review"
-        >
-          <i className="mdi mdi-chevron-right" aria-hidden />
-        </Link>
+        <div className="d-flex gap-2 align-items-center">
+          <Link
+            to="/analytics/monthly-review"
+            className="btn btn-outline-secondary btn-sm"
+            aria-label="View full monthly review"
+          >
+            <i className="mdi mdi-chart-box" aria-hidden />
+          </Link>
+          <OverlayTrigger
+            placement="top"
+            overlay={
+              <BSTooltip id="month-prev-tooltip">Previous month</BSTooltip>
+            }
+          >
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setMonthOffset((o) => o - 1)}
+              aria-label="Previous month"
+            >
+              <i className="mdi mdi-chevron-left" aria-hidden />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<BSTooltip id="month-next-tooltip">Next month</BSTooltip>}
+          >
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setMonthOffset((o) => o + 1)}
+              disabled={monthOffset >= 0}
+              aria-label="Next month"
+            >
+              <i className="mdi mdi-chevron-right" aria-hidden />
+            </Button>
+          </OverlayTrigger>
+        </div>
       </Card.Header>
       <Card.Body className="py-3">
-        <div className="d-flex flex-wrap gap-3 align-items-center">
+        <div className="d-flex flex-wrap gap-3 align-items-start">
           <div>
             <span className="small text-muted">Money in</span>
             <div className="fw-medium text-success">
               ${formatMoney(comparison.moneyIn.current)}
-              {comparison.hasPreviousData && (
-                <DeltaBadge delta={comparison.moneyIn} />
-              )}
             </div>
+            {comparison.hasPreviousData && (
+              <DeltaBadge delta={comparison.moneyIn} />
+            )}
           </div>
           <div>
             <span className="small text-muted">Money out</span>
             <div className="fw-medium text-danger">
               ${formatMoney(comparison.moneyOut.current)}
-              {comparison.hasPreviousData && (
-                <DeltaBadge delta={comparison.moneyOut} invert />
-              )}
             </div>
+            {comparison.hasPreviousData && (
+              <DeltaBadge delta={comparison.moneyOut} invert />
+            )}
           </div>
           <div>
             <span className="small text-muted">Charges</span>
-            <div className="fw-medium">
-              {comparison.charges.current}
-              {comparison.hasPreviousData && (
-                <DeltaBadge delta={comparison.charges} invert />
-              )}
-            </div>
+            <div className="fw-medium">{comparison.charges.current}</div>
+            {comparison.hasPreviousData && (
+              <DeltaBadge delta={comparison.charges} invert />
+            )}
           </div>
           {comparison.currentTopCategory && (
             <div>
