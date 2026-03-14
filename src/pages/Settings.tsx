@@ -658,7 +658,7 @@ export function Settings() {
         </Card.Body>
       </Card>
 
-      <Card className="grid-margin mb-4">
+      <Card className="grid-margin mb-4 appearance-card">
         <Card.Header as="h5" className="mb-0">
           Appearance
         </Card.Header>
@@ -675,11 +675,11 @@ export function Settings() {
                 <button
                   key={id}
                   type="button"
-                  className="border rounded-circle p-0 d-flex align-items-center justify-content-center"
+                  className="accent-swatch border rounded-circle p-0 d-flex align-items-center justify-content-center"
                   style={{
                     width: 40,
                     height: 40,
-                    background: palette.primary,
+                    background: `linear-gradient(135deg, ${palette.gradientStart}, ${palette.gradientEnd})`,
                     borderWidth: isSelected ? 3 : 1,
                     borderColor: isSelected
                       ? 'var(--vantura-text)'

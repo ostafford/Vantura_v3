@@ -30,6 +30,43 @@
   --vantura-table-striped-bg: rgba(0, 0, 0, 0.03);
   /* Theme-aware table hover */
   --vantura-table-hover-bg: rgba(0, 0, 0, 0.06);
+  /* Stat card semantic backgrounds (light theme) */
+  --vantura-stat-success-bg: #d4f4ee;
+  --vantura-stat-danger-bg: #ffe4ec;
+  --vantura-stat-info-bg: #e3f2fd;
+  --vantura-stat-primary-bg: #f3e5f5;
+  /* Stat card subtle gradients (light) */
+  --vantura-stat-success-gradient: linear-gradient(
+    135deg,
+    #d4f4ee 0%,
+    #b8ebe2 100%
+  );
+  --vantura-stat-danger-gradient: linear-gradient(
+    135deg,
+    #ffe4ec 0%,
+    #ffc9d4 100%
+  );
+  --vantura-stat-info-gradient: linear-gradient(
+    135deg,
+    #e3f2fd 0%,
+    #bbdefb 100%
+  );
+  --vantura-stat-primary-gradient: linear-gradient(
+    135deg,
+    #f3e5f5 0%,
+    #e1bee7 100%
+  );
+  /* Compact gradient cards (light) — theme-aware */
+  --vantura-gradient-success: linear-gradient(to right, #84d9d2, #07cdae);
+  --vantura-gradient-danger: linear-gradient(to right, #ffbf96, #fe7096);
+  --vantura-gradient-info: linear-gradient(to right, #90caf9, #047edf 99%);
+  --vantura-gradient-primary: var(--vantura-primary-gradient);
+  /* Appearance card (Settings) — theme-aware subtle gradient */
+  --vantura-appearance-card-bg: linear-gradient(
+    135deg,
+    var(--vantura-surface) 0%,
+    var(--vantura-content-bg) 100%
+  );
 }
 
 [data-theme='dark'] {
@@ -57,6 +94,43 @@
   --vantura-table-striped-bg: rgba(255, 255, 255, 0.05);
   /* Theme-aware table hover — stronger so hover is clear in dark mode */
   --vantura-table-hover-bg: rgba(255, 255, 255, 0.12);
+  /* Stat card semantic backgrounds (dark theme) */
+  --vantura-stat-success-bg: #0f4d44;
+  --vantura-stat-danger-bg: #4a2430;
+  --vantura-stat-info-bg: #0d2d4a;
+  --vantura-stat-primary-bg: #2a1b3d;
+  /* Stat card subtle gradients (dark) */
+  --vantura-stat-success-gradient: linear-gradient(
+    135deg,
+    #0f4d44 0%,
+    #0a3d36 100%
+  );
+  --vantura-stat-danger-gradient: linear-gradient(
+    135deg,
+    #4a2430 0%,
+    #3a1c28 100%
+  );
+  --vantura-stat-info-gradient: linear-gradient(
+    135deg,
+    #0d2d4a 0%,
+    #0a2240 100%
+  );
+  --vantura-stat-primary-gradient: linear-gradient(
+    135deg,
+    #2a1b3d 0%,
+    #1f1430 100%
+  );
+  /* Compact gradient cards (dark) — theme-aware */
+  --vantura-gradient-success: linear-gradient(to right, #1a7a6a, #0d4d42);
+  --vantura-gradient-danger: linear-gradient(to right, #8b3a4d, #5c2836);
+  --vantura-gradient-info: linear-gradient(to right, #0d47a1, #01579b);
+  --vantura-gradient-primary: var(--vantura-primary-gradient);
+  /* Appearance card (Settings) — theme-aware subtle gradient */
+  --vantura-appearance-card-bg: linear-gradient(
+    135deg,
+    var(--vantura-surface) 0%,
+    var(--vantura-content-bg) 100%
+  );
 }
 
 /* Phase 12: Accent color overrides — user choice from Settings */
@@ -177,6 +251,36 @@ body {
 .card .card-description {
   color: var(--vantura-text-secondary);
   margin-bottom: 1.5rem;
+}
+
+/* Appearance card (Settings) — theme-aware gradient background */
+.appearance-card {
+  background: var(--vantura-appearance-card-bg);
+}
+
+/* Accent swatch buttons (Settings) — theme-aware hover/focus */
+.accent-swatch:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.accent-swatch:focus-visible {
+  outline: 2px solid var(--vantura-primary);
+  outline-offset: 2px;
+}
+
+/* Theme toggle (sidebar) — theme-aware so it aligns with light/dark choice */
+.theme-toggle-btn {
+  border-color: var(--vantura-border);
+  background-color: transparent;
+  color: var(--vantura-text);
+}
+.theme-toggle-btn:hover {
+  border-color: var(--vantura-border);
+  background-color: var(--vantura-sidebar-hover-bg);
+  color: var(--vantura-text);
+}
+.theme-toggle-btn:focus-visible {
+  outline: 2px solid var(--vantura-primary);
+  outline-offset: 2px;
 }
 
 /* Phase 10: Dark theme modal and surfaces */
@@ -465,21 +569,21 @@ body {
   height: 100%;
 }
 
-/* Phase 8: Purple React gradient card backgrounds */
+/* Phase 8: Purple React gradient card backgrounds — theme-aware */
 .bg-gradient-primary {
-  background: var(--vantura-primary-gradient);
+  background: var(--vantura-gradient-primary);
   color: white;
 }
 .bg-gradient-success {
-  background: linear-gradient(to right, #84d9d2, #07cdae);
+  background: var(--vantura-gradient-success);
   color: white;
 }
 .bg-gradient-info {
-  background: linear-gradient(to right, #90caf9, #047edf 99%);
+  background: var(--vantura-gradient-info);
   color: white;
 }
 .bg-gradient-danger {
-  background: linear-gradient(to right, #ffbf96, #fe7096);
+  background: var(--vantura-gradient-danger);
   color: white;
 }
 
@@ -496,15 +600,19 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .stat-card-flat--success {
+  background: var(--vantura-stat-success-gradient);
   border-left-color: var(--vantura-success);
 }
 .stat-card-flat--danger {
+  background: var(--vantura-stat-danger-gradient);
   border-left-color: var(--vantura-danger);
 }
 .stat-card-flat--info {
+  background: var(--vantura-stat-info-gradient);
   border-left-color: var(--vantura-info);
 }
 .stat-card-flat--primary {
+  background: var(--vantura-stat-primary-gradient);
   border-left-color: var(--vantura-primary);
 }
 .stat-card-flat__body {

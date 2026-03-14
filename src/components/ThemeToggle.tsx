@@ -20,6 +20,7 @@ export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
     <Button
       variant="outline-secondary"
       size="sm"
+      className="theme-toggle-btn"
       onClick={() => setTheme(next)}
       aria-label={`Switch to ${label} theme`}
     >
