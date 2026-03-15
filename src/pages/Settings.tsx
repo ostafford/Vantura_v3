@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useStore } from 'zustand'
-import { Card, Button, Modal, Spinner, Form } from 'react-bootstrap'
+import { Accordion, Button, Modal, Spinner, Form } from 'react-bootstrap'
 import { getAppSetting, setAppSetting, deleteDatabase } from '@/db'
 import { accentStore } from '@/stores/accentStore'
 import { syncStore } from '@/stores/syncStore'
@@ -301,6 +301,55 @@ export function Settings() {
   const accent = useStore(accentStore, (s) => s.accent)
   const setAccent = useStore(accentStore, (s) => s.setAccent)
   const navigate = useNavigate()
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
+    getNotificationsEnabled()
+  )
+
+  const SETTINGS_ACCORDION_KEY = 'vantura_settings_accordion'
+  const allSectionKeys = [
+    'help',
+    'appearance',
+    'payday',
+    'categorization',
+    'dashboard-sections',
+    ...(isNotificationSupported() ? (['notifications'] as const) : []),
+    'data',
+  ]
+  const [activeKeys, setActiveKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_ACCORDION_KEY)
+      if (!raw) return [...allSectionKeys]
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) return [...allSectionKeys]
+      const filtered = parsed.filter(
+        (k): k is string => typeof k === 'string' && allSectionKeys.includes(k)
+      )
+      return filtered.length > 0 ? filtered : [...allSectionKeys]
+    } catch {
+      return [...allSectionKeys]
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(SETTINGS_ACCORDION_KEY, JSON.stringify(activeKeys))
+    } catch {
+      /* ignore */
+    }
+  }, [activeKeys])
+  function handleAccordionSelect(
+    eventKey: string | string[] | null | undefined
+  ) {
+    if (Array.isArray(eventKey)) {
+      setActiveKeys(eventKey)
+      return
+    }
+    if (eventKey == null) return
+    setActiveKeys((prev) =>
+      prev.includes(eventKey)
+        ? prev.filter((k) => k !== eventKey)
+        : [...prev, eventKey]
+    )
+  }
 
   useEffect(() => {
     setLastSync(getAppSetting('last_sync'))
@@ -626,402 +675,414 @@ export function Settings() {
         </h3>
       </div>
 
-      <Card className="grid-margin mb-4">
-        <Card.Header as="h5" className="mb-0">
-          Help
-        </Card.Header>
-        <Card.Body>
-          <p className="small text-muted mb-2">
-            New to Vantura? Read the user guide or run the dashboard tour to see
-            how everything works.
-          </p>
-          <div className="d-flex flex-wrap gap-2">
-            <Link
-              to="/help"
-              className="btn btn-gradient-primary btn-sm"
-              aria-label="Open user guide"
-            >
-              User guide
-            </Link>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => {
-                setDashboardTourCompleted(false)
-                navigate('/')
-              }}
-              aria-label="Show dashboard tour again"
-            >
-              Show dashboard tour again
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
-
-      <Card className="grid-margin mb-4 appearance-card">
-        <Card.Header as="h5" className="mb-0">
-          Appearance
-        </Card.Header>
-        <Card.Body>
-          <h6 className="text-muted mb-2">Accent color</h6>
-          <p className="small text-muted mb-3">
-            Choose a color for buttons, charts, and highlights.
-          </p>
-          <div className="d-flex flex-wrap gap-2">
-            {(Object.keys(ACCENT_PALETTES) as AccentId[]).map((id) => {
-              const palette = ACCENT_PALETTES[id]
-              const isSelected = accent === id
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className="accent-swatch border rounded-circle p-0 d-flex align-items-center justify-content-center"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    background: `linear-gradient(135deg, ${palette.gradientStart}, ${palette.gradientEnd})`,
-                    borderWidth: isSelected ? 3 : 1,
-                    borderColor: isSelected
-                      ? 'var(--vantura-text)'
-                      : 'var(--vantura-border)',
-                  }}
-                  onClick={() => setAccent(id)}
-                  aria-label={`Select ${palette.label} accent`}
-                  aria-pressed={isSelected}
-                >
-                  {isSelected && (
-                    <i
-                      className="mdi mdi-check"
-                      style={{
-                        fontSize: '1.25rem',
-                        color: 'white',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                      }}
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </Card.Body>
-      </Card>
-
-      <Card className="grid-margin mb-4">
-        <Card.Header as="h5" className="mb-0">
-          Payday
-        </Card.Header>
-        <Card.Body>
-          <p className="small text-muted mb-3">
-            Used for spendable balance and PAYDAY trackers. Update when your pay
-            cycle changes (e.g. new job). When Monthly, Day is the date in the
-            month (1st–28th). If you&apos;re paid on the 29th–31st, choose 28th
-            and set Next payday to your actual date.
-          </p>
-          <Form onSubmit={handlePaydaySubmit}>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="settings-payday-frequency">
-                Frequency
-              </Form.Label>
-              <Form.Select
-                id="settings-payday-frequency"
-                value={paydayFrequency}
-                onChange={(e) =>
-                  setPaydayFrequency(e.target.value as PaydayFrequency)
-                }
-              >
-                <option value="WEEKLY">Weekly</option>
-                <option value="FORTNIGHTLY">Fortnightly</option>
-                <option value="MONTHLY">Monthly</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="settings-payday-day">Day</Form.Label>
-              <Form.Select
-                id="settings-payday-day"
-                value={effectivePaydayDay}
-                onChange={(e) => setPaydayDay(Number(e.target.value))}
-              >
-                {paydayDayOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="settings-payday-pay-amount">
-                Pay amount ($)
-              </Form.Label>
-              <Form.Control
-                id="settings-payday-pay-amount"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Optional"
-                value={paydayPayAmount}
-                onChange={(e) => setPaydayPayAmount(e.target.value)}
-                aria-label="Pay amount per pay period (optional)"
-              />
-              <Form.Text className="text-muted">
-                Optional. Used for Spendable context, alerts, and PAYDAY tracker
-                warnings.
-              </Form.Text>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label htmlFor="settings-next-payday">
-                Next payday
-              </Form.Label>
-              <Form.Control
-                id="settings-next-payday"
-                type="date"
-                value={nextPayday}
-                onChange={(e) => setNextPayday(e.target.value)}
-              />
-            </Form.Group>
-            {paydayError && (
-              <div className="text-danger small mb-2" role="alert">
-                {paydayError}
-              </div>
-            )}
-            {paydaySuccess && (
-              <span className="d-block mb-2 text-success small" role="status">
-                Payday settings updated.
-              </span>
-            )}
-            <Button type="submit" className="btn-gradient-primary" size="sm">
-              Save payday settings
-            </Button>
-          </Form>
-        </Card.Body>
-      </Card>
-
-      <Card className="grid-margin">
-        <Card.Header as="h5" className="mb-0">
-          Categorization rules
-        </Card.Header>
-        <Card.Body>
-          <CategorizationRulesForm />
-        </Card.Body>
-      </Card>
-
-      <Card className="grid-margin">
-        <Card.Header as="h5" className="mb-0">
-          Dashboard sections
-        </Card.Header>
-        <Card.Body>
-          <p className="small text-muted mb-3">
-            Reorder sections on the Dashboard. You can also drag sections to
-            reorder on the Dashboard itself.
-          </p>
-          <DashboardSectionOrderForm />
-        </Card.Body>
-      </Card>
-
-      {isNotificationSupported() && (
-        <Card className="grid-margin">
-          <Card.Header as="h5" className="mb-0">
-            Notifications
-          </Card.Header>
-          <Card.Body>
-            <p className="small text-muted mb-3">
-              Get a browser notification when upcoming charges are due soon
-              (within their reminder window). Requires browser permission.
+      <Accordion
+        activeKey={activeKeys}
+        onSelect={handleAccordionSelect}
+        alwaysOpen
+        className="settings-accordion"
+      >
+        <Accordion.Item eventKey="help">
+          <Accordion.Header as="h5" className="mb-0">
+            Help
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="small text-muted mb-2">
+              New to Vantura? Read the user guide or run the dashboard tour to
+              see how everything works.
             </p>
-            <Form.Check
-              type="switch"
-              id="settings-notifications-toggle"
-              label="Enable bill reminders"
-              checked={getNotificationsEnabled()}
-              onChange={async (e) => {
-                if (e.target.checked) {
-                  const perm = getNotificationPermission()
-                  if (perm !== 'granted') {
-                    const granted = await requestNotificationPermission()
-                    if (!granted) {
-                      toast.error(
-                        'Notification permission denied. Enable in browser settings.'
-                      )
-                      return
+            <div className="d-flex flex-wrap gap-2">
+              <Link
+                to="/help"
+                className="btn btn-gradient-primary btn-sm"
+                aria-label="Open user guide"
+              >
+                User guide
+              </Link>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => {
+                  setDashboardTourCompleted(false)
+                  navigate('/')
+                }}
+                aria-label="Show dashboard tour again"
+              >
+                Show dashboard tour again
+              </Button>
+            </div>
+          </Accordion.Body>
+        </Accordion.Item>
+
+        <Accordion.Item eventKey="appearance" className="appearance-section">
+          <Accordion.Header as="h5" className="mb-0">
+            Appearance
+          </Accordion.Header>
+          <Accordion.Body>
+            <h6 className="text-muted mb-2">Accent color</h6>
+            <p className="small text-muted mb-3">
+              Choose a color for buttons, charts, and highlights.
+            </p>
+            <div className="d-flex flex-wrap gap-2">
+              {(Object.keys(ACCENT_PALETTES) as AccentId[]).map((id) => {
+                const palette = ACCENT_PALETTES[id]
+                const isSelected = accent === id
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className="accent-swatch border rounded-circle p-0 d-flex align-items-center justify-content-center"
+                    style={{
+                      width: 40,
+                      height: 40,
+                      background: `linear-gradient(135deg, ${palette.gradientStart}, ${palette.gradientEnd})`,
+                      borderWidth: isSelected ? 3 : 1,
+                      borderColor: isSelected
+                        ? 'var(--vantura-text)'
+                        : 'var(--vantura-border)',
+                    }}
+                    onClick={() => setAccent(id)}
+                    aria-label={`Select ${palette.label} accent`}
+                    aria-pressed={isSelected}
+                  >
+                    {isSelected && (
+                      <i
+                        className="mdi mdi-check"
+                        style={{
+                          fontSize: '1.25rem',
+                          color: 'white',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </Accordion.Body>
+        </Accordion.Item>
+
+        <Accordion.Item eventKey="payday">
+          <Accordion.Header as="h5" className="mb-0">
+            Payday
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="small text-muted mb-3">
+              Used for spendable balance and PAYDAY trackers. Update when your
+              pay cycle changes (e.g. new job). When Monthly, Day is the date in
+              the month (1st–28th). If you&apos;re paid on the 29th–31st, choose
+              28th and set Next payday to your actual date.
+            </p>
+            <Form onSubmit={handlePaydaySubmit}>
+              <Form.Group className="mb-2">
+                <Form.Label htmlFor="settings-payday-frequency">
+                  Frequency
+                </Form.Label>
+                <Form.Select
+                  id="settings-payday-frequency"
+                  value={paydayFrequency}
+                  onChange={(e) =>
+                    setPaydayFrequency(e.target.value as PaydayFrequency)
+                  }
+                >
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="FORTNIGHTLY">Fortnightly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </Form.Select>
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label htmlFor="settings-payday-day">Day</Form.Label>
+                <Form.Select
+                  id="settings-payday-day"
+                  value={effectivePaydayDay}
+                  onChange={(e) => setPaydayDay(Number(e.target.value))}
+                >
+                  {paydayDayOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+              <Form.Group className="mb-2">
+                <Form.Label htmlFor="settings-payday-pay-amount">
+                  Pay amount ($)
+                </Form.Label>
+                <Form.Control
+                  id="settings-payday-pay-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Optional"
+                  value={paydayPayAmount}
+                  onChange={(e) => setPaydayPayAmount(e.target.value)}
+                  aria-label="Pay amount per pay period (optional)"
+                />
+                <Form.Text className="text-muted">
+                  Optional. Used for Spendable context, alerts, and PAYDAY
+                  tracker warnings.
+                </Form.Text>
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label htmlFor="settings-next-payday">
+                  Next payday
+                </Form.Label>
+                <Form.Control
+                  id="settings-next-payday"
+                  type="date"
+                  value={nextPayday}
+                  onChange={(e) => setNextPayday(e.target.value)}
+                />
+              </Form.Group>
+              {paydayError && (
+                <div className="text-danger small mb-2" role="alert">
+                  {paydayError}
+                </div>
+              )}
+              {paydaySuccess && (
+                <span className="d-block mb-2 text-success small" role="status">
+                  Payday settings updated.
+                </span>
+              )}
+              <Button type="submit" className="btn-gradient-primary" size="sm">
+                Save payday settings
+              </Button>
+            </Form>
+          </Accordion.Body>
+        </Accordion.Item>
+
+        <Accordion.Item eventKey="categorization">
+          <Accordion.Header as="h5" className="mb-0">
+            Categorization rules
+          </Accordion.Header>
+          <Accordion.Body>
+            <CategorizationRulesForm />
+          </Accordion.Body>
+        </Accordion.Item>
+
+        <Accordion.Item eventKey="dashboard-sections">
+          <Accordion.Header as="h5" className="mb-0">
+            Dashboard sections
+          </Accordion.Header>
+          <Accordion.Body>
+            <p className="small text-muted mb-3">
+              Reorder sections on the Dashboard. You can also drag sections to
+              reorder on the Dashboard itself.
+            </p>
+            <DashboardSectionOrderForm />
+          </Accordion.Body>
+        </Accordion.Item>
+
+        {isNotificationSupported() && (
+          <Accordion.Item eventKey="notifications">
+            <Accordion.Header as="h5" className="mb-0">
+              Notifications
+            </Accordion.Header>
+            <Accordion.Body>
+              <p className="small text-muted mb-3">
+                Get a browser notification when upcoming charges are due soon
+                (within their reminder window). Requires browser permission.
+              </p>
+              <Form.Check
+                type="switch"
+                id="settings-notifications-toggle"
+                label="Enable bill reminders"
+                checked={notificationsEnabled}
+                onChange={async (e) => {
+                  const next = e.target.checked
+                  if (next) {
+                    const perm = getNotificationPermission()
+                    if (perm !== 'granted') {
+                      const granted = await requestNotificationPermission()
+                      if (!granted) {
+                        toast.error(
+                          'Notification permission denied. Enable in browser settings.'
+                        )
+                        return
+                      }
                     }
                   }
-                }
-                setNotificationsEnabled(e.target.checked)
-                toast.success(
-                  e.target.checked
-                    ? 'Bill reminders enabled.'
-                    : 'Bill reminders disabled.'
-                )
-              }}
-            />
-          </Card.Body>
-        </Card>
-      )}
+                  setNotificationsEnabled(next)
+                  setNotificationsEnabledState(next)
+                  toast.success(
+                    next
+                      ? 'Bill reminders enabled.'
+                      : 'Bill reminders disabled.'
+                  )
+                }}
+              />
+            </Accordion.Body>
+          </Accordion.Item>
+        )}
 
-      <Card className="grid-margin">
-        <Card.Header as="h5" className="mb-0">
-          Data
-        </Card.Header>
-        <Card.Body>
-          {isDemoMode && (
-            <div
-              className="alert alert-info mb-4"
-              role="status"
-              id="settings-demo-banner"
-            >
-              You&apos;re using sample data. Clear all data below to connect
-              your real Up Bank account.
-            </div>
-          )}
-          <div className="mb-4">
-            <h6 className="text-muted mb-2">Re-sync with Up Bank</h6>
-            <p className="small text-muted mb-2">
-              Sync downloads your Up Bank transactions to this device only. No
-              cloud storage is used; we don&apos;t have servers that store your
-              data.
-            </p>
-            <p className="small text-muted mb-2">
-              Re-syncs all transactions, including category changes made in the
-              Up Bank app.
-            </p>
-            <p className="small text-muted mb-2">
-              Last synced: {formatLastSync(lastSync)}
-            </p>
-            <Button
-              className="btn-gradient-primary"
-              size="sm"
-              onClick={handleReSync}
-              disabled={syncing || isDemoMode}
-              aria-label="Re-sync with Up Bank"
-              aria-busy={syncing}
-            >
-              {syncing ? (
-                <>
-                  <Spinner
-                    animation="border"
-                    size="sm"
-                    className="me-1"
-                    role="status"
-                    aria-hidden="true"
-                  />
-                  Syncing…
-                </>
-              ) : (
-                'Re-sync now'
-              )}
-            </Button>
-            {syncing && syncProgress && (
-              <p
-                className="small text-muted mt-2 mb-0"
+        <Accordion.Item eventKey="data">
+          <Accordion.Header as="h5" className="mb-0">
+            Data
+          </Accordion.Header>
+          <Accordion.Body>
+            {isDemoMode && (
+              <div
+                className="alert alert-info mb-4"
                 role="status"
-                aria-live="polite"
+                id="settings-demo-banner"
               >
-                {syncProgress.phase === 'done'
-                  ? 'Complete.'
-                  : syncProgress.phase === 'transactions' &&
-                      syncProgress.fetched != null
-                    ? `Fetched ${syncProgress.fetched} transactions…`
-                    : `Syncing ${syncProgress.phase}…`}
-              </p>
+                You&apos;re using sample data. Clear all data below to connect
+                your real Up Bank account.
+              </div>
             )}
-            {syncError && (
-              <span className="d-block mt-2 text-danger small" role="alert">
-                {syncError}
-              </span>
-            )}
-          </div>
-
-          <hr />
-
-          {!isDemoMode && (
             <div className="mb-4">
-              <h6 className="text-muted mb-2">Personal Access Token</h6>
+              <h6 className="text-muted mb-2">Re-sync with Up Bank</h6>
               <p className="small text-muted mb-2">
-                If your token has expired (e.g. 48-hour token from Up Bank),
-                update it here. Your passphrase is required; other data is not
-                deleted.
+                Sync downloads your Up Bank transactions to this device only. No
+                cloud storage is used; we don&apos;t have servers that store
+                your data.
+              </p>
+              <p className="small text-muted mb-2">
+                Re-syncs all transactions, including category changes made in
+                the Up Bank app.
+              </p>
+              <p className="small text-muted mb-2">
+                Last synced: {formatLastSync(lastSync)}
+              </p>
+              <Button
+                className="btn-gradient-primary"
+                size="sm"
+                onClick={handleReSync}
+                disabled={syncing || isDemoMode}
+                aria-label="Re-sync with Up Bank"
+                aria-busy={syncing}
+              >
+                {syncing ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-1"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Syncing…
+                  </>
+                ) : (
+                  'Re-sync now'
+                )}
+              </Button>
+              {syncing && syncProgress && (
+                <p
+                  className="small text-muted mt-2 mb-0"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {syncProgress.phase === 'done'
+                    ? 'Complete.'
+                    : syncProgress.phase === 'transactions' &&
+                        syncProgress.fetched != null
+                      ? `Fetched ${syncProgress.fetched} transactions…`
+                      : `Syncing ${syncProgress.phase}…`}
+                </p>
+              )}
+              {syncError && (
+                <span className="d-block mt-2 text-danger small" role="alert">
+                  {syncError}
+                </span>
+              )}
+            </div>
+
+            <hr />
+
+            {!isDemoMode && (
+              <div className="mb-4">
+                <h6 className="text-muted mb-2">Personal Access Token</h6>
+                <p className="small text-muted mb-2">
+                  If your token has expired (e.g. 48-hour token from Up Bank),
+                  update it here. Your passphrase is required; other data is not
+                  deleted.
+                </p>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => {
+                    setUpdateTokenError(null)
+                    setShowUpdateTokenModal(true)
+                  }}
+                  aria-label="Update Personal Access Token"
+                >
+                  Update Personal Access Token
+                </Button>
+                {updateTokenSuccess && (
+                  <span
+                    className="d-block mt-2 text-success small"
+                    role="status"
+                  >
+                    Personal Access Token updated. You can re-sync now.
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!isDemoMode && <hr />}
+
+            <div className="mb-4">
+              <h6 className="text-muted mb-2">Export profile settings</h6>
+              <p className="small text-muted mb-2">
+                Exports only appearance and configuration (colors, payday setup,
+                trackers, upcoming charges, chart preferences). Does not export
+                bank transactions, account numbers, or API tokens. The file is
+                encrypted with the passphrase you choose.
               </p>
               <Button
                 variant="outline-primary"
                 size="sm"
                 onClick={() => {
-                  setUpdateTokenError(null)
-                  setShowUpdateTokenModal(true)
+                  setExportError(null)
+                  setShowExportModal(true)
                 }}
-                aria-label="Update Personal Access Token"
+                aria-label="Export settings to file"
               >
-                Update Personal Access Token
+                Export settings to file
               </Button>
-              {updateTokenSuccess && (
-                <span className="d-block mt-2 text-success small" role="status">
-                  Personal Access Token updated. You can re-sync now.
-                </span>
-              )}
             </div>
-          )}
 
-          {!isDemoMode && <hr />}
+            <div className="mb-4">
+              <h6 className="text-muted mb-2">Import profile settings</h6>
+              <p className="small text-muted mb-2">
+                Imports appearance and configuration into this browser. Does not
+                import transactions or API tokens. Use to restore your setup on
+                a new device.
+              </p>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => {
+                  setImportError(null)
+                  setShowImportModal(true)
+                }}
+                aria-label="Import settings from file"
+              >
+                Choose settings file
+              </Button>
+            </div>
 
-          <div className="mb-4">
-            <h6 className="text-muted mb-2">Export profile settings</h6>
-            <p className="small text-muted mb-2">
-              Exports only appearance and configuration (colors, payday setup,
-              trackers, upcoming charges, chart preferences). Does not export
-              bank transactions, account numbers, or API tokens. The file is
-              encrypted with the passphrase you choose.
-            </p>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => {
-                setExportError(null)
-                setShowExportModal(true)
-              }}
-              aria-label="Export settings to file"
-            >
-              Export settings to file
-            </Button>
-          </div>
+            <hr />
 
-          <div className="mb-4">
-            <h6 className="text-muted mb-2">Import profile settings</h6>
-            <p className="small text-muted mb-2">
-              Imports appearance and configuration into this browser. Does not
-              import transactions or API tokens. Use to restore your setup on a
-              new device.
-            </p>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => {
-                setImportError(null)
-                setShowImportModal(true)
-              }}
-              aria-label="Import settings from file"
-            >
-              Choose settings file
-            </Button>
-          </div>
-
-          <hr />
-
-          <div>
-            <h6 className="text-muted mb-2">Clear all data</h6>
-            <p className="small text-muted mb-2">
-              Permanently delete all local data. You will need to re-enter your
-              passphrase and Personal Access Token (re-onboard).
-            </p>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => setShowClearModal(true)}
-              aria-label="Clear all data"
-            >
-              Clear all data
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
+            <div>
+              <h6 className="text-muted mb-2">Clear all data</h6>
+              <p className="small text-muted mb-2">
+                Permanently delete all local data. You will need to re-enter
+                your passphrase and Personal Access Token (re-onboard).
+              </p>
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => setShowClearModal(true)}
+                aria-label="Clear all data"
+              >
+                Clear all data
+              </Button>
+            </div>
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
 
       <Modal
         show={showClearModal}

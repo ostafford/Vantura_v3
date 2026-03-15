@@ -23,16 +23,21 @@ export function ToastProvider() {
   }, [show, hide])
 
   return (
-    <ToastContainer position="top-end" className="p-3" style={{ zIndex: 9999 }}>
+    <ToastContainer
+      position="top-center"
+      containerPosition="fixed"
+      className="p-3"
+      style={{ zIndex: 9999 }}
+    >
       <Toast
         show={show}
         onClose={hide}
         autohide
         delay={AUTO_HIDE_MS}
         bg={variantToBootstrap(variant)}
-        className="bg-opacity-90"
+        className="bg-opacity-90 toast-fit-content"
       >
-        <ToastBody className="text-white">{message}</ToastBody>
+        <ToastBody className="text-white text-center">{message}</ToastBody>
       </Toast>
     </ToastContainer>
   )

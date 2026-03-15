@@ -239,6 +239,39 @@ export function Dashboard() {
     }
   }, [])
 
+  function renderSectionCell(id: DashboardSectionId) {
+    const isDragOver = dragOverId === id
+    const tourAttr = TOUR_DATA_ATTRS[id]
+    return (
+      <div
+        key={id}
+        className="dashboard-grid-cell"
+        data-section-id={id}
+        {...(tourAttr ? { 'data-tour': tourAttr } : {})}
+        onDragOver={(e: React.DragEvent) => handleSectionDragOver(e, id)}
+        onDragLeave={handleSectionDragLeave}
+        onDrop={(e: React.DragEvent) => handleSectionDrop(e, id)}
+        onDragEnd={handleSectionDragEnd}
+        style={{
+          outline: isDragOver ? '2px dashed var(--vantura-primary)' : undefined,
+          borderRadius: 6,
+        }}
+      >
+        <div className="dashboard-grid-card-wrapper">
+          <span
+            className="dashboard-drag-handle text-muted"
+            aria-label="Drag to reorder section"
+            draggable
+            onDragStart={(e: React.DragEvent) => handleSectionDragStart(e, id)}
+          >
+            <i className="mdi mdi-drag-vertical" aria-hidden />
+          </span>
+          {getSectionComponent(id)}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -343,45 +376,9 @@ export function Dashboard() {
         </Modal.Footer>
       </Modal>
 
-      <Row className="dashboard-grid">
-        {sectionOrder.map((id) => {
-          const isDragOver = dragOverId === id
-          const tourAttr = TOUR_DATA_ATTRS[id]
-          return (
-            <Col
-              key={id}
-              md={6}
-              className="dashboard-grid-cell"
-              data-section-id={id}
-              {...(tourAttr ? { 'data-tour': tourAttr } : {})}
-              draggable
-              onDragStart={(e: React.DragEvent) =>
-                handleSectionDragStart(e, id)
-              }
-              onDragOver={(e: React.DragEvent) => handleSectionDragOver(e, id)}
-              onDragLeave={handleSectionDragLeave}
-              onDrop={(e: React.DragEvent) => handleSectionDrop(e, id)}
-              onDragEnd={handleSectionDragEnd}
-              style={{
-                outline: isDragOver
-                  ? '2px dashed var(--vantura-primary)'
-                  : undefined,
-                borderRadius: 6,
-              }}
-            >
-              <div className="dashboard-grid-card-wrapper">
-                <span
-                  className="dashboard-drag-handle text-muted"
-                  aria-label="Drag to reorder section"
-                >
-                  <i className="mdi mdi-drag-vertical" aria-hidden />
-                </span>
-                {getSectionComponent(id)}
-              </div>
-            </Col>
-          )
-        })}
-      </Row>
+      <div className="dashboard-grid">
+        {sectionOrder.map((id) => renderSectionCell(id))}
+      </div>
     </div>
   )
 }

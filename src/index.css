@@ -183,6 +183,23 @@
   --vantura-chart-series-6: #f2a654;
 }
 
+/* Form check / switch — clear on/off in dark mode */
+[data-theme='dark'] .form-check-input {
+  background-color: var(--vantura-surface);
+  border-color: var(--vantura-border);
+}
+[data-theme='dark'] .form-check-input:checked {
+  background-color: var(--vantura-primary);
+  border-color: var(--vantura-primary);
+}
+[data-theme='dark'] .form-check-input:focus {
+  border-color: var(--vantura-primary);
+  box-shadow: 0 0 0 0.2rem rgba(182, 109, 255, 0.25);
+}
+[data-theme='dark'] .form-check-label {
+  color: var(--vantura-text);
+}
+
 /* Phase 12: Accent color overrides — user choice from Settings */
 [data-accent='purple'] {
   --vantura-primary: #b66dff;
@@ -301,6 +318,90 @@ body {
 .card .card-description {
   color: var(--vantura-text-secondary);
   margin-bottom: 1.5rem;
+}
+
+/* Theme-aware list group (Settings dashboard sections, analytics, etc.) */
+.list-group {
+  --bs-list-group-bg: var(--vantura-surface);
+  --bs-list-group-color: var(--vantura-text);
+  --bs-list-group-border-color: var(--vantura-border);
+}
+.list-group-item {
+  background-color: var(--vantura-surface);
+  color: var(--vantura-text);
+  border-color: var(--vantura-border);
+}
+.list-group-item:hover {
+  background-color: var(--vantura-table-hover-bg);
+  color: var(--vantura-text);
+}
+
+/* Settings accordion — card-like appearance, theme-aware */
+.settings-accordion.accordion {
+  --bs-accordion-bg: transparent;
+  --bs-accordion-border-color: var(--vantura-border);
+  --bs-accordion-btn-bg: var(--vantura-surface);
+  --bs-accordion-active-bg: var(--vantura-surface);
+  --bs-accordion-btn-color: var(--vantura-text);
+  --bs-accordion-active-color: var(--vantura-text);
+}
+.settings-accordion .accordion-item {
+  background: var(--vantura-card-bg);
+  border: 0;
+  margin-bottom: 2.5rem;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+.settings-accordion .accordion-item:last-of-type {
+  margin-bottom: 0;
+}
+.settings-accordion .accordion-button {
+  background-color: var(--vantura-surface);
+  color: var(--vantura-text);
+  border: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+  padding: 1rem 1.5rem;
+  box-shadow: none;
+}
+.settings-accordion .accordion-button:not(.collapsed) {
+  background-color: var(--vantura-surface);
+  color: var(--vantura-text);
+}
+.settings-accordion .accordion-button:hover {
+  background-color: var(--vantura-table-hover-bg);
+  color: var(--vantura-text);
+}
+.settings-accordion .accordion-button:focus {
+  box-shadow: none;
+  outline: 0;
+  background-color: var(--vantura-surface);
+}
+.settings-accordion .accordion-button:focus-visible {
+  outline: 2px solid var(--vantura-primary);
+  outline-offset: -2px;
+}
+.settings-accordion .accordion-button::after {
+  filter: none;
+  opacity: 0.8;
+}
+[data-theme='dark'] .settings-accordion .accordion-button::after {
+  filter: invert(1);
+}
+.settings-accordion .accordion-body {
+  background: var(--vantura-card-bg);
+  color: var(--vantura-text);
+  padding: 1.5rem;
+  border-top: 1px solid var(--vantura-border);
+}
+@media (max-width: 767px) {
+  .settings-accordion .accordion-body {
+    padding: 1.25rem;
+  }
+}
+.settings-accordion .accordion-item.appearance-section .accordion-button,
+.settings-accordion .accordion-item.appearance-section .accordion-body {
+  background: var(--vantura-appearance-card-bg);
 }
 
 /* Appearance card (Settings) — theme-aware gradient background */
@@ -439,17 +540,23 @@ body {
   gap: 0;
 }
 
-/* Dashboard 2-column grid (Monarch-inspired) */
+/* Dashboard: 2-column grid, fixed-height cards, responsive */
 .dashboard-grid {
   --dashboard-gap: 1.5rem;
-  row-gap: var(--dashboard-gap);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--dashboard-gap);
+  grid-auto-rows: 520px;
 }
 .dashboard-grid-cell {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+.dashboard-grid-cell .dashboard-drag-handle {
   cursor: grab;
 }
-.dashboard-grid-cell:active {
+.dashboard-grid-cell:active .dashboard-drag-handle {
   cursor: grabbing;
 }
 .dashboard-grid-card-wrapper {
@@ -474,7 +581,7 @@ body {
   top: 0.5rem;
   right: 0.5rem;
   z-index: 2;
-  cursor: grab;
+  padding: 0.25rem;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -489,10 +596,11 @@ body {
 }
 @media (max-width: 767px) {
   .dashboard-grid {
+    grid-template-columns: 1fr;
     --dashboard-gap: 1rem;
   }
   .dashboard-grid-card-wrapper > .card > .card-body {
-    max-height: none;
+    max-height: 520px;
   }
   .dashboard-drag-handle {
     opacity: 1;
@@ -1269,4 +1377,10 @@ body {
   border: 0;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   color: var(--vantura-text);
+}
+
+/* Toast: width fits content, avoids oversized box for short messages */
+.toast-fit-content {
+  width: max-content;
+  min-width: 10rem;
 }
