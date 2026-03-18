@@ -564,12 +564,14 @@ body {
 .dashboard-grid {
   --dashboard-gap: 1.5rem;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Auto-reflow to 1 column before content gets clipped on resize */
+  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
   gap: var(--dashboard-gap);
 }
 .dashboard-grid-cell {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
 }
 .dashboard-grid-card-wrapper {
@@ -577,6 +579,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
 }
 .dashboard-grid-card-wrapper > .card {
@@ -596,7 +599,6 @@ body {
 }
 @media (max-width: 767px) {
   .dashboard-grid {
-    grid-template-columns: 1fr;
     --dashboard-gap: 1rem;
   }
 }
