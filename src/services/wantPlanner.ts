@@ -333,3 +333,177 @@ export function estimatePayPeriodsToFund(
   const raw = Math.ceil(remainingCents / perPayCents)
   return Math.max(1, Math.ceil(raw * behavioralMultiplier))
 }
+
+export type WantScheduleTone = 'success' | 'warning' | 'danger' | 'secondary'
+
+export type WantScheduleStatus =
+  | 'ahead'
+  | 'onTrack'
+  | 'atRisk'
+  | 'offTrack'
+  | 'noTargetDate'
+  | 'noPace'
+
+export interface WantScheduleHealthInput {
+  remainingCents: number
+  perPayCents: number
+  payPeriodDays: number
+  behavioralMultiplier: number
+  targetDate: string | null
+  warningLateDays?: number
+  now?: Date
+}
+
+export interface WantScheduleHealth {
+  status: WantScheduleStatus
+  tone: WantScheduleTone
+  projectedPayPeriods: number | null
+  projectedCompletionDate: string | null
+  daysDeltaToTarget: number | null
+}
+
+function toUtcDateOnly(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  )
+}
+
+function parseIsoDate(dateLike: string): Date | null {
+  const value = String(dateLike).trim()
+  if (!value) return null
+  const parsed = new Date(`${value}T12:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+export function getWantScheduleHealth(
+  input: WantScheduleHealthInput
+): WantScheduleHealth {
+  const warningLateDays = Math.max(0, input.warningLateDays ?? 45)
+  const now = toUtcDateOnly(input.now ?? new Date())
+  const target = input.targetDate ? parseIsoDate(input.targetDate) : null
+  if (!target) {
+    return {
+      status: 'noTargetDate',
+      tone: 'secondary',
+      projectedPayPeriods: null,
+      projectedCompletionDate: null,
+      daysDeltaToTarget: null,
+    }
+  }
+
+  const projectedPayPeriods = estimatePayPeriodsToFund(
+    input.remainingCents,
+    input.perPayCents,
+    input.behavioralMultiplier
+  )
+  if (projectedPayPeriods == null) {
+    return {
+      status: 'noPace',
+      tone: 'secondary',
+      projectedPayPeriods: null,
+      projectedCompletionDate: null,
+      daysDeltaToTarget: null,
+    }
+  }
+
+  const projectedDays = projectedPayPeriods * Math.max(1, input.payPeriodDays)
+  const projectedAt = new Date(
+    now.getTime() + projectedDays * 24 * 60 * 60 * 1000
+  )
+  const rawDaysDeltaToTarget = Math.ceil(
+    (projectedAt.getTime() - target.getTime()) / (24 * 60 * 60 * 1000)
+  )
+  const daysDeltaToTarget = Object.is(rawDaysDeltaToTarget, -0)
+    ? 0
+    : rawDaysDeltaToTarget
+
+  if (daysDeltaToTarget <= 0) {
+    return {
+      status: daysDeltaToTarget < 0 ? 'ahead' : 'onTrack',
+      tone: 'success',
+      projectedPayPeriods,
+      projectedCompletionDate: projectedAt.toISOString().slice(0, 10),
+      daysDeltaToTarget,
+    }
+  }
+  if (daysDeltaToTarget <= warningLateDays) {
+    return {
+      status: 'atRisk',
+      tone: 'warning',
+      projectedPayPeriods,
+      projectedCompletionDate: projectedAt.toISOString().slice(0, 10),
+      daysDeltaToTarget,
+    }
+  }
+  return {
+    status: 'offTrack',
+    tone: 'danger',
+    projectedPayPeriods,
+    projectedCompletionDate: projectedAt.toISOString().slice(0, 10),
+    daysDeltaToTarget,
+  }
+}
+
+export function formatMixedDurationFromDays(daysRaw: number): string {
+  const days = Math.max(0, Math.abs(Math.round(daysRaw)))
+  if (days === 0) return '0 days'
+  const years = Math.floor(days / 365)
+  const afterYears = days % 365
+  const months = Math.floor(afterYears / 30)
+  const remDays = afterYears % 30
+  const parts: string[] = []
+  if (years > 0) parts.push(`${years} year${years === 1 ? '' : 's'}`)
+  if (months > 0) parts.push(`${months} month${months === 1 ? '' : 's'}`)
+  if (remDays > 0) parts.push(`${remDays} day${remDays === 1 ? '' : 's'}`)
+  return parts.slice(0, 2).join(' ')
+}
+
+export function formatCompactDurationFromDays(daysRaw: number): string {
+  const days = Math.max(0, Math.abs(Math.round(daysRaw)))
+  if (days === 0) return '0d'
+  const years = Math.floor(days / 365)
+  const afterYears = days % 365
+  const months = Math.floor(afterYears / 30)
+  const remDays = afterYears % 30
+  const parts: string[] = []
+  if (years > 0) parts.push(`${years}y`)
+  if (months > 0) parts.push(`${months}mo`)
+  if (remDays > 0) parts.push(`${remDays}d`)
+  return parts.slice(0, 2).join(' ')
+}
+
+export interface WantExpectedPaceInput {
+  remainingCents: number
+  payPeriodDays: number
+  behavioralMultiplier: number
+  targetDate: string | null
+  now?: Date
+}
+
+/**
+ * Returns the pace needed per pay period to finish by target date.
+ * Null means the required pace cannot be estimated from current inputs.
+ */
+export function getExpectedPerPayCentsForTarget(
+  input: WantExpectedPaceInput
+): number | null {
+  const now = toUtcDateOnly(input.now ?? new Date())
+  const target = input.targetDate ? parseIsoDate(input.targetDate) : null
+  if (!target) return null
+  if (input.remainingCents <= 0) return 0
+  const msPerDay = 24 * 60 * 60 * 1000
+  const daysUntilTarget = Math.ceil(
+    (target.getTime() - now.getTime()) / msPerDay
+  )
+  if (daysUntilTarget <= 0) return input.remainingCents
+  const rawPeriodsLeft = Math.max(
+    1,
+    Math.ceil(daysUntilTarget / Math.max(1, input.payPeriodDays))
+  )
+  const effectivePeriodsLeft = Math.max(
+    1,
+    Math.floor(rawPeriodsLeft / Math.max(1, input.behavioralMultiplier))
+  )
+  return Math.ceil(input.remainingCents / effectivePeriodsLeft)
+}

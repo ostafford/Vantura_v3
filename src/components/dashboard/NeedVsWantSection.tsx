@@ -14,7 +14,6 @@ import {
   Collapse,
 } from 'react-bootstrap'
 import { Link } from 'react-router-dom'
-import { themeStore } from '@/stores/themeStore'
 import {
   getGoals,
   createGoal,
@@ -27,14 +26,17 @@ import {
 import { formatMoney } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { HelpPopover } from '@/components/HelpPopover'
-import { getProgressVariant } from '@/lib/progressVariant'
 import {
   buildWantPlannerSnapshot,
   getNeedsSummary,
   getWantSplitMode,
   setWantSplitMode,
   allocatePerWantPerPayCents,
-  estimatePayPeriodsToFund,
+  getWantScheduleHealth,
+  getExpectedPerPayCentsForTarget,
+  formatCompactDurationFromDays,
+  formatMixedDurationFromDays,
+  type WantScheduleTone,
   type WantSplitMode,
 } from '@/services/wantPlanner'
 import type React from 'react'
@@ -52,6 +54,54 @@ const WANT_ICONS = [
   { value: '\uD83D\uDCBB', label: 'Tech' },
   { value: '\uD83C\uDFCB\uFE0F', label: 'Fitness' },
 ]
+
+function toneTextClass(tone: WantScheduleTone): string {
+  if (tone === 'success') return 'text-success'
+  if (tone === 'warning') return 'text-warning'
+  if (tone === 'danger') return 'text-danger'
+  return 'text-muted'
+}
+
+function getBadgeToneClass(tone: WantScheduleTone): string {
+  if (tone === 'success') return 'text-bg-success'
+  if (tone === 'warning') return 'text-bg-warning'
+  if (tone === 'danger') return 'text-bg-danger'
+  return 'text-bg-secondary'
+}
+
+function getTrackerStyleProgress(progress: number): {
+  variant: 'danger' | 'warning' | 'success'
+  striped: boolean
+  animated: boolean
+} {
+  if (progress >= 100) {
+    return { variant: 'danger', striped: true, animated: true }
+  }
+  if (progress >= 81) {
+    return { variant: 'danger', striped: false, animated: false }
+  }
+  if (progress > 50) {
+    return { variant: 'warning', striped: false, animated: false }
+  }
+  return { variant: 'success', striped: false, animated: false }
+}
+
+function getPaceStatusBadgeLabel(
+  schedule: ReturnType<typeof getWantScheduleHealth>
+): string {
+  if (schedule.status === 'ahead') {
+    return `Status: Ahead ${formatCompactDurationFromDays(Math.abs(schedule.daysDeltaToTarget ?? 0))}`
+  }
+  if (schedule.status === 'onTrack') return 'Status: On track'
+  if (schedule.status === 'atRisk') {
+    return `Status: At risk ${formatCompactDurationFromDays(schedule.daysDeltaToTarget ?? 0)}`
+  }
+  if (schedule.status === 'offTrack') {
+    return `Status: Off track ${formatCompactDurationFromDays(schedule.daysDeltaToTarget ?? 0)}`
+  }
+  if (schedule.status === 'noPace') return 'Status: No pace yet'
+  return 'Status: Add target date'
+}
 
 export function NeedVsWantSection({
   dragHandleProps,
@@ -75,7 +125,6 @@ export function NeedVsWantSection({
     getWantSplitMode()
   )
   const [showAssumptions, setShowAssumptions] = useState(false)
-  const theme = useStore(themeStore, (s) => s.theme)
 
   const goals = getGoals()
   const active = goals.filter((g) => !g.completed_at)
@@ -95,6 +144,20 @@ export function NeedVsWantSection({
     splitMode,
     perWantAllocInputs
   )
+  const wantSchedules = active.map((g) =>
+    getWantScheduleHealth({
+      remainingCents: g.remaining,
+      perPayCents: perWantAlloc.get(g.id) ?? 0,
+      payPeriodDays: planner.payPeriodDays,
+      behavioralMultiplier: planner.behavioralMultiplier,
+      targetDate: g.target_date,
+    })
+  )
+  const topRecommendationTone: WantScheduleTone =
+    wantSchedules.find((s) => s.tone === 'danger')?.tone ??
+    wantSchedules.find((s) => s.tone === 'warning')?.tone ??
+    wantSchedules.find((s) => s.tone === 'success')?.tone ??
+    'secondary'
 
   const onSplitChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -317,7 +380,9 @@ export function NeedVsWantSection({
                 <div className="small text-muted">
                   Suggested toward wants before next pay
                 </div>
-                <div className="h5 mb-1 text-success">
+                <div
+                  className={`h5 mb-1 ${toneTextClass(topRecommendationTone)}`}
+                >
                   ${formatMoney(planner.recommendedBeforeNextPayCents)}
                 </div>
                 <div className="small text-muted">
@@ -367,39 +432,23 @@ export function NeedVsWantSection({
             <>
               {active.map((g) => {
                 const perPay = perWantAlloc.get(g.id) ?? 0
-                const estPeriods = estimatePayPeriodsToFund(
-                  g.remaining,
-                  perPay,
-                  planner.behavioralMultiplier
-                )
-                const estMonths =
-                  estPeriods != null
-                    ? (estPeriods * planner.payPeriodDays) / 30
+                const schedule = getWantScheduleHealth({
+                  remainingCents: g.remaining,
+                  perPayCents: perPay,
+                  payPeriodDays: planner.payPeriodDays,
+                  behavioralMultiplier: planner.behavioralMultiplier,
+                  targetDate: g.target_date,
+                })
+                const expectedPerPayCents =
+                  schedule.status === 'atRisk' || schedule.status === 'offTrack'
+                    ? getExpectedPerPayCentsForTarget({
+                        remainingCents: g.remaining,
+                        payPeriodDays: planner.payPeriodDays,
+                        behavioralMultiplier: planner.behavioralMultiplier,
+                        targetDate: g.target_date,
+                      })
                     : null
-                const hasElevatedSpend =
-                  planner.currentWeekMoneyOut >
-                    planner.avgWeeklyMoneyOut4Weeks &&
-                  planner.avgWeeklyMoneyOut4Weeks > 0
-                const weeklyOverspendCents = hasElevatedSpend
-                  ? planner.currentWeekMoneyOut -
-                    planner.avgWeeklyMoneyOut4Weeks
-                  : 0
-                const reclaimPerPayCents = Math.max(
-                  0,
-                  Math.round(
-                    weeklyOverspendCents * planner.weeksUntilNextPayday
-                  )
-                )
-                const boostedPerPayCents = perPay + reclaimPerPayCents
-                const improvedPeriods = estimatePayPeriodsToFund(
-                  g.remaining,
-                  boostedPerPayCents,
-                  planner.behavioralMultiplier
-                )
-                const periodsSaved =
-                  estPeriods != null && improvedPeriods != null
-                    ? Math.max(0, estPeriods - improvedPeriods)
-                    : 0
+                const progressStyle = getTrackerStyleProgress(g.progress)
                 return (
                   <div key={g.id} className="mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-1">
@@ -414,7 +463,34 @@ export function NeedVsWantSection({
                           {g.name}
                         </button>
                       </div>
-                      <div className="d-flex align-items-center gap-2">
+                      <div className="d-flex flex-column align-items-end gap-1">
+                        <div className="d-flex gap-1 align-items-center flex-wrap justify-content-end">
+                          <span
+                            className={`badge ${getBadgeToneClass(schedule.tone)}`}
+                            title={
+                              schedule.daysDeltaToTarget != null
+                                ? `Pace status detail: ${formatMixedDurationFromDays(
+                                    Math.abs(schedule.daysDeltaToTarget)
+                                  )}`
+                                : 'Pace status detail'
+                            }
+                          >
+                            {getPaceStatusBadgeLabel(schedule)}
+                          </span>
+                          <span
+                            className={`badge ${getBadgeToneClass(schedule.tone)}`}
+                          >
+                            Pace: ${formatMoney(perPay)}/{payPeriodLabel}
+                          </span>
+                          {expectedPerPayCents != null &&
+                            (schedule.status === 'atRisk' ||
+                              schedule.status === 'offTrack') && (
+                              <span className="badge text-bg-warning">
+                                Req: ${formatMoney(expectedPerPayCents)}/
+                                {payPeriodLabel}
+                              </span>
+                            )}
+                        </div>
                         <span className="small text-muted">
                           ${formatMoney(g.current_amount)} / $
                           {formatMoney(g.target_amount)}
@@ -433,59 +509,19 @@ export function NeedVsWantSection({
                     </div>
                     <ProgressBar
                       now={Math.min(100, g.progress)}
-                      variant={getProgressVariant(g.progress)}
-                      style={{ height: 8 }}
+                      variant={progressStyle.variant}
+                      striped={progressStyle.striped}
+                      animated={progressStyle.animated}
+                      label={`${Math.round(g.progress)}%`}
+                      style={{ height: 14 }}
                       aria-label={`${g.name} progress: ${Math.round(g.progress)}%`}
                     />
-                    <div className="small text-muted mt-1">
-                      {perPay > 0 ? (
-                        <>
-                          <span
-                            className={
-                              theme === 'dark'
-                                ? 'fw-medium text-muted'
-                                : 'fw-medium text-body'
-                            }
-                          >
-                            At your current pace: ~${formatMoney(perPay)}/
-                            {payPeriodLabel} toward this want.
-                          </span>
-                          {estPeriods != null && g.remaining > 0 && (
-                            <>
-                              {' '}
-                              You could reach it in about {estPeriods} pay
-                              period
-                              {estPeriods === 1 ? '' : 's'} (~
-                              {estMonths != null
-                                ? estMonths.toFixed(1)
-                                : '—'}{' '}
-                              months at this rate).
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-warning">
-                          No suggested amount before next pay right now.
-                        </span>
-                      )}
-                      {g.monthly_contribution != null && (
-                        <span className="ms-1">
-                          · Manual: ${formatMoney(g.monthly_contribution)}/month
-                          {g.target_date && ` · Target: ${g.target_date}`}
-                        </span>
-                      )}
-                    </div>
-                    {perPay > 0 &&
-                      periodsSaved > 0 &&
-                      weeklyOverspendCents > 0 && (
-                        <div className="small mt-1 text-warning">
-                          How to hit it sooner: if weekly outflow drops by about
-                          ${formatMoney(weeklyOverspendCents)} (back to your
-                          4-week average), this pace could improve by ~
-                          {periodsSaved} pay period
-                          {periodsSaved === 1 ? '' : 's'}.
-                        </div>
-                      )}
+                    {g.monthly_contribution != null && (
+                      <div className="small text-muted mt-1">
+                        Manual: ${formatMoney(g.monthly_contribution)}/month
+                        {g.target_date && ` · Target: ${g.target_date}`}
+                      </div>
+                    )}
                   </div>
                 )
               })}
