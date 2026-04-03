@@ -1,5 +1,5 @@
 /**
- * Shared chart data types used by dashboard bar charts (Insights, Savers).
+ * Shared chart data types used by dashboard bar charts (Insights).
  */
 
 export type InsightsChartDatum = {
@@ -8,22 +8,4 @@ export type InsightsChartDatum = {
   totalDollars: number
   fill: string
   stroke: string
-}
-
-export type SaversChartRow = {
-  id: string
-  name: string
-  current: number
-  remaining: number
-  goal: number
-  saver: {
-    id: string
-    name: string
-    current_balance: number
-    goal_amount: number | null
-    target_date: string | null
-    monthly_transfer: number | null
-    user_icon: string | null
-  }
-  currentFill: string
 }

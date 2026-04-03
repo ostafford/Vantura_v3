@@ -44,12 +44,6 @@ export function Sidebar({
   const navItems: NavItem[] = [
     { to: '/', label: 'Dashboard', icon: 'mdi-home', short: 'D' },
     {
-      to: '/plan',
-      label: 'Plan',
-      icon: 'mdi-scale-balance',
-      short: 'P',
-    },
-    {
       to: '/analytics',
       label: 'Analytics',
       icon: 'mdi-chart-box',

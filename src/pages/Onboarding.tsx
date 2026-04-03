@@ -474,9 +474,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <>
               <h5 className="mb-2">All set</h5>
               <p className="text-muted small mb-3">
-                You're ready to start tracking your finances. Create trackers to
-                monitor spending, view Spendable to see safe-to-spend amount,
-                and set saver goals to reach financial targets.
+                You&apos;re ready to start tracking your finances. Create
+                trackers to monitor spending, view Spendable to see your
+                safe-to-spend amount, and use Analytics for longer-term trends
+                and reports.
               </p>
               <p className="text-muted small mb-3">
                 New to Vantura? You can take a short dashboard tour or read the

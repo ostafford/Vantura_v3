@@ -33,11 +33,9 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'pay_amount_cents',
   'spendable_alert_below_cents',
   'spendable_alert_below_pct_pay',
-  'saver_chart_colors',
   'insights_category_colors',
   'dashboard_tour_completed',
   'dashboard_section_order',
-  'want_split_mode',
   'categorization_rules',
 ] as const
 
@@ -59,7 +57,6 @@ export interface ExportPayload {
   trackers: TrackerExportRow[]
   trackerCategories: { tracker_id: number; category_id: string }[]
   upcomingCharges: UpcomingChargeExportRow[]
-  goals?: GoalExportRow[]
 }
 
 export interface TrackerExportRow {
@@ -85,18 +82,6 @@ export interface UpcomingChargeExportRow {
   reminder_days_before?: number | null
   is_subscription?: number
   cancel_by_date?: string | null
-}
-
-export interface GoalExportRow {
-  name: string
-  target_amount: number
-  current_amount: number
-  monthly_contribution: number | null
-  target_date: string | null
-  icon: string | null
-  completed_at: string | null
-  priority_rank?: number | null
-  allocation_percent?: number | null
 }
 
 export interface ExportFileWrapper {
@@ -212,43 +197,6 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   return rows
 }
 
-function collectGoals(): GoalExportRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT name, target_amount, current_amount, monthly_contribution,
-            target_date, icon, completed_at, priority_rank, allocation_percent
-     FROM goals ORDER BY id`
-  )
-  const rows: GoalExportRow[] = []
-  while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      number,
-      number,
-      number | null,
-      string | null,
-      string | null,
-      string | null,
-      number | null,
-      number | null,
-    ]
-    rows.push({
-      name: r[0],
-      target_amount: r[1],
-      current_amount: r[2],
-      monthly_contribution: r[3],
-      target_date: r[4],
-      icon: r[5],
-      completed_at: r[6],
-      priority_rank: r[7],
-      allocation_percent: r[8],
-    })
-  }
-  stmt.free()
-  return rows
-}
-
 /**
  * Build the plain-text export payload (before encryption).
  */
@@ -257,7 +205,6 @@ export function buildExportPayload(): ExportPayload {
   const trackers = collectTrackers()
   const trackerCategories = collectTrackerCategories()
   const upcomingCharges = collectUpcomingCharges()
-  const goals = collectGoals()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -267,7 +214,6 @@ export function buildExportPayload(): ExportPayload {
     trackers,
     trackerCategories,
     upcomingCharges,
-    goals,
   }
 }
 
@@ -428,7 +374,6 @@ export interface ImportOptions {
   settings: boolean
   trackers: boolean
   upcomingCharges: boolean
-  goals: boolean
 }
 
 /** Apply whitelisted settings from payload. */
@@ -582,58 +527,6 @@ export function replaceUpcomingCharges(
   }
 }
 
-/** Replace goals with imported data. */
-export function replaceGoals(goals: GoalExportRow[]): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  db.run(`DELETE FROM goal_snapshots`)
-  db.run(`DELETE FROM goals`)
-
-  const now = new Date().toISOString()
-  const goalsArr = Array.isArray(goals) ? goals : []
-  for (const g of goalsArr) {
-    if (
-      typeof g.name !== 'string' ||
-      typeof g.target_amount !== 'number' ||
-      typeof g.current_amount !== 'number'
-    ) {
-      continue
-    }
-    const monthlyContribution =
-      typeof g.monthly_contribution === 'number' ? g.monthly_contribution : null
-    const targetDate =
-      typeof g.target_date === 'string' && g.target_date
-        ? g.target_date.slice(0, 10)
-        : null
-    const icon = g.icon != null && typeof g.icon === 'string' ? g.icon : null
-    const completedAt =
-      typeof g.completed_at === 'string' && g.completed_at
-        ? g.completed_at
-        : null
-    const priorityRank =
-      typeof g.priority_rank === 'number' ? g.priority_rank : null
-    const allocationPercent =
-      typeof g.allocation_percent === 'number' ? g.allocation_percent : null
-    db.run(
-      `INSERT INTO goals (name, target_amount, current_amount, monthly_contribution, target_date, icon, completed_at, priority_rank, allocation_percent, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        g.name,
-        g.target_amount,
-        g.current_amount,
-        monthlyContribution,
-        targetDate,
-        icon,
-        completedAt,
-        priorityRank,
-        allocationPercent,
-        now,
-        now,
-      ]
-    )
-  }
-}
-
 /**
  * Import payload into the database with optional section selection.
  * Only sections with options set to true will be applied; others are left unchanged.
@@ -654,9 +547,6 @@ export function importPayloadWithOptions(
   if (options.upcomingCharges) {
     replaceUpcomingCharges(payload.upcomingCharges ?? [])
   }
-  if (options.goals) {
-    replaceGoals(payload.goals ?? [])
-  }
   schedulePersist()
 }
 
@@ -669,6 +559,5 @@ export function importPayload(payload: ExportPayload): void {
     settings: true,
     trackers: true,
     upcomingCharges: true,
-    goals: true,
   })
 }

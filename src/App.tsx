@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useParams,
-} from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { themeStore } from '@/stores/themeStore'
@@ -20,22 +14,11 @@ import { AnalyticsLayout } from '@/pages/analytics/AnalyticsLayout'
 import { AnalyticsIndex } from '@/pages/analytics/AnalyticsIndex'
 import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
 import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
-import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
 import { AnalyticsInsights } from '@/pages/analytics/AnalyticsInsights'
 import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
-import { AnalyticsNetWorth } from '@/pages/analytics/AnalyticsNetWorth'
 import { AnalyticsMonthlyReview } from '@/pages/analytics/AnalyticsMonthlyReview'
-import { AnalyticsSaverDetail } from '@/pages/analytics/AnalyticsSaverDetail'
-import { AnalyticsWants } from '@/pages/analytics/AnalyticsWants'
-import { AnalyticsGoalDetail } from '@/pages/analytics/AnalyticsGoalDetail'
-function LegacyGoalsToWantsRedirect() {
-  const { goalId } = useParams<{ goalId: string }>()
-  if (!goalId) return <Navigate to="/analytics/wants" replace />
-  return <Navigate to={`/analytics/wants/${goalId}`} replace />
-}
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
-import { PlanPage } from '@/pages/PlanPage'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
 
@@ -213,7 +196,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
-            <Route path="plan" element={<PlanPage />} />
+            <Route path="plan" element={<Navigate to="/analytics" replace />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="analytics" element={<AnalyticsLayout />}>
               <Route index element={<AnalyticsIndex />} />
@@ -230,24 +213,36 @@ function AppContent() {
                 path="trackers/:trackerId"
                 element={<AnalyticsTrackersDetail />}
               />
-              <Route path="savers" element={<AnalyticsSavers />} />
+              <Route
+                path="savers"
+                element={<Navigate to="/analytics" replace />}
+              />
               <Route
                 path="savers/:saverId"
-                element={<AnalyticsSaverDetail />}
+                element={<Navigate to="/analytics" replace />}
               />
-              <Route path="wants" element={<AnalyticsWants />} />
-              <Route path="wants/:wantId" element={<AnalyticsGoalDetail />} />
+              <Route
+                path="wants"
+                element={<Navigate to="/analytics" replace />}
+              />
+              <Route
+                path="wants/:wantId"
+                element={<Navigate to="/analytics" replace />}
+              />
               <Route
                 path="goals"
-                element={<Navigate to="/analytics/wants" replace />}
+                element={<Navigate to="/analytics" replace />}
               />
               <Route
                 path="goals/:goalId"
-                element={<LegacyGoalsToWantsRedirect />}
+                element={<Navigate to="/analytics" replace />}
               />
               <Route path="insights" element={<AnalyticsInsights />} />
               <Route path="reports" element={<AnalyticsReports />} />
-              <Route path="net-worth" element={<AnalyticsNetWorth />} />
+              <Route
+                path="net-worth"
+                element={<Navigate to="/analytics" replace />}
+              />
               <Route
                 path="monthly-review"
                 element={<AnalyticsMonthlyReview />}

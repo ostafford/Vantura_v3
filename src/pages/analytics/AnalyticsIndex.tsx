@@ -28,39 +28,6 @@ export function AnalyticsIndex() {
       <Row className="mb-4 g-3">
         <Col xs={12} md={6} lg={3}>
           <Link
-            to="/analytics/net-worth"
-            className="text-decoration-none"
-            style={{ color: 'inherit' }}
-          >
-            <Card className="h-100 border">
-              <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
-                  <i
-                    className="mdi mdi-trending-up"
-                    style={{ fontSize: '1.25rem' }}
-                    aria-hidden
-                  />
-                </span>
-                <div>
-                  <h6 className="mb-1 fw-semibold">Net worth</h6>
-                  <p className="mb-0 text-muted small">
-                    Chart your total Up account balance over time (recorded on
-                    each sync).
-                  </p>
-                  <span className="small text-primary mt-1 d-inline-block">
-                    View net worth{' '}
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Link>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Link
             to="/analytics/reports"
             className="text-decoration-none"
             style={{ color: 'inherit' }}
@@ -118,72 +85,6 @@ export function AnalyticsIndex() {
                   </p>
                   <span className="small text-primary mt-1 d-inline-block">
                     View trackers{' '}
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Link>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Link
-            to="/analytics/savers"
-            className="text-decoration-none"
-            style={{ color: 'inherit' }}
-          >
-            <Card className="h-100 border">
-              <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
-                  <i
-                    className="mdi mdi-piggy-bank"
-                    style={{ fontSize: '1.25rem' }}
-                    aria-hidden
-                  />
-                </span>
-                <div>
-                  <h6 className="mb-1 fw-semibold">Savers</h6>
-                  <p className="mb-0 text-muted small">
-                    See saver balance over time and compare multiple savers in
-                    one view.
-                  </p>
-                  <span className="small text-primary mt-1 d-inline-block">
-                    View savers{' '}
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Link>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Link
-            to="/analytics/wants"
-            className="text-decoration-none"
-            style={{ color: 'inherit' }}
-          >
-            <Card className="h-100 border">
-              <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
-                  <i
-                    className="mdi mdi-scale-balance"
-                    style={{ fontSize: '1.25rem' }}
-                    aria-hidden
-                  />
-                </span>
-                <div>
-                  <h6 className="mb-1 fw-semibold">Wants</h6>
-                  <p className="mb-0 text-muted small">
-                    Track progress toward your wants and see growth over time.
-                    Add or edit wants from <strong>Plan</strong> in the sidebar.
-                  </p>
-                  <span className="small text-primary mt-1 d-inline-block">
-                    View wants{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
                   </span>
                 </div>
@@ -262,8 +163,8 @@ export function AnalyticsIndex() {
       <Card className="border">
         <Card.Body>
           <p className="mb-3 text-muted small">
-            Use your Dashboard for trackers, savers, upcoming charges, and the
-            weekly insights summary. Browse and filter all transactions on the
+            Use your Dashboard for trackers, upcoming charges, and the weekly
+            insights summary. Browse and filter all transactions on the
             Transactions page.
           </p>
           <div className="d-flex flex-wrap gap-2">

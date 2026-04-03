@@ -322,7 +322,6 @@ export function Settings() {
     settings: true,
     trackers: true,
     upcomingCharges: true,
-    goals: true,
   })
   const accent = useStore(accentStore, (s) => s.accent)
   const setAccent = useStore(accentStore, (s) => s.setAccent)
@@ -595,7 +594,6 @@ export function Settings() {
         settings: true,
         trackers: true,
         upcomingCharges: true,
-        goals: true,
       })
       setImportStep(2)
     } catch (err) {
@@ -1192,8 +1190,7 @@ export function Settings() {
           <Modal.Body id="update-token-modal-description">
             <p className="small text-muted mb-3">
               Enter your passphrase and a new Personal Access Token from the Up
-              Bank app. Your existing data (savers, trackers, etc.) will be
-              kept.
+              Bank app. Your existing data (trackers, etc.) will be kept.
             </p>
             <Form.Group className="mb-3">
               <Form.Label htmlFor="update-token-passphrase">
@@ -1542,24 +1539,6 @@ export function Settings() {
                           )}
                         </div>
                       </div>
-                      <div>
-                        <Form.Check
-                          type="checkbox"
-                          id="import-opt-goals"
-                          label="Wants"
-                          checked={importOptions.goals}
-                          onChange={(e) =>
-                            setImportOptions((o) => ({
-                              ...o,
-                              goals: e.target.checked,
-                            }))
-                          }
-                          aria-label="Import wants"
-                        />
-                        <div className="small text-muted ms-4 mt-1">
-                          {(importPreview.goals ?? []).length} want(s) in file
-                        </div>
-                      </div>
                     </div>
                   )
                 })()}
@@ -1581,8 +1560,7 @@ export function Settings() {
                   !importPreview ||
                   (!importOptions.settings &&
                     !importOptions.trackers &&
-                    !importOptions.upcomingCharges &&
-                    !importOptions.goals)
+                    !importOptions.upcomingCharges)
                 }
                 aria-busy={importing}
               >

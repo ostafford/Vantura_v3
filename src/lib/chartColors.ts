@@ -5,7 +5,6 @@
 
 import { getAppSetting, setAppSetting } from '@/db'
 
-const SAVER_CHART_COLORS_KEY = 'saver_chart_colors'
 const INSIGHTS_CATEGORY_COLORS_KEY = 'insights_category_colors'
 
 /** Sentinel for uncategorised transactions (null/empty category_id). */
@@ -41,24 +40,6 @@ function parseJsonMap(key: string): Record<string, string> {
     // ignore corrupted or invalid JSON
   }
   return {}
-}
-
-export function getSaverChartColors(): Record<string, string> {
-  return parseJsonMap(SAVER_CHART_COLORS_KEY)
-}
-
-export function setSaverChartColor(saverId: string, hex: string | null): void {
-  const map = parseJsonMap(SAVER_CHART_COLORS_KEY)
-  if (hex == null || hex === '') {
-    delete map[saverId]
-  } else {
-    map[saverId] = hex
-  }
-  setAppSetting(SAVER_CHART_COLORS_KEY, JSON.stringify(map))
-}
-
-export function clearSaverChartColor(saverId: string): void {
-  setSaverChartColor(saverId, null)
 }
 
 export function getInsightsCategoryColors(): Record<string, string> {

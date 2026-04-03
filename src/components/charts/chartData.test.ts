@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import type { InsightsChartDatum, SaversChartRow } from '@/types/charts'
+import type { InsightsChartDatum } from '@/types/charts'
 
 /**
- * Chart data building logic (mirrors InsightsSection / SaversSection).
+ * Chart data building logic (mirrors InsightsSection).
  * Tests ensure maxDomain and chartData shape are safe for D3 charts.
  */
 
@@ -28,57 +28,6 @@ function buildInsightsChartData(
   const maxDomain = Math.max(
     1,
     ...chartData.map((d) => d.totalDollars).filter(Number.isFinite)
-  )
-  return { chartData, maxDomain }
-}
-
-function buildSaversChartData(
-  savers: {
-    id: string
-    name: string
-    current_balance: number
-    goal_amount: number | null
-  }[],
-  saverColors: Record<string, string>,
-  defaultFill: string
-): { chartData: SaversChartRow[]; maxDomain: number } {
-  const chartData: SaversChartRow[] = savers.map((s) => {
-    const currentDollars = Number.isFinite(s.current_balance / 100)
-      ? s.current_balance / 100
-      : 0
-    const goalDollars =
-      s.goal_amount != null &&
-      s.goal_amount > 0 &&
-      Number.isFinite(s.goal_amount / 100)
-        ? s.goal_amount / 100
-        : currentDollars
-    const remaining = Math.max(
-      0,
-      Number.isFinite(goalDollars - currentDollars)
-        ? goalDollars - currentDollars
-        : 0
-    )
-    return {
-      id: s.id,
-      name: s.name,
-      current: currentDollars,
-      remaining: s.goal_amount != null && s.goal_amount > 0 ? remaining : 0,
-      goal: goalDollars,
-      saver: {
-        id: s.id,
-        name: s.name,
-        current_balance: s.current_balance,
-        goal_amount: s.goal_amount,
-        target_date: null,
-        monthly_transfer: null,
-        user_icon: null,
-      },
-      currentFill: saverColors[s.id] ?? defaultFill,
-    }
-  })
-  const maxDomain = Math.max(
-    1,
-    ...chartData.map((d) => d.current + d.remaining).filter(Number.isFinite)
   )
   return { chartData, maxDomain }
 }
@@ -164,49 +113,5 @@ describe('buildInsightsChartData', () => {
     expect(groceriesWeek1?.stroke).toBe('#ff0000')
     expect(groceriesWeek2?.fill).toBe('#ff0000')
     expect(groceriesWeek2?.stroke).toBe('#ff0000')
-  })
-})
-
-describe('buildSaversChartData', () => {
-  const defaultFill = 'var(--vantura-primary)'
-
-  it('returns empty chartData and maxDomain 1 for empty savers', () => {
-    const { chartData, maxDomain } = buildSaversChartData([], {}, defaultFill)
-    expect(chartData).toHaveLength(0)
-    expect(maxDomain).toBe(1)
-  })
-
-  it('returns one row and maxDomain >= 1 for single saver', () => {
-    const { chartData, maxDomain } = buildSaversChartData(
-      [
-        {
-          id: 's1',
-          name: 'Holiday',
-          current_balance: 10000,
-          goal_amount: 50000,
-        },
-      ],
-      {},
-      defaultFill
-    )
-    expect(chartData).toHaveLength(1)
-    expect(chartData[0].id).toBe('s1')
-    expect(chartData[0].name).toBe('Holiday')
-    expect(chartData[0].current).toBe(100)
-    expect(chartData[0].remaining).toBe(400)
-    expect(maxDomain).toBe(500)
-  })
-
-  it('maxDomain is at least 1 when all values are zero', () => {
-    const { chartData, maxDomain } = buildSaversChartData(
-      [
-        { id: 's1', name: 'A', current_balance: 0, goal_amount: null },
-        { id: 's2', name: 'B', current_balance: 0, goal_amount: 0 },
-      ],
-      {},
-      defaultFill
-    )
-    expect(chartData).toHaveLength(2)
-    expect(maxDomain).toBe(1)
   })
 })

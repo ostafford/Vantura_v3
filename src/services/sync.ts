@@ -1,10 +1,17 @@
 /**
  * Sync orchestration: initial sync and subsequent sync with Up Bank API.
- * Upserts accounts, transactions, categories; sets up savers; recalculates trackers.
+ * Upserts accounts, transactions, categories; recalculates trackers.
  */
 
 import { getDb, setAppSetting, getAppSetting, schedulePersist } from '@/db'
-
+import {
+  fetchAccounts,
+  fetchAllTransactions,
+  fetchCategories,
+  type UpAccount,
+  type UpTransaction,
+  type UpCategory,
+} from '@/api/upBank'
 /** Return today as YYYY-MM-DD for date-only comparison. */
 function todayDateString(): string {
   const d = new Date()
@@ -42,22 +49,9 @@ export function advanceNextPaydayIfNeeded(): void {
   const nextStr = next.toISOString().slice(0, 10)
   setAppSetting('next_payday', nextStr)
 }
-import {
-  fetchAccounts,
-  fetchAllTransactions,
-  fetchCategories,
-  type UpAccount,
-  type UpTransaction,
-  type UpCategory,
-} from '@/api/upBank'
-import {
-  recordNetWorthSnapshot,
-  recordNetWorthSnapshotByType,
-} from '@/services/netWorth'
-import { recordSaverBalanceSnapshots } from '@/services/savers'
 
 export type SyncProgress = {
-  phase: 'accounts' | 'transactions' | 'categories' | 'savers' | 'done'
+  phase: 'accounts' | 'transactions' | 'categories' | 'done'
   fetched?: number
   hasMore?: boolean
 }
@@ -95,15 +89,11 @@ function upsertTransaction(tx: UpTransaction): void {
   const categoryId = rel?.category?.data?.id ?? null
   const parentCategoryId = rel?.parentCategory?.data?.id ?? null
   const amount = a.amount?.valueInBaseUnits ?? 0
-  // Don't store transfer_account_id on purchases that triggered a round-up (API may send round-up
-  // destination on the purchase); only the actual round-up credit and real transfers should be tagged.
   const transferAccountId =
     amount < 0 && a.roundUp != null
       ? null
       : (rel?.transferAccount?.data?.id ?? null)
   const isRoundUp = a.roundUp != null ? 1 : 0
-  // round_up_parent_id: Up API does not expose a parent transaction relationship on round-up
-  // resources in the list response; leave null. When present, Transactions page shows round-ups under parent.
   const roundUpParentId: string | null = null
   run(
     `INSERT OR REPLACE INTO transactions (
@@ -144,67 +134,6 @@ function upsertCategory(cat: UpCategory): void {
     `INSERT OR REPLACE INTO categories (id, name, parent_id) VALUES (?, ?, ?)`,
     [cat.id, cat.attributes?.name ?? cat.id, parentId]
   )
-}
-
-function recordNetWorthByAccountType(): void {
-  const db = getDb()
-  if (!db) return
-  const stmt = db.prepare(
-    `SELECT account_type, COALESCE(SUM(balance), 0)
-     FROM accounts GROUP BY account_type`
-  )
-  while (stmt.step()) {
-    const row = stmt.get() as [string, number]
-    recordNetWorthSnapshotByType(row[0], row[1])
-  }
-  stmt.free()
-}
-
-function setupSavers(accounts: UpAccount[]): void {
-  const savers = accounts.filter((a) => a.attributes?.accountType === 'SAVER')
-  const now = new Date().toISOString()
-  for (const acc of savers) {
-    const a = acc.attributes
-    const balance = a.balance?.valueInBaseUnits ?? 0
-    run(
-      `INSERT INTO savers (id, name, icon, current_balance, goal_amount, target_date, monthly_transfer, auto_transfer_day, is_goal_based, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, 0, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name,
-         icon = excluded.icon,
-         current_balance = excluded.current_balance,
-         updated_at = excluded.updated_at`,
-      [acc.id, a.displayName ?? 'Saver', null, balance, now, now]
-    )
-  }
-  reconcileRemovedSavers(savers.map((s) => s.id))
-}
-
-/**
- * Remove local savers (and their balance snapshots) that no longer exist in the
- * Up API response. Called after upserting active savers so the card never shows
- * stale / deleted saver accounts.
- */
-function reconcileRemovedSavers(activeIds: string[]): void {
-  const db = getDb()
-  if (!db) return
-  if (activeIds.length === 0) {
-    db.run(`DELETE FROM saver_balance_snapshots`)
-    db.run(`DELETE FROM savers`)
-    schedulePersist()
-    return
-  }
-  const placeholders = activeIds.map(() => '?').join(',')
-  db.run(
-    `DELETE FROM saver_balance_snapshots WHERE saver_id NOT IN (${placeholders})`,
-    activeIds
-  )
-  db.run(`DELETE FROM savers WHERE id NOT IN (${placeholders})`, activeIds)
-  schedulePersist()
-}
-
-function updateSavers(accounts: UpAccount[]): void {
-  setupSavers(accounts)
 }
 
 /**
@@ -259,7 +188,7 @@ export function recalculateTrackers(): void {
 }
 
 /**
- * Perform initial sync: accounts, transactions, categories, savers; set last_sync and onboarding_complete.
+ * Perform initial sync: accounts, transactions, categories; set last_sync and onboarding_complete.
  * Caller must have already stored encrypted token and salt (onboarding step 3).
  */
 export async function performInitialSync(
@@ -282,26 +211,13 @@ export async function performInitialSync(
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)
   for (const c of categories) upsertCategory(c)
-  progressCallback({ phase: 'savers' })
-  setupSavers(accounts)
-  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   setAppSetting('onboarding_complete', '1')
-  const db = getDb()
-  if (db) {
-    const stmt = db.prepare('SELECT COALESCE(SUM(balance), 0) FROM accounts')
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    const total = row ? Number(row[0]) : 0
-    recordNetWorthSnapshot(total)
-    recordNetWorthByAccountType()
-  }
   progressCallback({ phase: 'done' })
 }
 
 /**
- * Subsequent sync: fetch accounts, transactions since last_sync, update savers, recalculate trackers.
+ * Subsequent sync: fetch accounts, transactions since last_sync, recalculate trackers.
  */
 export async function performSync(
   apiToken: string,
@@ -325,21 +241,8 @@ export async function performSync(
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)
   for (const c of categories) upsertCategory(c)
-  progressCallback({ phase: 'savers' })
-  updateSavers(accounts)
-  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
-  const db = getDb()
-  if (db) {
-    const stmt = db.prepare('SELECT COALESCE(SUM(balance), 0) FROM accounts')
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    const total = row ? Number(row[0]) : 0
-    recordNetWorthSnapshot(total)
-    recordNetWorthByAccountType()
-  }
   progressCallback({ phase: 'done' })
 }
 
@@ -369,22 +272,7 @@ export async function performFullSync(
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)
   for (const c of categories) upsertCategory(c)
-  progressCallback({ phase: 'savers' })
-  updateSavers(accounts)
-  recordSaverBalanceSnapshots()
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
-  const dbFull = getDb()
-  if (dbFull) {
-    const stmt = dbFull.prepare(
-      'SELECT COALESCE(SUM(balance), 0) FROM accounts'
-    )
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    const total = row ? Number(row[0]) : 0
-    recordNetWorthSnapshot(total)
-    recordNetWorthByAccountType()
-  }
   progressCallback({ phase: 'done' })
 }

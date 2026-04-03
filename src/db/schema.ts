@@ -5,7 +5,17 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 11
+const SCHEMA_VERSION = 14
+
+function tableExists(database: Database, name: string): boolean {
+  const stmt = database.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`
+  )
+  stmt.bind([name])
+  const exists = stmt.step()
+  stmt.free()
+  return exists
+}
 
 const DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS accounts (
@@ -76,22 +86,6 @@ const DDL_STATEMENTS = [
     FOREIGN KEY (tracker_id) REFERENCES trackers(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
-  `CREATE TABLE IF NOT EXISTS savers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    icon TEXT,
-    current_balance INTEGER NOT NULL,
-    goal_amount INTEGER,
-    target_date TEXT,
-    monthly_transfer INTEGER,
-    auto_transfer_day INTEGER,
-    is_goal_based INTEGER DEFAULT 0,
-    interest_rate REAL,
-    completed_at TEXT,
-    user_icon TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS upcoming_charges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -110,49 +104,12 @@ const DDL_STATEMENTS = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
-  `CREATE TABLE IF NOT EXISTS net_worth_snapshots (
-    snapshot_date TEXT PRIMARY KEY,
-    total_balance_cents INTEGER NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS transaction_user_data (
     transaction_id TEXT PRIMARY KEY,
     user_notes TEXT,
     user_category_override TEXT,
     is_income INTEGER DEFAULT 0,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS net_worth_type_snapshots (
-    snapshot_date TEXT NOT NULL,
-    account_type TEXT NOT NULL,
-    total_balance_cents INTEGER NOT NULL,
-    PRIMARY KEY (snapshot_date, account_type)
-  )`,
-  `CREATE TABLE IF NOT EXISTS goals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    target_amount INTEGER NOT NULL,
-    current_amount INTEGER NOT NULL DEFAULT 0,
-    monthly_contribution INTEGER,
-    target_date TEXT,
-    icon TEXT,
-    completed_at TEXT,
-    priority_rank INTEGER,
-    allocation_percent INTEGER,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
-    saver_id TEXT NOT NULL,
-    snapshot_date TEXT NOT NULL,
-    balance_cents INTEGER NOT NULL,
-    PRIMARY KEY (saver_id, snapshot_date)
-  )`,
-  `CREATE TABLE IF NOT EXISTS goal_snapshots (
-    goal_id INTEGER NOT NULL,
-    snapshot_date TEXT NOT NULL,
-    current_amount INTEGER NOT NULL,
-    target_amount INTEGER NOT NULL,
-    PRIMARY KEY (goal_id, snapshot_date)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -236,8 +193,10 @@ export function runMigrations(database: Database): void {
     )
   }
   if (version < 6) {
-    database.run(`ALTER TABLE savers ADD COLUMN completed_at TEXT`)
-    database.run(`ALTER TABLE savers ADD COLUMN user_icon TEXT`)
+    if (tableExists(database, 'savers')) {
+      database.run(`ALTER TABLE savers ADD COLUMN completed_at TEXT`)
+      database.run(`ALTER TABLE savers ADD COLUMN user_icon TEXT`)
+    }
     database.run(
       `CREATE TABLE IF NOT EXISTS net_worth_type_snapshots (
         snapshot_date TEXT NOT NULL,
@@ -355,6 +314,34 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['11']
+    )
+  }
+  if (version < 12) {
+    database.run(`DROP TABLE IF EXISTS goal_snapshots`)
+    database.run(`DROP TABLE IF EXISTS goals`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['12']
+    )
+  }
+  if (version < 13) {
+    database.run(`DROP TABLE IF EXISTS saver_balance_snapshots`)
+    database.run(`DROP TABLE IF EXISTS savers`)
+    database.run(
+      `DELETE FROM net_worth_type_snapshots WHERE account_type = 'SAVER'`
+    )
+    database.run(`DELETE FROM app_settings WHERE key = 'saver_chart_colors'`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['13']
+    )
+  }
+  if (version < 14) {
+    database.run(`DROP TABLE IF EXISTS net_worth_snapshots`)
+    database.run(`DROP TABLE IF EXISTS net_worth_type_snapshots`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['14']
     )
   }
 }

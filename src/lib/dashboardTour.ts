@@ -33,16 +33,6 @@ export function startDashboardTour(onCompleted?: () => void): void {
       },
     },
     {
-      element: '[data-tour="savers"]',
-      popover: {
-        title: 'Savers',
-        description:
-          'Your Up Bank saver accounts. Set goals and target dates to track progress.',
-        side: 'right' as const,
-        align: 'start' as const,
-      },
-    },
-    {
       element: '[data-tour="trackers"]',
       popover: {
         title: 'Trackers',
@@ -73,21 +63,11 @@ export function startDashboardTour(onCompleted?: () => void): void {
       },
     },
     {
-      element: '[data-tour="need_vs_want"]',
-      popover: {
-        title: 'Plan summary',
-        description:
-          'Quick view of suggested savings toward wants and your need estimate. Open the full Plan page from the sidebar or "View breakdown" for assumptions, split options, and your want list.',
-        side: 'top' as const,
-        align: 'center' as const,
-      },
-    },
-    {
       element: '[data-tour="sidebar-nav"]',
       popover: {
         title: 'Navigation',
         description:
-          'Dashboard, Plan (needs vs wants workspace), Analytics (trends and reports), Transactions (filter and search), Settings (sync, payday, theme), and Help (user guide).',
+          'Dashboard, Analytics (trends and reports), Transactions (filter and search), Settings (sync, payday, theme), and Help (user guide).',
         side: 'right' as const,
         align: 'start' as const,
       },

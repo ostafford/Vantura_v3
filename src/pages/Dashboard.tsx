@@ -11,12 +11,10 @@ import {
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
-import { SaversSection } from '@/components/dashboard/SaversSection'
 import { InsightsSection } from '@/components/dashboard/InsightsSection'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
-import { NeedVsWantSection } from '@/components/dashboard/NeedVsWantSection'
 import { StatCard } from '@/components/StatCard'
 import {
   shouldShowDashboardTour,
@@ -55,11 +53,9 @@ const MONTH_NAMES = [
 ]
 
 const TOUR_DATA_ATTRS: Partial<Record<DashboardSectionId, string>> = {
-  savers: 'savers',
   insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
-  need_vs_want: 'need_vs_want',
 }
 
 export function Dashboard() {
@@ -246,10 +242,6 @@ export function Dashboard() {
       switch (id) {
         case 'month_summary':
           return <MonthSummarySection dragHandleProps={dragHandleProps} />
-        case 'savers':
-          return <SaversSection dragHandleProps={dragHandleProps} />
-        case 'need_vs_want':
-          return <NeedVsWantSection dragHandleProps={dragHandleProps} />
         case 'insights':
           return <InsightsSection dragHandleProps={dragHandleProps} />
         case 'trackers':
