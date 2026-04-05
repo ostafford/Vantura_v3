@@ -1,44 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useParams,
-} from 'react-router-dom'
+import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { themeStore } from '@/stores/themeStore'
 import { accentStore } from '@/stores/accentStore'
 import { sessionStore } from '@/stores/sessionStore'
-import { Layout } from '@/layout/Layout'
 import { ToastProvider } from '@/components/ToastProvider'
-import { Dashboard } from '@/pages/Dashboard'
-import { Transactions } from '@/pages/Transactions'
-import { AnalyticsLayout } from '@/pages/analytics/AnalyticsLayout'
-import { AnalyticsIndex } from '@/pages/analytics/AnalyticsIndex'
-import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
-import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
-import { AnalyticsInsights } from '@/pages/analytics/AnalyticsInsights'
-import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
-import { AnalyticsMonthlyReview } from '@/pages/analytics/AnalyticsMonthlyReview'
-import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
-import { Settings } from '@/pages/Settings'
-import { Help } from '@/pages/Help'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
-
-function SaverAccountTransactionsRedirect() {
-  const { saverId } = useParams<{ saverId: string }>()
-  const id = saverId?.trim()
-  if (!id) return <Navigate to="/analytics/savers" replace />
-  const q = new URLSearchParams({
-    saverActivity: '1',
-    linkedAccountId: id,
-  })
-  return <Navigate to={`/transactions?${q.toString()}`} replace />
-}
+import { appRouter } from '@/appRouter'
 
 function AppContent() {
   const [ready, setReady] = useState(false)
@@ -169,64 +140,7 @@ function AppContent() {
   return (
     <>
       <ToastProvider />
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="plan" element={<Navigate to="/analytics" replace />} />
-            <Route path="transactions" element={<Transactions />} />
-            <Route path="analytics" element={<AnalyticsLayout />}>
-              <Route index element={<AnalyticsIndex />} />
-              <Route
-                path="budget"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route
-                path="income"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route path="trackers" element={<AnalyticsTrackers />} />
-              <Route
-                path="trackers/:trackerId"
-                element={<AnalyticsTrackersDetail />}
-              />
-              <Route path="savers" element={<AnalyticsSavers />} />
-              <Route
-                path="savers/:saverId"
-                element={<SaverAccountTransactionsRedirect />}
-              />
-              <Route
-                path="wants"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route
-                path="wants/:wantId"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route
-                path="goals"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route
-                path="goals/:goalId"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route path="insights" element={<AnalyticsInsights />} />
-              <Route path="reports" element={<AnalyticsReports />} />
-              <Route
-                path="net-worth"
-                element={<Navigate to="/analytics" replace />}
-              />
-              <Route
-                path="monthly-review"
-                element={<AnalyticsMonthlyReview />}
-              />
-            </Route>
-            <Route path="settings" element={<Settings />} />
-            <Route path="help" element={<Help />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={appRouter} />
     </>
   )
 }
