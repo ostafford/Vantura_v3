@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Card,
@@ -16,6 +16,7 @@ import {
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
   getTrackerCategoryIds,
+  getTrackersList,
   createTracker,
   updateTracker,
   deleteTracker,
@@ -131,6 +132,33 @@ export function TrackersSection({
     MONTHLY: 0,
   })
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
+
+  const trackerList = getTrackersList()
+  const usedFrequencies = new Set(
+    trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
+  )
+  const visibleScopeOptions = FREQUENCY_SCOPE_OPTIONS.filter((opt) =>
+    opt.value === 'ALL'
+      ? trackerList.length > 0
+      : usedFrequencies.has(opt.value as TrackerResetFrequency)
+  )
+  const frequencyInventoryKey = trackerList
+    .map((t) => t.reset_frequency)
+    .sort()
+    .join(',')
+
+  useEffect(() => {
+    const list = getTrackersList()
+    if (list.length === 0) return
+    const used = new Set(
+      list.map((t) => t.reset_frequency as TrackerResetFrequency)
+    )
+    const allowed = new Set<FrequencyScope>(['ALL'])
+    for (const f of used) allowed.add(f)
+    if (!allowed.has(selectedFrequencyScope)) {
+      setSelectedFrequencyScope('ALL')
+    }
+  }, [frequencyInventoryKey, selectedFrequencyScope])
 
   const activePeriodOffset = offsetByScope[selectedFrequencyScope]
   const resetActiveScopeToCurrentPeriod = () =>
@@ -489,27 +517,29 @@ export function TrackersSection({
               </div>
             </>
           )}
-          <div className="d-flex justify-content-center mt-1">
-            <div
-              className="btn-group btn-group-sm flex-wrap"
-              role="group"
-              aria-label="Select tracker frequency view"
-            >
-              {FREQUENCY_SCOPE_OPTIONS.map((scope) => (
-                <button
-                  key={scope.value}
-                  type="button"
-                  className={`btn btn-outline-secondary ${
-                    selectedFrequencyScope === scope.value ? 'active' : ''
-                  }`}
-                  onClick={() => setSelectedFrequencyScope(scope.value)}
-                  aria-pressed={selectedFrequencyScope === scope.value}
-                >
-                  {scope.label}
-                </button>
-              ))}
+          {visibleScopeOptions.length > 0 && (
+            <div className="d-flex justify-content-center mt-1">
+              <div
+                className="btn-group btn-group-sm flex-wrap"
+                role="group"
+                aria-label="Select tracker frequency view"
+              >
+                {visibleScopeOptions.map((scope) => (
+                  <button
+                    key={scope.value}
+                    type="button"
+                    className={`btn btn-outline-secondary ${
+                      selectedFrequencyScope === scope.value ? 'active' : ''
+                    }`}
+                    onClick={() => setSelectedFrequencyScope(scope.value)}
+                    aria-pressed={selectedFrequencyScope === scope.value}
+                  >
+                    {scope.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           {trackers.length > 0 && (
             <div
               className="small text-muted text-center mt-1 px-2"

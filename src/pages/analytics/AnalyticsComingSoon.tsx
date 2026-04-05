@@ -1,29 +1,15 @@
 import { Link } from 'react-router-dom'
 import { Card, Row, Col } from 'react-bootstrap'
+import { AnalyticsAtAGlanceSection } from '@/components/analytics/AnalyticsAtAGlanceSection'
 
 export function AnalyticsComingSoon() {
   return (
     <div className="grid-margin">
-      <Card className="mb-4 bg-gradient-primary text-white border-0">
-        <Card.Body className="text-center py-5">
-          <div className="mb-3">
-            <i
-              className="mdi mdi-chart-box opacity-90"
-              style={{ fontSize: '4rem' }}
-              aria-hidden
-            />
-          </div>
-          <h4 className="fw-bold mb-2 text-white">Analytics is coming soon</h4>
-          <p
-            className="mb-0 opacity-90"
-            style={{ maxWidth: '36rem', margin: '0 auto' }}
-          >
-            We are building detailed analytics to help you understand your
-            spending patterns, track progress over time, and see trends across
-            your finances. This will land in an upcoming update.
-          </p>
-        </Card.Body>
-      </Card>
+      <AnalyticsAtAGlanceSection />
+
+      <p className="mb-2 text-muted small">
+        More detailed analytics are rolling out in upcoming updates.
+      </p>
 
       <p className="mb-3 fw-medium">
         When Analytics is ready, you will be able to:

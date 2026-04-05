@@ -50,3 +50,34 @@ export function getMonthComparisonSemanticStrokes(
     previousStroke: isGood ? DANGER_COLOR : SUCCESS_COLOR,
   }
 }
+
+/**
+ * Semantic line colors for year-at-a-glance monthly series: compares **YTD sums**
+ * over parallel months. Pass **aligned** arrays of the same length (e.g. Jan–Apr
+ * this year vs Jan–Apr last year for a YTD view), not necessarily full 12 months.
+ */
+export function getYearMonthlySemanticStrokes(
+  currentMonthlyValues: number[],
+  previousMonthlyValues: number[],
+  metric: MonthMetric
+): { currentStroke: string; previousStroke: string } | null {
+  const n = Math.min(currentMonthlyValues.length, previousMonthlyValues.length)
+  if (n < 1) return null
+
+  let currentYtd = 0
+  let previousYtd = 0
+  for (let i = 0; i < n; i++) {
+    currentYtd += currentMonthlyValues[i] ?? 0
+    previousYtd += previousMonthlyValues[i] ?? 0
+  }
+
+  const isGood =
+    metric === 'spending'
+      ? currentYtd <= previousYtd
+      : currentYtd >= previousYtd
+
+  return {
+    currentStroke: isGood ? SUCCESS_COLOR : DANGER_COLOR,
+    previousStroke: isGood ? DANGER_COLOR : SUCCESS_COLOR,
+  }
+}

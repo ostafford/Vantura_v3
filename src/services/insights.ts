@@ -468,46 +468,50 @@ function makeDelta(current: number, previous: number): MonthDelta {
   return { current, previous, delta, direction }
 }
 
-function getPreviousMonthBounds(year: number, month: number) {
-  let prevMonth = month - 1
-  let prevYear = year
-  if (prevMonth < 1) {
-    prevMonth = 12
-    prevYear -= 1
-  }
-  const from = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`
-  const lastDay = new Date(prevYear, prevMonth, 0).getDate()
-  const to = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  return { from, to }
+function fmtCentsDelta(cents: number): string {
+  const abs = Math.abs(cents)
+  const dollars = Math.floor(abs / 100)
+  const remainder = abs % 100
+  return `${dollars}.${String(remainder).padStart(2, '0')}`
 }
 
-function getMonthLength(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
+/** Labels for period-over-period narratives (vs last month/year/week). */
+export type NarrativePeriod = 'month' | 'year' | 'week'
 
-function parseYearMonth(dateFrom: string): { year: number; month: number } {
-  return {
-    year: parseInt(dateFrom.slice(0, 4), 10),
-    month: parseInt(dateFrom.slice(5, 7), 10),
+function narrativePriorLabel(p: NarrativePeriod): string {
+  switch (p) {
+    case 'month':
+      return 'last month'
+    case 'year':
+      return 'last year'
+    case 'week':
+      return 'last week'
+    default:
+      return 'last month'
   }
 }
 
 /**
- * Compare current month metrics with the previous month and derive narrative
- * insights (wins, challenges, opportunities).
+ * Compare two arbitrary periods (current vs previous date ranges) and derive the same
+ * KPI deltas and narratives as the month card.
  */
-export function getMonthComparison(
+export function getPeriodComparison(
   currentFrom: string,
-  currentTo: string
+  currentTo: string,
+  previousFrom: string,
+  previousTo: string,
+  narrativePeriod: NarrativePeriod
 ): MonthComparisonData {
+  const prior = narrativePriorLabel(narrativePeriod)
+
   const curInsights = getInsightsForDateRange(currentFrom, currentTo)
   const curCategories = getCategoryBreakdownForDateRange(currentFrom, currentTo)
 
-  const year = parseInt(currentFrom.slice(0, 4), 10)
-  const month = parseInt(currentFrom.slice(5, 7), 10)
-  const prev = getPreviousMonthBounds(year, month)
-  const prevInsights = getInsightsForDateRange(prev.from, prev.to)
-  const prevCategories = getCategoryBreakdownForDateRange(prev.from, prev.to)
+  const prevInsights = getInsightsForDateRange(previousFrom, previousTo)
+  const prevCategories = getCategoryBreakdownForDateRange(
+    previousFrom,
+    previousTo
+  )
 
   const hasPreviousData =
     prevInsights.moneyIn !== 0 ||
@@ -527,31 +531,31 @@ export function getMonthComparison(
   if (hasPreviousData) {
     if (moneyIn.direction === 'up') {
       narratives.push({
-        label: `Income is up $${fmtCentsDelta(moneyIn.delta)} vs last month`,
+        label: `Income is up $${fmtCentsDelta(moneyIn.delta)} vs ${prior}`,
         type: 'win',
       })
     }
 
     if (moneyOut.direction === 'down') {
       narratives.push({
-        label: `Spending is down $${fmtCentsDelta(Math.abs(moneyOut.delta))} vs last month`,
+        label: `Spending is down $${fmtCentsDelta(Math.abs(moneyOut.delta))} vs ${prior}`,
         type: 'win',
       })
     } else if (moneyOut.direction === 'up') {
       narratives.push({
-        label: `Spending is up $${fmtCentsDelta(moneyOut.delta)} vs last month`,
+        label: `Spending is up $${fmtCentsDelta(moneyOut.delta)} vs ${prior}`,
         type: 'challenge',
       })
     }
 
     if (charges.direction === 'up') {
       narratives.push({
-        label: `${charges.delta} more charges than last month`,
+        label: `${charges.delta} more charges than ${prior}`,
         type: 'challenge',
       })
     } else if (charges.direction === 'down') {
       narratives.push({
-        label: `${Math.abs(charges.delta)} fewer charges than last month`,
+        label: `${Math.abs(charges.delta)} fewer charges than ${prior}`,
         type: 'win',
       })
     }
@@ -596,6 +600,144 @@ export function getMonthComparison(
     narratives,
     hasPreviousData,
   }
+}
+
+function getPreviousMonthBounds(year: number, month: number) {
+  let prevMonth = month - 1
+  let prevYear = year
+  if (prevMonth < 1) {
+    prevMonth = 12
+    prevYear -= 1
+  }
+  const from = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`
+  const lastDay = new Date(prevYear, prevMonth, 0).getDate()
+  const to = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return { from, to }
+}
+
+function getMonthLength(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
+}
+
+function parseYearMonth(dateFrom: string): { year: number; month: number } {
+  return {
+    year: parseInt(dateFrom.slice(0, 4), 10),
+    month: parseInt(dateFrom.slice(5, 7), 10),
+  }
+}
+
+/** Calendar month bounds for `offset` from the current month (0 = this month, -1 = previous). */
+export function getMonthBoundsForOffset(offset: number): {
+  from: string
+  to: string
+  year: number
+  month: number
+} {
+  const now = new Date()
+  const target = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  const y = target.getFullYear()
+  const m = target.getMonth() + 1
+  const from = `${y}-${String(m).padStart(2, '0')}-01`
+  const lastDay = new Date(y, m, 0).getDate()
+  const to = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return { from, to, year: y, month: m }
+}
+
+/**
+ * Compare current month metrics with the previous month and derive narrative
+ * insights (wins, challenges, opportunities).
+ */
+export function getMonthComparison(
+  currentFrom: string,
+  currentTo: string
+): MonthComparisonData {
+  const year = parseInt(currentFrom.slice(0, 4), 10)
+  const month = parseInt(currentFrom.slice(5, 7), 10)
+  const prev = getPreviousMonthBounds(year, month)
+  return getPeriodComparison(
+    currentFrom,
+    currentTo,
+    prev.from,
+    prev.to,
+    'month'
+  )
+}
+
+/**
+ * Date ranges for comparing a calendar year to the prior year.
+ * Past years: full Jan–Dec vs full prior year.
+ * Current year: YTD (Jan 1–today) vs Jan 1–same calendar date in the prior year.
+ */
+export function getYearComparisonPeriods(year: number): {
+  current: { from: string; to: string }
+  previous: { from: string; to: string }
+} {
+  const now = new Date()
+  const cy = now.getFullYear()
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  if (year < cy) {
+    return {
+      current: {
+        from: `${year}-01-01`,
+        to: `${year}-12-31`,
+      },
+      previous: {
+        from: `${year - 1}-01-01`,
+        to: `${year - 1}-12-31`,
+      },
+    }
+  }
+
+  if (year === cy) {
+    const y = now.getFullYear()
+    const m = now.getMonth() + 1
+    const day = now.getDate()
+    const currentTo = `${y}-${pad(m)}-${pad(day)}`
+
+    const endPrev = new Date(now)
+    endPrev.setFullYear(endPrev.getFullYear() - 1)
+    const py = endPrev.getFullYear()
+    const pm = endPrev.getMonth() + 1
+    const pd = endPrev.getDate()
+    const previousTo = `${py}-${pad(pm)}-${pd}`
+
+    return {
+      current: { from: `${year}-01-01`, to: currentTo },
+      previous: { from: `${year - 1}-01-01`, to: previousTo },
+    }
+  }
+
+  // Future calendar year (edge): compare empty/full year to prior full year
+  return {
+    current: { from: `${year}-01-01`, to: `${year}-12-31` },
+    previous: { from: `${year - 1}-01-01`, to: `${year - 1}-12-31` },
+  }
+}
+
+/** Year-over-year KPI comparison for analytics (uses YTD when viewing the current year). */
+export function getYearComparison(year: number): MonthComparisonData {
+  const { current, previous } = getYearComparisonPeriods(year)
+  return getPeriodComparison(
+    current.from,
+    current.to,
+    previous.from,
+    previous.to,
+    'year'
+  )
+}
+
+/** Week-over-week KPI comparison (this ISO week vs previous week). */
+export function getWeekComparison(weekOffset: number): MonthComparisonData {
+  const cur = getWeekRange(weekOffset)
+  const prev = getWeekRange(weekOffset - 1)
+  return getPeriodComparison(
+    cur.startStr,
+    cur.endStr,
+    prev.startStr,
+    prev.endStr,
+    'week'
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -647,6 +789,91 @@ function getDailyMoneyInOutForRange(
     byDay,
   }
   return input
+}
+
+/**
+ * Per-calendar-day money in/out (cents) for transactions in [dateFrom, dateToInclusive].
+ * Used for week view where grouping by day-of-month is invalid.
+ */
+function getDailyMoneyInOutByDateInRange(
+  dateFrom: string,
+  dateToInclusive: string
+): Map<string, { moneyInCents: number; moneyOutCents: number }> {
+  const result = new Map<
+    string,
+    { moneyInCents: number; moneyOutCents: number }
+  >()
+  const db = getDb()
+  if (!db) return result
+
+  const endStr =
+    dateToInclusive.length <= 10
+      ? dateToInclusive + 'T23:59:59.999Z'
+      : dateToInclusive
+
+  const stmt = db.prepare(
+    `SELECT date(COALESCE(created_at, settled_at)) AS d,
+       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL THEN ABS(amount) ELSE 0 END), 0) AS money_out
+     FROM transactions
+     WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
+     GROUP BY d
+     ORDER BY d`
+  )
+  stmt.bind([dateFrom, endStr])
+
+  while (stmt.step()) {
+    const row = stmt.get() as [string | null, number, number]
+    const key = row[0]
+    if (!key) continue
+    result.set(key, {
+      moneyInCents: row[1] ?? 0,
+      moneyOutCents: row[2] ?? 0,
+    })
+  }
+  stmt.free()
+  return result
+}
+
+function toDateOnlyLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function buildWeekDailyInputFromRange(
+  week: WeekRange,
+  dailyMap: Map<string, { moneyInCents: number; moneyOutCents: number }>,
+  daysToInclude: number
+): MonthDailyInput {
+  const byDay: Record<number, { moneyInCents: number; moneyOutCents: number }> =
+    {}
+  const d = new Date(week.start)
+  for (let i = 1; i <= 7; i++) {
+    const key = toDateOnlyLocal(d)
+    const row = dailyMap.get(key)
+    byDay[i] = row ?? { moneyInCents: 0, moneyOutCents: 0 }
+    d.setDate(d.getDate() + 1)
+  }
+  return {
+    daysInMonth: Math.min(7, Math.max(1, daysToInclude)),
+    byDay,
+  }
+}
+
+function getDaysElapsedInWeek(
+  week: WeekRange,
+  now: Date,
+  weekOffset: number
+): number {
+  if (weekOffset !== 0) return 7
+  const monday = new Date(week.start)
+  monday.setHours(0, 0, 0, 0)
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.floor((today.getTime() - monday.getTime()) / 86400000)
+  return Math.min(7, Math.max(1, diff + 1))
 }
 
 export interface MonthSeriesResult {
@@ -716,9 +943,114 @@ export function getMonthDayByDaySeries(
   return { series }
 }
 
-function fmtCentsDelta(cents: number): string {
-  const abs = Math.abs(cents)
-  const dollars = Math.floor(abs / 100)
-  const remainder = abs % 100
-  return `${dollars}.${String(remainder).padStart(2, '0')}`
+/**
+ * Mon–Sun cumulative series for the selected week vs the prior week.
+ */
+export function getWeekDayByDaySeries(weekOffset: number): MonthSeriesResult {
+  const now = new Date()
+  const currentWeek = getWeekRange(weekOffset)
+  const previousWeek = getWeekRange(weekOffset - 1)
+
+  const curMap = getDailyMoneyInOutByDateInRange(
+    currentWeek.startStr,
+    currentWeek.endStr
+  )
+  const prevMap = getDailyMoneyInOutByDateInRange(
+    previousWeek.startStr,
+    previousWeek.endStr
+  )
+
+  const elapsed = getDaysElapsedInWeek(currentWeek, now, weekOffset)
+  const currentInput = buildWeekDailyInputFromRange(
+    currentWeek,
+    curMap,
+    elapsed
+  )
+  const previousInput = buildWeekDailyInputFromRange(previousWeek, prevMap, 7)
+
+  const series = buildMonthSpendingSeries(currentInput, previousInput)
+  const maxDay = Math.max(series.maxDay, 7)
+  if (maxDay !== series.maxDay) {
+    const existing = new Map(series.points.map((p) => [p.day, p]))
+    const points = []
+    for (let day = 1; day <= maxDay; day += 1) {
+      const found = existing.get(day)
+      if (found) {
+        points.push(found)
+      } else {
+        points.push({
+          day,
+          currentSpending: null,
+          previousSpending: null,
+          currentIncome: null,
+          previousIncome: null,
+          currentNet: null,
+          previousNet: null,
+        })
+      }
+    }
+    return {
+      series: {
+        points,
+        maxDay,
+      },
+    }
+  }
+
+  return { series }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar year: monthly totals (Jan–Dec)
+// ---------------------------------------------------------------------------
+
+/** One month within a calendar year; moneyIn/moneyOut in cents (same rules as getInsightsForDateRange). */
+export interface YearMonthPoint {
+  month: number
+  moneyIn: number
+  moneyOut: number
+}
+
+/**
+ * Money in/out per calendar month for `year`, always 12 entries (months 1–12).
+ * Missing months are zeros. Uses same transaction filters as getWeeklyInsights.
+ */
+export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
+  const db = getDb()
+  const empty: YearMonthPoint[] = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    moneyIn: 0,
+    moneyOut: 0,
+  }))
+  if (!db) return empty
+
+  const from = `${year}-01-01`
+  const to = `${year}-12-31T23:59:59.999Z`
+
+  const stmt = db.prepare(
+    `SELECT CAST(strftime('%m', COALESCE(created_at, settled_at)) AS INTEGER) AS m,
+       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL THEN ABS(amount) ELSE 0 END), 0) AS money_out
+     FROM transactions
+     WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
+     GROUP BY m
+     ORDER BY m`
+  )
+  stmt.bind([from, to])
+
+  const byMonth = new Map<number, { moneyIn: number; moneyOut: number }>()
+  while (stmt.step()) {
+    const row = stmt.get() as [number, number, number]
+    const m = row[0]
+    if (!Number.isFinite(m) || m < 1 || m > 12) continue
+    byMonth.set(m, { moneyIn: row[1] ?? 0, moneyOut: row[2] ?? 0 })
+  }
+  stmt.free()
+
+  return empty.map((slot) => {
+    const found = byMonth.get(slot.month)
+    return found
+      ? { month: slot.month, moneyIn: found.moneyIn, moneyOut: found.moneyOut }
+      : slot
+  })
 }

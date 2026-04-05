@@ -26,6 +26,14 @@ export interface MonthSpendingComparisonChartProps {
   showAverage?: boolean
   showCurrent?: boolean
   showPrevious?: boolean
+  /** Default: `Day ${day}`; use for week view (e.g. Mon–Sun). */
+  formatXAxisTick?: (day: number) => string
+  /** Tooltip / legend label for the previous (baseline) series. */
+  previousLineLabel?: string
+  /** Tooltip / legend label for the current series. */
+  currentLineLabel?: string
+  /** Tooltip title for the x-axis bucket; default `Day ${day}`. */
+  formatTooltipDayTitle?: (day: number) => string
   className?: string
   style?: React.CSSProperties
   'aria-label'?: string
@@ -79,10 +87,22 @@ export function MonthSpendingComparisonChart({
   showAverage = false,
   showCurrent = true,
   showPrevious = true,
+  formatXAxisTick,
+  previousLineLabel = 'Last month',
+  currentLineLabel = 'This month',
+  formatTooltipDayTitle,
   className,
   style,
   'aria-label': ariaLabel,
 }: MonthSpendingComparisonChartProps) {
+  const formatXResolved = useMemo(
+    () => formatXAxisTick ?? ((d: number) => `Day ${d}`),
+    [formatXAxisTick]
+  )
+  const formatTitleResolved = useMemo(
+    () => formatTooltipDayTitle ?? ((d: number) => `Day ${d}`),
+    [formatTooltipDayTitle]
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
@@ -221,7 +241,7 @@ export function MonthSpendingComparisonChart({
     const xAxis = d3
       .axisBottom(xScale)
       .ticks(Math.min(points.length, 8))
-      .tickFormat((d: d3.NumberValue) => `Day ${d.toString()}`)
+      .tickFormat((d: d3.NumberValue) => formatXResolved(Number(d)))
       .tickSizeOuter(0)
 
     const yAxis = d3
@@ -354,23 +374,24 @@ export function MonthSpendingComparisonChart({
       if (showPrevious) {
         const v = point[previousKey] as number | null
         const formatted = v == null ? 'No data' : `$${formatMoney(v)}`
-        lines.push(`Last month: ${formatted}`)
+        lines.push(`${previousLineLabel}: ${formatted}`)
       }
       if (showCurrent) {
         const v = point[currentKey] as number | null
         const formatted = v == null ? 'No data' : `$${formatMoney(v)}`
-        lines.push(`This month: ${formatted}`)
+        lines.push(`${currentLineLabel}: ${formatted}`)
       }
       if (avg != null) {
         lines.push(`Average: $${formatMoney(avg)}`)
       }
 
+      const dayTitle = formatTitleResolved(point.day)
       if (lines.length === 0) {
-        tooltipEl.innerHTML = `<strong>Day ${point.day}</strong><br/>No series selected`
+        tooltipEl.innerHTML = `<strong>${dayTitle}</strong><br/>No series selected`
         tooltipEl.style.display = 'block'
         // Positioning still matters; we'll reuse existing placement logic below.
       } else {
-        tooltipEl.innerHTML = `<strong>Day ${point.day}</strong><br/>${lines.join(
+        tooltipEl.innerHTML = `<strong>${dayTitle}</strong><br/>${lines.join(
           '<br/>'
         )}`
         tooltipEl.style.display = 'block'
@@ -408,6 +429,7 @@ export function MonthSpendingComparisonChart({
       .attr('width', innerWidth)
       .attr('height', innerHeight)
       .attr('fill', 'transparent')
+      .style('cursor', 'crosshair')
       .style('pointer-events', 'all')
       .on('mousemove', function (event: MouseEvent) {
         const [mx] = d3.pointer(event, this)
@@ -465,7 +487,19 @@ export function MonthSpendingComparisonChart({
       hideTooltip()
       d3.select(container).selectAll('*').remove()
     }
-  }, [prepared, metric, width, height, showCurrent, showPrevious])
+  }, [
+    prepared,
+    metric,
+    width,
+    height,
+    showCurrent,
+    showPrevious,
+    showAverage,
+    formatXResolved,
+    formatTitleResolved,
+    previousLineLabel,
+    currentLineLabel,
+  ])
 
   if (!series || series.points.length === 0) {
     return (
