@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 14
+const SCHEMA_VERSION = 15
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -55,6 +55,7 @@ const DDL_STATEMENTS = [
     transfer_account_id TEXT,
     transfer_type TEXT,
     synced_at TEXT,
+    round_up_amount INTEGER,
     FOREIGN KEY (account_id) REFERENCES accounts(id),
     FOREIGN KEY (round_up_parent_id) REFERENCES transactions(id),
     FOREIGN KEY (transfer_account_id) REFERENCES accounts(id),
@@ -342,6 +343,21 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['14']
+    )
+  }
+  if (version < 15) {
+    const txCols = database.exec(`PRAGMA table_info(transactions)`)
+    const txExisting = new Set(
+      (txCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!txExisting.has('round_up_amount')) {
+      database.run(
+        `ALTER TABLE transactions ADD COLUMN round_up_amount INTEGER`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['15']
     )
   }
 }

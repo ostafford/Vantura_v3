@@ -1,25 +1,25 @@
-import { Link, Outlet } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
+import { PageBreadcrumb } from '@/components/PageBreadcrumb'
+import { resolveAnalyticsChrome } from '@/lib/analyticsChrome'
 
 export function AnalyticsLayout() {
+  const { pathname } = useLocation()
+  const { breadcrumbItems, pageTitle, pageTitleIcon } = useMemo(
+    () => resolveAnalyticsChrome(pathname),
+    [pathname]
+  )
+
   return (
     <div>
       <div className="page-header">
         <h3 className="page-title">
           <span className="page-title-icon bg-gradient-primary text-white mr-2">
-            <i className="mdi mdi-chart-box" aria-hidden />
+            <i className={`mdi ${pageTitleIcon}`} aria-hidden />
           </span>
-          Analytics
+          {pageTitle}
         </h3>
-        <nav aria-label="breadcrumb">
-          <ol className="breadcrumb">
-            <li className="breadcrumb-item">
-              <Link to="/">Dashboard</Link>
-            </li>
-            <li className="breadcrumb-item active" aria-current="page">
-              Analytics
-            </li>
-          </ol>
-        </nav>
+        <PageBreadcrumb items={breadcrumbItems} />
       </div>
 
       <Outlet />

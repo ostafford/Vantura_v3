@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useParams,
+} from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { themeStore } from '@/stores/themeStore'
@@ -17,10 +23,22 @@ import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDeta
 import { AnalyticsInsights } from '@/pages/analytics/AnalyticsInsights'
 import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
 import { AnalyticsMonthlyReview } from '@/pages/analytics/AnalyticsMonthlyReview'
+import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
+
+function SaverAccountTransactionsRedirect() {
+  const { saverId } = useParams<{ saverId: string }>()
+  const id = saverId?.trim()
+  if (!id) return <Navigate to="/analytics/savers" replace />
+  const q = new URLSearchParams({
+    saverActivity: '1',
+    linkedAccountId: id,
+  })
+  return <Navigate to={`/transactions?${q.toString()}`} replace />
+}
 
 function AppContent() {
   const [ready, setReady] = useState(false)
@@ -172,13 +190,10 @@ function AppContent() {
                 path="trackers/:trackerId"
                 element={<AnalyticsTrackersDetail />}
               />
-              <Route
-                path="savers"
-                element={<Navigate to="/analytics" replace />}
-              />
+              <Route path="savers" element={<AnalyticsSavers />} />
               <Route
                 path="savers/:saverId"
-                element={<Navigate to="/analytics" replace />}
+                element={<SaverAccountTransactionsRedirect />}
               />
               <Route
                 path="wants"

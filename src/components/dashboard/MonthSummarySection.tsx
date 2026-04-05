@@ -95,6 +95,25 @@ export function MonthSummarySection({
           </OverlayTrigger>
           <OverlayTrigger
             placement="top"
+            overlay={
+              <BSTooltip id="month-today-tooltip">
+                Go to current period
+              </BSTooltip>
+            }
+          >
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setMonthOffset(0)}
+              disabled={monthOffset === 0}
+              aria-label="Go to current period"
+              aria-describedby="month-today-tooltip"
+            >
+              <i className="mdi mdi-calendar-today" aria-hidden />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
             overlay={<BSTooltip id="month-next-tooltip">Next month</BSTooltip>}
           >
             <Button

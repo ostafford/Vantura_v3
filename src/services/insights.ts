@@ -10,7 +10,9 @@
  *   (e.g. to a saver). Filter: amount < 0 AND transfer_account_id IS NULL.
  *
  * - Savers: Net movement to/from any saver account (Loose Change, Investing, Bupa Insurance,
- *   Rego, etc.). Filter: transfer_account_id IN (accounts WHERE account_type = 'SAVER').
+ *   Rego, etc.). Sum of (1) transactions whose transfer_account_id points at a SAVER account,
+ *   plus (2) round_up_amount on rows with is_round_up = 1 (parent purchase lines where Up
+ *   exposes roundUp; transfer_account_id is intentionally not set on those rows in sync).
  *
  * - Charges: Count of spending transactions. Same rules as Money Out (negative, non-transfer).
  *   One charge per purchase (e.g. Coles, ALDI).
@@ -179,13 +181,20 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startStr, endStr]
   )
-  // Savers: net movement to/from any saver account
-  const saverChanges = runOne(
+  // Savers: explicit transfers to savers + round-up amounts recorded on purchase lines
+  const saverTransfers = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
      WHERE transfer_account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startStr, endStr]
   )
+  const saverRoundUps = runOne(
+    `SELECT COALESCE(SUM(round_up_amount), 0) FROM transactions
+     WHERE is_round_up = 1
+     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [startStr, endStr]
+  )
+  const saverChanges = saverTransfers + saverRoundUps
   // Charges: count of spending transactions (same filter as Money Out)
   const charges = runOne(
     `SELECT COUNT(*) FROM transactions
@@ -412,12 +421,19 @@ export function getInsightsForDateRange(
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [dateFrom, endStr]
   )
-  const saverChanges = runOne(
+  const saverTransfers = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
      WHERE transfer_account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [dateFrom, endStr]
   )
+  const saverRoundUps = runOne(
+    `SELECT COALESCE(SUM(round_up_amount), 0) FROM transactions
+     WHERE is_round_up = 1
+     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+    [dateFrom, endStr]
+  )
+  const saverChanges = saverTransfers + saverRoundUps
   const charges = runOne(
     `SELECT COUNT(*) FROM transactions
      WHERE amount < 0 AND transfer_account_id IS NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,

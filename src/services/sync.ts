@@ -76,9 +76,10 @@ function upsertAccount(acc: UpAccount): void {
   const a = acc.attributes
   const balance = a.balance?.valueInBaseUnits ?? 0
   const now = new Date().toISOString()
+  const ownership = a.ownershipType != null ? String(a.ownershipType) : null
   run(
-    `INSERT OR REPLACE INTO accounts (id, display_name, account_type, balance, created_at, updated_at, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO accounts (id, display_name, account_type, balance, created_at, updated_at, ownership_type, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       acc.id,
       a.displayName ?? '',
@@ -86,6 +87,7 @@ function upsertAccount(acc: UpAccount): void {
       balance,
       a.createdAt ?? now,
       now,
+      ownership,
       now,
     ]
   )
@@ -104,12 +106,17 @@ function upsertTransaction(tx: UpTransaction): void {
       : (rel?.transferAccount?.data?.id ?? null)
   const isRoundUp = a.roundUp != null ? 1 : 0
   const roundUpParentId: string | null = null
+  const roundUpAmount =
+    a.roundUp?.amount?.valueInBaseUnits != null
+      ? a.roundUp.amount.valueInBaseUnits
+      : null
   run(
     `INSERT OR REPLACE INTO transactions (
       id, account_id, status, raw_text, description, message, is_categorizable,
       category_id, parent_category_id, amount, currency, settled_at, created_at,
-      is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at,
+      round_up_amount
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tx.id,
       accountId,
@@ -129,6 +136,7 @@ function upsertTransaction(tx: UpTransaction): void {
       transferAccountId,
       null,
       new Date().toISOString(),
+      roundUpAmount,
     ]
   )
 }

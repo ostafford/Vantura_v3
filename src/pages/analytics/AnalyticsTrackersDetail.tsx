@@ -126,29 +126,26 @@ export function AnalyticsTrackersDetail() {
 
   return (
     <>
-      <div className="d-flex align-items-center gap-2 mb-3">
+      <div className="d-flex align-items-start gap-2 mb-3">
         <Link
           to="/analytics/trackers"
-          className="btn btn-outline-secondary btn-sm"
+          className="btn btn-outline-secondary btn-sm flex-shrink-0"
           aria-label="Back to trackers"
         >
           <i className="mdi mdi-arrow-left" aria-hidden />
         </Link>
-        <div className="flex-grow-1">
-          <h4 className="mb-0">{tracker.name}</h4>
-          <div className="small text-muted d-flex flex-wrap gap-2 mt-1">
-            {tracker.badge_color && (
-              <Badge
-                style={{
-                  backgroundColor: tracker.badge_color,
-                  color: 'white',
-                }}
-              >
-                {tracker.reset_frequency}
-              </Badge>
-            )}
-            {categoryNames && <span>Categories: {categoryNames}</span>}
-          </div>
+        <div className="small text-muted d-flex flex-wrap gap-2 align-items-center pt-1">
+          {tracker.badge_color && (
+            <Badge
+              style={{
+                backgroundColor: tracker.badge_color,
+                color: 'white',
+              }}
+            >
+              {tracker.reset_frequency}
+            </Badge>
+          )}
+          {categoryNames && <span>Categories: {categoryNames}</span>}
         </div>
       </div>
 

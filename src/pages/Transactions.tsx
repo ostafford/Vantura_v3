@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import {
   Card,
   Form,
@@ -75,6 +76,9 @@ function useFiltersFromSearchParams(): {
       ;[dateFrom, dateTo] = [dateTo, dateFrom]
     }
     const search = searchParams.get('search') ?? undefined
+    const saverActivity = searchParams.get('saverActivity') === '1'
+    const linkedAccountId =
+      searchParams.get('linkedAccountId')?.trim() || undefined
     return {
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
@@ -82,6 +86,8 @@ function useFiltersFromSearchParams(): {
       ...(amountMin != null && { amountMin }),
       ...(amountMax != null && { amountMax }),
       ...(search && { search }),
+      ...(saverActivity ? { saverActivity: true } : {}),
+      ...(linkedAccountId ? { linkedAccountId } : {}),
     }
   }, [searchParams])
 
@@ -97,6 +103,8 @@ function useFiltersFromSearchParams(): {
     if (f.amountMin != null) next.set('amountMin', String(f.amountMin))
     if (f.amountMax != null) next.set('amountMax', String(f.amountMax))
     if (f.search) next.set('search', f.search)
+    if (f.saverActivity) next.set('saverActivity', '1')
+    if (f.linkedAccountId) next.set('linkedAccountId', f.linkedAccountId)
     next.set('sort', s)
     setSearchParams(next)
   }
@@ -191,6 +199,8 @@ export function Transactions() {
     filters.amountMin,
     filters.amountMax,
     filters.search,
+    filters.saverActivity,
+    filters.linkedAccountId,
   ])
 
   const updateFilter = <K extends keyof TransactionFilters>(
@@ -204,6 +214,17 @@ export function Transactions() {
     setFilters(filters, s)
   }
 
+  const clearSaverFilters = () => {
+    setFilters(
+      {
+        ...filters,
+        saverActivity: undefined,
+        linkedAccountId: undefined,
+      },
+      sort
+    )
+  }
+
   return (
     <>
       <div className="page-header">
@@ -213,30 +234,35 @@ export function Transactions() {
           </span>
           Transactions
         </h3>
-        <Button
-          type="button"
-          className="btn-gradient-primary"
-          size="sm"
-          onClick={handleReSync}
-          disabled={syncing || isDemoMode}
-          aria-label="Re-sync with Up Bank"
-          aria-busy={syncing}
-        >
-          {syncing ? (
-            <>
-              <Spinner
-                animation="border"
-                size="sm"
-                className="me-1"
-                role="status"
-                aria-hidden="true"
-              />
-              Syncing…
-            </>
-          ) : (
-            'Re-sync now'
-          )}
-        </Button>
+        <div className="d-flex flex-wrap align-items-center gap-2 ms-auto">
+          <PageBreadcrumb
+            items={[{ label: 'Dashboard', to: '/' }, { label: 'Transactions' }]}
+          />
+          <Button
+            type="button"
+            className="btn-gradient-primary"
+            size="sm"
+            onClick={handleReSync}
+            disabled={syncing || isDemoMode}
+            aria-label="Re-sync with Up Bank"
+            aria-busy={syncing}
+          >
+            {syncing ? (
+              <>
+                <Spinner
+                  animation="border"
+                  size="sm"
+                  className="me-1"
+                  role="status"
+                  aria-hidden="true"
+                />
+                Syncing…
+              </>
+            ) : (
+              'Re-sync now'
+            )}
+          </Button>
+        </div>
       </div>
       {syncError ? (
         <div className="text-danger small mb-3" role="alert">
@@ -422,6 +448,18 @@ export function Transactions() {
                         }
                       />
                     </Form.Group>
+                    <Form.Check
+                      type="checkbox"
+                      id="transactions-filter-saver-mobile"
+                      label="Saver-related only"
+                      checked={!!filters.saverActivity}
+                      onChange={(e) =>
+                        updateFilter(
+                          'saverActivity',
+                          e.target.checked ? true : undefined
+                        )
+                      }
+                    />
                   </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -592,6 +630,40 @@ export function Transactions() {
               </Col>
             </Row>
           )}
+          {!isMobile && (filters.saverActivity || filters.linkedAccountId) ? (
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-2 small">
+              <span className="text-muted">
+                {filters.saverActivity && 'Saver-related filter active'}
+                {filters.saverActivity && filters.linkedAccountId && ' · '}
+                {filters.linkedAccountId &&
+                  `Account scope: ${filters.linkedAccountId.slice(0, 8)}…`}
+              </span>
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 small"
+                onClick={clearSaverFilters}
+              >
+                Clear saver filters
+              </Button>
+            </div>
+          ) : null}
+          {!isMobile ? (
+            <div className="mb-2">
+              <Form.Check
+                type="checkbox"
+                id="transactions-filter-saver-desktop"
+                label="Saver-related only (transfers to/from savers, activity on saver accounts, round-ups)"
+                checked={!!filters.saverActivity}
+                onChange={(e) =>
+                  updateFilter(
+                    'saverActivity',
+                    e.target.checked ? true : undefined
+                  )
+                }
+              />
+            </div>
+          ) : null}
           {totalCount === 0 ? (
             <p className="text-muted mb-0">
               No transactions match your filters.

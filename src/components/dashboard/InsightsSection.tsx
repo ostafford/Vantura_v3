@@ -181,6 +181,25 @@ export function InsightsSection({
                 <OverlayTrigger
                   placement="top"
                   overlay={
+                    <BSTooltip id="insights-today-tooltip-mobile">
+                      Go to current period
+                    </BSTooltip>
+                  }
+                >
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => setWeekOffset(0)}
+                    disabled={weekOffset === 0}
+                    aria-label="Go to current period"
+                    aria-describedby="insights-today-tooltip-mobile"
+                  >
+                    <i className="mdi mdi-calendar-today" aria-hidden />
+                  </Button>
+                </OverlayTrigger>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
                     <BSTooltip id="insights-next-tooltip">Next week</BSTooltip>
                   }
                 >
@@ -236,6 +255,25 @@ export function InsightsSection({
                     aria-label="Previous week"
                   >
                     <i className="mdi mdi-chevron-left" aria-hidden />
+                  </Button>
+                </OverlayTrigger>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <BSTooltip id="insights-today-tooltip-desktop">
+                      Go to current period
+                    </BSTooltip>
+                  }
+                >
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => setWeekOffset(0)}
+                    disabled={weekOffset === 0}
+                    aria-label="Go to current period"
+                    aria-describedby="insights-today-tooltip-desktop"
+                  >
+                    <i className="mdi mdi-calendar-today" aria-hidden />
                   </Button>
                 </OverlayTrigger>
                 <OverlayTrigger

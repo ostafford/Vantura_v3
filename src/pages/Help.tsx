@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import { Form } from 'react-bootstrap'
+import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 
 const HELP_ACTIVE_SECTION_KEY = 'vantura_help_active_section'
@@ -48,16 +48,9 @@ export function Help() {
           </span>
           User guide
         </h3>
-        <nav aria-label="breadcrumb">
-          <ol className="breadcrumb">
-            <li className="breadcrumb-item">
-              <Link to="/">Dashboard</Link>
-            </li>
-            <li className="breadcrumb-item active" aria-current="page">
-              User guide
-            </li>
-          </ol>
-        </nav>
+        <PageBreadcrumb
+          items={[{ label: 'Dashboard', to: '/' }, { label: 'User guide' }]}
+        />
       </div>
 
       <div className="settings-layout">

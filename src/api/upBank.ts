@@ -23,12 +23,17 @@ export class UpBankUnauthorizedError extends Error {
 export const SYNC_401_MESSAGE =
   'Your Personal Access Token may have expired. Update it in Settings.'
 
+/** Matches Up API AccountTypeEnum and OwnershipTypeEnum. */
+export type UpAccountType = 'SAVER' | 'TRANSACTIONAL' | 'HOME_LOAN'
+export type UpOwnershipType = 'INDIVIDUAL' | 'JOINT'
+
 export interface UpAccount {
   id: string
   type: string
   attributes: {
     displayName: string
-    accountType: 'TRANSACTIONAL' | 'SAVER'
+    accountType: UpAccountType
+    ownershipType?: UpOwnershipType
     balance: { value: string; valueInBaseUnits: number }
     createdAt: string
   }
@@ -109,14 +114,41 @@ export async function validateUpBankToken(token: string): Promise<boolean> {
   }
 }
 
+const ACCOUNTS_PAGE_SIZE = 100
+
+function buildAccountsUrl(): string {
+  const params = new URLSearchParams()
+  params.set('page[size]', String(ACCOUNTS_PAGE_SIZE))
+  return `${BASE_URL}/api/v1/accounts?${params.toString()}`
+}
+
 /**
- * Fetch all accounts.
+ * Fetch one page of accounts. Use `links.next` for the next URL.
  */
-export async function fetchAccounts(token: string): Promise<UpAccount[]> {
-  const res = await fetchWithAuth(`${BASE_URL}/api/v1/accounts`, token)
+export async function fetchAccountsPage(
+  token: string,
+  url: string
+): Promise<{ data: UpAccount[]; nextUrl: string | null }> {
+  const res = await fetchWithAuth(url, token)
   if (!res.ok) throw new Error(`Up Bank API error: ${res.status}`)
   const json = (await res.json()) as UpListResponse<UpAccount>
-  return json.data ?? []
+  const nextUrl = json.links?.next ?? null
+  return { data: json.data ?? [], nextUrl }
+}
+
+/**
+ * Fetch all accounts (cursor pagination, 1s delay between pages; same pattern as transactions).
+ */
+export async function fetchAccounts(token: string): Promise<UpAccount[]> {
+  const all: UpAccount[] = []
+  let nextUrl: string | null = buildAccountsUrl()
+  while (nextUrl) {
+    const { data, nextUrl: next } = await fetchAccountsPage(token, nextUrl)
+    all.push(...data)
+    nextUrl = next
+    if (nextUrl) await sleep(1000)
+  }
+  return all
 }
 
 /**

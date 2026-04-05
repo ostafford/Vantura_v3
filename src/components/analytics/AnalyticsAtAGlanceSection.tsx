@@ -272,6 +272,25 @@ export function AnalyticsAtAGlanceSection() {
               <OverlayTrigger
                 placement="top"
                 overlay={
+                  <BSTooltip id="aag-year-today-tooltip">
+                    Go to current period
+                  </BSTooltip>
+                }
+              >
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setYear(new Date().getFullYear())}
+                  disabled={year === currentCalendarYear}
+                  aria-label="Go to current period"
+                  aria-describedby="aag-year-today-tooltip"
+                >
+                  <i className="mdi mdi-calendar-today" aria-hidden />
+                </Button>
+              </OverlayTrigger>
+              <OverlayTrigger
+                placement="top"
+                overlay={
                   <BSTooltip id="aag-year-next-tooltip">Next year</BSTooltip>
                 }
               >
@@ -309,6 +328,25 @@ export function AnalyticsAtAGlanceSection() {
               <OverlayTrigger
                 placement="top"
                 overlay={
+                  <BSTooltip id="aag-month-today-tooltip">
+                    Go to current period
+                  </BSTooltip>
+                }
+              >
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setMonthOffset(0)}
+                  disabled={monthOffset === 0}
+                  aria-label="Go to current period"
+                  aria-describedby="aag-month-today-tooltip"
+                >
+                  <i className="mdi mdi-calendar-today" aria-hidden />
+                </Button>
+              </OverlayTrigger>
+              <OverlayTrigger
+                placement="top"
+                overlay={
                   <BSTooltip id="aag-month-next-tooltip">Next month</BSTooltip>
                 }
               >
@@ -341,6 +379,25 @@ export function AnalyticsAtAGlanceSection() {
                   aria-label="Previous week"
                 >
                   <i className="mdi mdi-chevron-left" aria-hidden />
+                </Button>
+              </OverlayTrigger>
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  <BSTooltip id="aag-week-today-tooltip">
+                    Go to current period
+                  </BSTooltip>
+                }
+              >
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setWeekOffset(0)}
+                  disabled={weekOffset === 0}
+                  aria-label="Go to current period"
+                  aria-describedby="aag-week-today-tooltip"
+                >
+                  <i className="mdi mdi-calendar-today" aria-hidden />
                 </Button>
               </OverlayTrigger>
               <OverlayTrigger

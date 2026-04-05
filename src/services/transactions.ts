@@ -37,6 +37,12 @@ export interface TransactionFilters {
   amountMin?: number
   amountMax?: number
   search?: string
+  /**
+   * When true: transfers to/from SAVER accounts, activity on saver accounts, or round-up lines.
+   */
+  saverActivity?: boolean
+  /** Either leg matches this Up account id (spending account or saver counterparty). */
+  linkedAccountId?: string
 }
 
 const DEFAULT_SORT: TransactionSort = 'date'
@@ -73,6 +79,18 @@ function buildWhereClause(filters: TransactionFilters): {
     conditions.push('(t.description LIKE ? OR t.raw_text LIKE ?)')
     const term = '%' + filters.search.trim() + '%'
     params.push(term, term)
+  }
+  if (filters.saverActivity) {
+    conditions.push(`(
+      t.transfer_account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
+      OR t.account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
+      OR t.is_round_up = 1
+    )`)
+  }
+  const linked = filters.linkedAccountId?.trim()
+  if (linked) {
+    conditions.push('(t.account_id = ? OR t.transfer_account_id = ?)')
+    params.push(linked, linked)
   }
 
   return {
