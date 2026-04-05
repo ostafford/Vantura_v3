@@ -287,6 +287,7 @@ export function Settings() {
     syncProgress,
     setSyncError,
     handleReSync,
+    refreshLastSync,
   } = useFullReSync()
   const [showClearModal, setShowClearModal] = useState(false)
   const [clearing, setClearing] = useState(false)
@@ -441,7 +442,7 @@ export function Settings() {
       setShowUpdateTokenModal(false)
       setUpdateTokenSuccess(true)
       toast.success('Personal Access Token updated.')
-      setLastSync(getAppSetting('last_sync'))
+      refreshLastSync()
       setTimeout(() => setUpdateTokenSuccess(false), 5000)
     } catch (err) {
       setUpdateTokenError(

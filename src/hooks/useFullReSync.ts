@@ -20,6 +20,10 @@ export function useFullReSync() {
     setLastSync(getAppSetting('last_sync'))
   }, [syncing])
 
+  const refreshLastSync = useCallback(() => {
+    setLastSync(getAppSetting('last_sync'))
+  }, [])
+
   const handleReSync = useCallback(async () => {
     const token = sessionStore.getState().getToken()
     if (!token || syncing) return
@@ -61,5 +65,6 @@ export function useFullReSync() {
     syncProgress,
     setSyncError,
     handleReSync,
+    refreshLastSync,
   }
 }
