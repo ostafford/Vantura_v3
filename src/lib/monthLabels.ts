@@ -129,9 +129,12 @@ export function formatWeekStartLabel(d: Date): string {
   }
 }
 
-/** Prior week phrase for narratives (week containing `previousFrom`). */
+/** Prior week phrase for narratives (week containing `previousFrom`). Accepts both "YYYY-MM-DD" and full UTC ISO strings. */
 export function weekNarrativePriorLabel(previousFrom: string): string {
-  const date = localDateFromYmd(previousFrom)
-  if (!date) return MONTH_LABEL_FALLBACK
+  if (previousFrom.length < 10) return MONTH_LABEL_FALLBACK
+  const date = previousFrom.includes('T')
+    ? new Date(previousFrom)
+    : localDateFromYmd(previousFrom)
+  if (!date || Number.isNaN(date.getTime())) return MONTH_LABEL_FALLBACK
   return formatWeekStartLabel(date)
 }

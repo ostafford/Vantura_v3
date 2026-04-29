@@ -20,6 +20,10 @@ export interface TransactionRow {
   round_up_parent_id: string | null
   transfer_account_id: string | null
   transfer_account_display_name: string | null
+  message: string | null
+  foreign_amount: number | null
+  foreign_currency: string | null
+  round_up_amount: number | null
 }
 
 /** Display date: created (first encountered) with fallback to settled for consistency with Up app. */
@@ -120,20 +124,24 @@ interface StatementLike {
 function rowFromStmt(stmt: StatementLike): TransactionRow | null {
   if (!stmt.step()) return null
   const row = stmt.get() as [
-    string,
-    string,
-    string,
-    string | null,
-    number,
-    string | null,
-    string | null,
-    string,
-    string | null,
-    string | null,
-    number,
-    string | null,
-    string | null,
-    string | null,
+    string, // 0:  id
+    string, // 1:  account_id
+    string, // 2:  description
+    string | null, // 3:  raw_text
+    number, // 4:  amount
+    string | null, // 5:  settled_at
+    string | null, // 6:  created_at
+    string, // 7:  status
+    string | null, // 8:  category_id
+    string | null, // 9:  category_name
+    number, // 10: is_round_up
+    string | null, // 11: round_up_parent_id
+    string | null, // 12: transfer_account_id
+    string | null, // 13: transfer_account_display_name
+    string | null, // 14: message
+    number | null, // 15: foreign_amount
+    string | null, // 16: foreign_currency
+    number | null, // 17: round_up_amount
   ]
   return {
     id: row[0],
@@ -150,6 +158,10 @@ function rowFromStmt(stmt: StatementLike): TransactionRow | null {
     round_up_parent_id: row[11],
     transfer_account_id: row[12],
     transfer_account_display_name: row[13],
+    message: row[14],
+    foreign_amount: row[15],
+    foreign_currency: row[16],
+    round_up_amount: row[17],
   }
 }
 
@@ -172,7 +184,8 @@ export function getFilteredTransactions(
   const sql = `SELECT t.id, t.account_id, t.description, t.raw_text, t.amount, t.settled_at,
     t.created_at, t.status,
     t.category_id, c.name AS category_name, t.is_round_up, t.round_up_parent_id,
-    t.transfer_account_id, a.display_name AS transfer_account_display_name
+    t.transfer_account_id, a.display_name AS transfer_account_display_name,
+    t.message, t.foreign_amount, t.foreign_currency, t.round_up_amount
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN accounts a ON t.transfer_account_id = a.id
@@ -235,6 +248,39 @@ export interface RoundUpRow {
   amount: number
   transfer_account_id: string | null
   transfer_account_display_name: string | null
+}
+
+/**
+ * Round-up rows for a single parent transaction.
+ * Used by the transaction detail modal to query directly rather than relying on the paginated list cache.
+ */
+export function getRoundUpsForTransaction(txId: string): RoundUpRow[] {
+  const db = getDb()
+  if (!db) return []
+  const sql = `SELECT t.id, t.amount, t.round_up_parent_id, t.transfer_account_id, a.display_name
+    FROM transactions t
+    LEFT JOIN accounts a ON t.transfer_account_id = a.id
+    WHERE t.round_up_parent_id = ?`
+  const stmt = db.prepare(sql)
+  stmt.bind([txId])
+  const rows: RoundUpRow[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [
+      string,
+      number,
+      string,
+      string | null,
+      string | null,
+    ]
+    rows.push({
+      id: row[0],
+      amount: row[1],
+      transfer_account_id: row[3],
+      transfer_account_display_name: row[4],
+    })
+  }
+  stmt.free()
+  return rows
 }
 
 /**

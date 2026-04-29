@@ -127,7 +127,7 @@ function upsertTransaction(tx: UpTransaction): void {
       ? null
       : (rel?.transferAccount?.data?.id ?? null)
   const isRoundUp = a.roundUp != null ? 1 : 0
-  const roundUpParentId: string | null = null
+  const roundUpParentId = rel?.roundUp?.data?.id ?? null
   const roundUpAmount =
     a.roundUp?.amount?.valueInBaseUnits != null
       ? a.roundUp.amount.valueInBaseUnits

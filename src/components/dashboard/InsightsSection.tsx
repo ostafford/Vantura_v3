@@ -41,7 +41,7 @@ import type React from 'react'
 
 /**
  * Weekly Insights card: Money In (income), Money Out (spending), Savers (saver movement),
- * Charges (count of spending), Payments made (external BPAY/PayID etc.), and spending-by-category chart.
+ * Charges (count of spending), and spending-by-category chart.
  * Definitions and filters are in @/services/insights.ts; see the file-level comment there.
  */
 type EditingCategory = {
@@ -352,17 +352,6 @@ export function InsightsSection({
                 gradient="danger"
                 imgAlt=""
                 tooltip="Count of spending transactions this week (excludes transfers)."
-                compact
-              />
-            </Col>
-            <Col xs={6} md>
-              <StatCard
-                title="Payments made"
-                value={0}
-                displayValue={insights.payments}
-                gradient="danger"
-                imgAlt=""
-                tooltip="External payments (e.g. BPAY, PayID) this week."
                 compact
               />
             </Col>

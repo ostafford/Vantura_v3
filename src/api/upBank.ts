@@ -58,6 +58,7 @@ export interface UpTransaction {
     category?: { data: { id: string } | null }
     parentCategory?: { data: { id: string } | null }
     transferAccount?: { data: { id: string } | null }
+    roundUp?: { data: { type: string; id: string } | null }
   }
 }
 

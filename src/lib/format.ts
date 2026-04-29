@@ -11,6 +11,21 @@ export function formatDollars(dollars: number): string {
   return Number.isFinite(dollars) ? dollars.toFixed(2) : '0.00'
 }
 
+export function formatDateTime(isoString: string): string {
+  try {
+    const d = new Date(isoString)
+    return d.toLocaleString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return isoString
+  }
+}
+
 export function formatDate(isoDate: string): string {
   try {
     const d = new Date(isoDate + (isoDate.length === 10 ? 'T12:00:00Z' : ''))

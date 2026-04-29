@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import {
@@ -16,6 +16,7 @@ import {
   getTransactionsGroupedByDate,
   getFilteredTransactionsCount,
   getRoundUpsByParentIds,
+  getRoundUpsForTransaction,
   DEFAULT_PAGE_SIZE,
   type TransactionFilters,
   type TransactionSort,
@@ -24,16 +25,14 @@ import {
 import { getCategories } from '@/services/categories'
 import {
   getTransactionUserDataMap,
-  setTransactionUserNote,
-  setTransactionUserCategoryOverride,
   suggestCategoryFromRules,
-  learnCategoryFromOverride,
 } from '@/services/transactionUserData'
 import { getAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
 import { useFullReSync } from '@/hooks/useFullReSync'
 import {
   formatMoney,
+  formatDateTime,
   formatShortDate,
   formatShortDateWithYear,
 } from '@/lib/format'
@@ -156,15 +155,12 @@ export function Transactions() {
     [parentIdsByDate]
   )
 
-  const [userDataVersion, setUserDataVersion] = useState(0)
-  const userDataMap = useMemo(() => {
-    void userDataVersion // invalidate when user saves note/override
-    return getTransactionUserDataMap(parentIdsByDate)
-  }, [parentIdsByDate, userDataVersion])
+  const userDataMap = useMemo(
+    () => getTransactionUserDataMap(parentIdsByDate),
+    [parentIdsByDate]
+  )
 
   const [editTxId, setEditTxId] = useState<string | null>(null)
-  const [editNote, setEditNote] = useState('')
-  const [editCategoryId, setEditCategoryId] = useState('')
   const editTxRow = useMemo(() => {
     if (!editTxId) return null
     for (const rows of Object.values(grouped)) {
@@ -173,21 +169,31 @@ export function Transactions() {
     }
     return null
   }, [editTxId, grouped])
-  const openEditModal = (row: TransactionRow) => {
-    const ud = userDataMap[row.id]
+  const editRoundUps = useMemo(
+    () => (editTxId ? getRoundUpsForTransaction(editTxId) : []),
+    [editTxId, lastSyncCompletedAt]
+  )
+
+  const editEffectiveCategory = useMemo(() => {
+    if (!editTxRow) return null
+    const savedOverride = userDataMap[editTxRow.id]?.user_category_override
+    if (savedOverride)
+      return (
+        categories.find((c) => c.id === savedOverride)?.name ?? savedOverride
+      )
+    const suggested = suggestCategoryFromRules(
+      editTxRow.description || editTxRow.raw_text || ''
+    )
+    if (suggested)
+      return (
+        (categories.find((c) => c.id === suggested)?.name ?? suggested) +
+        ' (suggested)'
+      )
+    return editTxRow.category_name
+  }, [editTxRow, userDataMap, categories])
+
+  const openDetailModal = (row: TransactionRow) => {
     setEditTxId(row.id)
-    setEditNote(ud?.user_notes ?? '')
-    setEditCategoryId(ud?.user_category_override ?? '')
-  }
-  const saveEditModal = () => {
-    if (!editTxId) return
-    setTransactionUserNote(editTxId, editNote.trim() || null)
-    setTransactionUserCategoryOverride(editTxId, editCategoryId.trim() || null)
-    if (editCategoryId.trim() && editTxRow) {
-      learnCategoryFromOverride(editTxRow.description, editCategoryId.trim())
-    }
-    setEditTxId(null)
-    setUserDataVersion((v) => v + 1)
   }
 
   useEffect(() => {
@@ -700,9 +706,10 @@ export function Transactions() {
                     className="py-2 px-3"
                     role="button"
                     tabIndex={0}
-                    onClick={() => openEditModal(row)}
+                    onClick={() => openDetailModal(row)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') openEditModal(row)
+                      if (e.key === 'Enter' || e.key === ' ')
+                        openDetailModal(row)
                     }}
                     style={{ cursor: 'pointer' }}
                   >
@@ -729,11 +736,6 @@ export function Transactions() {
                             return effective ? ` · ${effective}` : ''
                           })()}
                         </div>
-                        {userDataMap[row.id]?.user_notes && (
-                          <div className="small text-muted mt-1">
-                            Note: {userDataMap[row.id].user_notes}
-                          </div>
-                        )}
                         <span
                           className={`badge mt-1 ${
                             row.status === 'HELD'
@@ -819,10 +821,10 @@ export function Transactions() {
                           key={row.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => openEditModal(row)}
+                          onClick={() => openDetailModal(row)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ')
-                              openEditModal(row)
+                              openDetailModal(row)
                           }}
                           style={{ cursor: 'pointer' }}
                         >
@@ -856,11 +858,6 @@ export function Transactions() {
                               }
                               return row.category_name ?? ''
                             })()}
-                            {userDataMap[row.id]?.user_notes && (
-                              <div className="small text-muted">
-                                Note: {userDataMap[row.id].user_notes}
-                              </div>
-                            )}
                           </td>
                           <td
                             className={`text-end ${isDebit ? '' : 'text-success'}`}
@@ -920,55 +917,104 @@ export function Transactions() {
         show={editTxId != null}
         onHide={() => setEditTxId(null)}
         centered
-        aria-labelledby="transaction-edit-modal-title"
+        aria-labelledby="transaction-detail-modal-title"
       >
         <Modal.Header closeButton>
-          <Modal.Title id="transaction-edit-modal-title">
-            Transaction note &amp; category
+          <Modal.Title
+            id="transaction-detail-modal-title"
+            className="text-truncate"
+            style={{ maxWidth: '90%' }}
+          >
+            {editTxRow?.description || editTxRow?.raw_text || 'Transaction'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {editTxRow && (
             <>
-              <p className="small text-muted mb-2">
-                {editTxRow.description || editTxRow.raw_text || 'Unknown'}
-              </p>
-              <Form.Group className="mb-2">
-                <Form.Label>Note (local only)</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={2}
-                  value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)}
-                  placeholder="Optional note for this transaction"
-                />
-              </Form.Group>
-              <Form.Group>
-                <Form.Label>Category override (local only)</Form.Label>
-                <Form.Select
-                  value={editCategoryId}
-                  onChange={(e) => setEditCategoryId(e.target.value)}
+              <div className="mb-3">
+                <div
+                  className={`fs-4 fw-bold ${editTxRow.amount < 0 ? '' : 'text-success'}`}
                 >
-                  <option value="">Use bank category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Text className="text-muted">
-                  Overrides the category from Up Bank for display only.
-                </Form.Text>
-              </Form.Group>
+                  {editTxRow.amount < 0 ? '-' : '+'}$
+                  {formatMoney(Math.abs(editTxRow.amount))}
+                </div>
+                <span
+                  className={`badge ${
+                    editTxRow.status === 'HELD'
+                      ? 'bg-warning text-dark'
+                      : 'bg-secondary'
+                  }`}
+                >
+                  {editTxRow.status === 'HELD' ? 'Pending' : 'Settled'}
+                </span>
+              </div>
+
+              <dl className="row small mb-3">
+                <dt className="col-sm-4 text-muted">Date</dt>
+                <dd className="col-sm-8">
+                  {formatDateTime(
+                    editTxRow.created_at ?? editTxRow.settled_at ?? ''
+                  )}
+                </dd>
+
+                {editTxRow.settled_at && editTxRow.status !== 'HELD' && (
+                  <>
+                    <dt className="col-sm-4 text-muted">Settled</dt>
+                    <dd className="col-sm-8">
+                      {formatDateTime(editTxRow.settled_at)}
+                    </dd>
+                  </>
+                )}
+
+                {editEffectiveCategory && (
+                  <>
+                    <dt className="col-sm-4 text-muted">Category</dt>
+                    <dd className="col-sm-8">{editEffectiveCategory}</dd>
+                  </>
+                )}
+
+                {editTxRow.message && (
+                  <>
+                    <dt className="col-sm-4 text-muted">Message</dt>
+                    <dd className="col-sm-8">{editTxRow.message}</dd>
+                  </>
+                )}
+
+                {editRoundUps.map((ru) => (
+                  <Fragment key={ru.id}>
+                    <dt className="col-sm-4 text-muted">Round-up</dt>
+                    <dd className="col-sm-8 text-success">
+                      +${formatMoney(Math.abs(ru.amount))} →{' '}
+                      {ru.transfer_account_display_name ?? 'Loose Change'}
+                    </dd>
+                  </Fragment>
+                ))}
+
+                {editTxRow.foreign_amount != null && (
+                  <>
+                    <dt className="col-sm-4 text-muted">Foreign amount</dt>
+                    <dd className="col-sm-8">
+                      {editTxRow.foreign_currency ?? ''}{' '}
+                      {formatMoney(Math.abs(editTxRow.foreign_amount))}
+                    </dd>
+                  </>
+                )}
+
+                {editTxRow.transfer_account_display_name && (
+                  <>
+                    <dt className="col-sm-4 text-muted">Transfer</dt>
+                    <dd className="col-sm-8">
+                      {editTxRow.transfer_account_display_name}
+                    </dd>
+                  </>
+                )}
+              </dl>
             </>
           )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setEditTxId(null)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={saveEditModal}>
-            Save
+            Close
           </Button>
         </Modal.Footer>
       </Modal>
