@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
@@ -55,7 +55,7 @@ export function InsightsSection({
 }: {
   dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>
 }) {
-  const [, setRefresh] = useState(0)
+  const [refresh, setRefresh] = useState(0)
   const [weekOffset, setWeekOffset] = useState(0)
   const [editingCategory, setEditingCategory] =
     useState<EditingCategory | null>(null)
@@ -63,19 +63,27 @@ export function InsightsSection({
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   const accent = useStore(accentStore, (s) => s.accent)
+  // Subscribed for its side-effect: re-renders this component when the theme
+  // changes so CSS variable colours (chart categories) are picked up fresh.
   useStore(themeStore, (s) => s.theme)
-  const weekRange = getWeekRange(weekOffset)
+  const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
   const { startStr, endStr } = weekRange
-  const insights = getWeeklyInsights(weekRange)
-  const categories = getWeeklyCategoryBreakdown(weekRange)
-  const rawCount = import.meta.env.DEV
-    ? getWeeklyInsightsRawCount(weekRange)
-    : 0
-  const debugCounts = import.meta.env.DEV
-    ? getWeeklyInsightsDebugCounts(weekRange)
-    : null
+  const insights = useMemo(() => getWeeklyInsights(weekRange), [weekRange])
+  const categories = useMemo(
+    () => getWeeklyCategoryBreakdown(weekRange),
+    [weekRange]
+  )
+  const rawCount = useMemo(
+    () => (import.meta.env.DEV ? getWeeklyInsightsRawCount(weekRange) : 0),
+    [weekRange]
+  )
+  const debugCounts = useMemo(
+    () =>
+      import.meta.env.DEV ? getWeeklyInsightsDebugCounts(weekRange) : null,
+    [weekRange]
+  )
   const chartPalette = ACCENT_PALETTES[accent].chartPalette
-  const categoryColors = getInsightsCategoryColors()
+  const categoryColors = useMemo(() => getInsightsCategoryColors(), [refresh])
 
   function getThemeChartCategoryColor(index: number): string {
     if (typeof document === 'undefined')
@@ -126,6 +134,83 @@ export function InsightsSection({
     toast.success('Colour updated for all weeks.')
   }
 
+  const titleBlock = (
+    <div className="d-flex align-items-center">
+      <span
+        className="page-title-icon bg-gradient-primary text-white mr-2"
+        {...dragHandleProps}
+      >
+        <i className="mdi mdi-chart-bar" aria-hidden />
+      </span>
+      <div className="d-flex flex-column">
+        <span>Weekly Insights</span>
+        <span className="small text-muted">
+          {formatShortDateFromDate(weekRange.start)} –{' '}
+          {formatShortDateFromDate(weekRange.end)}
+        </span>
+      </div>
+    </div>
+  )
+
+  const navControls = (
+    <>
+      <Link
+        to="/analytics/insights"
+        className="btn btn-outline-secondary btn-sm"
+        aria-label="View insights analytics"
+      >
+        <i className="mdi mdi-chart-box" aria-hidden />
+      </Link>
+      <OverlayTrigger
+        placement="top"
+        overlay={
+          <BSTooltip id="insights-prev-tooltip">Previous week</BSTooltip>
+        }
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => setWeekOffset((o) => o - 1)}
+          aria-label="Previous week"
+        >
+          <i className="mdi mdi-chevron-left" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+      <OverlayTrigger
+        placement="top"
+        overlay={
+          <BSTooltip id="insights-today-tooltip">
+            Go to current period
+          </BSTooltip>
+        }
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => setWeekOffset(0)}
+          disabled={weekOffset === 0}
+          aria-label="Go to current period"
+        >
+          <i className="mdi mdi-calendar-today" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+      <OverlayTrigger
+        placement="top"
+        overlay={<BSTooltip id="insights-next-tooltip">Next week</BSTooltip>}
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => setWeekOffset((o) => o + 1)}
+          disabled={weekOffset >= 0}
+          aria-label="Next week"
+        >
+          <i className="mdi mdi-chevron-right" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+    </>
+  )
+
   return (
     <>
       <Card>
@@ -136,165 +221,16 @@ export function InsightsSection({
               : 'd-flex align-items-center justify-content-between flex-wrap gap-2 section-header'
           }
         >
-          {isMobile ? (
-            <>
-              <div className="d-flex align-items-center">
-                <span
-                  className="page-title-icon bg-gradient-primary text-white mr-2"
-                  {...dragHandleProps}
-                >
-                  <i className="mdi mdi-chart-bar" aria-hidden />
-                </span>
-                <div className="d-flex flex-column">
-                  <span>Weekly Insights</span>
-                  <span className="small text-muted">
-                    {formatShortDateFromDate(weekRange.start)} –{' '}
-                    {formatShortDateFromDate(weekRange.end)}
-                  </span>
-                </div>
-              </div>
-              <div className="d-flex justify-content-center gap-2 align-items-center">
-                <Link
-                  to="/analytics/insights"
-                  className="btn btn-outline-secondary btn-sm"
-                  aria-label="View insights analytics"
-                >
-                  <i className="mdi mdi-chart-box" aria-hidden />
-                </Link>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-prev-tooltip">
-                      Previous week
-                    </BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset((o) => o - 1)}
-                    aria-label="Previous week"
-                  >
-                    <i className="mdi mdi-chevron-left" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-today-tooltip-mobile">
-                      Go to current period
-                    </BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset(0)}
-                    disabled={weekOffset === 0}
-                    aria-label="Go to current period"
-                    aria-describedby="insights-today-tooltip-mobile"
-                  >
-                    <i className="mdi mdi-calendar-today" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-next-tooltip">Next week</BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset((o) => o + 1)}
-                    disabled={weekOffset >= 0}
-                    aria-label="Next week"
-                  >
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="d-flex align-items-center">
-                <span
-                  className="page-title-icon bg-gradient-primary text-white mr-2"
-                  {...dragHandleProps}
-                >
-                  <i className="mdi mdi-chart-bar" aria-hidden />
-                </span>
-                <div className="d-flex flex-column">
-                  <span>Weekly Insights</span>
-                  <span className="small text-muted">
-                    {formatShortDateFromDate(weekRange.start)} –{' '}
-                    {formatShortDateFromDate(weekRange.end)}
-                  </span>
-                </div>
-              </div>
-              <div className="d-flex gap-2 flex-grow-1 justify-content-end align-items-center">
-                <Link
-                  to="/analytics/insights"
-                  className="btn btn-outline-secondary btn-sm"
-                  aria-label="View insights analytics"
-                >
-                  <i className="mdi mdi-chart-box" aria-hidden />
-                </Link>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-prev-tooltip">
-                      Previous week
-                    </BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset((o) => o - 1)}
-                    aria-label="Previous week"
-                  >
-                    <i className="mdi mdi-chevron-left" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-today-tooltip-desktop">
-                      Go to current period
-                    </BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset(0)}
-                    disabled={weekOffset === 0}
-                    aria-label="Go to current period"
-                    aria-describedby="insights-today-tooltip-desktop"
-                  >
-                    <i className="mdi mdi-calendar-today" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <BSTooltip id="insights-next-tooltip">Next week</BSTooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setWeekOffset((o) => o + 1)}
-                    disabled={weekOffset >= 0}
-                    aria-label="Next week"
-                  >
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-              </div>
-            </>
-          )}
+          {titleBlock}
+          <div
+            className={
+              isMobile
+                ? 'd-flex justify-content-center gap-2 align-items-center'
+                : 'd-flex gap-2 flex-grow-1 justify-content-end align-items-center'
+            }
+          >
+            {navControls}
+          </div>
         </Card.Header>
         {import.meta.env.DEV && (
           <Card.Body className="py-1 small text-muted border-bottom">

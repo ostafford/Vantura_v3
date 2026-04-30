@@ -9,6 +9,7 @@ import {
   getPayAmountCents,
 } from '@/services/balance'
 import { formatMoney, formatShortDate } from '@/lib/format'
+import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
 import { InsightsSection } from '@/components/dashboard/InsightsSection'
@@ -37,21 +38,6 @@ import { useEffect } from 'react'
 
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
 const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
 
 const TOUR_DATA_ATTRS: Partial<Record<DashboardSectionId, string>> = {
   insights: 'insights',
@@ -197,9 +183,9 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!getNotificationsEnabled() || hasNotifiedToday()) return
-    const dueSoon = getDueSoonCharges()
-    if (dueSoon.length > 0) {
-      const names = dueSoon
+    const dueSoonCharges = getDueSoonCharges()
+    if (dueSoonCharges.length > 0) {
+      const names = dueSoonCharges
         .map((c) => `${c.name} ($${formatMoney(c.amount)})`)
         .join(', ')
       showNotification('Bills due soon', names)

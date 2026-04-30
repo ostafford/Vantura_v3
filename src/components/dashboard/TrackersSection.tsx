@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Card,
@@ -110,7 +110,7 @@ export function TrackersSection({
 }: {
   dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>
 }) {
-  const [, setRefresh] = useState(0)
+  const [refresh, setRefresh] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -133,7 +133,7 @@ export function TrackersSection({
   })
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
-  const trackerList = getTrackersList()
+  const trackerList = useMemo(() => getTrackersList(), [refresh])
   const usedFrequencies = new Set(
     trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
   )
@@ -142,37 +142,52 @@ export function TrackersSection({
       ? trackerList.length > 0
       : usedFrequencies.has(opt.value as TrackerResetFrequency)
   )
-  const frequencyInventoryKey = trackerList
-    .map((t) => t.reset_frequency)
-    .sort()
-    .join(',')
 
   useEffect(() => {
-    const list = getTrackersList()
-    if (list.length === 0) return
+    if (trackerList.length === 0) return
     const used = new Set(
-      list.map((t) => t.reset_frequency as TrackerResetFrequency)
+      trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
     )
     const allowed = new Set<FrequencyScope>(['ALL'])
     for (const f of used) allowed.add(f)
     if (!allowed.has(selectedFrequencyScope)) {
       setSelectedFrequencyScope('ALL')
     }
-  }, [frequencyInventoryKey, selectedFrequencyScope])
+  }, [trackerList, selectedFrequencyScope])
 
   const activePeriodOffset = offsetByScope[selectedFrequencyScope]
   const resetActiveScopeToCurrentPeriod = () =>
     setOffsetByScope((prev) => ({ ...prev, [selectedFrequencyScope]: 0 }))
-  const trackers = getTrackersWithProgressForPeriod(activePeriodOffset)
-  const visibleTrackers =
-    selectedFrequencyScope === 'ALL'
-      ? trackers
-      : trackers.filter((t) => t.reset_frequency === selectedFrequencyScope)
-  const categories = getCategories()
-  const payAmountCents = getPayAmountCents()
-  const totalPaydayBudgetCents = getTrackersWithProgress()
-    .filter((t) => t.reset_frequency === 'PAYDAY')
-    .reduce((sum, t) => sum + t.budget_amount, 0)
+  const trackers = useMemo(
+    () => getTrackersWithProgressForPeriod(activePeriodOffset),
+    [activePeriodOffset, refresh]
+  )
+  const visibleTrackers = useMemo(
+    () =>
+      selectedFrequencyScope === 'ALL'
+        ? trackers
+        : trackers.filter((t) => t.reset_frequency === selectedFrequencyScope),
+    [trackers, selectedFrequencyScope]
+  )
+  const categories = useMemo(() => getCategories(), [refresh])
+  const payAmountCents = useMemo(() => getPayAmountCents(), [refresh])
+  const totalPaydayBudgetCents = useMemo(
+    () =>
+      getTrackersWithProgress()
+        .filter((t) => t.reset_frequency === 'PAYDAY')
+        .reduce((sum, t) => sum + t.budget_amount, 0),
+    [refresh]
+  )
+  const periodTxsByTrackerId = useMemo(() => {
+    const map: Record<
+      number,
+      ReturnType<typeof getTrackerTransactionsInPeriod>
+    > = {}
+    for (const t of visibleTrackers) {
+      map[t.id] = getTrackerTransactionsInPeriod(t.id, activePeriodOffset)
+    }
+    return map
+  }, [visibleTrackers, activePeriodOffset, refresh])
   const paydayBudgetExceedsPay =
     payAmountCents != null &&
     payAmountCents > 0 &&
@@ -209,8 +224,10 @@ export function TrackersSection({
 
   function handleSave() {
     const budgetCents = Math.round(parseFloat(budget || '0') * 100)
-    if (!name.trim() || budgetCents <= 0 || selectedCategoryIds.length === 0)
+    if (!name.trim() || budgetCents <= 0 || selectedCategoryIds.length === 0) {
+      toast.error('Please fill in name, budget, and at least one category.')
       return
+    }
     if (editingId != null) {
       updateTracker(
         editingId,
@@ -269,6 +286,87 @@ export function TrackersSection({
     budgetCentsForModal > 0 &&
     newTotalPaydayCents > payAmountCents
 
+  const titleBlock = (
+    <div className="d-flex align-items-center">
+      <span
+        className="page-title-icon bg-gradient-primary text-white mr-2"
+        {...dragHandleProps}
+      >
+        <i className="mdi mdi-chart-line" aria-hidden />
+      </span>
+      <div className="d-flex align-items-center">
+        <span>Trackers</span>
+        <HelpPopover
+          id="trackers-help"
+          title="Trackers"
+          content="Set a budget and reset frequency (Weekly, Fortnightly, Monthly, or Payday). Assign categories to each tracker. Use the frequency tabs to focus on one cadence at a time. Previous/Next moves the selected tab's period only, so you can browse Weekly, Payday, or Monthly history independently."
+          ariaLabel="What are trackers?"
+        />
+      </div>
+    </div>
+  )
+
+  const periodNavButtons = (
+    <>
+      <OverlayTrigger
+        placement="top"
+        overlay={<Tooltip id="trackers-prev-tooltip">Previous period</Tooltip>}
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() =>
+            setOffsetByScope((prev) => ({
+              ...prev,
+              [selectedFrequencyScope]: prev[selectedFrequencyScope] - 1,
+            }))
+          }
+          aria-label="Previous period"
+        >
+          <i className="mdi mdi-chevron-left" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+      <OverlayTrigger
+        placement="top"
+        overlay={
+          <Tooltip id="trackers-today-tooltip">Go to current period</Tooltip>
+        }
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={resetActiveScopeToCurrentPeriod}
+          disabled={activePeriodOffset === 0}
+          aria-label="Go to current period"
+        >
+          <i className="mdi mdi-calendar-today" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+      <OverlayTrigger
+        placement="top"
+        overlay={<Tooltip id="trackers-next-tooltip">Next period</Tooltip>}
+      >
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() =>
+            setOffsetByScope((prev) => ({
+              ...prev,
+              [selectedFrequencyScope]: Math.min(
+                0,
+                prev[selectedFrequencyScope] + 1
+              ),
+            }))
+          }
+          disabled={activePeriodOffset >= 0}
+          aria-label="Next period"
+        >
+          <i className="mdi mdi-chevron-right" aria-hidden />
+        </Button>
+      </OverlayTrigger>
+    </>
+  )
+
   return (
     <>
       <Card>
@@ -276,23 +374,7 @@ export function TrackersSection({
           {isMobile ? (
             <>
               <div className="d-flex align-items-center justify-content-between">
-                <div className="d-flex align-items-center">
-                  <span
-                    className="page-title-icon bg-gradient-primary text-white mr-2"
-                    {...dragHandleProps}
-                  >
-                    <i className="mdi mdi-chart-line" aria-hidden />
-                  </span>
-                  <div className="d-flex align-items-center">
-                    <span>Trackers</span>
-                    <HelpPopover
-                      id="trackers-help"
-                      title="Trackers"
-                      content="Set a budget and reset frequency (Weekly, Fortnightly, Monthly, or Payday). Assign categories to each tracker. Use the frequency tabs to focus on one cadence at a time. Previous/Next moves the selected tab's period only, so you can browse Weekly, Payday, or Monthly history independently."
-                      ariaLabel="What are trackers?"
-                    />
-                  </div>
-                </div>
+                {titleBlock}
                 <div className="d-flex gap-1">
                   <OverlayTrigger
                     placement="top"
@@ -328,194 +410,50 @@ export function TrackersSection({
                 </div>
               </div>
               <div className="d-flex justify-content-center gap-2">
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="trackers-prev-tooltip">
-                      Previous period
-                    </Tooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() =>
-                      setOffsetByScope((prev) => ({
-                        ...prev,
-                        [selectedFrequencyScope]:
-                          prev[selectedFrequencyScope] - 1,
-                      }))
-                    }
-                    aria-label="Previous period"
-                  >
-                    <i className="mdi mdi-chevron-left" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="trackers-today-tooltip-mobile">
-                      Go to current period
-                    </Tooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={resetActiveScopeToCurrentPeriod}
-                    disabled={activePeriodOffset === 0}
-                    aria-label="Go to current period"
-                  >
-                    <i className="mdi mdi-calendar-today" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="trackers-next-tooltip">Next period</Tooltip>
-                  }
-                >
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() =>
-                      setOffsetByScope((prev) => ({
-                        ...prev,
-                        [selectedFrequencyScope]: Math.min(
-                          0,
-                          prev[selectedFrequencyScope] + 1
-                        ),
-                      }))
-                    }
-                    disabled={activePeriodOffset >= 0}
-                    aria-label="Next period"
-                  >
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
+                {periodNavButtons}
               </div>
             </>
           ) : (
-            <>
-              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <div className="d-flex align-items-center">
-                  <span
-                    className="page-title-icon bg-gradient-primary text-white mr-2"
-                    {...dragHandleProps}
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div className="d-flex align-items-center">
+                {titleBlock}
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id="trackers-analytics-header-tooltip-desktop">
+                      View tracker analytics
+                    </Tooltip>
+                  }
+                >
+                  <Link
+                    to="/analytics/trackers"
+                    className="btn btn-outline-secondary btn-sm ms-2"
+                    aria-label="View tracker analytics"
                   >
-                    <i className="mdi mdi-chart-line" aria-hidden />
-                  </span>
-                  <div className="d-flex align-items-center">
-                    <span>Trackers</span>
-                    <HelpPopover
-                      id="trackers-help"
-                      title="Trackers"
-                      content="Set a budget and reset frequency (Weekly, Fortnightly, Monthly, or Payday). Assign categories to each tracker. Use the frequency tabs to focus on one cadence at a time. Previous/Next moves the selected tab's period only, so you can browse Weekly, Payday, or Monthly history independently."
-                      ariaLabel="What are trackers?"
-                    />
-                    <OverlayTrigger
-                      placement="top"
-                      overlay={
-                        <Tooltip id="trackers-analytics-header-tooltip-desktop">
-                          View tracker analytics
-                        </Tooltip>
-                      }
-                    >
-                      <Link
-                        to="/analytics/trackers"
-                        className="btn btn-outline-secondary btn-sm ms-2"
-                        aria-label="View tracker analytics"
-                      >
-                        <i className="mdi mdi-chart-box" aria-hidden />
-                      </Link>
-                    </OverlayTrigger>
-                  </div>
-                </div>
-                <div className="d-flex gap-1 align-items-center flex-nowrap ms-auto">
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-prev-tooltip">
-                        Previous period
-                      </Tooltip>
-                    }
-                  >
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() =>
-                        setOffsetByScope((prev) => ({
-                          ...prev,
-                          [selectedFrequencyScope]:
-                            prev[selectedFrequencyScope] - 1,
-                        }))
-                      }
-                      aria-label="Previous period"
-                    >
-                      <i className="mdi mdi-chevron-left" aria-hidden />
-                    </Button>
-                  </OverlayTrigger>
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-today-tooltip-desktop">
-                        Go to current period
-                      </Tooltip>
-                    }
-                  >
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={resetActiveScopeToCurrentPeriod}
-                      disabled={activePeriodOffset === 0}
-                      aria-label="Go to current period"
-                    >
-                      <i className="mdi mdi-calendar-today" aria-hidden />
-                    </Button>
-                  </OverlayTrigger>
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-next-tooltip">Next period</Tooltip>
-                    }
-                  >
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() =>
-                        setOffsetByScope((prev) => ({
-                          ...prev,
-                          [selectedFrequencyScope]: Math.min(
-                            0,
-                            prev[selectedFrequencyScope] + 1
-                          ),
-                        }))
-                      }
-                      disabled={activePeriodOffset >= 0}
-                      aria-label="Next period"
-                    >
-                      <i className="mdi mdi-chevron-right" aria-hidden />
-                    </Button>
-                  </OverlayTrigger>
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-add-tooltip">Add tracker</Tooltip>
-                    }
-                  >
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="ms-2"
-                      onClick={openCreate}
-                      aria-label="Add tracker"
-                    >
-                      <i className="mdi mdi-plus" aria-hidden />
-                    </Button>
-                  </OverlayTrigger>
-                </div>
+                    <i className="mdi mdi-chart-box" aria-hidden />
+                  </Link>
+                </OverlayTrigger>
               </div>
-            </>
+              <div className="d-flex gap-1 align-items-center flex-nowrap ms-auto">
+                {periodNavButtons}
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id="trackers-add-tooltip">Add tracker</Tooltip>
+                  }
+                >
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="ms-2"
+                    onClick={openCreate}
+                    aria-label="Add tracker"
+                  >
+                    <i className="mdi mdi-plus" aria-hidden />
+                  </Button>
+                </OverlayTrigger>
+              </div>
+            </div>
           )}
           {visibleScopeOptions.length > 0 && (
             <div className="d-flex justify-content-center mt-1">
@@ -632,10 +570,7 @@ export function TrackersSection({
                     t.period_start && t.period_end
                       ? `${formatShortDate(t.period_start)} – ${formatShortDate(t.period_end)}`
                       : ''
-                  const periodTxs = getTrackerTransactionsInPeriod(
-                    t.id,
-                    activePeriodOffset
-                  )
+                  const periodTxs = periodTxsByTrackerId[t.id] ?? []
                   const daysTooltipText = periodRangeText
                     ? `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period (${periodRangeText})`
                     : `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period`
@@ -729,67 +664,65 @@ export function TrackersSection({
                           animated={progressStyle.animated}
                           label={`${Math.round(t.progress)}%`}
                         />
-                        <div
-                          className="d-flex justify-content-between align-items-center"
-                          role="button"
-                          tabIndex={0}
-                          aria-label={
-                            expandedId === t.id
-                              ? 'Collapse transactions'
-                              : 'View transactions for this period'
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation()
+                      </div>
+                      <div
+                        className="d-flex justify-content-between align-items-center"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={
+                          expandedId === t.id
+                            ? 'Collapse transactions'
+                            : 'View transactions for this period'
+                        }
+                        onClick={() => {
+                          setExpandedId(expandedId === t.id ? null : t.id)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
                             setExpandedId(expandedId === t.id ? null : t.id)
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setExpandedId(expandedId === t.id ? null : t.id)
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                          title="View transactions"
-                        >
-                          <small className="text-muted">
-                            ${formatMoney(t.spent)} of $
-                            {formatMoney(t.budget_amount)} spent
-                          </small>
-                          {t.period_start && t.period_end && (
-                            <span className="small text-muted text-end">
-                              {formatShortDate(t.period_start)} –{' '}
-                              {formatShortDate(t.period_end)}
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="View transactions"
+                      >
+                        <small className="text-muted">
+                          ${formatMoney(t.spent)} of $
+                          {formatMoney(t.budget_amount)} spent
+                        </small>
+                        {t.period_start && t.period_end && (
+                          <span className="small text-muted text-end">
+                            {formatShortDate(t.period_start)} –{' '}
+                            {formatShortDate(t.period_end)}
+                          </span>
+                        )}
+                      </div>
+                      <Collapse in={expandedId === t.id}>
+                        <div className="mt-2 small">
+                          {periodTxs.length === 0 ? (
+                            <span className="text-muted">
+                              No transactions this period
                             </span>
+                          ) : (
+                            <ul className="list-unstyled mb-0">
+                              {periodTxs.map((tx) => (
+                                <li key={tx.id}>
+                                  {formatShortDate(
+                                    tx.created_at ?? tx.settled_at ?? ''
+                                  )}{' '}
+                                  {tx.description} $
+                                  {formatMoney(Math.abs(tx.amount))}
+                                  {tx.status === 'HELD' && (
+                                    <span className="text-muted small ms-1">
+                                      (Held)
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
                           )}
                         </div>
-                        <Collapse in={expandedId === t.id}>
-                          <div className="mt-2 small">
-                            {periodTxs.length === 0 ? (
-                              <span className="text-muted">
-                                No transactions this period
-                              </span>
-                            ) : (
-                              <ul className="list-unstyled mb-0">
-                                {periodTxs.map((tx) => (
-                                  <li key={tx.id}>
-                                    {formatShortDate(
-                                      tx.created_at ?? tx.settled_at ?? ''
-                                    )}{' '}
-                                    {tx.description} $
-                                    {formatMoney(Math.abs(tx.amount))}
-                                    {tx.status === 'HELD' && (
-                                      <span className="text-muted small ms-1">
-                                        (Held)
-                                      </span>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </Collapse>
-                      </div>
+                      </Collapse>
                     </Fragment>
                   )
                 })}

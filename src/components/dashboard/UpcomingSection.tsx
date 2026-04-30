@@ -23,7 +23,7 @@ import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
+import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
 import type React from 'react'
 
 const FREQUENCIES = [
@@ -33,21 +33,6 @@ const FREQUENCIES = [
   'QUARTERLY',
   'YEARLY',
   'ONCE',
-]
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
 ]
 
 function UpcomingCalendar({
@@ -159,7 +144,7 @@ export function UpcomingSection({
   onUpcomingChange,
   dragHandleProps,
 }: UpcomingSectionProps) {
-  const [, setRefresh] = useState(0)
+  const [refresh, setRefresh] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [editingCharge, setEditingCharge] = useState<UpcomingChargeRow | null>(
     null
@@ -179,10 +164,13 @@ export function UpcomingSection({
     return { year: d.getFullYear(), month: d.getMonth() + 1 }
   })
 
-  const { nextPay, later, nextPayday } = getUpcomingChargesGrouped()
+  const { nextPay, later, nextPayday } = useMemo(
+    () => getUpcomingChargesGrouped(),
+    [refresh]
+  )
   const calendarCharges = useMemo(
     () => getUpcomingChargesForMonth(calendarMonth.year, calendarMonth.month),
-    [calendarMonth.year, calendarMonth.month]
+    [calendarMonth.year, calendarMonth.month, refresh]
   )
   const calendarDaysByDate = useMemo(() => {
     const map: Record<string, UpcomingChargeRow[]> = {}
@@ -193,8 +181,8 @@ export function UpcomingSection({
     }
     return map
   }, [calendarCharges])
-  const reserved = getReservedAmount()
-  const categories = getCategories()
+  const reserved = useMemo(() => getReservedAmount(), [refresh])
+  const categories = useMemo(() => getCategories(), [refresh])
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   function openCreate() {
@@ -229,7 +217,10 @@ export function UpcomingSection({
 
   function handleSave() {
     const amountCents = Math.round(parseFloat(amount || '0') * 100)
-    if (!name.trim() || amountCents <= 0 || !nextChargeDate) return
+    if (!name.trim() || amountCents <= 0 || !nextChargeDate) {
+      toast.error('Please fill in name, amount, and next charge date.')
+      return
+    }
     const reminder =
       reminderDaysBefore.trim() === '' ? null : parseInt(reminderDaysBefore, 10)
     const reminderDays =
@@ -416,50 +407,53 @@ export function UpcomingSection({
                       ${formatMoney(nextPayTotal)} total
                     </span>
                   </div>
-                  {nextPay.map((c) => (
-                    <Card
-                      key={c.id}
-                      className="mb-2 upcoming-card"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openEdit(c)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          openEdit(c)
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <Card.Body className="py-2 px-3">
-                        <div className="d-flex justify-content-between align-items-start gap-2">
-                          <div>
-                            <div className="fw-medium">
-                              {c.name}
-                              {c.is_subscription === 1 && (
-                                <span className="badge badge-subscription ms-1">
-                                  Sub
-                                </span>
-                              )}
-                              {reminderLabel(c) && (
-                                <span className="badge badge-reminder ms-1">
-                                  {reminderLabel(c)}
-                                </span>
-                              )}
+                  {nextPay.map((c) => {
+                    const dueLabel = reminderLabel(c)
+                    return (
+                      <Card
+                        key={c.id}
+                        className="mb-2 upcoming-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openEdit(c)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openEdit(c)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Card.Body className="py-2 px-3">
+                          <div className="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div className="fw-medium">
+                                {c.name}
+                                {c.is_subscription === 1 && (
+                                  <span className="badge badge-subscription ms-1">
+                                    Sub
+                                  </span>
+                                )}
+                                {dueLabel && (
+                                  <span className="badge badge-reminder ms-1">
+                                    {dueLabel}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="small text-muted">
+                                {formatShortDate(c.next_charge_date)} ·{' '}
+                                {c.frequency.charAt(0) +
+                                  c.frequency.slice(1).toLowerCase()}
+                              </div>
                             </div>
-                            <div className="small text-muted">
-                              {formatShortDate(c.next_charge_date)} ·{' '}
-                              {c.frequency.charAt(0) +
-                                c.frequency.slice(1).toLowerCase()}
+                            <div className="text-end">
+                              ${formatMoney(c.amount)}
                             </div>
                           </div>
-                          <div className="text-end">
-                            ${formatMoney(c.amount)}
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
+                        </Card.Body>
+                      </Card>
+                    )
+                  })}
                 </div>
               )}
               {later.length > 0 && (
@@ -470,50 +464,53 @@ export function UpcomingSection({
                       ${formatMoney(laterTotal)}
                     </span>
                   </div>
-                  {later.map((c) => (
-                    <Card
-                      key={c.id}
-                      className="mb-2 upcoming-card"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openEdit(c)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          openEdit(c)
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <Card.Body className="py-2 px-3">
-                        <div className="d-flex justify-content-between align-items-start gap-2">
-                          <div>
-                            <div className="fw-medium">
-                              {c.name}
-                              {c.is_subscription === 1 && (
-                                <span className="badge badge-subscription ms-1">
-                                  Sub
-                                </span>
-                              )}
-                              {reminderLabel(c) && (
-                                <span className="badge badge-reminder ms-1">
-                                  {reminderLabel(c)}
-                                </span>
-                              )}
+                  {later.map((c) => {
+                    const dueLabel = reminderLabel(c)
+                    return (
+                      <Card
+                        key={c.id}
+                        className="mb-2 upcoming-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openEdit(c)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openEdit(c)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Card.Body className="py-2 px-3">
+                          <div className="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div className="fw-medium">
+                                {c.name}
+                                {c.is_subscription === 1 && (
+                                  <span className="badge badge-subscription ms-1">
+                                    Sub
+                                  </span>
+                                )}
+                                {dueLabel && (
+                                  <span className="badge badge-reminder ms-1">
+                                    {dueLabel}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="small text-muted">
+                                {formatShortDate(c.next_charge_date)} ·{' '}
+                                {c.frequency.charAt(0) +
+                                  c.frequency.slice(1).toLowerCase()}
+                              </div>
                             </div>
-                            <div className="small text-muted">
-                              {formatShortDate(c.next_charge_date)} ·{' '}
-                              {c.frequency.charAt(0) +
-                                c.frequency.slice(1).toLowerCase()}
+                            <div className="text-end">
+                              ${formatMoney(c.amount)}
                             </div>
                           </div>
-                          <div className="text-end">
-                            ${formatMoney(c.amount)}
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
+                        </Card.Body>
+                      </Card>
+                    )
+                  })}
                 </div>
               )}
             </div>
