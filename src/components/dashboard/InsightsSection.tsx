@@ -24,6 +24,7 @@ import {
 } from '@/lib/format'
 import { accentStore } from '@/stores/accentStore'
 import { themeStore } from '@/stores/themeStore'
+import { syncStore } from '@/stores/syncStore'
 import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import {
   getInsightsCategoryColors,
@@ -66,12 +67,18 @@ export function InsightsSection({
   // Subscribed for its side-effect: re-renders this component when the theme
   // changes so CSS variable colours (chart categories) are picked up fresh.
   useStore(themeStore, (s) => s.theme)
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
   const { startStr, endStr } = weekRange
-  const insights = useMemo(() => getWeeklyInsights(weekRange), [weekRange])
+  const insights = useMemo(
+    () => getWeeklyInsights(weekRange),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekRange, lastSyncCompletedAt]
+  )
   const categories = useMemo(
     () => getWeeklyCategoryBreakdown(weekRange),
-    [weekRange]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekRange, lastSyncCompletedAt]
   )
   const rawCount = useMemo(
     () => (import.meta.env.DEV ? getWeeklyInsightsRawCount(weekRange) : 0),
@@ -271,9 +278,9 @@ export function InsightsSection({
                 title="Savers"
                 value={Math.abs(insights.saverChanges)}
                 displayValue={
-                  (insights.saverChanges >= 0 ? '+' : '') +
+                  (insights.saverChanges <= 0 ? '+' : '-') +
                   '$' +
-                  formatMoney(insights.saverChanges)
+                  formatMoney(Math.abs(insights.saverChanges))
                 }
                 gradient="success"
                 imgAlt=""

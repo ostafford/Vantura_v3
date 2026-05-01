@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
 import {
   Card,
@@ -26,6 +27,7 @@ import { getCategories } from '@/services/categories'
 import { getPayAmountCents } from '@/services/balance'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
+import { syncStore } from '@/stores/syncStore'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
@@ -132,8 +134,13 @@ export function TrackersSection({
     MONTHLY: 0,
   })
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
-  const trackerList = useMemo(() => getTrackersList(), [refresh])
+  const trackerList = useMemo(
+    () => getTrackersList(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
   const usedFrequencies = new Set(
     trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
   )
@@ -160,7 +167,8 @@ export function TrackersSection({
     setOffsetByScope((prev) => ({ ...prev, [selectedFrequencyScope]: 0 }))
   const trackers = useMemo(
     () => getTrackersWithProgressForPeriod(activePeriodOffset),
-    [activePeriodOffset, refresh]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activePeriodOffset, refresh, lastSyncCompletedAt]
   )
   const visibleTrackers = useMemo(
     () =>

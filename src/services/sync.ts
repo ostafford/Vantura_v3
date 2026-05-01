@@ -110,6 +110,10 @@ function reconcileClosedAccounts(fetchedIds: Set<string>): void {
   for (const id of storedIds) {
     if (!fetchedIds.has(id)) {
       db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [id])
+      db.run(
+        `UPDATE maybuys SET saver_account_id = NULL WHERE saver_account_id = ?`,
+        [id]
+      )
     }
   }
   schedulePersist()

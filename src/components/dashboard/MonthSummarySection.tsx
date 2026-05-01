@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { useStore } from 'zustand'
 import {
   Card,
   Button,
@@ -11,6 +12,7 @@ import {
   getMonthDayByDaySeries,
   getMonthBoundsForOffset,
 } from '@/services/insights'
+import { syncStore } from '@/stores/syncStore'
 import type { MonthMetric } from '@/lib/monthSpendingSeries'
 import { MonthSpendingComparisonChart } from '@/components/charts/MonthSpendingComparisonChart'
 import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
@@ -29,15 +31,21 @@ export function MonthSummarySection({
   const [showPrevious, setShowPrevious] = useState(true)
   const [showCurrent, setShowCurrent] = useState(true)
   const [showAverageLine, setShowAverageLine] = useState(true)
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
   const { from, to, year, month } = useMemo(
     () => getMonthBoundsForOffset(monthOffset),
     [monthOffset]
   )
-  const comparison = useMemo(() => getMonthComparison(from, to), [from, to])
+  const comparison = useMemo(
+    () => getMonthComparison(from, to),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [from, to, lastSyncCompletedAt]
+  )
   const monthSeries = useMemo(
     () => getMonthDayByDaySeries(from, to),
-    [from, to]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [from, to, lastSyncCompletedAt]
   )
   const monthLabel = monthNameLong(year, month)
   const monthPairLabels = useMemo(

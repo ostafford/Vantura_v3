@@ -17,10 +17,6 @@
  * - Charges: Count of spending transactions. Same rules as Money Out (negative, non-transfer).
  *   One charge per purchase (e.g. Coles, ALDI).
  *
- * - Payments made: Scheduled or manual payments to external parties (BPAY, PayID, bank transfer)
- *   where Up app shows Payment Method = Payment. Filter: transfer_type IS NOT NULL.
- *   Currently 0 because we do not set transfer_type from the API yet; reserved for future use.
- *
  * - Category chart: Spending by category (same as Money Out), no transfers. Same filter as
  *   Money Out, grouped by category_id.
  */
@@ -150,18 +146,15 @@ export interface WeeklyInsightsData {
   saverChanges: number
   /** Count of spending transactions (same set as moneyOut). */
   charges: number
-  /** Count of external payments (BPAY, PayID, etc.); 0 until transfer_type is set from API. */
-  payments: number
 }
 
 /**
  * Returns weekly insight metrics for the given week. See file-level comment and WeeklyInsightsData
- * for definitions of moneyIn, moneyOut, saverChanges, charges, and payments.
+ * for definitions of moneyIn, moneyOut, saverChanges, and charges.
  */
 export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
   const db = getDb()
-  if (!db)
-    return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0, payments: 0 }
+  if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
   const { startIso, endStr } = weekRange ?? getWeekRange()
 
   const runOne = (sql: string, params: (string | number)[]): number => {
@@ -206,14 +199,7 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
      WHERE amount < 0 AND transfer_account_id IS NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startIso, endStr]
   )
-  // Payments made: external payments (BPAY, PayID, etc.); transfer_type set when API supports it
-  const payments = runOne(
-    `SELECT COUNT(*) FROM transactions
-     WHERE transfer_type IS NOT NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
-    [startIso, endStr]
-  )
-
-  return { moneyIn, moneyOut, saverChanges, charges, payments }
+  return { moneyIn, moneyOut, saverChanges, charges }
 }
 
 export interface CategoryBreakdownRow {
@@ -400,8 +386,7 @@ export function getInsightsForDateRange(
   dateTo: string
 ): WeeklyInsightsData {
   const db = getDb()
-  if (!db)
-    return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0, payments: 0 }
+  if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
   const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
 
   const runOne = (sql: string, params: (string | number)[]): number => {
@@ -442,12 +427,7 @@ export function getInsightsForDateRange(
      WHERE amount < 0 AND transfer_account_id IS NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [dateFrom, endStr]
   )
-  const payments = runOne(
-    `SELECT COUNT(*) FROM transactions
-     WHERE transfer_type IS NOT NULL AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
-    [dateFrom, endStr]
-  )
-  return { moneyIn, moneyOut, saverChanges, charges, payments }
+  return { moneyIn, moneyOut, saverChanges, charges }
 }
 
 // ---------------------------------------------------------------------------
