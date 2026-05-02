@@ -289,36 +289,39 @@ export function getTracker(trackerId: number): TrackerRow | null {
   }
 }
 
-/**
- * Transactions in a period for a tracker (for list in UI). Uses display date
- * (created_at with fallback to settled_at) for period and ordering. Returns status for Held/Settled.
- * When periodOffset is 0 or omitted, uses current period from DB; otherwise uses computed period.
- */
-export function getTrackerTransactionsInPeriod(
-  trackerId: number,
-  periodOffset?: number
-): Array<{
+export type TrackerPeriodTransaction = {
   id: string
   description: string
   created_at: string | null
   settled_at: string | null
   amount: number
   status: string
-}> {
+}
+
+/**
+ * Transactions in a period for a tracker (for list in UI). Uses display date
+ * (created_at with fallback to settled_at) for period and ordering. Returns status for Held/Settled.
+ * When periodOffset is 0 or omitted, uses current period from DB; otherwise uses computed period.
+ * Fetches 21 rows and returns the first 20 plus a hasMore flag.
+ */
+export function getTrackerTransactionsInPeriod(
+  trackerId: number,
+  periodOffset?: number
+): { list: TrackerPeriodTransaction[]; hasMore: boolean } {
   const db = getDb()
-  if (!db) return []
+  if (!db) return { list: [], hasMore: false }
   let periodStart: string
   let periodEnd: string
   if (periodOffset === undefined || periodOffset === 0) {
     const row = getTracker(trackerId)
-    if (!row) return []
+    if (!row) return { list: [], hasMore: false }
     periodStart = row.last_reset_date
     periodEnd = row.next_reset_date
   } else {
     const row = getTracker(trackerId)
-    if (!row) return []
+    if (!row) return { list: [], hasMore: false }
     const bounds = getPeriodBoundsForOffset(row, periodOffset)
-    if (!bounds) return []
+    if (!bounds) return { list: [], hasMore: false }
     periodStart = bounds.periodStart
     periodEnd = bounds.periodEnd
   }
@@ -333,17 +336,10 @@ export function getTrackerTransactionsInPeriod(
        AND COALESCE(t.created_at, t.settled_at) >= ?
        AND COALESCE(t.created_at, t.settled_at) < ?
        AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT 20`
+     ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT 21`
   )
   stmt.bind([trackerId, startNorm, endNorm])
-  const list: Array<{
-    id: string
-    description: string
-    created_at: string | null
-    settled_at: string | null
-    amount: number
-    status: string
-  }> = []
+  const raw: TrackerPeriodTransaction[] = []
   while (stmt.step()) {
     const row = stmt.get() as [
       string,
@@ -353,7 +349,7 @@ export function getTrackerTransactionsInPeriod(
       number,
       string,
     ]
-    list.push({
+    raw.push({
       id: row[0],
       description: row[1],
       created_at: row[2],
@@ -363,7 +359,7 @@ export function getTrackerTransactionsInPeriod(
     })
   }
   stmt.free()
-  return list
+  return { list: raw.slice(0, 20), hasMore: raw.length === 21 }
 }
 
 /**
@@ -533,8 +529,9 @@ export function createTracker(
   let nextReset: string
   if (resetFrequency === 'PAYDAY') {
     const nextPayday = getAppSetting('next_payday')
-    nextReset = nextPayday ?? today
-    lastReset = today
+    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
+    nextReset = nextPayday
+    lastReset = getPreviousPaydayDate(nextPayday) ?? today
   } else {
     lastReset = getLastResetDate(resetFrequency, resetDay, today)
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
@@ -568,8 +565,8 @@ export function createTracker(
 
 /**
  * Update tracker name, budget, frequency, reset_day, categories.
- * Recalculates last_reset_date and next_reset_date so the period is correct
- * immediately after a frequency or reset_day change.
+ * Only recalculates last_reset_date / next_reset_date when reset_frequency or
+ * reset_day actually changes — preserves the current period otherwise.
  */
 export function updateTracker(
   id: number,
@@ -583,12 +580,22 @@ export function updateTracker(
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   const today = new Date().toISOString().slice(0, 10)
+  const existing = getTracker(id)
+  const needsPeriodReset =
+    !existing ||
+    existing.reset_frequency !== resetFrequency ||
+    existing.reset_day !== resetDay
+
   let lastReset: string
   let nextReset: string
-  if (resetFrequency === 'PAYDAY') {
+  if (!needsPeriodReset) {
+    lastReset = existing!.last_reset_date
+    nextReset = existing!.next_reset_date
+  } else if (resetFrequency === 'PAYDAY') {
     const nextPayday = getAppSetting('next_payday')
-    nextReset = nextPayday ?? today
-    lastReset = today
+    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
+    nextReset = nextPayday
+    lastReset = getPreviousPaydayDate(nextPayday) ?? today
   } else {
     lastReset = getLastResetDate(resetFrequency, resetDay, today)
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
@@ -878,4 +885,32 @@ export function getTrackerCategoryIds(trackerId: number): string[] {
   }
   stmt.free()
   return ids
+}
+
+/**
+ * Returns a map of category_id → comma-separated tracker names for all OTHER active
+ * trackers. Used to warn when a category is already assigned to another tracker.
+ * Pass excludeTrackerId when editing an existing tracker to exclude it from results.
+ */
+export function getTrackerCategoryUsage(
+  excludeTrackerId?: number | null
+): Record<string, string> {
+  const db = getDb()
+  if (!db) return {}
+  const hasExclude = excludeTrackerId != null
+  const stmt = db.prepare(
+    `SELECT tc.category_id, GROUP_CONCAT(t.name, ', ')
+     FROM tracker_categories tc
+     INNER JOIN trackers t ON tc.tracker_id = t.id
+     WHERE t.is_active = 1${hasExclude ? ' AND t.id != ?' : ''}
+     GROUP BY tc.category_id`
+  )
+  if (hasExclude) stmt.bind([excludeTrackerId])
+  const map: Record<string, string> = {}
+  while (stmt.step()) {
+    const row = stmt.get() as [string, string]
+    map[row[0]] = row[1]
+  }
+  stmt.free()
+  return map
 }

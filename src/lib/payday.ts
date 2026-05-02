@@ -34,3 +34,52 @@ export function getPaydayDayOptions(
 ): { value: number; label: string }[] {
   return PAYDAY_DAY_OPTIONS[frequency]
 }
+
+/**
+ * Given a reference date (a past payday transaction) and a chosen frequency,
+ * derive paydayDay (the stored integer: 1–7 for weekly/fortnightly, 1–28 for monthly)
+ * and the next upcoming payday date after today.
+ */
+export function computeNextPaydayFromReference(
+  refDate: string,
+  frequency: PaydayFrequency
+): { paydayDay: number; nextPayday: string } {
+  const ref = new Date(refDate + 'T12:00:00Z')
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const today = new Date(todayStr + 'T12:00:00Z')
+
+  if (frequency === 'MONTHLY') {
+    const day = Math.min(ref.getUTCDate(), 28)
+    const next = new Date(today)
+    next.setUTCDate(day)
+    if (next.toISOString().slice(0, 10) <= todayStr) {
+      next.setUTCMonth(next.getUTCMonth() + 1)
+      next.setUTCDate(day)
+    }
+    return { paydayDay: day, nextPayday: next.toISOString().slice(0, 10) }
+  }
+
+  if (frequency === 'WEEKLY') {
+    const refWeekday = ref.getUTCDay()
+    const paydayDay = refWeekday === 0 ? 7 : refWeekday
+    const todayWeekday = today.getUTCDay()
+    const daysUntil = (refWeekday - todayWeekday + 7) % 7 || 7
+    const next = new Date(today)
+    next.setUTCDate(next.getUTCDate() + daysUntil)
+    return { paydayDay, nextPayday: next.toISOString().slice(0, 10) }
+  }
+
+  // FORTNIGHTLY: align to the reference date's 14-day cadence
+  const refWeekday = ref.getUTCDay()
+  const paydayDay = refWeekday === 0 ? 7 : refWeekday
+  const daysSinceRef = Math.floor(
+    (today.getTime() - ref.getTime()) / (24 * 60 * 60 * 1000)
+  )
+  const periodsSince = Math.max(0, Math.floor(daysSinceRef / 14))
+  const next = new Date(ref)
+  next.setUTCDate(next.getUTCDate() + 14 * (periodsSince + 1))
+  if (next.toISOString().slice(0, 10) <= todayStr) {
+    next.setUTCDate(next.getUTCDate() + 14)
+  }
+  return { paydayDay, nextPayday: next.toISOString().slice(0, 10) }
+}

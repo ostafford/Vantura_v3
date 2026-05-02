@@ -37,7 +37,13 @@ import {
   removeTransactionTags,
 } from '@/api/upBank'
 import { sessionStore } from '@/stores/sessionStore'
-import { getAppSetting } from '@/db'
+import { getAppSetting, setAppSetting } from '@/db'
+import {
+  type PaydayFrequency,
+  getPaydayDayOptions,
+  computeNextPaydayFromReference,
+} from '@/lib/payday'
+import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { useFullReSync } from '@/hooks/useFullReSync'
 import {
@@ -239,15 +245,51 @@ export function Transactions() {
   const [tagUpdating, setTagUpdating] = useState(false)
   const [tagError, setTagError] = useState<string | null>(null)
 
+  const [showPaydaySetup, setShowPaydaySetup] = useState(false)
+  const [paydaySetupFreq, setPaydaySetupFreq] = useState<PaydayFrequency>(
+    () =>
+      (getAppSetting('payday_frequency') as PaydayFrequency | null) ?? 'MONTHLY'
+  )
+
+  const paydaySetupPreview = useMemo(() => {
+    if (!editTxRow) return null
+    const txDate = (editTxRow.created_at ?? editTxRow.settled_at ?? '').slice(
+      0,
+      10
+    )
+    if (!txDate) return null
+    const { paydayDay, nextPayday } = computeNextPaydayFromReference(
+      txDate,
+      paydaySetupFreq
+    )
+    const dayOptions = getPaydayDayOptions(paydaySetupFreq)
+    const dayLabel =
+      dayOptions.find((o) => o.value === paydayDay)?.label ?? String(paydayDay)
+    return { paydayDay, nextPayday, dayLabel }
+  }, [editTxRow, paydaySetupFreq])
+
+  function handlePaydayNominate() {
+    if (!editTxRow || !paydaySetupPreview) return
+    setAppSetting('payday_frequency', paydaySetupFreq)
+    setAppSetting('payday_day', String(paydaySetupPreview.paydayDay))
+    setAppSetting('next_payday', paydaySetupPreview.nextPayday)
+    toast.success(
+      `Payday set: ${paydaySetupFreq.charAt(0) + paydaySetupFreq.slice(1).toLowerCase()} on ${paydaySetupPreview.dayLabel}. Next: ${paydaySetupPreview.nextPayday}.`
+    )
+    setShowPaydaySetup(false)
+  }
+
   useEffect(() => {
     if (editTxId) {
       setEditTxTags(getTagsForTransaction(editTxId))
       setAllTags(getAllTags())
       setCategoryError(null)
       setTagError(null)
+      setShowPaydaySetup(false)
     } else {
       setEditTxTags([])
       setAllTags([])
+      setShowPaydaySetup(false)
     }
   }, [editTxId, localDbVersion])
 
@@ -1224,6 +1266,75 @@ export function Transactions() {
                   )}
                 </dd>
               </dl>
+
+              {editTxRow.amount > 0 && !editTxRow.transfer_account_id && (
+                <>
+                  <hr className="my-2" />
+                  {showPaydaySetup ? (
+                    <div className="small">
+                      <p className="fw-semibold mb-2">
+                        Configure pay schedule from this transaction
+                      </p>
+                      <Form.Group className="mb-2">
+                        <Form.Label htmlFor="payday-setup-freq">
+                          Frequency
+                        </Form.Label>
+                        <Form.Select
+                          id="payday-setup-freq"
+                          size="sm"
+                          value={paydaySetupFreq}
+                          onChange={(e) =>
+                            setPaydaySetupFreq(
+                              e.target.value as PaydayFrequency
+                            )
+                          }
+                        >
+                          <option value="WEEKLY">Weekly</option>
+                          <option value="FORTNIGHTLY">Fortnightly</option>
+                          <option value="MONTHLY">Monthly</option>
+                        </Form.Select>
+                      </Form.Group>
+                      {paydaySetupPreview && (
+                        <p className="text-muted mb-2">
+                          Pay day:{' '}
+                          <strong>{paydaySetupPreview.dayLabel}</strong>
+                          {' · '}Next payday:{' '}
+                          <strong>{paydaySetupPreview.nextPayday}</strong>
+                        </p>
+                      )}
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handlePaydayNominate}
+                        >
+                          Save payday settings
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted"
+                          onClick={() => setShowPaydaySetup(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => setShowPaydaySetup(true)}
+                    >
+                      <i
+                        className="mdi mdi-calendar-account me-1"
+                        aria-hidden
+                      />
+                      Use as payday reference
+                    </Button>
+                  )}
+                </>
+              )}
             </>
           )}
         </Modal.Body>

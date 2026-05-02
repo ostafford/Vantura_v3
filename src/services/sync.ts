@@ -25,31 +25,33 @@ function todayDateString(): string {
  * Call on app init and at start of each sync so PAYDAY trackers and reserved amount use current value.
  */
 export function advanceNextPaydayIfNeeded(): void {
-  const nextPayday = getAppSetting('next_payday')
   const frequency = getAppSetting('payday_frequency')
   const dayStr = getAppSetting('payday_day')
-  if (!nextPayday || !frequency) return
+  if (!frequency) return
+  let nextPayday = getAppSetting('next_payday')
+  if (!nextPayday) return
   const today = todayDateString()
-  if (today < nextPayday) return
-
   const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  const current = new Date(nextPayday + 'T12:00:00Z')
-  let next: Date
-  if (frequency === 'WEEKLY') {
-    next = new Date(current)
-    next.setUTCDate(next.getUTCDate() + 7)
-  } else if (frequency === 'FORTNIGHTLY') {
-    next = new Date(current)
-    next.setUTCDate(next.getUTCDate() + 14)
-  } else if (frequency === 'MONTHLY') {
-    next = new Date(current)
-    next.setUTCMonth(next.getUTCMonth() + 1)
-    if (paydayDay >= 1 && paydayDay <= 28) next.setUTCDate(paydayDay)
-  } else {
-    return
+
+  while (today >= nextPayday) {
+    const current = new Date(nextPayday + 'T12:00:00Z')
+    let next: Date
+    if (frequency === 'WEEKLY') {
+      next = new Date(current)
+      next.setUTCDate(next.getUTCDate() + 7)
+    } else if (frequency === 'FORTNIGHTLY') {
+      next = new Date(current)
+      next.setUTCDate(next.getUTCDate() + 14)
+    } else if (frequency === 'MONTHLY') {
+      next = new Date(current)
+      next.setUTCMonth(next.getUTCMonth() + 1)
+      if (paydayDay >= 1 && paydayDay <= 28) next.setUTCDate(paydayDay)
+    } else {
+      break
+    }
+    nextPayday = next.toISOString().slice(0, 10)
+    setAppSetting('next_payday', nextPayday)
   }
-  const nextStr = next.toISOString().slice(0, 10)
-  setAppSetting('next_payday', nextStr)
 }
 
 export type SyncProgress = {
@@ -217,55 +219,92 @@ function upsertCategory(cat: UpCategory): void {
   )
 }
 
+/** The payday before nextPayday, computed from payday settings. */
+function prevPaydayDate(nextPayday: string): string | null {
+  const frequency = getAppSetting('payday_frequency')
+  const dayStr = getAppSetting('payday_day')
+  if (!frequency) return null
+  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
+  const from = new Date(nextPayday + 'T12:00:00Z')
+  if (frequency === 'WEEKLY') {
+    const prev = new Date(from)
+    prev.setUTCDate(prev.getUTCDate() - 7)
+    return prev.toISOString().slice(0, 10)
+  }
+  if (frequency === 'FORTNIGHTLY') {
+    const prev = new Date(from)
+    prev.setUTCDate(prev.getUTCDate() - 14)
+    return prev.toISOString().slice(0, 10)
+  }
+  if (frequency === 'MONTHLY') {
+    const prev = new Date(from)
+    prev.setUTCMonth(prev.getUTCMonth() - 1)
+    if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
+    return prev.toISOString().slice(0, 10)
+  }
+  return null
+}
+
 /**
  * Advance tracker reset dates where current time >= next_reset_date.
- * For PAYDAY frequency use app_settings next_payday.
+ * Loops until all trackers are current (handles multiple missed periods).
+ * For PAYDAY frequency uses app_settings next_payday; skips if not configured.
  */
 export function recalculateTrackers(): void {
   const db = getDb()
   if (!db) return
-  const now = new Date().toISOString()
-  const nextPayday = getAppSetting('next_payday')
-  const stmt = db.prepare(
-    `SELECT id, reset_frequency, next_reset_date FROM trackers WHERE is_active = 1`
-  )
-  while (stmt.step()) {
-    const row = stmt.get()
-    const id = row[0]
-    const freq = row[1]
-    const nextReset = row[2] as string
-    if (!nextReset || now < nextReset) continue
-    if (freq === 'PAYDAY' && nextPayday) {
-      const nextPaydayNorm =
-        nextPayday.length > 10 ? nextPayday.slice(0, 10) : nextPayday
-      db.run(
-        `UPDATE trackers SET last_reset_date = next_reset_date, next_reset_date = ? WHERE id = ?`,
-        [nextPaydayNorm, id]
-      )
-    } else {
-      const prev = new Date(nextReset)
-      let next: Date
-      if (freq === 'WEEKLY')
-        next = new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000)
-      else if (freq === 'FORTNIGHTLY')
-        next = new Date(prev.getTime() + 14 * 24 * 60 * 60 * 1000)
-      else if (freq === 'MONTHLY') {
-        next = new Date(prev)
-        next.setMonth(next.getMonth() + 1)
+
+  let anyChanged = false
+  let changed = true
+  while (changed) {
+    changed = false
+    const now = new Date().toISOString()
+    const nextPayday = getAppSetting('next_payday')
+    const stmt = db.prepare(
+      `SELECT id, reset_frequency, next_reset_date FROM trackers WHERE is_active = 1`
+    )
+    while (stmt.step()) {
+      const row = stmt.get()
+      const id = row[0]
+      const freq = row[1]
+      const nextReset = row[2] as string
+      if (!nextReset || now < nextReset) continue
+      changed = true
+      if (freq === 'PAYDAY') {
+        if (!nextPayday) continue
+        const nextPaydayNorm =
+          nextPayday.length > 10 ? nextPayday.slice(0, 10) : nextPayday
+        const lastPaydayNorm = prevPaydayDate(nextPaydayNorm) ?? nextPaydayNorm
+        db.run(
+          `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
+          [lastPaydayNorm, nextPaydayNorm, id]
+        )
       } else {
-        next = prev
+        const prev = new Date(nextReset + 'T12:00:00Z')
+        let next: Date
+        if (freq === 'WEEKLY')
+          next = new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000)
+        else if (freq === 'FORTNIGHTLY')
+          next = new Date(prev.getTime() + 14 * 24 * 60 * 60 * 1000)
+        else if (freq === 'MONTHLY') {
+          next = new Date(prev)
+          next.setUTCMonth(next.getUTCMonth() + 1)
+        } else {
+          continue
+        }
+        const lastNorm =
+          nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
+        const nextNorm = next.toISOString().slice(0, 10)
+        db.run(
+          `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
+          [lastNorm, nextNorm, id]
+        )
       }
-      const lastNorm =
-        nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
-      const nextNorm = next.toISOString().slice(0, 10)
-      db.run(
-        `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
-        [lastNorm, nextNorm, id]
-      )
     }
-    schedulePersist()
+    stmt.free()
+    if (changed) anyChanged = true
   }
-  stmt.free()
+  if (anyChanged) schedulePersist()
 }
 
 /**

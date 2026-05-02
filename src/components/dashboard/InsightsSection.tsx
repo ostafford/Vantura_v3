@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
@@ -69,7 +69,7 @@ export function InsightsSection({
   useStore(themeStore, (s) => s.theme)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
-  const { startStr, endStr } = weekRange
+  const { startStr, endIso } = weekRange
   const insights = useMemo(
     () => getWeeklyInsights(weekRange),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,19 +119,18 @@ export function InsightsSection({
     ...chartData.map((d) => d.totalDollars).filter(Number.isFinite)
   )
 
-  function openCategoryEdit(payload: {
-    category_id: string
-    name: string
-    totalDollars: number
-  }) {
-    setEditingCategory({
-      category_id: payload.category_id,
-      category_name: payload.name,
-      totalDollars: payload.totalDollars,
-    })
-    const colorKey = normalizeCategoryIdForColor(payload.category_id)
-    setCategoryBarColor(categoryColors[colorKey] ?? null)
-  }
+  const openCategoryEdit = useCallback(
+    (payload: { category_id: string; name: string; totalDollars: number }) => {
+      setEditingCategory({
+        category_id: payload.category_id,
+        category_name: payload.name,
+        totalDollars: payload.totalDollars,
+      })
+      const colorKey = normalizeCategoryIdForColor(payload.category_id)
+      setCategoryBarColor(categoryColors[colorKey] ?? null)
+    },
+    [categoryColors]
+  )
 
   function handleSaveCategoryColor() {
     if (!editingCategory) return
@@ -242,7 +241,7 @@ export function InsightsSection({
         {import.meta.env.DEV && (
           <Card.Body className="py-1 small text-muted border-bottom">
             <div>
-              Range: {startStr} – {endStr} · {rawCount} transactions in range
+              Range: {startStr} – {endIso} · {rawCount} transactions in range
             </div>
             {debugCounts != null && (
               <div className="mt-1">
@@ -342,10 +341,15 @@ export function InsightsSection({
                   chartData={chartData}
                   maxDomain={maxDomain}
                   isMobile={isMobile}
-                  onBarClick={(d) => openCategoryEdit(d)}
+                  onBarClick={openCategoryEdit}
                   aria-label="Spending by category this week (bar chart)"
                 />
               </div>
+              {categories.length === 15 && (
+                <p className="text-muted small mb-0 mt-1 text-end">
+                  Showing top 15 categories
+                </p>
+              )}
             </>
           ) : (
             <p className="text-muted small mb-0">

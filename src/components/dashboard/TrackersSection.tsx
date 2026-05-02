@@ -17,6 +17,7 @@ import {
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
   getTrackerCategoryIds,
+  getTrackerCategoryUsage,
   getTrackersList,
   createTracker,
   updateTracker,
@@ -25,6 +26,7 @@ import {
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
 import { getPayAmountCents } from '@/services/balance'
+import { getAppSetting } from '@/db'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
@@ -122,6 +124,7 @@ export function TrackersSection({
   const [resetDay, setResetDay] = useState(1)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [badgeColor, setBadgeColor] = useState<string | null>(null)
+  const [categoryUsage, setCategoryUsage] = useState<Record<string, string>>({})
   const [selectedFrequencyScope, setSelectedFrequencyScope] =
     useState<FrequencyScope>('ALL')
   const [offsetByScope, setOffsetByScope] = useState<
@@ -177,14 +180,19 @@ export function TrackersSection({
         : trackers.filter((t) => t.reset_frequency === selectedFrequencyScope),
     [trackers, selectedFrequencyScope]
   )
-  const categories = useMemo(() => getCategories(), [refresh])
+  const categories = useMemo(
+    () => getCategories(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
   const payAmountCents = useMemo(() => getPayAmountCents(), [refresh])
   const totalPaydayBudgetCents = useMemo(
     () =>
       getTrackersWithProgress()
         .filter((t) => t.reset_frequency === 'PAYDAY')
         .reduce((sum, t) => sum + t.budget_amount, 0),
-    [refresh]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
   )
   const periodTxsByTrackerId = useMemo(() => {
     const map: Record<
@@ -209,6 +217,7 @@ export function TrackersSection({
     setResetDay(1)
     setSelectedCategoryIds([])
     setBadgeColor(null)
+    setCategoryUsage(getTrackerCategoryUsage(null))
     setShowModal(true)
   }
 
@@ -227,6 +236,7 @@ export function TrackersSection({
     setResetDay(t.reset_day ?? 1)
     setSelectedCategoryIds(getTrackerCategoryIds(t.id))
     setBadgeColor(t.badge_color ?? null)
+    setCategoryUsage(getTrackerCategoryUsage(t.id))
     setShowModal(true)
   }
 
@@ -236,27 +246,43 @@ export function TrackersSection({
       toast.error('Please fill in name, budget, and at least one category.')
       return
     }
-    if (editingId != null) {
-      updateTracker(
-        editingId,
-        name.trim(),
-        budgetCents,
-        frequency,
-        resetDay,
-        selectedCategoryIds,
-        badgeColor
+    if (frequency === 'PAYDAY' && !getAppSetting('next_payday')) {
+      toast.error(
+        'Payday not configured. Set up your pay schedule in Settings before adding a Payday tracker.'
       )
-      toast.success('Tracker saved.')
-    } else {
-      createTracker(
-        name.trim(),
-        budgetCents,
-        frequency,
-        resetDay,
-        selectedCategoryIds,
-        badgeColor
-      )
-      toast.success('Tracker created.')
+      return
+    }
+    try {
+      if (editingId != null) {
+        updateTracker(
+          editingId,
+          name.trim(),
+          budgetCents,
+          frequency,
+          resetDay,
+          selectedCategoryIds,
+          badgeColor
+        )
+        toast.success('Tracker saved.')
+      } else {
+        createTracker(
+          name.trim(),
+          budgetCents,
+          frequency,
+          resetDay,
+          selectedCategoryIds,
+          badgeColor
+        )
+        toast.success('Tracker created.')
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === 'PAYDAY_NOT_CONFIGURED') {
+        toast.error(
+          'Payday not configured. Set up your pay schedule in Settings before adding a Payday tracker.'
+        )
+        return
+      }
+      throw e
     }
     setShowModal(false)
     setRefresh((r) => r + 1)
@@ -578,7 +604,9 @@ export function TrackersSection({
                     t.period_start && t.period_end
                       ? `${formatShortDate(t.period_start)} – ${formatShortDate(t.period_end)}`
                       : ''
-                  const periodTxs = periodTxsByTrackerId[t.id] ?? []
+                  const periodTxEntry = periodTxsByTrackerId[t.id]
+                  const periodTxs = periodTxEntry?.list ?? []
+                  const periodTxsHasMore = periodTxEntry?.hasMore ?? false
                   const daysTooltipText = periodRangeText
                     ? `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period (${periodRangeText})`
                     : `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period`
@@ -660,11 +688,18 @@ export function TrackersSection({
                             </OverlayTrigger>
                           </div>
                         </div>
-                        <h6
-                          className={`text-${progressStyle.variant} mt-1 text-end`}
-                        >
-                          ${formatMoney(t.remaining)} left
-                        </h6>
+                        {t.spent > t.budget_amount ? (
+                          <h6 className="text-danger mt-1 text-end">
+                            ${formatMoney(t.spent - t.budget_amount)} over
+                            budget
+                          </h6>
+                        ) : (
+                          <h6
+                            className={`text-${progressStyle.variant} mt-1 text-end`}
+                          >
+                            ${formatMoney(t.remaining)} left
+                          </h6>
+                        )}
                         <ProgressBar
                           now={Math.min(100, t.progress)}
                           variant={progressStyle.variant}
@@ -712,22 +747,35 @@ export function TrackersSection({
                               No transactions this period
                             </span>
                           ) : (
-                            <ul className="list-unstyled mb-0">
-                              {periodTxs.map((tx) => (
-                                <li key={tx.id}>
-                                  {formatShortDate(
-                                    tx.created_at ?? tx.settled_at ?? ''
-                                  )}{' '}
-                                  {tx.description} $
-                                  {formatMoney(Math.abs(tx.amount))}
-                                  {tx.status === 'HELD' && (
-                                    <span className="text-muted small ms-1">
-                                      (Held)
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
+                            <>
+                              <ul className="list-unstyled mb-0">
+                                {periodTxs.map((tx) => (
+                                  <li key={tx.id}>
+                                    {formatShortDate(
+                                      tx.created_at ?? tx.settled_at ?? ''
+                                    )}{' '}
+                                    {tx.description} $
+                                    {formatMoney(Math.abs(tx.amount))}
+                                    {tx.status === 'HELD' && (
+                                      <span className="text-muted small ms-1">
+                                        (Held)
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                              {periodTxsHasMore && (
+                                <div className="text-muted mt-1">
+                                  Showing first 20 —{' '}
+                                  <Link
+                                    to={`/analytics/trackers/${t.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    view all in analytics
+                                  </Link>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </Collapse>
@@ -881,7 +929,16 @@ export function TrackersSection({
                     key={c.id}
                     type="checkbox"
                     id={`cat-${c.id}`}
-                    label={c.name}
+                    label={
+                      <>
+                        {c.name}
+                        {categoryUsage[c.id] && (
+                          <span className="text-warning small ms-1">
+                            (in: {categoryUsage[c.id]})
+                          </span>
+                        )}
+                      </>
+                    }
                     checked={selectedCategoryIds.includes(c.id)}
                     onChange={() => toggleCategory(c.id)}
                   />
