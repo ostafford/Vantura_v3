@@ -308,6 +308,7 @@ export function seedDemoData(): void {
   }
 
   // Saver transfer transactions to Rainy Day: 2-4 per week for 26 weeks
+  // Each transfer seeds both sides: debit from spending account + credit in saver account
   let transferIdx = 0
   for (let w = 0; w < 26; w++) {
     const count = 2 + (w % 3)
@@ -320,6 +321,7 @@ export function seedDemoData(): void {
       const iso = dateStr + 'T14:00:00.000Z'
       const amount = -(5000 + (transferIdx % 5) * 2500)
       transferIdx++
+      // Spending account side (debit)
       run(
         `INSERT OR REPLACE INTO transactions (
           id, account_id, status, raw_text, description, message, is_categorizable,
@@ -347,6 +349,34 @@ export function seedDemoData(): void {
           NOW,
         ]
       )
+      // Saver account side (credit) — this is what saverChanges query reads
+      run(
+        `INSERT OR REPLACE INTO transactions (
+          id, account_id, status, raw_text, description, message, is_categorizable,
+          category_id, parent_category_id, amount, currency, settled_at, created_at,
+          is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `demo-transfer-${w}-${i}-credit`,
+          DEMO_SAVER_ID,
+          'SETTLED',
+          null,
+          'Transfer from Spending',
+          null,
+          0,
+          null,
+          null,
+          -amount,
+          'AUD',
+          dateStr,
+          iso,
+          0,
+          null,
+          DEMO_ACCOUNT_ID,
+          'MANUAL',
+          NOW,
+        ]
+      )
     }
   }
 
@@ -357,6 +387,7 @@ export function seedDemoData(): void {
     const dateStr = date.toISOString().slice(0, 10)
     const iso = dateStr + 'T15:00:00.000Z'
     const amount = -(3000 + (w % 4) * 2000)
+    // Spending account side (debit)
     run(
       `INSERT OR REPLACE INTO transactions (
         id, account_id, status, raw_text, description, message, is_categorizable,
@@ -380,6 +411,34 @@ export function seedDemoData(): void {
         0,
         null,
         DEMO_SAVER_2_ID,
+        'MANUAL',
+        NOW,
+      ]
+    )
+    // Saver account side (credit)
+    run(
+      `INSERT OR REPLACE INTO transactions (
+        id, account_id, status, raw_text, description, message, is_categorizable,
+        category_id, parent_category_id, amount, currency, settled_at, created_at,
+        is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `demo-transfer-hol-${w}-credit`,
+        DEMO_SAVER_2_ID,
+        'SETTLED',
+        null,
+        'Transfer from Spending',
+        null,
+        0,
+        null,
+        null,
+        -amount,
+        'AUD',
+        dateStr,
+        iso,
+        0,
+        null,
+        DEMO_ACCOUNT_ID,
         'MANUAL',
         NOW,
       ]
@@ -688,4 +747,23 @@ export function seedDemoData(): void {
       daysAgo(12),
     ]
   )
+
+  // Saver balance snapshots (last 30 days, every 3 days) so "Balance over time" charts render
+  const snapshotDates: number[] = [30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 0]
+  const rainyDayBase = 118000
+  const holidayBase = 192000
+  for (const d of snapshotDates) {
+    const date = new Date()
+    date.setDate(date.getDate() - d)
+    const dateStr = date.toISOString().slice(0, 10)
+    const progress = (30 - d) / 30
+    run(
+      `INSERT OR REPLACE INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents) VALUES (?, ?, ?)`,
+      [DEMO_SAVER_ID, dateStr, Math.round(rainyDayBase + progress * 7000)]
+    )
+    run(
+      `INSERT OR REPLACE INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents) VALUES (?, ?, ?)`,
+      [DEMO_SAVER_2_ID, dateStr, Math.round(holidayBase + progress * 8000)]
+    )
+  }
 }

@@ -157,7 +157,7 @@ export function SaverFlowChart({
   return (
     <div
       className={className}
-      style={{ position: 'relative', ...style }}
+      style={{ position: 'relative', width: '100%', height: '100%', ...style }}
       aria-label={ariaLabel}
     >
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />

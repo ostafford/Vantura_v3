@@ -154,6 +154,12 @@ const DDL_STATEMENTS = [
     FOREIGN KEY (tag_id) REFERENCES tags(id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_transaction_tags_transaction_id ON transaction_tags(transaction_id)`,
+  `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
+    saver_id TEXT NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    balance_cents INTEGER NOT NULL,
+    PRIMARY KEY (saver_id, snapshot_date)
+  )`,
 ]
 
 export function runSchema(database: Database): void {
