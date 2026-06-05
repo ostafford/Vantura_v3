@@ -93,11 +93,13 @@ export function AnalyticsAtAGlanceSection() {
 
   const pointsCurrent = useMemo(
     () => getYearMonthlyTotals(year),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [year, lastSyncCompletedAt]
   )
 
   const pointsPrevious = useMemo(
     () => getYearMonthlyTotals(year - 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [year, lastSyncCompletedAt]
   )
   const previousYear = year - 1

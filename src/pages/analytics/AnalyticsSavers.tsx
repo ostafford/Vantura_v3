@@ -60,6 +60,7 @@ export function AnalyticsSavers() {
 
   const weeklyHistory = useMemo(
     () => getInsightsHistory(12),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt]
   )
 

@@ -204,6 +204,7 @@ export function Transactions() {
   }, [editTxId, grouped, localDbVersion])
   const editRoundUps = useMemo(
     () => (editTxId ? getRoundUpsForTransaction(editTxId) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [editTxId, lastSyncCompletedAt]
   )
 

@@ -90,6 +90,7 @@ export function InsightsSection({
     [weekRange]
   )
   const chartPalette = ACCENT_PALETTES[accent].chartPalette
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const categoryColors = useMemo(() => getInsightsCategoryColors(), [refresh])
 
   function getThemeChartCategoryColor(index: number): string {

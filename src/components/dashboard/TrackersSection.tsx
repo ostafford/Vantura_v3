@@ -193,6 +193,7 @@ export function TrackersSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt]
   )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const payAmountCents = useMemo(() => getPayAmountCents(), [refresh])
   const totalPaydayBudgetCents = useMemo(
     () =>
@@ -211,6 +212,7 @@ export function TrackersSection({
       map[t.id] = getTrackerTransactionsInPeriod(t.id, activePeriodOffset)
     }
     return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleTrackers, activePeriodOffset, refresh])
   const paydayBudgetExceedsPay =
     payAmountCents != null &&

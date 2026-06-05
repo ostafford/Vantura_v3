@@ -175,10 +175,12 @@ export function UpcomingSection({
 
   const { nextPay, later, nextPayday } = useMemo(
     () => getUpcomingChargesGrouped(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh]
   )
   const calendarCharges = useMemo(
     () => getUpcomingChargesForMonth(calendarMonth.year, calendarMonth.month),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [calendarMonth.year, calendarMonth.month, refresh]
   )
   const calendarDaysByDate = useMemo(() => {
@@ -190,7 +192,9 @@ export function UpcomingSection({
     }
     return map
   }, [calendarCharges])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const reserved = useMemo(() => getReservedAmount(), [refresh])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const categories = useMemo(() => getCategories(), [refresh])
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
