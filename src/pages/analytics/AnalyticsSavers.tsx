@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
-import { Card, Row, Col, ProgressBar, Form } from 'react-bootstrap'
+import { Card, Row, Col, ProgressBar, Form, Collapse } from 'react-bootstrap'
 import {
   getAccountsByTypes,
   getSaverMonthlyFlow,
@@ -168,6 +168,18 @@ export function AnalyticsSavers() {
   const prevMonthLabel = monthNameLong(prev.year, prev.month)
   const monthName = now.toLocaleString(undefined, { month: 'long' })
   const transactionsAllSaversLink = '/transactions?saverActivity=1'
+
+  // Which saver cards have charts expanded (collapsed by default)
+  const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
+
+  function toggleCharts(id: string) {
+    setExpandedCharts((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Goal editing state — one saver editable at a time
   const [editingGoalFor, setEditingGoalFor] = useState<string | null>(null)
@@ -390,140 +402,185 @@ export function AnalyticsSavers() {
               >
                 View transactions
               </Link>
+
+              {/* Charts toggle — mirrors Trackers expand row */}
+              <div
+                className="d-flex justify-content-between align-items-center mt-2"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleCharts(account.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    toggleCharts(account.id)
+                  }
+                }}
+                aria-expanded={expandedCharts.has(account.id)}
+              >
+                <small className="text-muted">
+                  {expandedCharts.has(account.id)
+                    ? 'Hide charts'
+                    : 'Show charts'}
+                </small>
+                <i
+                  className={`mdi ${expandedCharts.has(account.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'} text-muted`}
+                  aria-hidden
+                />
+              </div>
             </Card.Header>
 
-            {/* Card body: charts */}
-            <Card.Body>
-              <p className="small text-muted mb-2">
-                Monthly contributions — last 12 months
-              </p>
-              {hasMonthlyActivity ? (
-                <div style={{ width: '100%', height: 200 }} className="mb-4">
-                  <SaverMonthlyFlowChart
-                    data={monthlyFlow}
-                    aria-label={`${account.display_name} monthly contributions`}
-                  />
-                </div>
-              ) : (
-                <p className="small text-muted mb-4">
-                  No transfers recorded for this saver in the last 12 months.
-                </p>
-              )}
-
-              <p className="small text-muted mb-2">Balance over time</p>
-              {hasBalance && derivedBalances.length >= 2 ? (
-                <div style={{ width: '100%', height: 180 }} className="mb-4">
-                  <SaverBalanceChart
-                    data={derivedBalances}
-                    aria-label={`${account.display_name} balance trend`}
-                  />
-                </div>
-              ) : (
-                <p className="small text-muted mb-4">
-                  Current balance:{' '}
-                  <span className="fw-semibold">
-                    ${formatMoney(account.balance)}
-                  </span>
-                </p>
-              )}
-
-              {/* Data verification panel — dev mode only */}
-              {import.meta.env.DEV &&
-                (() => {
-                  const impliedStart =
-                    account.balance +
-                    monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
-                  const totalTx = monthlyFlow.reduce((s, p) => s + p.txCount, 0)
-                  const totalSaved = monthlyFlow.reduce(
-                    (s, p) => (p.flowCents < 0 ? s + Math.abs(p.flowCents) : s),
-                    0
-                  )
-                  const totalWithdrawn = monthlyFlow.reduce(
-                    (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
-                    0
-                  )
-                  const netChange = account.balance - Math.max(0, impliedStart)
-                  return (
+            {/* Card body: charts — collapsed by default */}
+            <Collapse in={expandedCharts.has(account.id)}>
+              <div>
+                <Card.Body>
+                  <p className="small text-muted mb-2">
+                    Monthly contributions — last 12 months
+                  </p>
+                  {hasMonthlyActivity ? (
                     <div
-                      className="rounded p-3"
-                      style={{
-                        background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
-                        fontSize: '0.78rem',
-                      }}
+                      style={{ width: '100%', height: 200 }}
+                      className="mb-4"
                     >
-                      <p
-                        className="fw-semibold mb-2 text-muted"
-                        style={{
-                          fontSize: '0.72rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                        }}
-                      >
-                        Data check
-                      </p>
-                      <div className="d-flex flex-wrap gap-3">
-                        <div>
-                          <span className="text-muted">
-                            Implied balance 12 mo. ago
-                          </span>
-                          <br />
-                          <span className="fw-semibold">
-                            ${formatMoney(Math.max(0, impliedStart))}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted">Current balance</span>
-                          <br />
-                          <span className="fw-semibold">
-                            ${formatMoney(account.balance)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted">
-                            Net change (12 mo.)
-                          </span>
-                          <br />
-                          <span
-                            className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
-                          >
-                            {netChange >= 0 ? '+' : '−'}$
-                            {formatMoney(Math.abs(netChange))}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted">Contributed</span>
-                          <br />
-                          <span className="fw-semibold text-success">
-                            +${formatMoney(totalSaved)}
-                          </span>
-                        </div>
-                        {totalWithdrawn > 0 && (
-                          <div>
-                            <span className="text-muted">Withdrawn</span>
-                            <br />
-                            <span className="fw-semibold text-danger">
-                              −${formatMoney(totalWithdrawn)}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-muted">Transactions</span>
-                          <br />
-                          <span className="fw-semibold">{totalTx}</span>
-                        </div>
-                      </div>
-                      <p
-                        className="mb-0 mt-2 text-muted"
-                        style={{ fontSize: '0.7rem' }}
-                      >
-                        Cross-check: compare &quot;Implied balance 12 mo.
-                        ago&quot; and &quot;Current balance&quot; against Up
-                        Bank&apos;s account history.
-                      </p>
+                      <SaverMonthlyFlowChart
+                        data={monthlyFlow}
+                        aria-label={`${account.display_name} monthly contributions`}
+                      />
                     </div>
-                  )
-                })()}
-            </Card.Body>
+                  ) : (
+                    <p className="small text-muted mb-4">
+                      No transfers recorded for this saver in the last 12
+                      months.
+                    </p>
+                  )}
+
+                  <p className="small text-muted mb-2">Balance over time</p>
+                  {hasBalance && derivedBalances.length >= 2 ? (
+                    <div
+                      style={{ width: '100%', height: 180 }}
+                      className="mb-4"
+                    >
+                      <SaverBalanceChart
+                        data={derivedBalances}
+                        aria-label={`${account.display_name} balance trend`}
+                      />
+                    </div>
+                  ) : (
+                    <p className="small text-muted mb-4">
+                      Current balance:{' '}
+                      <span className="fw-semibold">
+                        ${formatMoney(account.balance)}
+                      </span>
+                    </p>
+                  )}
+
+                  {/* Data verification panel — dev mode only */}
+                  {import.meta.env.DEV &&
+                    (() => {
+                      const impliedStart =
+                        account.balance +
+                        monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
+                      const totalTx = monthlyFlow.reduce(
+                        (s, p) => s + p.txCount,
+                        0
+                      )
+                      const totalSaved = monthlyFlow.reduce(
+                        (s, p) =>
+                          p.flowCents < 0 ? s + Math.abs(p.flowCents) : s,
+                        0
+                      )
+                      const totalWithdrawn = monthlyFlow.reduce(
+                        (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
+                        0
+                      )
+                      const netChange =
+                        account.balance - Math.max(0, impliedStart)
+                      return (
+                        <div
+                          className="rounded p-3"
+                          style={{
+                            background:
+                              'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+                            fontSize: '0.78rem',
+                          }}
+                        >
+                          <p
+                            className="fw-semibold mb-2 text-muted"
+                            style={{
+                              fontSize: '0.72rem',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            Data check
+                          </p>
+                          <div className="d-flex flex-wrap gap-3">
+                            <div>
+                              <span className="text-muted">
+                                Implied balance 12 mo. ago
+                              </span>
+                              <br />
+                              <span className="fw-semibold">
+                                ${formatMoney(Math.max(0, impliedStart))}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted">
+                                Current balance
+                              </span>
+                              <br />
+                              <span className="fw-semibold">
+                                ${formatMoney(account.balance)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted">
+                                Net change (12 mo.)
+                              </span>
+                              <br />
+                              <span
+                                className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
+                              >
+                                {netChange >= 0 ? '+' : '−'}$
+                                {formatMoney(Math.abs(netChange))}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted">Contributed</span>
+                              <br />
+                              <span className="fw-semibold text-success">
+                                +${formatMoney(totalSaved)}
+                              </span>
+                            </div>
+                            {totalWithdrawn > 0 && (
+                              <div>
+                                <span className="text-muted">Withdrawn</span>
+                                <br />
+                                <span className="fw-semibold text-danger">
+                                  −${formatMoney(totalWithdrawn)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-muted">Transactions</span>
+                              <br />
+                              <span className="fw-semibold">{totalTx}</span>
+                            </div>
+                          </div>
+                          <p
+                            className="mb-0 mt-2 text-muted"
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            Cross-check: compare &quot;Implied balance 12 mo.
+                            ago&quot; and &quot;Current balance&quot; against Up
+                            Bank&apos;s account history.
+                          </p>
+                        </div>
+                      )
+                    })()}
+                </Card.Body>
+              </div>
+            </Collapse>
           </Card>
         )
       })}
