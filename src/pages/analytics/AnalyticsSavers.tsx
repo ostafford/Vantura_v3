@@ -265,99 +265,102 @@ export function AnalyticsSavers() {
                 </p>
               )}
 
-              {/* Data verification panel */}
-              {(() => {
-                const impliedStart =
-                  account.balance +
-                  monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
-                const totalTx = monthlyFlow.reduce((s, p) => s + p.txCount, 0)
-                const totalSaved = monthlyFlow.reduce(
-                  (s, p) => (p.flowCents < 0 ? s + Math.abs(p.flowCents) : s),
-                  0
-                )
-                const totalWithdrawn = monthlyFlow.reduce(
-                  (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
-                  0
-                )
-                const netChange = account.balance - Math.max(0, impliedStart)
-                return (
-                  <div
-                    className="rounded p-3"
-                    style={{
-                      background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
-                      fontSize: '0.78rem',
-                    }}
-                  >
-                    <p
-                      className="fw-semibold mb-2 text-muted"
+              {/* Data verification panel — dev mode only */}
+              {import.meta.env.DEV &&
+                (() => {
+                  const impliedStart =
+                    account.balance +
+                    monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
+                  const totalTx = monthlyFlow.reduce((s, p) => s + p.txCount, 0)
+                  const totalSaved = monthlyFlow.reduce(
+                    (s, p) => (p.flowCents < 0 ? s + Math.abs(p.flowCents) : s),
+                    0
+                  )
+                  const totalWithdrawn = monthlyFlow.reduce(
+                    (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
+                    0
+                  )
+                  const netChange = account.balance - Math.max(0, impliedStart)
+                  return (
+                    <div
+                      className="rounded p-3"
                       style={{
-                        fontSize: '0.72rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
+                        background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+                        fontSize: '0.78rem',
                       }}
                     >
-                      Data check
-                    </p>
-                    <div className="d-flex flex-wrap gap-3">
-                      <div>
-                        <span className="text-muted">
-                          Implied balance 12 mo. ago
-                        </span>
-                        <br />
-                        <span className="fw-semibold">
-                          ${formatMoney(Math.max(0, impliedStart))}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted">Current balance</span>
-                        <br />
-                        <span className="fw-semibold">
-                          ${formatMoney(account.balance)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted">Net change (12 mo.)</span>
-                        <br />
-                        <span
-                          className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
-                        >
-                          {netChange >= 0 ? '+' : '−'}$
-                          {formatMoney(Math.abs(netChange))}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted">Contributed</span>
-                        <br />
-                        <span className="fw-semibold text-success">
-                          +${formatMoney(totalSaved)}
-                        </span>
-                      </div>
-                      {totalWithdrawn > 0 && (
+                      <p
+                        className="fw-semibold mb-2 text-muted"
+                        style={{
+                          fontSize: '0.72rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Data check
+                      </p>
+                      <div className="d-flex flex-wrap gap-3">
                         <div>
-                          <span className="text-muted">Withdrawn</span>
+                          <span className="text-muted">
+                            Implied balance 12 mo. ago
+                          </span>
                           <br />
-                          <span className="fw-semibold text-danger">
-                            −${formatMoney(totalWithdrawn)}
+                          <span className="fw-semibold">
+                            ${formatMoney(Math.max(0, impliedStart))}
                           </span>
                         </div>
-                      )}
-                      <div>
-                        <span className="text-muted">Transactions</span>
-                        <br />
-                        <span className="fw-semibold">{totalTx}</span>
+                        <div>
+                          <span className="text-muted">Current balance</span>
+                          <br />
+                          <span className="fw-semibold">
+                            ${formatMoney(account.balance)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted">
+                            Net change (12 mo.)
+                          </span>
+                          <br />
+                          <span
+                            className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
+                          >
+                            {netChange >= 0 ? '+' : '−'}$
+                            {formatMoney(Math.abs(netChange))}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted">Contributed</span>
+                          <br />
+                          <span className="fw-semibold text-success">
+                            +${formatMoney(totalSaved)}
+                          </span>
+                        </div>
+                        {totalWithdrawn > 0 && (
+                          <div>
+                            <span className="text-muted">Withdrawn</span>
+                            <br />
+                            <span className="fw-semibold text-danger">
+                              −${formatMoney(totalWithdrawn)}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-muted">Transactions</span>
+                          <br />
+                          <span className="fw-semibold">{totalTx}</span>
+                        </div>
                       </div>
+                      <p
+                        className="mb-0 mt-2 text-muted"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        Cross-check: compare &quot;Implied balance 12 mo.
+                        ago&quot; and &quot;Current balance&quot; against Up
+                        Bank's account history.
+                      </p>
                     </div>
-                    <p
-                      className="mb-0 mt-2 text-muted"
-                      style={{ fontSize: '0.7rem' }}
-                    >
-                      Cross-check: compare &quot;Implied balance 12 mo.
-                      ago&quot; and &quot;Current balance&quot; against Up
-                      Bank's account history.
-                    </p>
-                  </div>
-                )
-              })()}
+                  )
+                })()}
             </Card.Body>
           </Card>
         )
