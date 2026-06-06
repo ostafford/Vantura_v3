@@ -258,7 +258,6 @@ export function AnalyticsSavers() {
 
   useEffect(() => {
     setSaverOrderState(getSaverOrder(saverIdsRef.current))
-     
   }, [saverIdsKey])
 
   const sortedSaverData = useMemo(() => {
