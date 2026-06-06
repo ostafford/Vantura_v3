@@ -300,10 +300,12 @@ export function getMonthlyInsights(
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startIso, endIso]
   )
+  // Round-up saver credits are identified by transaction_type = 'Round Up'.
+  // is_round_up and round_up_parent_id are not set on the saver side in Up Bank's API.
   const saverRoundUps = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
-     AND round_up_parent_id IS NOT NULL
+     AND transaction_type = 'Round Up'
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startIso, endIso]
   )

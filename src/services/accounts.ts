@@ -93,6 +93,98 @@ export function getSaverBalanceHistory(
   return out
 }
 
+export interface SaverRoundUpDiagnostic {
+  saverCreditTxCount: number
+  isRoundUpOnSaverCount: number
+  roundUpParentOnSaverCount: number
+  roundUpParentOnSpendCount: number
+  existsMatchCents: number
+  isRoundUpOnSpendCount: number
+  roundUpAmountCents: number
+  recentSaverCredits: Array<{
+    description: string
+    is_round_up: number
+    round_up_parent_id: string | null
+    transaction_type: string | null
+    amount: number
+  }>
+}
+
+export function getSaverRoundUpDiagnostic(
+  startIso: string,
+  endIso: string
+): SaverRoundUpDiagnostic | null {
+  const db = getDb()
+  if (!db) return null
+  const n = (sql: string, p: (string | number | null)[]) => {
+    const s = db.prepare(sql)
+    s.bind(p)
+    s.step()
+    const r = s.get()
+    s.free()
+    return r ? Number(r[0]) : 0
+  }
+  const saverCreditTxCount = n(
+    `SELECT COUNT(*) FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE account_type='SAVER') AND transfer_account_id IS NOT NULL AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const isRoundUpOnSaverCount = n(
+    `SELECT COUNT(*) FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE account_type='SAVER') AND is_round_up=1 AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const roundUpParentOnSaverCount = n(
+    `SELECT COUNT(*) FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE account_type='SAVER') AND round_up_parent_id IS NOT NULL AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const roundUpParentOnSpendCount = n(
+    `SELECT COUNT(*) FROM transactions WHERE account_id NOT IN (SELECT id FROM accounts WHERE account_type='SAVER') AND round_up_parent_id IS NOT NULL AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const existsMatchCents = n(
+    `SELECT COALESCE(-SUM(st.amount),0) FROM transactions st WHERE st.account_id IN (SELECT id FROM accounts WHERE account_type='SAVER') AND EXISTS(SELECT 1 FROM transactions sp WHERE sp.round_up_parent_id=st.id) AND COALESCE(st.created_at,st.settled_at)>=? AND COALESCE(st.created_at,st.settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const isRoundUpOnSpendCount = n(
+    `SELECT COUNT(*) FROM transactions WHERE is_round_up=1 AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const roundUpAmountCents = n(
+    `SELECT COALESCE(SUM(ABS(round_up_amount)),0) FROM transactions WHERE round_up_amount IS NOT NULL AND COALESCE(created_at,settled_at)>=? AND COALESCE(created_at,settled_at)<=?`,
+    [startIso, endIso]
+  )
+  const sampleStmt = db.prepare(
+    `SELECT description, is_round_up, round_up_parent_id, transaction_type, amount FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE account_type='SAVER') AND transfer_account_id IS NOT NULL ORDER BY COALESCE(created_at,settled_at) DESC LIMIT 8`
+  )
+  const recentSaverCredits: SaverRoundUpDiagnostic['recentSaverCredits'] = []
+  while (sampleStmt.step()) {
+    const r = sampleStmt.get() as [
+      string,
+      number,
+      string | null,
+      string | null,
+      number,
+    ]
+    recentSaverCredits.push({
+      description: r[0],
+      is_round_up: r[1],
+      round_up_parent_id: r[2],
+      transaction_type: r[3],
+      amount: r[4],
+    })
+  }
+  sampleStmt.free()
+  return {
+    saverCreditTxCount,
+    isRoundUpOnSaverCount,
+    roundUpParentOnSaverCount,
+    roundUpParentOnSpendCount,
+    existsMatchCents,
+    isRoundUpOnSpendCount,
+    roundUpAmountCents,
+    recentSaverCredits,
+  }
+}
+
 export function updateSaverGoal(
   saverId: string,
   targetAmountCents: number | null

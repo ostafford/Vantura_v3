@@ -66,6 +66,7 @@ function KpiCell({
   delta,
   vsPriorLabel,
   detail,
+  monetary,
 }: {
   label: string
   value: string
@@ -73,6 +74,7 @@ function KpiCell({
   delta?: MonthDelta
   vsPriorLabel?: string
   detail?: string
+  monetary?: boolean
 }) {
   return (
     <div
@@ -85,7 +87,11 @@ function KpiCell({
       <div className="small text-muted mb-1">{label}</div>
       <div className={`fw-semibold fs-5 ${valueClass ?? ''}`}>{value}</div>
       {delta && vsPriorLabel && (
-        <ComparisonDeltaBadge delta={delta} vsPriorLabel={vsPriorLabel} />
+        <ComparisonDeltaBadge
+          delta={delta}
+          vsPriorLabel={vsPriorLabel}
+          monetary={monetary}
+        />
       )}
       {detail && (
         <div className="small text-muted mt-1" style={{ fontSize: '0.72rem' }}>
@@ -136,31 +142,62 @@ export function AnalyticsSavers() {
     [savers.map((s) => s.id).join(','), lastSyncCompletedAt]
   )
 
-  const isNetWithdrawal = monthlyInsights.saverChanges > 0
-  const savedThisMonth = Math.abs(monthlyInsights.saverChanges)
+  // Round-ups (Loose Change) — always a deposit into savers
   const roundUpsThisMonth = Math.abs(monthlyInsights.saverRoundUps)
-  const savingsRate =
-    monthlyInsights.moneyIn > 0
-      ? ((isNetWithdrawal ? -savedThisMonth : savedThisMonth) /
-          monthlyInsights.moneyIn) *
-        100
-      : null
+  const roundUpsPrevMonth = Math.abs(prevMonthlyInsights.saverRoundUps)
 
-  const netSavedThis = isNetWithdrawal ? -savedThisMonth : savedThisMonth
-  const prevIsWithdrawal = prevMonthlyInsights.saverChanges > 0
-  const prevSavedAmount = Math.abs(prevMonthlyInsights.saverChanges)
-  const netSavedPrev = prevIsWithdrawal ? -prevSavedAmount : prevSavedAmount
-  const savedDelta: MonthDelta | null =
-    netSavedThis === 0 && netSavedPrev === 0
+  // Self-contributed: net manual transfers (total net movement minus round-ups)
+  const selfContribRaw =
+    monthlyInsights.saverChanges - monthlyInsights.saverRoundUps
+  const selfContribIsWithdrawal = selfContribRaw > 0
+  const selfContribAmount = Math.abs(selfContribRaw)
+  const netSelfContrib = selfContribIsWithdrawal
+    ? -selfContribAmount
+    : selfContribAmount
+
+  const prevSelfContribRaw =
+    prevMonthlyInsights.saverChanges - prevMonthlyInsights.saverRoundUps
+  const prevSelfContribIsWithdrawal = prevSelfContribRaw > 0
+  const prevSelfContribAmount = Math.abs(prevSelfContribRaw)
+  const netPrevSelfContrib = prevSelfContribIsWithdrawal
+    ? -prevSelfContribAmount
+    : prevSelfContribAmount
+
+  // Health status: is money net flowing into savers this month?
+  const healthStatus: 'on-track' | 'no-activity' | 'withdrawal' =
+    monthlyInsights.saverChanges < -1
+      ? 'on-track'
+      : monthlyInsights.saverChanges > 1
+        ? 'withdrawal'
+        : 'no-activity'
+
+  // Month-over-month deltas
+  const selfContribDelta: MonthDelta | null =
+    netSelfContrib === 0 && netPrevSelfContrib === 0
       ? null
       : {
-          current: netSavedThis,
-          previous: netSavedPrev,
-          delta: netSavedThis - netSavedPrev,
+          current: netSelfContrib,
+          previous: netPrevSelfContrib,
+          delta: netSelfContrib - netPrevSelfContrib,
           direction:
-            Math.abs(netSavedThis - netSavedPrev) < 1
+            Math.abs(netSelfContrib - netPrevSelfContrib) < 1
               ? 'flat'
-              : netSavedThis > netSavedPrev
+              : netSelfContrib > netPrevSelfContrib
+                ? 'up'
+                : 'down',
+        }
+
+  const roundUpsDelta: MonthDelta | null =
+    roundUpsThisMonth === 0 && roundUpsPrevMonth === 0
+      ? null
+      : {
+          current: roundUpsThisMonth,
+          previous: roundUpsPrevMonth,
+          delta: roundUpsThisMonth - roundUpsPrevMonth,
+          direction:
+            Math.abs(roundUpsThisMonth - roundUpsPrevMonth) < 1
+              ? 'flat'
+              : roundUpsThisMonth > roundUpsPrevMonth
                 ? 'up'
                 : 'down',
         }
@@ -231,39 +268,53 @@ export function AnalyticsSavers() {
       {/* Monthly KPIs */}
       <Card className="mb-4 border">
         <Card.Body>
-          <h6 className="text-muted mb-3">{monthName} at a glance</h6>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h6 className="text-muted mb-0">{monthName} at a glance</h6>
+            <span
+              className={`badge ${
+                healthStatus === 'on-track'
+                  ? 'bg-success'
+                  : healthStatus === 'withdrawal'
+                    ? 'bg-danger'
+                    : 'bg-warning text-dark'
+              }`}
+            >
+              {healthStatus === 'on-track'
+                ? 'On track'
+                : healthStatus === 'withdrawal'
+                  ? 'Net withdrawal'
+                  : 'No contributions'}
+            </span>
+          </div>
           <div className="d-flex flex-wrap gap-3">
             <KpiCell
-              label="Saved this month"
+              label="Self-contributed"
               value={
-                savedThisMonth === 0
+                selfContribRaw === 0
                   ? '$0.00'
-                  : isNetWithdrawal
-                    ? `-$${formatMoney(savedThisMonth)}`
-                    : `+$${formatMoney(savedThisMonth)}`
+                  : selfContribIsWithdrawal
+                    ? `-$${formatMoney(selfContribAmount)}`
+                    : `+$${formatMoney(selfContribAmount)}`
               }
-              valueClass={isNetWithdrawal ? 'text-danger' : 'text-success'}
-              delta={savedDelta ?? undefined}
-              vsPriorLabel={prevMonthLabel}
-            />
-            <KpiCell
-              label="of which round-ups"
-              value={`$${formatMoney(roundUpsThisMonth)}`}
-              detail="Loose Change accumulation"
-            />
-            <KpiCell
-              label="Savings rate"
-              value={savingsRate != null ? `${savingsRate.toFixed(1)}%` : '—'}
-              detail="of income this month"
               valueClass={
-                savingsRate == null
-                  ? undefined
-                  : savingsRate < 0
-                    ? 'text-danger'
-                    : savingsRate >= 10
-                      ? 'text-success'
-                      : undefined
+                selfContribIsWithdrawal
+                  ? 'text-danger'
+                  : selfContribRaw < 0
+                    ? 'text-success'
+                    : undefined
               }
+              delta={selfContribDelta ?? undefined}
+              vsPriorLabel={prevMonthLabel}
+              detail="Manual transfers to savers"
+              monetary
+            />
+            <KpiCell
+              label="Round-ups"
+              value={`$${formatMoney(roundUpsThisMonth)}`}
+              delta={roundUpsDelta ?? undefined}
+              vsPriorLabel={prevMonthLabel}
+              detail="Loose Change accumulation"
+              monetary
             />
             <KpiCell
               label="Total saver balance"

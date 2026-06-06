@@ -5,11 +5,14 @@ export function ComparisonDeltaBadge({
   delta,
   invert,
   vsPriorLabel = 'prev month',
+  monetary,
 }: {
   delta: MonthDelta
   invert?: boolean
   /** Short label for accessibility, e.g. "prev month", "last year". */
   vsPriorLabel?: string
+  /** Force dollar formatting — use when delta values are in cents but small enough to trigger the count heuristic. */
+  monetary?: boolean
 }) {
   if (delta.direction === 'flat') return null
   const isUp = delta.direction === 'up'
@@ -17,7 +20,8 @@ export function ComparisonDeltaBadge({
   const icon = isUp ? 'mdi-arrow-up' : 'mdi-arrow-down'
   const cls = positive ? 'text-success' : 'text-danger'
   const absDelta = Math.abs(delta.delta)
-  const isCount = Number.isInteger(delta.current) && absDelta < 10000
+  const isCount =
+    !monetary && Number.isInteger(delta.current) && absDelta < 10000
   const label = isCount ? String(absDelta) : `$${formatMoney(absDelta)}`
   return (
     <div
