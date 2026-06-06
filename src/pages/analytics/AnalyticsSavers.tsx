@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
 import {
@@ -30,6 +30,7 @@ import {
   buildDeltaTooltip,
 } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
+import { getSaverOrder, setSaverOrder } from '@/lib/saverOrder'
 
 // Reconstruct end-of-month balances from flow data working backwards from current balance.
 // Both charts then share the same source and time window.
@@ -246,6 +247,64 @@ export function AnalyticsSavers() {
   const monthName = now.toLocaleString(undefined, { month: 'long' })
   const transactionsAllSaversLink = '/transactions?saverActivity=1'
 
+  // Drag-and-drop order — persisted to app_settings, same pattern as Dashboard sections
+  const saverIdsKey = savers.map((s) => s.id).join(',')
+  const [saverOrder, setSaverOrderState] = useState<string[]>(() =>
+    getSaverOrder(savers.map((s) => s.id))
+  )
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const saverIdsRef = useRef<string[]>([])
+  saverIdsRef.current = savers.map((s) => s.id)
+
+  useEffect(() => {
+    setSaverOrderState(getSaverOrder(saverIdsRef.current))
+     
+  }, [saverIdsKey])
+
+  const sortedSaverData = useMemo(() => {
+    const orderMap = new Map(saverOrder.map((id, i) => [id, i]))
+    return [...saverData].sort((a, b) => {
+      const ai = orderMap.get(a.account.id) ?? Infinity
+      const bi = orderMap.get(b.account.id) ?? Infinity
+      return ai - bi
+    })
+  }, [saverData, saverOrder])
+
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id)
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverId(id)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    setDragOverId(null)
+    const sourceId = e.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetId) return
+    const order = getSaverOrder(saverIdsRef.current)
+    const from = order.indexOf(sourceId)
+    const to = order.indexOf(targetId)
+    if (from === -1 || to === -1) return
+    const next = [...order]
+    next.splice(from, 1)
+    next.splice(to, 0, sourceId)
+    setSaverOrder(next)
+    setSaverOrderState(next)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
   // Which saver cards have charts expanded (collapsed by default)
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
 
@@ -376,7 +435,7 @@ export function AnalyticsSavers() {
           </Card.Body>
         </Card>
       )}
-      {saverData.map(({ account, monthlyFlow, derivedBalances }) => {
+      {sortedSaverData.map(({ account, monthlyFlow, derivedBalances }) => {
         const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
         const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
         const goalCents = getGoal(account.id, account.target_amount_cents)
@@ -388,288 +447,312 @@ export function AnalyticsSavers() {
           goalCents != null && goalCents > 0 && account.balance >= goalCents
 
         return (
-          <Card key={account.id} className="mb-4 border">
-            {/* Card header: saver identity + goal — mirrors tracker card layout */}
-            <Card.Header className="py-3">
-              {/* Row 1: name (left) + balance (right) */}
-              <div className="d-flex justify-content-between align-items-start">
-                <strong>{account.display_name}</strong>
-                <span
-                  className={`fw-semibold ${account.balance > 0 ? 'text-success' : ''}`}
-                >
-                  ${formatMoney(account.balance)}
-                </span>
-              </div>
-
-              {/* Goal section */}
-              {editingGoalFor === account.id ? (
-                <div className="d-flex align-items-center gap-2 mt-2">
-                  <div
-                    className="input-group input-group-sm"
-                    style={{ maxWidth: 180 }}
+          <div
+            key={account.id}
+            className="mb-4"
+            onDragOver={(e) => handleDragOver(e, account.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, account.id)}
+            onDragEnd={handleDragEnd}
+            style={{
+              outline:
+                dragOverId === account.id
+                  ? '2px dashed var(--vantura-primary)'
+                  : undefined,
+              borderRadius: 8,
+            }}
+          >
+            <Card className="border">
+              {/* Card header: saver identity + goal — mirrors tracker card layout */}
+              <Card.Header className="py-3">
+                {/* Row 1: name (left) + balance (right) */}
+                <div className="d-flex justify-content-between align-items-start">
+                  <strong
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, account.id)}
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                    style={{ cursor: 'grab' }}
                   >
-                    <span className="input-group-text">$</span>
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={goalDraft}
-                      onChange={(e) => setGoalDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveGoal(account.id)
-                        if (e.key === 'Escape') cancelEdit()
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <button
-                    className="btn btn-sm btn-success"
-                    onClick={() => saveGoal(account.id)}
+                    {account.display_name}
+                  </strong>
+                  <span
+                    className={`fw-semibold ${account.balance > 0 ? 'text-success' : ''}`}
                   >
-                    Save
-                  </button>
-                  <button
-                    className="btn btn-sm btn-link p-0 text-muted"
-                    onClick={cancelEdit}
-                  >
-                    Cancel
-                  </button>
+                    ${formatMoney(account.balance)}
+                  </span>
                 </div>
-              ) : goalCents && goalCents > 0 ? (
-                <>
-                  {/* Row 2: remaining / reached (right-aligned) — mirrors tracker "X left" */}
-                  <div
-                    className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
-                  >
-                    {goalReached
-                      ? 'Goal reached!'
-                      : `$${formatMoney(goalCents - account.balance)} to go`}
-                  </div>
-                  {/* Row 3: progress bar — mirrors tracker ProgressBar */}
-                  <ProgressBar
-                    now={Math.min(100, goalPct)}
-                    variant="success"
-                    striped={goalReached}
-                    animated={goalReached}
-                    label={`${Math.round(goalPct)}%`}
-                  />
-                  {/* Row 4: "balance of goal" + actions — mirrors tracker "spent of budget" */}
-                  <div className="d-flex justify-content-between align-items-center mt-1">
-                    <small className="text-muted">
-                      ${formatMoney(account.balance)} of $
-                      {formatMoney(goalCents)}
-                    </small>
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-link p-0 text-muted"
-                        style={{ fontSize: '0.75rem' }}
-                        onClick={() => startEditGoal(account.id, goalCents)}
-                      >
-                        Edit goal
-                      </button>
-                      <button
-                        className="btn btn-link p-0 text-danger"
-                        style={{ fontSize: '0.75rem' }}
-                        onClick={() => removeGoal(account.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <button
-                  className="btn btn-link p-0 mt-1 text-muted small"
-                  onClick={() => startEditGoal(account.id, null)}
-                >
-                  + Set goal
-                </button>
-              )}
 
-              {/* Charts toggle — mirrors Trackers expand row */}
-              <div
-                className="d-flex justify-content-between align-items-center mt-2"
-                role="button"
-                tabIndex={0}
-                style={{ cursor: 'pointer' }}
-                onClick={() => toggleCharts(account.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    toggleCharts(account.id)
-                  }
-                }}
-                aria-expanded={expandedCharts.has(account.id)}
-              >
-                <small className="text-muted">
-                  {expandedCharts.has(account.id)
-                    ? 'Hide charts'
-                    : 'Show charts'}
-                </small>
-                <i
-                  className={`mdi ${expandedCharts.has(account.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'} text-muted`}
-                  aria-hidden
-                />
-              </div>
-            </Card.Header>
-
-            {/* Card body: charts — collapsed by default */}
-            <Collapse in={expandedCharts.has(account.id)}>
-              <div>
-                <Card.Body>
-                  <p className="small text-muted mb-2">
-                    Monthly contributions — last 12 months
-                  </p>
-                  {hasMonthlyActivity ? (
+                {/* Goal section */}
+                {editingGoalFor === account.id ? (
+                  <div className="d-flex align-items-center gap-2 mt-2">
                     <div
-                      style={{ width: '100%', height: 200 }}
-                      className="mb-4"
+                      className="input-group input-group-sm"
+                      style={{ maxWidth: 180 }}
                     >
-                      <SaverMonthlyFlowChart
-                        data={monthlyFlow}
-                        aria-label={`${account.display_name} monthly contributions`}
+                      <span className="input-group-text">$</span>
+                      <Form.Control
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={goalDraft}
+                        onChange={(e) => setGoalDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveGoal(account.id)
+                          if (e.key === 'Escape') cancelEdit()
+                        }}
+                        autoFocus
                       />
                     </div>
-                  ) : (
-                    <p className="small text-muted mb-4">
-                      No transfers recorded for this saver in the last 12
-                      months.
-                    </p>
-                  )}
-
-                  <p className="small text-muted mb-2">Balance over time</p>
-                  {hasBalance && derivedBalances.length >= 2 ? (
-                    <div
-                      style={{ width: '100%', height: 180 }}
-                      className="mb-4"
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => saveGoal(account.id)}
                     >
-                      <SaverBalanceChart
-                        data={derivedBalances}
-                        aria-label={`${account.display_name} balance trend`}
-                      />
+                      Save
+                    </button>
+                    <button
+                      className="btn btn-sm btn-link p-0 text-muted"
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : goalCents && goalCents > 0 ? (
+                  <>
+                    {/* Row 2: remaining / reached (right-aligned) — mirrors tracker "X left" */}
+                    <div
+                      className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
+                    >
+                      {goalReached
+                        ? 'Goal reached!'
+                        : `$${formatMoney(goalCents - account.balance)} to go`}
                     </div>
-                  ) : (
-                    <p className="small text-muted mb-4">
-                      Current balance:{' '}
-                      <span className="fw-semibold">
-                        ${formatMoney(account.balance)}
-                      </span>
-                    </p>
-                  )}
-
-                  {/* Data verification panel — dev mode only */}
-                  {import.meta.env.DEV &&
-                    (() => {
-                      const impliedStart =
-                        account.balance +
-                        monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
-                      const totalTx = monthlyFlow.reduce(
-                        (s, p) => s + p.txCount,
-                        0
-                      )
-                      const totalSaved = monthlyFlow.reduce(
-                        (s, p) =>
-                          p.flowCents < 0 ? s + Math.abs(p.flowCents) : s,
-                        0
-                      )
-                      const totalWithdrawn = monthlyFlow.reduce(
-                        (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
-                        0
-                      )
-                      const netChange =
-                        account.balance - Math.max(0, impliedStart)
-                      return (
-                        <div
-                          className="rounded p-3"
-                          style={{
-                            background:
-                              'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
-                            fontSize: '0.78rem',
-                          }}
+                    {/* Row 3: progress bar — mirrors tracker ProgressBar */}
+                    <ProgressBar
+                      now={Math.min(100, goalPct)}
+                      variant="success"
+                      striped={goalReached}
+                      animated={goalReached}
+                      label={`${Math.round(goalPct)}%`}
+                    />
+                    {/* Row 4: "balance of goal" + actions — mirrors tracker "spent of budget" */}
+                    <div className="d-flex justify-content-between align-items-center mt-1">
+                      <small className="text-muted">
+                        ${formatMoney(account.balance)} of $
+                        {formatMoney(goalCents)}
+                      </small>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-link p-0 text-muted"
+                          style={{ fontSize: '0.75rem' }}
+                          onClick={() => startEditGoal(account.id, goalCents)}
                         >
-                          <p
-                            className="fw-semibold mb-2 text-muted"
+                          Edit goal
+                        </button>
+                        <button
+                          className="btn btn-link p-0 text-danger"
+                          style={{ fontSize: '0.75rem' }}
+                          onClick={() => removeGoal(account.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    className="btn btn-link p-0 mt-1 text-muted small"
+                    onClick={() => startEditGoal(account.id, null)}
+                  >
+                    + Set goal
+                  </button>
+                )}
+
+                {/* Charts toggle — mirrors Trackers expand row */}
+                <div
+                  className="d-flex justify-content-between align-items-center mt-2"
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => toggleCharts(account.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggleCharts(account.id)
+                    }
+                  }}
+                  aria-expanded={expandedCharts.has(account.id)}
+                >
+                  <small className="text-muted">
+                    {expandedCharts.has(account.id)
+                      ? 'Hide charts'
+                      : 'Show charts'}
+                  </small>
+                  <i
+                    className={`mdi ${expandedCharts.has(account.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'} text-muted`}
+                    aria-hidden
+                  />
+                </div>
+              </Card.Header>
+
+              {/* Card body: charts — collapsed by default */}
+              <Collapse in={expandedCharts.has(account.id)}>
+                <div>
+                  <Card.Body>
+                    <p className="small text-muted mb-2">
+                      Monthly contributions — last 12 months
+                    </p>
+                    {hasMonthlyActivity ? (
+                      <div
+                        style={{ width: '100%', height: 200 }}
+                        className="mb-4"
+                      >
+                        <SaverMonthlyFlowChart
+                          data={monthlyFlow}
+                          aria-label={`${account.display_name} monthly contributions`}
+                        />
+                      </div>
+                    ) : (
+                      <p className="small text-muted mb-4">
+                        No transfers recorded for this saver in the last 12
+                        months.
+                      </p>
+                    )}
+
+                    <p className="small text-muted mb-2">Balance over time</p>
+                    {hasBalance && derivedBalances.length >= 2 ? (
+                      <div
+                        style={{ width: '100%', height: 180 }}
+                        className="mb-4"
+                      >
+                        <SaverBalanceChart
+                          data={derivedBalances}
+                          aria-label={`${account.display_name} balance trend`}
+                        />
+                      </div>
+                    ) : (
+                      <p className="small text-muted mb-4">
+                        Current balance:{' '}
+                        <span className="fw-semibold">
+                          ${formatMoney(account.balance)}
+                        </span>
+                      </p>
+                    )}
+
+                    {/* Data verification panel — dev mode only */}
+                    {import.meta.env.DEV &&
+                      (() => {
+                        const impliedStart =
+                          account.balance +
+                          monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
+                        const totalTx = monthlyFlow.reduce(
+                          (s, p) => s + p.txCount,
+                          0
+                        )
+                        const totalSaved = monthlyFlow.reduce(
+                          (s, p) =>
+                            p.flowCents < 0 ? s + Math.abs(p.flowCents) : s,
+                          0
+                        )
+                        const totalWithdrawn = monthlyFlow.reduce(
+                          (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
+                          0
+                        )
+                        const netChange =
+                          account.balance - Math.max(0, impliedStart)
+                        return (
+                          <div
+                            className="rounded p-3"
                             style={{
-                              fontSize: '0.72rem',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
+                              background:
+                                'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+                              fontSize: '0.78rem',
                             }}
                           >
-                            Data check
-                          </p>
-                          <div className="d-flex flex-wrap gap-3">
-                            <div>
-                              <span className="text-muted">
-                                Implied balance 12 mo. ago
-                              </span>
-                              <br />
-                              <span className="fw-semibold">
-                                ${formatMoney(Math.max(0, impliedStart))}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted">
-                                Current balance
-                              </span>
-                              <br />
-                              <span className="fw-semibold">
-                                ${formatMoney(account.balance)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted">
-                                Net change (12 mo.)
-                              </span>
-                              <br />
-                              <span
-                                className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
-                              >
-                                {netChange >= 0 ? '+' : '−'}$
-                                {formatMoney(Math.abs(netChange))}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted">Contributed</span>
-                              <br />
-                              <span className="fw-semibold text-success">
-                                +${formatMoney(totalSaved)}
-                              </span>
-                            </div>
-                            {totalWithdrawn > 0 && (
+                            <p
+                              className="fw-semibold mb-2 text-muted"
+                              style={{
+                                fontSize: '0.72rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              Data check
+                            </p>
+                            <div className="d-flex flex-wrap gap-3">
                               <div>
-                                <span className="text-muted">Withdrawn</span>
+                                <span className="text-muted">
+                                  Implied balance 12 mo. ago
+                                </span>
                                 <br />
-                                <span className="fw-semibold text-danger">
-                                  −${formatMoney(totalWithdrawn)}
+                                <span className="fw-semibold">
+                                  ${formatMoney(Math.max(0, impliedStart))}
                                 </span>
                               </div>
-                            )}
-                            <div>
-                              <span className="text-muted">Transactions</span>
-                              <br />
-                              <span className="fw-semibold">{totalTx}</span>
+                              <div>
+                                <span className="text-muted">
+                                  Current balance
+                                </span>
+                                <br />
+                                <span className="fw-semibold">
+                                  ${formatMoney(account.balance)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted">
+                                  Net change (12 mo.)
+                                </span>
+                                <br />
+                                <span
+                                  className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
+                                >
+                                  {netChange >= 0 ? '+' : '−'}$
+                                  {formatMoney(Math.abs(netChange))}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted">Contributed</span>
+                                <br />
+                                <span className="fw-semibold text-success">
+                                  +${formatMoney(totalSaved)}
+                                </span>
+                              </div>
+                              {totalWithdrawn > 0 && (
+                                <div>
+                                  <span className="text-muted">Withdrawn</span>
+                                  <br />
+                                  <span className="fw-semibold text-danger">
+                                    −${formatMoney(totalWithdrawn)}
+                                  </span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-muted">Transactions</span>
+                                <br />
+                                <span className="fw-semibold">{totalTx}</span>
+                              </div>
                             </div>
+                            <p
+                              className="mb-0 mt-2 text-muted"
+                              style={{ fontSize: '0.7rem' }}
+                            >
+                              Cross-check: compare &quot;Implied balance 12 mo.
+                              ago&quot; and &quot;Current balance&quot; against
+                              Up Bank&apos;s account history.
+                            </p>
                           </div>
-                          <p
-                            className="mb-0 mt-2 text-muted"
-                            style={{ fontSize: '0.7rem' }}
-                          >
-                            Cross-check: compare &quot;Implied balance 12 mo.
-                            ago&quot; and &quot;Current balance&quot; against Up
-                            Bank&apos;s account history.
-                          </p>
-                        </div>
-                      )
-                    })()}
-                </Card.Body>
-              </div>
-            </Collapse>
-          </Card>
+                        )
+                      })()}
+                  </Card.Body>
+                </div>
+              </Collapse>
+            </Card>
+          </div>
         )
       })}
 
-      {saverData.length > 0 && (
+      {sortedSaverData.length > 0 && (
         <div className="mb-4">
           <Link
             className="btn btn-outline-primary btn-sm"
