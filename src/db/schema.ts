@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 22
+const SCHEMA_VERSION = 23
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -132,18 +132,6 @@ const DDL_STATEMENTS = [
     target_date TEXT,
     notes TEXT,
     created_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS maybuys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    price_cents INTEGER NOT NULL,
-    url TEXT,
-    notes TEXT,
-    saver_account_id TEXT,
-    status TEXT NOT NULL DEFAULT 'PENDING',
-    created_at TEXT NOT NULL,
-    decided_at TEXT,
-    FOREIGN KEY (saver_account_id) REFERENCES accounts(id)
   )`,
   `CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY
@@ -520,6 +508,13 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['22']
+    )
+  }
+  if (version < 23) {
+    database.run(`DROP TABLE IF EXISTS maybuys`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['23']
     )
   }
 }

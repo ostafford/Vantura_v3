@@ -115,8 +115,7 @@ export function AnalyticsIndex() {
           <p className="mb-3 text-muted small">
             Use your Dashboard for trackers, upcoming charges, and the weekly
             insights summary. Browse and filter all transactions on the
-            Transactions page. Track purchases you&apos;re considering under
-            Maybuys.
+            Transactions page.
           </p>
           <div className="d-flex flex-wrap gap-2">
             <Link to="/" className="btn btn-primary">
@@ -124,9 +123,6 @@ export function AnalyticsIndex() {
             </Link>
             <Link to="/transactions" className="btn btn-outline-secondary">
               Browse Transactions
-            </Link>
-            <Link to="/maybuys" className="btn btn-outline-secondary">
-              Maybuys
             </Link>
           </div>
         </Card.Body>

@@ -8,7 +8,6 @@ import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
 import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
 import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
 import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
-import { AnalyticsMaybuys } from '@/pages/analytics/AnalyticsMaybuys'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { SaverAccountTransactionsRedirect } from '@/routing/SaverAccountTransactionsRedirect'
@@ -23,10 +22,6 @@ export const appRouter = createBrowserRouter(
         { index: true, element: <Dashboard /> },
         { path: 'plan', element: <Navigate to="/analytics" replace /> },
         { path: 'transactions', element: <Transactions /> },
-        {
-          path: 'maybuys',
-          element: <AnalyticsMaybuys />,
-        },
         {
           path: 'analytics',
           element: <AnalyticsLayout />,
@@ -86,15 +81,15 @@ export const appRouter = createBrowserRouter(
             },
             {
               path: 'maybuys',
-              element: <Navigate to="/maybuys" replace />,
+              element: <Navigate to="/analytics" replace />,
             },
             {
               path: 'wants',
-              element: <Navigate to="/maybuys" replace />,
+              element: <Navigate to="/analytics" replace />,
             },
             {
               path: 'wants/:wantId',
-              element: <Navigate to="/maybuys" replace />,
+              element: <Navigate to="/analytics" replace />,
             },
             {
               path: 'goals',
