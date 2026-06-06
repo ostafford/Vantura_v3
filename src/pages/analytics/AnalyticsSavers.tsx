@@ -261,7 +261,7 @@ export function AnalyticsSavers() {
         </Card.Body>
       </Card>
 
-      {/* Per-saver charts */}
+      {/* Per-saver cards */}
       {saverData.length === 0 && (
         <Card className="mb-4 border">
           <Card.Body>
@@ -276,124 +276,124 @@ export function AnalyticsSavers() {
       {saverData.map(({ account, monthlyFlow, derivedBalances }) => {
         const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
         const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
+        const goalCents = getGoal(account.id, account.target_amount_cents)
+        const goalPct =
+          goalCents && goalCents > 0
+            ? Math.min(100, (account.balance / goalCents) * 100)
+            : 0
+        const goalReached =
+          goalCents != null && goalCents > 0 && account.balance >= goalCents
+
         return (
           <Card key={account.id} className="mb-4 border">
-            <Card.Body>
-              <div className="mb-3">
-                <h6 className="mb-1">{account.display_name}</h6>
-                <div
-                  className={`fw-semibold fs-5 mb-2 ${account.balance > 0 ? 'text-success' : ''}`}
+            {/* Card header: saver identity + goal — mirrors tracker card layout */}
+            <Card.Header className="py-3">
+              {/* Row 1: name (left) + balance (right) */}
+              <div className="d-flex justify-content-between align-items-start">
+                <strong>{account.display_name}</strong>
+                <span
+                  className={`fw-semibold ${account.balance > 0 ? 'text-success' : ''}`}
                 >
                   ${formatMoney(account.balance)}
-                </div>
-
-                {/* Goal — inline editor */}
-                {editingGoalFor === account.id ? (
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <div
-                      className="input-group input-group-sm"
-                      style={{ maxWidth: 180 }}
-                    >
-                      <span className="input-group-text">$</span>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={goalDraft}
-                        onChange={(e) => setGoalDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveGoal(account.id)
-                          if (e.key === 'Escape') cancelEdit()
-                        }}
-                        autoFocus
-                      />
-                    </div>
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => saveGoal(account.id)}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="btn btn-sm btn-link p-0 text-muted"
-                      onClick={cancelEdit}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  (() => {
-                    const goalCents = getGoal(
-                      account.id,
-                      account.target_amount_cents
-                    )
-                    if (goalCents && goalCents > 0) {
-                      const pct = Math.min(
-                        100,
-                        (account.balance / goalCents) * 100
-                      )
-                      const reached = account.balance >= goalCents
-                      return (
-                        <div className="mb-2">
-                          <div className="d-flex justify-content-between align-items-center mb-1">
-                            <span className="small text-muted">
-                              Goal: ${formatMoney(goalCents)}
-                            </span>
-                            {reached ? (
-                              <span className="small text-success fw-semibold">
-                                Goal reached!
-                              </span>
-                            ) : (
-                              <span className="small text-muted">
-                                {pct.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          <ProgressBar
-                            now={pct}
-                            variant="success"
-                            style={{ height: 6 }}
-                            className="mb-1"
-                          />
-                          <button
-                            className="btn btn-link p-0 me-2 text-muted"
-                            style={{ fontSize: '0.72rem' }}
-                            onClick={() => startEditGoal(account.id, goalCents)}
-                          >
-                            Edit goal
-                          </button>
-                          <button
-                            className="btn btn-link p-0 text-danger"
-                            style={{ fontSize: '0.72rem' }}
-                            onClick={() => removeGoal(account.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      )
-                    }
-                    return (
-                      <button
-                        className="btn btn-link p-0 mb-2 text-muted"
-                        style={{ fontSize: '0.75rem' }}
-                        onClick={() => startEditGoal(account.id, null)}
-                      >
-                        + Set goal
-                      </button>
-                    )
-                  })()
-                )}
-
-                <Link
-                  className="small d-block"
-                  to={`/transactions?saverActivity=1&linkedAccountId=${encodeURIComponent(account.id)}`}
-                >
-                  View transactions
-                </Link>
+                </span>
               </div>
 
-              {/* Monthly contributions */}
+              {/* Goal section */}
+              {editingGoalFor === account.id ? (
+                <div className="d-flex align-items-center gap-2 mt-2">
+                  <div
+                    className="input-group input-group-sm"
+                    style={{ maxWidth: 180 }}
+                  >
+                    <span className="input-group-text">$</span>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={goalDraft}
+                      onChange={(e) => setGoalDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveGoal(account.id)
+                        if (e.key === 'Escape') cancelEdit()
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    className="btn btn-sm btn-success"
+                    onClick={() => saveGoal(account.id)}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className="btn btn-sm btn-link p-0 text-muted"
+                    onClick={cancelEdit}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : goalCents && goalCents > 0 ? (
+                <>
+                  {/* Row 2: remaining / reached (right-aligned) — mirrors tracker "X left" */}
+                  <div
+                    className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
+                  >
+                    {goalReached
+                      ? 'Goal reached!'
+                      : `$${formatMoney(goalCents - account.balance)} to go`}
+                  </div>
+                  {/* Row 3: progress bar — mirrors tracker ProgressBar */}
+                  <ProgressBar
+                    now={Math.min(100, goalPct)}
+                    variant="success"
+                    striped={goalReached}
+                    animated={goalReached}
+                    label={`${Math.round(goalPct)}%`}
+                  />
+                  {/* Row 4: "balance of goal" + actions — mirrors tracker "spent of budget" */}
+                  <div className="d-flex justify-content-between align-items-center mt-1">
+                    <small className="text-muted">
+                      ${formatMoney(account.balance)} of $
+                      {formatMoney(goalCents)}
+                    </small>
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-link p-0 text-muted"
+                        style={{ fontSize: '0.75rem' }}
+                        onClick={() => startEditGoal(account.id, goalCents)}
+                      >
+                        Edit goal
+                      </button>
+                      <button
+                        className="btn btn-link p-0 text-danger"
+                        style={{ fontSize: '0.75rem' }}
+                        onClick={() => removeGoal(account.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <button
+                  className="btn btn-link p-0 mt-1 text-muted small"
+                  onClick={() => startEditGoal(account.id, null)}
+                >
+                  + Set goal
+                </button>
+              )}
+
+              <Link
+                className="small d-block mt-2"
+                to={`/transactions?saverActivity=1&linkedAccountId=${encodeURIComponent(account.id)}`}
+              >
+                View transactions
+              </Link>
+            </Card.Header>
+
+            {/* Card body: charts */}
+            <Card.Body>
               <p className="small text-muted mb-2">
                 Monthly contributions — last 12 months
               </p>
@@ -410,7 +410,6 @@ export function AnalyticsSavers() {
                 </p>
               )}
 
-              {/* Derived balance trend — same source and window as contributions above */}
               <p className="small text-muted mb-2">Balance over time</p>
               {hasBalance && derivedBalances.length >= 2 ? (
                 <div style={{ width: '100%', height: 180 }} className="mb-4">
@@ -519,7 +518,7 @@ export function AnalyticsSavers() {
                       >
                         Cross-check: compare &quot;Implied balance 12 mo.
                         ago&quot; and &quot;Current balance&quot; against Up
-                        Bank's account history.
+                        Bank&apos;s account history.
                       </p>
                     </div>
                   )

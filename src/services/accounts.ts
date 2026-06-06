@@ -2,7 +2,7 @@
  * Local account rows synced from Up Bank (see sync upsertAccount).
  */
 
-import { getDb } from '@/db'
+import { getDb, schedulePersist } from '@/db'
 
 export interface AccountRow {
   id: string
@@ -103,6 +103,7 @@ export function updateSaverGoal(
     targetAmountCents,
     saverId,
   ])
+  schedulePersist()
 }
 
 export interface SaverMonthlyFlowPoint {
