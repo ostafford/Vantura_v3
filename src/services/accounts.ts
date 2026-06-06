@@ -11,6 +11,8 @@ export interface AccountRow {
   balance: number
   ownership_type: string | null
   is_closed: number
+  target_amount_cents: number | null
+  monthly_deposit_target_cents: number | null
 }
 
 /**
@@ -26,7 +28,8 @@ export function getAccountsByTypes(
   const placeholders = types.map(() => '?').join(',')
   const closedFilter = includeClosed ? '' : ' AND is_closed = 0'
   const stmt = db.prepare(
-    `SELECT id, display_name, account_type, balance, ownership_type, is_closed
+    `SELECT id, display_name, account_type, balance, ownership_type, is_closed,
+            target_amount_cents, monthly_deposit_target_cents
      FROM accounts WHERE account_type IN (${placeholders})${closedFilter}
      ORDER BY display_name COLLATE NOCASE`
   )
@@ -40,6 +43,8 @@ export function getAccountsByTypes(
       number,
       string | null,
       number,
+      number | null,
+      number | null,
     ]
     out.push({
       id: r[0],
@@ -48,6 +53,8 @@ export function getAccountsByTypes(
       balance: r[3],
       ownership_type: r[4],
       is_closed: r[5],
+      target_amount_cents: r[6] ?? null,
+      monthly_deposit_target_cents: r[7] ?? null,
     })
   }
   stmt.free()
@@ -84,6 +91,18 @@ export function getSaverBalanceHistory(
   }
   stmt.free()
   return out
+}
+
+export function updateSaverGoal(
+  saverId: string,
+  targetAmountCents: number | null
+): void {
+  const db = getDb()
+  if (!db) return
+  db.run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
+    targetAmountCents,
+    saverId,
+  ])
 }
 
 export interface SaverMonthlyFlowPoint {

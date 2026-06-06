@@ -1,11 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
-import { Card, Row, Col } from 'react-bootstrap'
+import { Card, Row, Col, ProgressBar, Form } from 'react-bootstrap'
 import {
   getAccountsByTypes,
   getSaverMonthlyFlow,
   sumAccountBalancesCents,
+  updateSaverGoal,
   type SaverBalanceSnapshot,
   type SaverMonthlyFlowPoint,
 } from '@/services/accounts'
@@ -168,6 +169,45 @@ export function AnalyticsSavers() {
   const monthName = now.toLocaleString(undefined, { month: 'long' })
   const transactionsAllSaversLink = '/transactions?saverActivity=1'
 
+  // Goal editing state — one saver editable at a time
+  const [editingGoalFor, setEditingGoalFor] = useState<string | null>(null)
+  const [goalDraft, setGoalDraft] = useState('')
+  // Local overrides so progress bar updates instantly without re-fetching DB
+  const [goalOverrides, setGoalOverrides] = useState<
+    Record<string, number | null>
+  >({})
+
+  function getGoal(id: string, dbGoal: number | null): number | null {
+    return Object.prototype.hasOwnProperty.call(goalOverrides, id)
+      ? goalOverrides[id]
+      : dbGoal
+  }
+
+  function startEditGoal(id: string, currentGoal: number | null) {
+    setEditingGoalFor(id)
+    setGoalDraft(currentGoal ? (currentGoal / 100).toFixed(2) : '')
+  }
+
+  function saveGoal(id: string) {
+    const dollars = parseFloat(goalDraft.replace(/[^0-9.]/g, ''))
+    const cents =
+      isNaN(dollars) || dollars <= 0 ? null : Math.round(dollars * 100)
+    updateSaverGoal(id, cents)
+    setGoalOverrides((prev) => ({ ...prev, [id]: cents }))
+    setEditingGoalFor(null)
+    setGoalDraft('')
+  }
+
+  function cancelEdit() {
+    setEditingGoalFor(null)
+    setGoalDraft('')
+  }
+
+  function removeGoal(id: string) {
+    updateSaverGoal(id, null)
+    setGoalOverrides((prev) => ({ ...prev, [id]: null }))
+  }
+
   return (
     <div className="grid-margin">
       <p className="text-muted mb-3">
@@ -222,13 +262,136 @@ export function AnalyticsSavers() {
       </Card>
 
       {/* Per-saver charts */}
+      {saverData.length === 0 && (
+        <Card className="mb-4 border">
+          <Card.Body>
+            <p className="text-muted mb-0 small">
+              No saver accounts in your synced data. Re-sync after creating
+              savers in the Up app, or check that your token can see all
+              accounts.
+            </p>
+          </Card.Body>
+        </Card>
+      )}
       {saverData.map(({ account, monthlyFlow, derivedBalances }) => {
         const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
         const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
         return (
           <Card key={account.id} className="mb-4 border">
             <Card.Body>
-              <h6 className="mb-3">{account.display_name}</h6>
+              <div className="mb-3">
+                <h6 className="mb-1">{account.display_name}</h6>
+                <div
+                  className={`fw-semibold fs-5 mb-2 ${account.balance > 0 ? 'text-success' : ''}`}
+                >
+                  ${formatMoney(account.balance)}
+                </div>
+
+                {/* Goal — inline editor */}
+                {editingGoalFor === account.id ? (
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <div
+                      className="input-group input-group-sm"
+                      style={{ maxWidth: 180 }}
+                    >
+                      <span className="input-group-text">$</span>
+                      <Form.Control
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={goalDraft}
+                        onChange={(e) => setGoalDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveGoal(account.id)
+                          if (e.key === 'Escape') cancelEdit()
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => saveGoal(account.id)}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="btn btn-sm btn-link p-0 text-muted"
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  (() => {
+                    const goalCents = getGoal(
+                      account.id,
+                      account.target_amount_cents
+                    )
+                    if (goalCents && goalCents > 0) {
+                      const pct = Math.min(
+                        100,
+                        (account.balance / goalCents) * 100
+                      )
+                      const reached = account.balance >= goalCents
+                      return (
+                        <div className="mb-2">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <span className="small text-muted">
+                              Goal: ${formatMoney(goalCents)}
+                            </span>
+                            {reached ? (
+                              <span className="small text-success fw-semibold">
+                                Goal reached!
+                              </span>
+                            ) : (
+                              <span className="small text-muted">
+                                {pct.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          <ProgressBar
+                            now={pct}
+                            variant="success"
+                            style={{ height: 6 }}
+                            className="mb-1"
+                          />
+                          <button
+                            className="btn btn-link p-0 me-2 text-muted"
+                            style={{ fontSize: '0.72rem' }}
+                            onClick={() => startEditGoal(account.id, goalCents)}
+                          >
+                            Edit goal
+                          </button>
+                          <button
+                            className="btn btn-link p-0 text-danger"
+                            style={{ fontSize: '0.72rem' }}
+                            onClick={() => removeGoal(account.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )
+                    }
+                    return (
+                      <button
+                        className="btn btn-link p-0 mb-2 text-muted"
+                        style={{ fontSize: '0.75rem' }}
+                        onClick={() => startEditGoal(account.id, null)}
+                      >
+                        + Set goal
+                      </button>
+                    )
+                  })()
+                )}
+
+                <Link
+                  className="small d-block"
+                  to={`/transactions?saverActivity=1&linkedAccountId=${encodeURIComponent(account.id)}`}
+                >
+                  View transactions
+                </Link>
+              </div>
 
               {/* Monthly contributions */}
               <p className="small text-muted mb-2">
@@ -366,56 +529,16 @@ export function AnalyticsSavers() {
         )
       })}
 
-      {/* Saver accounts */}
-      <Card className="mb-4 border">
-        <Card.Body>
-          <h6 className="text-muted mb-2">Saver accounts</h6>
-          {savers.length === 0 ? (
-            <p className="text-muted mb-0 small">
-              No saver accounts in your synced data. Re-sync after creating
-              savers in the Up app, or check that your token can see all
-              accounts.
-            </p>
-          ) : (
-            <>
-              <p className="mb-3 fw-semibold">
-                Combined balance: ${formatMoney(saverTotal)}
-              </p>
-              <Row className="g-3 mb-3">
-                {savers.map((a) => (
-                  <Col key={a.id} xs={12} md={6} lg={4}>
-                    <Card className="h-100 border">
-                      <Card.Body>
-                        <h6 className="mb-1">{a.display_name}</h6>
-                        <p className="mb-2 h5">${formatMoney(a.balance)}</p>
-                        {a.ownership_type ? (
-                          <p className="small text-muted mb-2">
-                            {a.ownership_type === 'JOINT'
-                              ? 'Joint / 2Up'
-                              : 'Individual'}
-                          </p>
-                        ) : null}
-                        <Link
-                          className="btn btn-link p-0 small"
-                          to={`/transactions?saverActivity=1&linkedAccountId=${encodeURIComponent(a.id)}`}
-                        >
-                          Transactions for this account
-                        </Link>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-              <Link
-                className="btn btn-outline-primary btn-sm"
-                to={transactionsAllSaversLink}
-              >
-                View all saver transactions
-              </Link>
-            </>
-          )}
-        </Card.Body>
-      </Card>
+      {saverData.length > 0 && (
+        <div className="mb-4">
+          <Link
+            className="btn btn-outline-primary btn-sm"
+            to={transactionsAllSaversLink}
+          >
+            View all saver transactions
+          </Link>
+        </div>
+      )}
 
       {/* Home loan */}
       {homeLoans.length > 0 ? (

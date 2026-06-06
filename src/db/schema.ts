@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 21
+const SCHEMA_VERSION = 22
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -27,7 +27,9 @@ const DDL_STATEMENTS = [
     updated_at TEXT NOT NULL,
     ownership_type TEXT,
     synced_at TEXT,
-    is_closed INTEGER NOT NULL DEFAULT 0
+    is_closed INTEGER NOT NULL DEFAULT 0,
+    target_amount_cents INTEGER,
+    monthly_deposit_target_cents INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -498,6 +500,26 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['21']
+    )
+  }
+  if (version < 22) {
+    const accCols = database.exec(`PRAGMA table_info(accounts)`)
+    const accExisting = new Set(
+      (accCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!accExisting.has('target_amount_cents')) {
+      database.run(
+        `ALTER TABLE accounts ADD COLUMN target_amount_cents INTEGER`
+      )
+    }
+    if (!accExisting.has('monthly_deposit_target_cents')) {
+      database.run(
+        `ALTER TABLE accounts ADD COLUMN monthly_deposit_target_cents INTEGER`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['22']
     )
   }
 }
