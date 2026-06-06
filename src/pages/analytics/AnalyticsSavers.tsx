@@ -4,24 +4,73 @@ import { Link } from 'react-router-dom'
 import { Card, Row, Col } from 'react-bootstrap'
 import {
   getAccountsByTypes,
-  getSaverBalanceHistory,
+  getSaverMonthlyFlow,
   sumAccountBalancesCents,
+  type SaverBalanceSnapshot,
+  type SaverMonthlyFlowPoint,
 } from '@/services/accounts'
-import { getInsightsHistory, getMonthlyInsights } from '@/services/insights'
+import { getMonthlyInsights } from '@/services/insights'
+import type { MonthDelta } from '@/services/insights'
 import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
-import { SaverFlowChart } from '@/components/charts/SaverFlowChart'
 import { SaverBalanceChart } from '@/components/charts/SaverBalanceChart'
+import { SaverMonthlyFlowChart } from '@/components/charts/SaverMonthlyFlowChart'
+import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
+import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
+
+// Reconstruct end-of-month balances from flow data working backwards from current balance.
+// Both charts then share the same source and time window.
+const MONTH_MAP: Record<string, string> = {
+  Jan: '01',
+  Feb: '02',
+  Mar: '03',
+  Apr: '04',
+  May: '05',
+  Jun: '06',
+  Jul: '07',
+  Aug: '08',
+  Sep: '09',
+  Oct: '10',
+  Nov: '11',
+  Dec: '12',
+}
+
+function deriveMonthlyBalances(
+  flow: SaverMonthlyFlowPoint[],
+  saverId: string,
+  currentBalance: number
+): SaverBalanceSnapshot[] {
+  const result: SaverBalanceSnapshot[] = []
+  let b = currentBalance
+  for (let i = flow.length - 1; i >= 0; i--) {
+    const p = flow[i]
+    // "Jun '26" → "2026-06-01"
+    const [mon, yr] = p.monthLabel.split(' ')
+    const date = `20${yr.slice(1)}-${MONTH_MAP[mon]}-01`
+    result.unshift({
+      saver_id: saverId,
+      snapshot_date: date,
+      balance_cents: Math.max(0, b),
+    })
+    // balance at end of previous month = balance at end of this month + this month's flow
+    b += p.flowCents
+  }
+  return result
+}
 
 function KpiCell({
   label,
   value,
   valueClass,
+  delta,
+  vsPriorLabel,
   detail,
 }: {
   label: string
   value: string
   valueClass?: string
+  delta?: MonthDelta
+  vsPriorLabel?: string
   detail?: string
 }) {
   return (
@@ -34,6 +83,9 @@ function KpiCell({
     >
       <div className="small text-muted mb-1">{label}</div>
       <div className={`fw-semibold fs-5 ${valueClass ?? ''}`}>{value}</div>
+      {delta && vsPriorLabel && (
+        <ComparisonDeltaBadge delta={delta} vsPriorLabel={vsPriorLabel} />
+      )}
       {detail && (
         <div className="small text-muted mt-1" style={{ fontSize: '0.72rem' }}>
           {detail}
@@ -52,24 +104,33 @@ export function AnalyticsSavers() {
   const homeLoanTotal = sumAccountBalancesCents(homeLoans)
 
   const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const prev = previousCalendarMonth(currentYear, currentMonth)
+
   const monthlyInsights = useMemo(
-    () => getMonthlyInsights(now.getFullYear(), now.getMonth() + 1),
+    () => getMonthlyInsights(currentYear, currentMonth),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [now.getFullYear(), now.getMonth(), lastSyncCompletedAt]
+    [currentYear, currentMonth, lastSyncCompletedAt]
   )
 
-  const weeklyHistory = useMemo(
-    () => getInsightsHistory(12),
+  const prevMonthlyInsights = useMemo(
+    () => getMonthlyInsights(prev.year, prev.month),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt]
+    [prev.year, prev.month, lastSyncCompletedAt]
   )
 
-  const saverBalanceHistories = useMemo(
+  const saverData = useMemo(
     () =>
-      savers.map((s) => ({
-        account: s,
-        history: getSaverBalanceHistory(s.id),
-      })),
+      savers.map((s) => {
+        const monthlyFlow = getSaverMonthlyFlow(s.id, 12)
+        const derivedBalances = deriveMonthlyBalances(
+          monthlyFlow,
+          s.id,
+          s.balance
+        )
+        return { account: s, monthlyFlow, derivedBalances }
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [savers.map((s) => s.id).join(','), lastSyncCompletedAt]
   )
@@ -84,8 +145,28 @@ export function AnalyticsSavers() {
         100
       : null
 
-  const transactionsAllSaversLink = '/transactions?saverActivity=1'
+  const netSavedThis = isNetWithdrawal ? -savedThisMonth : savedThisMonth
+  const prevIsWithdrawal = prevMonthlyInsights.saverChanges > 0
+  const prevSavedAmount = Math.abs(prevMonthlyInsights.saverChanges)
+  const netSavedPrev = prevIsWithdrawal ? -prevSavedAmount : prevSavedAmount
+  const savedDelta: MonthDelta | null =
+    netSavedThis === 0 && netSavedPrev === 0
+      ? null
+      : {
+          current: netSavedThis,
+          previous: netSavedPrev,
+          delta: netSavedThis - netSavedPrev,
+          direction:
+            Math.abs(netSavedThis - netSavedPrev) < 1
+              ? 'flat'
+              : netSavedThis > netSavedPrev
+                ? 'up'
+                : 'down',
+        }
+
+  const prevMonthLabel = monthNameLong(prev.year, prev.month)
   const monthName = now.toLocaleString(undefined, { month: 'long' })
+  const transactionsAllSaversLink = '/transactions?saverActivity=1'
 
   return (
     <div className="grid-margin">
@@ -110,6 +191,8 @@ export function AnalyticsSavers() {
                     : `+$${formatMoney(savedThisMonth)}`
               }
               valueClass={isNetWithdrawal ? 'text-danger' : 'text-success'}
+              delta={savedDelta ?? undefined}
+              vsPriorLabel={prevMonthLabel}
             />
             <KpiCell
               label="of which round-ups"
@@ -138,54 +221,147 @@ export function AnalyticsSavers() {
         </Card.Body>
       </Card>
 
-      {/* Weekly savings flow chart */}
-      <Card className="mb-4 border">
-        <Card.Body>
-          <h6 className="text-muted mb-1">Weekly savings flow</h6>
-          <p className="small text-muted mb-3">
-            Amount moved into savers each week over the last 12 weeks.
-          </p>
-          {weeklyHistory.every((w) => w.saverChanges === 0) ? (
-            <p className="text-muted small mb-0">
-              No saver transfers found in the last 12 weeks.
-            </p>
-          ) : (
-            <div style={{ width: '100%', height: 240 }}>
-              <SaverFlowChart
-                data={weeklyHistory}
-                aria-label="Weekly savings flow bar chart"
-              />
-            </div>
-          )}
-        </Card.Body>
-      </Card>
+      {/* Per-saver charts */}
+      {saverData.map(({ account, monthlyFlow, derivedBalances }) => {
+        const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
+        const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
+        return (
+          <Card key={account.id} className="mb-4 border">
+            <Card.Body>
+              <h6 className="mb-3">{account.display_name}</h6>
 
-      {/* Per-saver balance history charts */}
-      {saverBalanceHistories.map(({ account, history }) => (
-        <Card key={account.id} className="mb-4 border">
-          <Card.Body>
-            <h6 className="text-muted mb-1">
-              {account.display_name} — balance over time
-            </h6>
-            {history.length < 2 ? (
-              <p className="small text-muted mb-0">
-                Balance history will appear here after a few syncs. Current
-                balance:{' '}
-                <span className="fw-semibold">
-                  ${formatMoney(account.balance)}
-                </span>
+              {/* Monthly contributions */}
+              <p className="small text-muted mb-2">
+                Monthly contributions — last 12 months
               </p>
-            ) : (
-              <div style={{ width: '100%', height: 240 }}>
-                <SaverBalanceChart
-                  data={history}
-                  aria-label={`${account.display_name} balance trend chart`}
-                />
-              </div>
-            )}
-          </Card.Body>
-        </Card>
-      ))}
+              {hasMonthlyActivity ? (
+                <div style={{ width: '100%', height: 200 }} className="mb-4">
+                  <SaverMonthlyFlowChart
+                    data={monthlyFlow}
+                    aria-label={`${account.display_name} monthly contributions`}
+                  />
+                </div>
+              ) : (
+                <p className="small text-muted mb-4">
+                  No transfers recorded for this saver in the last 12 months.
+                </p>
+              )}
+
+              {/* Derived balance trend — same source and window as contributions above */}
+              <p className="small text-muted mb-2">Balance over time</p>
+              {hasBalance && derivedBalances.length >= 2 ? (
+                <div style={{ width: '100%', height: 180 }} className="mb-4">
+                  <SaverBalanceChart
+                    data={derivedBalances}
+                    aria-label={`${account.display_name} balance trend`}
+                  />
+                </div>
+              ) : (
+                <p className="small text-muted mb-4">
+                  Current balance:{' '}
+                  <span className="fw-semibold">
+                    ${formatMoney(account.balance)}
+                  </span>
+                </p>
+              )}
+
+              {/* Data verification panel */}
+              {(() => {
+                const impliedStart =
+                  account.balance +
+                  monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
+                const totalTx = monthlyFlow.reduce((s, p) => s + p.txCount, 0)
+                const totalSaved = monthlyFlow.reduce(
+                  (s, p) => (p.flowCents < 0 ? s + Math.abs(p.flowCents) : s),
+                  0
+                )
+                const totalWithdrawn = monthlyFlow.reduce(
+                  (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
+                  0
+                )
+                const netChange = account.balance - Math.max(0, impliedStart)
+                return (
+                  <div
+                    className="rounded p-3"
+                    style={{
+                      background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    <p
+                      className="fw-semibold mb-2 text-muted"
+                      style={{
+                        fontSize: '0.72rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Data check
+                    </p>
+                    <div className="d-flex flex-wrap gap-3">
+                      <div>
+                        <span className="text-muted">
+                          Implied balance 12 mo. ago
+                        </span>
+                        <br />
+                        <span className="fw-semibold">
+                          ${formatMoney(Math.max(0, impliedStart))}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted">Current balance</span>
+                        <br />
+                        <span className="fw-semibold">
+                          ${formatMoney(account.balance)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted">Net change (12 mo.)</span>
+                        <br />
+                        <span
+                          className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
+                        >
+                          {netChange >= 0 ? '+' : '−'}$
+                          {formatMoney(Math.abs(netChange))}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted">Contributed</span>
+                        <br />
+                        <span className="fw-semibold text-success">
+                          +${formatMoney(totalSaved)}
+                        </span>
+                      </div>
+                      {totalWithdrawn > 0 && (
+                        <div>
+                          <span className="text-muted">Withdrawn</span>
+                          <br />
+                          <span className="fw-semibold text-danger">
+                            −${formatMoney(totalWithdrawn)}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-muted">Transactions</span>
+                        <br />
+                        <span className="fw-semibold">{totalTx}</span>
+                      </div>
+                    </div>
+                    <p
+                      className="mb-0 mt-2 text-muted"
+                      style={{ fontSize: '0.7rem' }}
+                    >
+                      Cross-check: compare &quot;Implied balance 12 mo.
+                      ago&quot; and &quot;Current balance&quot; against Up
+                      Bank's account history.
+                    </p>
+                  </div>
+                )
+              })()}
+            </Card.Body>
+          </Card>
+        )
+      })}
 
       {/* Saver accounts */}
       <Card className="mb-4 border">

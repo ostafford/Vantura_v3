@@ -85,3 +85,83 @@ export function getSaverBalanceHistory(
   stmt.free()
   return out
 }
+
+export interface SaverMonthlyFlowPoint {
+  monthLabel: string
+  /** Negative = savings (money into saver), positive = withdrawal. Same sign as saverChanges. */
+  flowCents: number
+  /** Number of saver transactions in this month — for data verification. */
+  txCount: number
+}
+
+const MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+/**
+ * Per-saver monthly net flow for the last `monthsBack` calendar months (oldest first).
+ * Months with no activity have flowCents = 0 so gaps are visible in the chart.
+ */
+export function getSaverMonthlyFlow(
+  saverId: string,
+  monthsBack: number
+): SaverMonthlyFlowPoint[] {
+  const db = getDb()
+  if (!db) return []
+
+  const now = new Date()
+  const cutoff = new Date(
+    now.getFullYear(),
+    now.getMonth() - monthsBack + 1,
+    1,
+    0,
+    0,
+    0,
+    0
+  )
+  const cutoffIso = cutoff.toISOString()
+
+  const stmt = db.prepare(
+    `SELECT strftime('%Y-%m', COALESCE(created_at, settled_at)) AS ym,
+            -SUM(amount) AS flow_cents,
+            COUNT(*) AS tx_count
+     FROM transactions
+     WHERE account_id = ?
+       AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
+       AND COALESCE(created_at, settled_at) >= ?
+     GROUP BY ym
+     ORDER BY ym`
+  )
+  stmt.bind([saverId, cutoffIso])
+  const byMonth = new Map<string, { flowCents: number; txCount: number }>()
+  while (stmt.step()) {
+    const r = stmt.get() as [string, number, number]
+    byMonth.set(r[0], { flowCents: Number(r[1]), txCount: Number(r[2]) })
+  }
+  stmt.free()
+
+  const result: SaverMonthlyFlowPoint[] = []
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const yearShort = String(d.getFullYear()).slice(2)
+    const found = byMonth.get(ym)
+    result.push({
+      monthLabel: `${MONTH_ABBR[d.getMonth()]} '${yearShort}`,
+      flowCents: found?.flowCents ?? 0,
+      txCount: found?.txCount ?? 0,
+    })
+  }
+  return result
+}
