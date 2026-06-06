@@ -396,13 +396,6 @@ export function AnalyticsSavers() {
                 </button>
               )}
 
-              <Link
-                className="small d-block mt-2"
-                to={`/transactions?saverActivity=1&linkedAccountId=${encodeURIComponent(account.id)}`}
-              >
-                View transactions
-              </Link>
-
               {/* Charts toggle — mirrors Trackers expand row */}
               <div
                 className="d-flex justify-content-between align-items-center mt-2"

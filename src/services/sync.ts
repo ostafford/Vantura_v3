@@ -82,8 +82,16 @@ function upsertAccount(acc: UpAccount): void {
   const now = new Date().toISOString()
   const ownership = a.ownershipType != null ? String(a.ownershipType) : null
   run(
-    `INSERT OR REPLACE INTO accounts (id, display_name, account_type, balance, created_at, updated_at, ownership_type, synced_at, is_closed)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, ownership_type, synced_at, is_closed)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+     ON CONFLICT(id) DO UPDATE SET
+       display_name = excluded.display_name,
+       account_type = excluded.account_type,
+       balance      = excluded.balance,
+       updated_at   = excluded.updated_at,
+       ownership_type = excluded.ownership_type,
+       synced_at    = excluded.synced_at,
+       is_closed    = 0`,
     [
       acc.id,
       a.displayName ?? '',
