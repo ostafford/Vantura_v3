@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
-import { Card, Row, Col, ProgressBar, Form, Collapse } from 'react-bootstrap'
+import {
+  Card,
+  Row,
+  Col,
+  ProgressBar,
+  Form,
+  Collapse,
+  OverlayTrigger,
+  Tooltip,
+} from 'react-bootstrap'
 import {
   getAccountsByTypes,
   getSaverMonthlyFlow,
@@ -16,7 +25,10 @@ import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { SaverBalanceChart } from '@/components/charts/SaverBalanceChart'
 import { SaverMonthlyFlowChart } from '@/components/charts/SaverMonthlyFlowChart'
-import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
+import {
+  ComparisonDeltaBadge,
+  buildDeltaTooltip,
+} from '@/components/atAGlance/ComparisonDeltaBadge'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
 
 // Reconstruct end-of-month balances from flow data working backwards from current balance.
@@ -76,12 +88,20 @@ function KpiCell({
   detail?: string
   monetary?: boolean
 }) {
-  return (
+  const tooltipLines =
+    delta && vsPriorLabel
+      ? buildDeltaTooltip(delta, vsPriorLabel, monetary)
+      : null
+  const deltaColor =
+    delta?.direction === 'up' ? 'var(--bs-success)' : 'var(--bs-danger)'
+
+  const cell = (
     <div
       className="rounded p-3 flex-fill"
       style={{
         background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
         minWidth: 120,
+        cursor: tooltipLines ? 'default' : undefined,
       }}
     >
       <div className="small text-muted mb-1">{label}</div>
@@ -99,6 +119,26 @@ function KpiCell({
         </div>
       )}
     </div>
+  )
+
+  if (!tooltipLines) return cell
+
+  return (
+    <OverlayTrigger
+      placement="top"
+      container={document.body}
+      overlay={
+        <Tooltip>
+          <div>
+            <span style={{ color: deltaColor }}>{tooltipLines.amount}</span>{' '}
+            {tooltipLines.line1rest}
+          </div>
+          <div style={{ opacity: 0.75 }}>{tooltipLines.line2}</div>
+        </Tooltip>
+      }
+    >
+      {cell}
+    </OverlayTrigger>
   )
 }
 
