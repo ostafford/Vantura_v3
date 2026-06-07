@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 import { Link, useNavigate } from 'react-router-dom'
-import { useStore } from 'zustand'
 import { Button, Modal, Spinner, Form } from 'react-bootstrap'
 import { getAppSetting, setAppSetting, deleteDatabase } from '@/db'
-import { accentStore } from '@/stores/accentStore'
 import { toast } from '@/stores/toastStore'
-import { ACCENT_PALETTES, type AccentId } from '@/lib/accentPalettes'
+import {
+  ACCENT_PALETTES,
+  type AccentId,
+  CUSTOM_ACCENT_KEY,
+  applyCustomAccentHex,
+  clearCustomAccentHex,
+} from '@/lib/accentPalettes'
 import { sessionStore } from '@/stores/sessionStore'
 import {
   deriveKeyFromPassphrase,
@@ -17,6 +21,7 @@ import {
 import { validateUpBankToken } from '@/api/upBank'
 import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
+import { CategoryColorsSection } from '@/components/CategoryColorsSection'
 import {
   getDashboardSectionOrder,
   setDashboardSectionOrder,
@@ -230,8 +235,9 @@ export function Settings() {
     trackers: true,
     upcomingCharges: true,
   })
-  const accent = useStore(accentStore, (s) => s.accent)
-  const setAccent = useStore(accentStore, (s) => s.setAccent)
+  const [customAccentHex, setCustomAccentHex] = useState<string | null>(
+    () => getAppSetting(CUSTOM_ACCENT_KEY) || null
+  )
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
@@ -635,47 +641,53 @@ export function Settings() {
               )}
               {activeSection === 'appearance' && (
                 <>
-                  <h6 className="text-muted mb-2">Accent color</h6>
+                  <h6 className="text-muted mb-2">Accent colour</h6>
                   <p className="small text-muted mb-3">
-                    Choose a color for buttons, charts, and highlights.
+                    Applies to buttons, highlights, and gradients throughout the
+                    app.
                   </p>
-                  <div className="d-flex flex-wrap gap-2">
-                    {(Object.keys(ACCENT_PALETTES) as AccentId[]).map((id) => {
-                      const palette = ACCENT_PALETTES[id]
-                      const isSelected = accent === id
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          className="accent-swatch border rounded-circle p-0 d-flex align-items-center justify-content-center"
-                          style={{
-                            width: 40,
-                            height: 40,
-                            background: `linear-gradient(135deg, ${palette.gradientStart}, ${palette.gradientEnd})`,
-                            borderWidth: isSelected ? 3 : 1,
-                            borderColor: isSelected
-                              ? 'var(--vantura-text)'
-                              : 'var(--vantura-border)',
-                          }}
-                          onClick={() => setAccent(id)}
-                          aria-label={`Select ${palette.label} accent`}
-                          aria-pressed={isSelected}
-                        >
-                          {isSelected && (
-                            <i
-                              className="mdi mdi-check"
-                              style={{
-                                fontSize: '1.25rem',
-                                color: 'white',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                              }}
-                              aria-hidden
-                            />
-                          )}
-                        </button>
-                      )
-                    })}
+                  <div className="d-flex align-items-center gap-3">
+                    <input
+                      type="color"
+                      value={customAccentHex ?? '#b66dff'}
+                      onChange={(e) => {
+                        const hex = e.target.value
+                        setAppSetting(CUSTOM_ACCENT_KEY, hex)
+                        setCustomAccentHex(hex)
+                        applyCustomAccentHex(hex)
+                      }}
+                      aria-label="Pick accent colour"
+                      className="rounded border"
+                      style={{
+                        width: 40,
+                        height: 40,
+                        padding: 2,
+                        cursor: 'pointer',
+                      }}
+                    />
+                    {customAccentHex != null ? (
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 text-muted"
+                        onClick={() => {
+                          setAppSetting(CUSTOM_ACCENT_KEY, '')
+                          setCustomAccentHex(null)
+                          clearCustomAccentHex()
+                        }}
+                        aria-label="Use default accent colour"
+                      >
+                        Use default
+                      </button>
+                    ) : (
+                      <span className="small text-muted">
+                        No custom colour set
+                      </span>
+                    )}
                   </div>
+
+                  <hr className="my-4" />
+                  <h6 className="text-muted mb-2">Category colours</h6>
+                  <CategoryColorsSection />
                 </>
               )}
               {activeSection === 'payday' && (

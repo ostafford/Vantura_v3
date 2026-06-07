@@ -3,12 +3,20 @@
  */
 
 export function formatMoney(cents: number): string {
-  return (cents / 100).toFixed(2)
+  return (cents / 100).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 /** Format dollars for display (e.g. tooltips, axis labels). Use when value is already in dollars. */
 export function formatDollars(dollars: number): string {
-  return Number.isFinite(dollars) ? dollars.toFixed(2) : '0.00'
+  return Number.isFinite(dollars)
+    ? dollars.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : '0.00'
 }
 
 export function formatDateTime(isoString: string): string {

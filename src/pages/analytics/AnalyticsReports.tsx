@@ -1,5 +1,14 @@
 import { useState, useMemo } from 'react'
-import { Card, Row, Col, Form, Button, ProgressBar } from 'react-bootstrap'
+import {
+  Card,
+  Row,
+  Col,
+  Form,
+  Button,
+  ProgressBar,
+  OverlayTrigger,
+  Tooltip,
+} from 'react-bootstrap'
 import {
   getMonthComparison,
   getCategoryBreakdownForDateRange,
@@ -22,12 +31,12 @@ import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import { useStore } from 'zustand'
 import { accentStore } from '@/stores/accentStore'
 import { syncStore } from '@/stores/syncStore'
-import { InsightsBarChart } from '@/components/charts/InsightsBarChart'
-import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
+import {
+  ComparisonDeltaBadge,
+  buildDeltaTooltip,
+} from '@/components/atAGlance/ComparisonDeltaBadge'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
-import { formatMoney } from '@/lib/format'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
+import { formatMoney, formatDollars } from '@/lib/format'
 import {
   monthNameLong,
   previousCalendarMonth,
@@ -117,6 +126,80 @@ function makeDelta(current: number, previous: number): MonthDelta {
   return { current, previous, delta, direction }
 }
 
+// ─── Spending Category List ───────────────────────────────────────────────────
+
+function SpendingCategoryList({
+  chartData,
+}: {
+  chartData: InsightsChartDatum[]
+}) {
+  const totalDollars = chartData.reduce((s, d) => s + d.totalDollars, 0)
+  const maxDollars = chartData[0]?.totalDollars ?? 1
+
+  return (
+    <div>
+      {chartData.map((d) => {
+        const barWidth =
+          maxDollars > 0 ? (d.totalDollars / maxDollars) * 100 : 0
+        const pctOfTotal =
+          totalDollars > 0
+            ? Math.round((d.totalDollars / totalDollars) * 100)
+            : 0
+
+        return (
+          <div key={d.category_id} className="mb-3">
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: d.fill,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                className="small fw-medium"
+                style={{ flex: 1, minWidth: 0 }}
+              >
+                {d.name}
+              </span>
+              <span className="small fw-semibold">
+                ${formatDollars(d.totalDollars)}
+              </span>
+              <span
+                className="small text-muted"
+                style={{ minWidth: 32, textAlign: 'right' }}
+              >
+                {pctOfTotal}%
+              </span>
+            </div>
+            <div
+              style={{
+                marginLeft: 18,
+                height: 7,
+                borderRadius: 4,
+                background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+              }}
+            >
+              <div
+                style={{
+                  width: `${barWidth}%`,
+                  height: '100%',
+                  borderRadius: 4,
+                  background: d.fill,
+                  opacity: 0.8,
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── KPI Cell ─────────────────────────────────────────────────────────────────
 
 function KpiCell({
@@ -136,12 +219,20 @@ function KpiCell({
   invert?: boolean
   detail?: string
 }) {
-  return (
+  const tooltipLines =
+    delta && vsPriorLabel ? buildDeltaTooltip(delta, vsPriorLabel, true) : null
+  const isPositive = invert
+    ? delta?.direction === 'down'
+    : delta?.direction === 'up'
+  const deltaColor = isPositive ? 'var(--bs-success)' : 'var(--bs-danger)'
+
+  const cell = (
     <div
       className="rounded p-3 flex-fill"
       style={{
         background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
         minWidth: 120,
+        cursor: tooltipLines ? 'default' : undefined,
       }}
     >
       <div className="small text-muted mb-1">{label}</div>
@@ -151,6 +242,7 @@ function KpiCell({
           delta={delta}
           vsPriorLabel={vsPriorLabel}
           invert={invert}
+          monetary
         />
       )}
       {detail && (
@@ -159,6 +251,26 @@ function KpiCell({
         </div>
       )}
     </div>
+  )
+
+  if (!tooltipLines) return cell
+
+  return (
+    <OverlayTrigger
+      placement="top"
+      container={document.body}
+      overlay={
+        <Tooltip>
+          <div>
+            <span style={{ color: deltaColor }}>{tooltipLines.amount}</span>{' '}
+            {tooltipLines.line1rest}
+          </div>
+          <div style={{ opacity: 0.75 }}>{tooltipLines.line2}</div>
+        </Tooltip>
+      }
+    >
+      {cell}
+    </OverlayTrigger>
   )
 }
 
@@ -200,7 +312,6 @@ export function AnalyticsReports() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const chartPalette = ACCENT_PALETTES[accent].chartPalette
   const categoryColors = getInsightsCategoryColors()
-  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   // --- Data ---
   const comparison = useMemo(
@@ -288,15 +399,6 @@ export function AnalyticsReports() {
       }),
     [categories, categoryColors, chartPalette]
   )
-  const maxDomain = useMemo(
-    () =>
-      Math.max(
-        1,
-        ...chartData.map((d) => d.totalDollars).filter(Number.isFinite)
-      ),
-    [chartData]
-  )
-
   const totalSpent = categories.reduce((s, c) => s + c.total, 0)
   const top3Total = categories.slice(0, 3).reduce((s, c) => s + c.total, 0)
   const top3Pct =
@@ -495,14 +597,7 @@ export function AnalyticsReports() {
               No spending recorded for this period.
             </p>
           ) : (
-            <div style={{ width: '100%', height: isMobile ? 280 : 320 }}>
-              <InsightsBarChart
-                chartData={chartData}
-                maxDomain={maxDomain}
-                isMobile={isMobile}
-                aria-label={`Spending by category for ${periodLabel}`}
-              />
-            </div>
+            <SpendingCategoryList chartData={chartData} />
           )}
         </Card.Body>
       </Card>

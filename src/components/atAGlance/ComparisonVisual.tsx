@@ -1,3 +1,4 @@
+import { OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { formatMoney } from '@/lib/format'
 import type { MonthComparisonData, MonthDelta } from '@/services/insights'
 
@@ -26,7 +27,8 @@ const SENTIMENT_BG: Record<Sentiment, string> = {
   neutral: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
 }
 
-const PREV_BAR = 'rgba(108, 117, 125, 0.28)'
+// Overfill color for income exceeding last month (good)
+const OVERFILL_GOOD = '#0891b2'
 
 function fmtAbs(cents: number) {
   return `$${formatMoney(Math.abs(cents))}`
@@ -85,111 +87,128 @@ function ChangeTile({
   )
 }
 
-// ── Comparison bar row ────────────────────────────────────────────────────────
+// ── Progress bar row ──────────────────────────────────────────────────────────
 
-function BarRow({
+function ProgressBarRow({
   label,
   current,
   previous,
-  maxVal,
-  sentiment,
+  isGoodWhenUnder,
   currentLabel,
   priorLabel,
 }: {
   label: string
   current: number
   previous: number
-  maxVal: number
-  sentiment: Sentiment
+  /** true for Spending (less is better), false for Income (more is better) */
+  isGoodWhenUnder: boolean
   currentLabel: string
   priorLabel: string
 }) {
-  const curPct = maxVal > 0 ? Math.min((current / maxVal) * 100, 100) : 0
-  const prevPct = maxVal > 0 ? Math.min((previous / maxVal) * 100, 100) : 0
-  const barColor = SENTIMENT_COLOR[sentiment]
+  if (previous <= 0) return null
 
-  return (
-    <div className="mb-3">
+  const rawPct = (current / previous) * 100
+  const barWidth = Math.max(Math.min(rawPct, 100), 0)
+  const displayPct = Math.round(rawPct)
+  const isOver = rawPct > 100
+
+  let barColor: string
+  let striped = false
+
+  if (isGoodWhenUnder) {
+    // Spending: under = green, over = red with stripes
+    if (isOver) {
+      barColor = 'var(--bs-danger)'
+      striped = true
+    } else {
+      barColor = 'var(--bs-success)'
+    }
+  } else {
+    // Income: under = red, matched = green, over = teal
+    if (rawPct < 100) barColor = 'var(--bs-danger)'
+    else if (isOver) barColor = OVERFILL_GOOD
+    else barColor = 'var(--bs-success)'
+  }
+
+  const row = (
+    <div className="mb-3" style={{ cursor: 'default' }}>
       <div
-        className="text-muted mb-2"
-        style={{
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
+        className="d-flex justify-content-between align-items-center mb-1"
+        style={{ fontSize: '0.7rem' }}
       >
-        {label}
-      </div>
-      {/* Current month */}
-      <div className="d-flex align-items-center gap-2 mb-1">
         <div
-          style={{
-            flex: 1,
-            height: 11,
-            borderRadius: 6,
-            background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
-          }}
+          className="text-muted fw-semibold"
+          style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
         >
-          <div
-            style={{
-              width: `${curPct}%`,
-              height: '100%',
-              borderRadius: 6,
-              background: barColor,
-              transition: 'width 0.4s ease',
-            }}
-          />
+          {label}
         </div>
         <div
           style={{
-            width: 76,
-            textAlign: 'right',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: 600,
             color: barColor,
           }}
         >
-          {fmtAbs(current)}
-        </div>
-        <div className="text-muted" style={{ width: 64, fontSize: '0.68rem' }}>
-          {currentLabel}
+          {displayPct}%
         </div>
       </div>
-      {/* Previous month */}
-      <div className="d-flex align-items-center gap-2">
+      <div
+        style={{
+          height: 11,
+          borderRadius: 6,
+          background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+          overflow: 'hidden',
+        }}
+      >
         <div
           style={{
-            flex: 1,
-            height: 11,
+            width: `${barWidth}%`,
+            height: '100%',
             borderRadius: 6,
-            background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+            background: barColor,
+            transition: 'width 0.4s ease',
+            ...(striped && {
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)',
+              backgroundSize: '1rem 1rem',
+              animation: 'progress-bar-stripes 1s linear infinite',
+            }),
           }}
-        >
-          <div
-            style={{
-              width: `${prevPct}%`,
-              height: '100%',
-              borderRadius: 6,
-              background: PREV_BAR,
-            }}
-          />
-        </div>
-        <div
-          className="text-muted"
-          style={{
-            width: 76,
-            textAlign: 'right',
-            fontSize: '0.8rem',
-          }}
-        >
-          {fmtAbs(previous)}
-        </div>
-        <div className="text-muted" style={{ width: 64, fontSize: '0.68rem' }}>
-          {priorLabel}
-        </div>
+        />
       </div>
     </div>
+  )
+
+  // Color each tooltip value: the better one is green, the worse one is red.
+  // For income (isGoodWhenUnder=false): higher = better.
+  // For spending (isGoodWhenUnder=true): lower = better.
+  const currentIsBetter = isGoodWhenUnder
+    ? current < previous
+    : current > previous
+  const currentTooltipColor = currentIsBetter
+    ? 'var(--bs-success)'
+    : 'var(--bs-danger)'
+  const previousTooltipColor = currentIsBetter
+    ? 'var(--bs-danger)'
+    : 'var(--bs-success)'
+
+  return (
+    <OverlayTrigger
+      placement="top"
+      container={document.body}
+      overlay={
+        <Tooltip>
+          <div style={{ fontWeight: 600, color: currentTooltipColor }}>
+            {currentLabel}: {fmtAbs(current)}
+          </div>
+          <div style={{ fontWeight: 600, color: previousTooltipColor }}>
+            {priorLabel}: {fmtAbs(previous)}
+          </div>
+        </Tooltip>
+      }
+    >
+      {row}
+    </OverlayTrigger>
   )
 }
 
@@ -206,25 +225,11 @@ export function ComparisonVisual({
 }) {
   const { moneyIn, moneyOut, netDelta, biggestCategoryMover } = comparison
 
-  const maxVal = Math.max(
-    moneyIn.current,
-    moneyIn.previous,
-    moneyOut.current,
-    moneyOut.previous,
-    1
-  )
-
   const incomeChangePct =
     moneyIn.previous > 0
       ? (Math.abs(moneyIn.delta) / Math.abs(moneyIn.previous)) * 100
       : 0
   const showIncomeTile = incomeChangePct >= 5 && Math.abs(moneyIn.delta) >= 500
-
-  const netCurrent = moneyIn.current - moneyOut.current
-  const netPrevious = moneyIn.previous - moneyOut.previous
-
-  const incomeSentiment = getSentiment(moneyIn.direction, false)
-  const spendingSentiment = getSentiment(moneyOut.direction, true)
 
   const showNetTile = netDelta.direction !== 'flat'
   const showCategoryTile =
@@ -235,7 +240,7 @@ export function ComparisonVisual({
 
   return (
     <div className="mt-3 pt-2 border-top">
-      {/* Part 1: Delta tiles */}
+      {/* Delta tiles */}
       {hasTiles ? (
         <div className="d-flex gap-2 flex-wrap mb-4">
           {showNetTile && (
@@ -273,60 +278,23 @@ export function ComparisonVisual({
         </div>
       )}
 
-      {/* Part 2: Comparison bars */}
-      <BarRow
+      {/* Progress bars — hover for exact values */}
+      <ProgressBarRow
         label="Income"
         current={moneyIn.current}
         previous={moneyIn.previous}
-        maxVal={maxVal}
-        sentiment={incomeSentiment}
+        isGoodWhenUnder={false}
         currentLabel={currentLabel}
         priorLabel={priorLabel}
       />
-      <BarRow
+      <ProgressBarRow
         label="Spending"
         current={moneyOut.current}
         previous={moneyOut.previous}
-        maxVal={maxVal}
-        sentiment={spendingSentiment}
+        isGoodWhenUnder={true}
         currentLabel={currentLabel}
         priorLabel={priorLabel}
       />
-
-      {/* Net summary row */}
-      <div
-        className="d-flex align-items-center gap-2 pt-2 border-top"
-        style={{ fontSize: '0.8rem' }}
-      >
-        <div
-          className="text-muted"
-          style={{
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            width: 64,
-          }}
-        >
-          Net
-        </div>
-        <div
-          className="fw-semibold"
-          style={{
-            color:
-              netCurrent >= 0
-                ? 'var(--bs-success, #1bcfb4)'
-                : 'var(--bs-danger, #fc424a)',
-          }}
-        >
-          {netCurrent >= 0 ? '+' : '−'}
-          {fmtAbs(netCurrent)}
-        </div>
-        <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-          vs {netPrevious >= 0 ? '+' : '−'}
-          {fmtAbs(netPrevious)} in {priorLabel}
-        </div>
-      </div>
     </div>
   )
 }

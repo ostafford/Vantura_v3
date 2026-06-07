@@ -1,5 +1,32 @@
 export type AccentId = 'purple' | 'blue' | 'teal' | 'green' | 'amber' | 'rose'
 
+export const CUSTOM_ACCENT_KEY = 'custom_accent_hex'
+
+function adjustHex(hex: string, amount: number): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!result) return hex
+  const clamp = (v: number) => Math.min(255, Math.max(0, v))
+  const r = clamp(parseInt(result[1], 16) + amount)
+  const g = clamp(parseInt(result[2], 16) + amount)
+  const b = clamp(parseInt(result[3], 16) + amount)
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+/** Apply a custom hex as the accent, overriding the data-accent CSS rules. */
+export function applyCustomAccentHex(hex: string): void {
+  document.documentElement.style.setProperty('--vantura-primary', hex)
+  document.documentElement.style.setProperty(
+    '--vantura-primary-gradient',
+    `linear-gradient(to right, ${adjustHex(hex, 40)}, ${adjustHex(hex, -30)})`
+  )
+}
+
+/** Remove custom accent overrides, letting the data-accent CSS rules take over. */
+export function clearCustomAccentHex(): void {
+  document.documentElement.style.removeProperty('--vantura-primary')
+  document.documentElement.style.removeProperty('--vantura-primary-gradient')
+}
+
 export const ACCENT_PALETTES: Record<
   AccentId,
   {

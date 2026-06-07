@@ -24,6 +24,7 @@
  */
 
 import { getDb } from '@/db'
+import { formatMoney } from '@/lib/format'
 import {
   buildMonthSpendingSeries,
   type MonthSpendingSeries,
@@ -544,10 +545,7 @@ function makeDelta(current: number, previous: number): MonthDelta {
 }
 
 function fmtCentsDelta(cents: number): string {
-  const abs = Math.abs(cents)
-  const dollars = Math.floor(abs / 100)
-  const remainder = abs % 100
-  return `${dollars}.${String(remainder).padStart(2, '0')}`
+  return formatMoney(Math.abs(cents))
 }
 
 function fmtPct(delta: number, base: number): string {
