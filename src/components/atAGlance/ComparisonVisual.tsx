@@ -27,9 +27,6 @@ const SENTIMENT_BG: Record<Sentiment, string> = {
   neutral: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
 }
 
-// Overfill color for income exceeding last month (good)
-const OVERFILL_GOOD = '#0891b2'
-
 function fmtAbs(cents: number) {
   return `$${formatMoney(Math.abs(cents))}`
 }
@@ -124,47 +121,38 @@ function ProgressBarRow({
       barColor = 'var(--bs-success)'
     }
   } else {
-    // Income: under = red, matched = green, over = teal
+    // Income: under = red, matched/over = green (over gets stripes)
     if (rawPct < 100) barColor = 'var(--bs-danger)'
-    else if (isOver) barColor = OVERFILL_GOOD
-    else barColor = 'var(--bs-success)'
+    else {
+      barColor = 'var(--bs-success)'
+      if (isOver) striped = true
+    }
   }
 
   const row = (
     <div className="mb-3" style={{ cursor: 'default' }}>
-      <div
-        className="d-flex justify-content-between align-items-center mb-1"
-        style={{ fontSize: '0.7rem' }}
-      >
+      <div className="mb-1" style={{ fontSize: '0.7rem' }}>
         <div
           className="text-muted fw-semibold"
           style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
         >
           {label}
         </div>
-        <div
-          style={{
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            color: barColor,
-          }}
-        >
-          {displayPct}%
-        </div>
       </div>
       <div
         style={{
-          height: 11,
-          borderRadius: 6,
+          height: 14,
+          borderRadius: 4,
           background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
         <div
           style={{
             width: `${barWidth}%`,
             height: '100%',
-            borderRadius: 6,
+            borderRadius: 4,
             background: barColor,
             transition: 'width 0.4s ease',
             ...(striped && {
@@ -175,6 +163,22 @@ function ProgressBarRow({
             }),
           }}
         />
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: 'white',
+            textShadow: '0 0 4px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
+          }}
+        >
+          {displayPct}%
+        </span>
       </div>
     </div>
   )
