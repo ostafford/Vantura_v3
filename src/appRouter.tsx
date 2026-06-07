@@ -110,6 +110,7 @@ export const appRouter = createBrowserRouter(
                 breadcrumbLabel: 'Reports',
                 pageTitle: 'Reports',
                 pageTitleIcon: 'mdi-file-chart',
+                noLayoutHeader: true,
               } satisfies AppRouteHandle,
             },
             {

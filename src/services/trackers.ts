@@ -688,6 +688,95 @@ export function getTrackerPeriodHistory(
   return result
 }
 
+// ─── Period slice breakdown ──────────────────────────────────────────────────
+
+export interface TrackerPeriodSlice {
+  periodStart: string // inclusive, clipped to the requested range
+  periodEnd: string // exclusive, clipped to the requested range
+  label: string // e.g. "May 5–11"
+  isPartial: boolean // true if the period was clipped at either end
+  spent: number // cents
+  budget: number // cents (full per-period budget, unprorated)
+  progress: number // spent / budget × 100
+}
+
+function formatPeriodSliceLabel(
+  fromInclusive: string,
+  toExclusive: string
+): string {
+  const start = new Date(fromInclusive + 'T12:00:00Z')
+  const end = new Date(toExclusive + 'T12:00:00Z')
+  end.setUTCDate(end.getUTCDate() - 1) // convert to inclusive display end
+  const startDay = start.getUTCDate()
+  const endDay = end.getUTCDate()
+  const startMonth = start.toLocaleString('default', {
+    month: 'short',
+    timeZone: 'UTC',
+  })
+  const endMonth = end.toLocaleString('default', {
+    month: 'short',
+    timeZone: 'UTC',
+  })
+  if (startMonth === endMonth) return `${startMonth} ${startDay}–${endDay}`
+  return `${startMonth} ${startDay} – ${endMonth} ${endDay}`
+}
+
+/**
+ * All reset periods for a tracker that overlap with [rangeFrom, rangeExclusiveEnd),
+ * clipped to that range. Use for per-period breakdowns in historical reports
+ * (e.g. showing each week of a given month for a WEEKLY tracker).
+ */
+export function getTrackerPeriodsInRange(
+  tracker: TrackerRow,
+  rangeFrom: string,
+  rangeExclusiveEnd: string
+): TrackerPeriodSlice[] {
+  const results: TrackerPeriodSlice[] = []
+  let offset = 0
+  let iterations = 0
+
+  while (iterations < 200) {
+    iterations++
+    const bounds = getPeriodBoundsForOffset(tracker, offset)
+    if (!bounds) break
+
+    const { periodStart, periodEnd } = bounds
+
+    // Period ends before our range — done walking back
+    if (periodEnd <= rangeFrom) break
+
+    // Period hasn't entered our range yet — keep going back
+    if (periodStart >= rangeExclusiveEnd) {
+      offset--
+      continue
+    }
+
+    // Overlaps — clip to range
+    const clippedStart = periodStart < rangeFrom ? rangeFrom : periodStart
+    const clippedEnd =
+      periodEnd > rangeExclusiveEnd ? rangeExclusiveEnd : periodEnd
+    const isPartial = clippedStart !== periodStart || clippedEnd !== periodEnd
+
+    const spent = getTrackerSpentInPeriod(tracker.id, clippedStart, clippedEnd)
+    const budget = tracker.budget_amount
+    const progress = budget > 0 ? (spent / budget) * 100 : 0
+    const label = formatPeriodSliceLabel(clippedStart, clippedEnd)
+
+    results.push({
+      periodStart: clippedStart,
+      periodEnd: clippedEnd,
+      label,
+      isPartial,
+      spent,
+      budget,
+      progress,
+    })
+    offset--
+  }
+
+  return results.reverse() // chronological order
+}
+
 /**
  * Transaction timeline for analytics: all spending transactions for a tracker
  * from first to current, for cumulative chart. Optionally filter by date range.

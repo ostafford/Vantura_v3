@@ -7,4 +7,5 @@ export type AppRouteHandle = {
   pageTitleIcon?: string
   breadcrumbBefore?: { label: string; to: string }
   useTrackerName?: boolean
+  noLayoutHeader?: boolean
 }

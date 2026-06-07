@@ -1,11 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Card,
   Row,
   Col,
   Form,
   Button,
-  ProgressBar,
   OverlayTrigger,
   Tooltip,
 } from 'react-bootstrap'
@@ -18,6 +17,8 @@ import {
 import {
   getTrackersWithProgress,
   getTrackerSpentInPeriod,
+  getTrackerPeriodsInRange,
+  type TrackerPeriodSlice,
 } from '@/services/trackers'
 import {
   getUpcomingChargesForMonth,
@@ -36,6 +37,7 @@ import {
   buildDeltaTooltip,
 } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
+import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { formatMoney, formatDollars } from '@/lib/format'
 import {
   monthNameLong,
@@ -81,14 +83,68 @@ function nextCalendarMonth(
   return { year, month: month + 1 }
 }
 
-function trackerProgressStyle(progress: number) {
-  if (progress >= 100)
-    return { variant: 'danger' as const, striped: true, animated: true }
-  if (progress >= 81)
-    return { variant: 'danger' as const, striped: false, animated: false }
-  if (progress > 50)
-    return { variant: 'warning' as const, striped: false, animated: false }
-  return { variant: 'success' as const, striped: false, animated: false }
+function trackerBarColor(progress: number): string {
+  if (progress >= 100) return 'var(--bs-danger)'
+  if (progress >= 81) return 'var(--bs-danger)'
+  if (progress > 50) return 'var(--bs-warning)'
+  return 'var(--bs-success)'
+}
+
+function TrackerProgressBar({
+  progress,
+  label,
+}: {
+  progress: number
+  label?: string
+}) {
+  const isOver = progress >= 100
+  const barWidth = Math.min(100, progress)
+  const color = trackerBarColor(progress)
+  return (
+    <div
+      style={{
+        height: 14,
+        borderRadius: 4,
+        background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          width: `${barWidth}%`,
+          height: '100%',
+          borderRadius: 4,
+          background: color,
+          transition: 'width 0.3s ease',
+          ...(isOver && {
+            backgroundImage:
+              'repeating-linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)',
+            backgroundSize: '1rem 1rem',
+            animation: 'progress-bar-stripes 1s linear infinite',
+          }),
+        }}
+      />
+      {label && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: 'white',
+            textShadow: '0 0 4px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
+          }}
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  )
 }
 
 type ChargeGroup = {
@@ -119,6 +175,25 @@ function groupUpcomingCharges(charges: UpcomingChargeRow[]): ChargeGroup[] {
   return Array.from(map.values()).sort((a, b) => b.total - a.total)
 }
 
+function formatFrequency(freq: string): string {
+  switch (freq.toUpperCase()) {
+    case 'WEEKLY':
+      return 'Weekly'
+    case 'FORTNIGHTLY':
+      return 'Fortnightly'
+    case 'MONTHLY':
+      return 'Monthly'
+    case 'QUARTERLY':
+      return 'Quarterly'
+    case 'YEARLY':
+      return 'Yearly'
+    case 'ONCE':
+      return 'One-time'
+    default:
+      return freq.charAt(0).toUpperCase() + freq.slice(1).toLowerCase()
+  }
+}
+
 function makeDelta(current: number, previous: number): MonthDelta {
   const delta = current - previous
   const direction: MonthDelta['direction'] =
@@ -128,17 +203,24 @@ function makeDelta(current: number, previous: number): MonthDelta {
 
 // ─── Spending Category List ───────────────────────────────────────────────────
 
+const SPENDING_LIST_DEFAULT_VISIBLE = 8
+
 function SpendingCategoryList({
   chartData,
 }: {
   chartData: InsightsChartDatum[]
 }) {
+  const [showAll, setShowAll] = useState(false)
   const totalDollars = chartData.reduce((s, d) => s + d.totalDollars, 0)
   const maxDollars = chartData[0]?.totalDollars ?? 1
+  const visible = showAll
+    ? chartData
+    : chartData.slice(0, SPENDING_LIST_DEFAULT_VISIBLE)
+  const hiddenCount = chartData.length - SPENDING_LIST_DEFAULT_VISIBLE
 
   return (
     <div>
-      {chartData.map((d) => {
+      {visible.map((d) => {
         const barWidth =
           maxDollars > 0 ? (d.totalDollars / maxDollars) * 100 : 0
         const pctOfTotal =
@@ -196,6 +278,30 @@ function SpendingCategoryList({
           </div>
         )
       })}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '0.25rem 0',
+            cursor: 'pointer',
+            fontSize: '0.8rem',
+            color: 'var(--bs-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            marginTop: '0.25rem',
+          }}
+        >
+          <i
+            className={`mdi ${showAll ? 'mdi-chevron-up' : 'mdi-chevron-down'}`}
+            aria-hidden
+          />
+          {showAll ? 'Show less' : `Show ${hiddenCount} more`}
+        </button>
+      )}
     </div>
   )
 }
@@ -288,6 +394,9 @@ export function AnalyticsReports() {
   const [dateFrom, setDateFrom] = useState(() => getDefaultDateRange().from)
   const [dateTo, setDateTo] = useState(() => getDefaultDateRange().to)
 
+  // --- Tracker frequency filter ---
+  const [trackerFreqFilter, setTrackerFreqFilter] = useState('MONTHLY')
+
   // --- Derived period ---
   const { from, to } = useMemo(
     () =>
@@ -370,6 +479,37 @@ export function AnalyticsReports() {
     [upcomingCharges]
   )
 
+  const [chargeFreqFilter, setChargeFreqFilter] = useState('MONTHLY')
+
+  const availableChargeFrequencies = useMemo(() => {
+    const seen = new Set(chargeGroups.map((g) => g.frequency.toUpperCase()))
+    return [
+      'WEEKLY',
+      'FORTNIGHTLY',
+      'MONTHLY',
+      'QUARTERLY',
+      'YEARLY',
+      'ONCE',
+    ].filter((f) => seen.has(f))
+  }, [chargeGroups])
+
+  useEffect(() => {
+    if (availableChargeFrequencies.length === 0) return
+    if (
+      !chargeFreqFilter ||
+      !availableChargeFrequencies.includes(chargeFreqFilter)
+    ) {
+      const preferred = availableChargeFrequencies.includes('MONTHLY')
+        ? 'MONTHLY'
+        : availableChargeFrequencies[0]
+      setChargeFreqFilter(preferred)
+    }
+  }, [availableChargeFrequencies])
+
+  const filteredChargeGroups = chargeFreqFilter
+    ? chargeGroups.filter((g) => g.frequency.toUpperCase() === chargeFreqFilter)
+    : chargeGroups
+
   // --- Derived stats ---
   const moneyIn = comparison
     ? comparison.moneyIn.current
@@ -425,9 +565,63 @@ export function AnalyticsReports() {
     .map((c) => c.category_name)
     .join(', ')
 
-  const trackersWithinBudget = trackerSpend.filter(
+  const availableFrequencies = useMemo(() => {
+    const seen = new Set(trackers.map((t) => t.reset_frequency.toUpperCase()))
+    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'].filter((f) => seen.has(f))
+  }, [trackers])
+
+  useEffect(() => {
+    if (availableFrequencies.length === 0) return
+    if (
+      !trackerFreqFilter ||
+      !availableFrequencies.includes(trackerFreqFilter)
+    ) {
+      const preferred = availableFrequencies.includes('MONTHLY')
+        ? 'MONTHLY'
+        : availableFrequencies[0]
+      setTrackerFreqFilter(preferred)
+    }
+  }, [availableFrequencies])
+
+  const filteredTrackerSpend = trackerFreqFilter
+    ? trackerSpend.filter(
+        (r) =>
+          r.tracker.reset_frequency.toUpperCase() ===
+          trackerFreqFilter.toUpperCase()
+      )
+    : trackerSpend
+
+  const trackersWithinBudget = filteredTrackerSpend.filter(
     ({ tracker, spent }) => spent <= tracker.budget_amount
   ).length
+
+  // Per-period breakdowns for sub-monthly trackers (WEEKLY, FORTNIGHTLY).
+  // Only computed for calendar month views, not custom date ranges.
+  const trackerPeriodBreakdowns = useMemo((): Record<
+    number,
+    TrackerPeriodSlice[]
+  > => {
+    if (isCustomRange) return {}
+    const result: Record<number, TrackerPeriodSlice[]> = {}
+    for (const { tracker } of filteredTrackerSpend) {
+      const freq = tracker.reset_frequency.toUpperCase()
+      if (freq === 'WEEKLY' || freq === 'FORTNIGHTLY') {
+        result[tracker.id] = getTrackerPeriodsInRange(
+          tracker,
+          from,
+          exclusiveEnd
+        )
+      }
+    }
+    return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filteredTrackerSpend,
+    from,
+    exclusiveEnd,
+    isCustomRange,
+    lastSyncCompletedAt,
+  ])
 
   const committedPct =
     moneyIn > 0 ? Math.round((committedTotal / moneyIn) * 100) : 0
@@ -452,74 +646,99 @@ export function AnalyticsReports() {
 
   return (
     <div className="grid-margin">
-      {/* ─── Period Selector ─────────────────────────────────────────────── */}
-      <Card className="grid-margin">
-        <Card.Body className="py-2">
-          <div className="d-flex flex-wrap align-items-center gap-3 justify-content-between">
-            {!isCustomRange ? (
-              <div className="d-flex align-items-center gap-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={goToPrevMonth}
-                  aria-label="Previous month"
-                >
-                  <i className="mdi mdi-chevron-left" aria-hidden />
-                </Button>
-                <span
-                  className="fw-medium"
-                  style={{ minWidth: 140, textAlign: 'center' }}
-                >
-                  {monthNameLong(year, month)} {year}
-                </span>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={goToNextMonth}
-                  disabled={!canGoForward}
-                  aria-label="Next month"
-                >
-                  <i className="mdi mdi-chevron-right" aria-hidden />
-                </Button>
-              </div>
-            ) : (
-              <Row className="g-2 align-items-end flex-grow-1">
-                <Col xs={12} sm="auto">
-                  <Form.Group>
-                    <Form.Label className="small mb-1">From</Form.Label>
-                    <Form.Control
-                      type="date"
-                      size="sm"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      aria-label="Report start date"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col xs={12} sm="auto">
-                  <Form.Group>
-                    <Form.Label className="small mb-1">To</Form.Label>
-                    <Form.Control
-                      type="date"
-                      size="sm"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      aria-label="Report end date"
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-            )}
-            <Button
-              variant={isCustomRange ? 'primary' : 'outline-primary'}
-              size="sm"
-              onClick={() => setIsCustomRange((v) => !v)}
-            >
-              {isCustomRange ? 'Monthly view' : 'Custom range'}
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
+      {/* ─── Combined sticky toolbar: title + breadcrumb + period controls ── */}
+      <div className="sticky-toolbar">
+        <div
+          className="page-header"
+          style={{ margin: 0, paddingBottom: '0.5rem' }}
+        >
+          <h3 className="page-title">
+            <span className="page-title-icon bg-gradient-primary text-white mr-2">
+              <i className="mdi mdi-file-chart" aria-hidden />
+            </span>
+            Reports
+          </h3>
+          <PageBreadcrumb
+            items={[
+              { label: 'Dashboard', to: '/' },
+              { label: 'Analytics', to: '/analytics' },
+              { label: 'Reports' },
+            ]}
+          />
+        </div>
+        <div className="d-flex flex-wrap align-items-center gap-3 justify-content-center">
+          {!isCustomRange ? (
+            <div className="d-flex align-items-center gap-1">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={goToPrevMonth}
+                aria-label="Previous month"
+              >
+                <i className="mdi mdi-chevron-left" aria-hidden />
+              </Button>
+              <span
+                className="fw-medium"
+                style={{ minWidth: 140, textAlign: 'center' }}
+              >
+                {monthNameLong(year, month)} {year}
+              </span>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={goToNextMonth}
+                disabled={!canGoForward}
+                aria-label="Next month"
+              >
+                <i className="mdi mdi-chevron-right" aria-hidden />
+              </Button>
+            </div>
+          ) : (
+            <Row className="g-2 align-items-end">
+              <Col xs={12} sm="auto">
+                <Form.Group>
+                  <Form.Label className="small mb-1">From</Form.Label>
+                  <Form.Control
+                    type="date"
+                    size="sm"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    aria-label="Report start date"
+                  />
+                </Form.Group>
+              </Col>
+              <Col xs={12} sm="auto">
+                <Form.Group>
+                  <Form.Label className="small mb-1">To</Form.Label>
+                  <Form.Control
+                    type="date"
+                    size="sm"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    aria-label="Report end date"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          )}
+          <Button
+            variant={isCustomRange ? 'primary' : 'outline-primary'}
+            size="sm"
+            onClick={() => setIsCustomRange((v) => !v)}
+            aria-label={
+              isCustomRange
+                ? 'Switch to monthly view'
+                : 'Switch to custom range'
+            }
+            title={isCustomRange ? 'Monthly view' : 'Custom range'}
+          >
+            <i
+              className={`mdi ${isCustomRange ? 'mdi-calendar-month' : 'mdi-calendar-range'}`}
+              aria-hidden
+            />
+          </Button>
+        </div>
+      </div>
 
       {/* ─── Block 1: Financial Snapshot ──────────────────────────────────── */}
       <Card className="grid-margin">
@@ -563,7 +782,7 @@ export function AnalyticsReports() {
             />
             {!isCustomRange && chargeGroups.length > 0 && (
               <KpiCell
-                label="Committed"
+                label="Upcoming"
                 value={`$${formatMoney(committedTotal)}`}
                 valueClass="text-warning"
                 detail={
@@ -623,25 +842,45 @@ export function AnalyticsReports() {
       {trackerSpend.length > 0 && (
         <Card className="grid-margin">
           <Card.Header>
-            <Card.Title className="mb-0">
-              Tracker Performance — {periodLabel}
-            </Card.Title>
-            <Card.Text as="div" className="small text-muted mt-1">
-              {!isCustomRange &&
-                `${trackersWithinBudget} of ${trackerSpend.length} within budget.`}
-              {prevMonthBounds && ` Compared to ${prevMonthBounds.label}.`}
-            </Card.Text>
+            <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
+              <div>
+                <Card.Title className="mb-0">
+                  Tracker Performance — {periodLabel}
+                </Card.Title>
+                <Card.Text as="div" className="small text-muted mt-1">
+                  {!isCustomRange &&
+                    `${trackersWithinBudget} of ${filteredTrackerSpend.length} within budget.`}
+                  {prevMonthBounds && ` Compared to ${prevMonthBounds.label}.`}
+                </Card.Text>
+              </div>
+              <Form.Select
+                size="sm"
+                value={trackerFreqFilter}
+                onChange={(e) => setTrackerFreqFilter(e.target.value)}
+                aria-label="Filter by frequency"
+                style={{ width: 'auto', minWidth: 150 }}
+              >
+                {availableFrequencies.length > 1 && (
+                  <option value="">All frequencies</option>
+                )}
+                {availableFrequencies.map((f) => (
+                  <option key={f} value={f}>
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </Form.Select>
+            </div>
           </Card.Header>
           <Card.Body>
-            {trackerSpend.length > 4 ? (
+            {filteredTrackerSpend.length === 0 ? (
+              <p className="text-muted mb-0 small">
+                No trackers match the selected frequency.
+              </p>
+            ) : filteredTrackerSpend.length > 4 ? (
+              /* ── List view (compact, >4 trackers) ── */
               <ul className="list-group list-group-flush">
-                {trackerSpend.map(({ tracker, spent, prevSpent }) => {
-                  const progress =
-                    tracker.budget_amount > 0
-                      ? (spent / tracker.budget_amount) * 100
-                      : 0
-                  const style = trackerProgressStyle(progress)
-                  const overBudget = spent > tracker.budget_amount
+                {filteredTrackerSpend.map(({ tracker, spent, prevSpent }) => {
+                  const budget = tracker.budget_amount
                   const spendDelta =
                     prevSpent !== null ? spent - prevSpent : null
                   const hasDelta =
@@ -651,6 +890,83 @@ export function AnalyticsReports() {
                       ? 'var(--bs-danger)'
                       : 'var(--bs-success)'
                     : undefined
+                  const periods = trackerPeriodBreakdowns[tracker.id]
+
+                  if (periods) {
+                    // Weekly / fortnightly — show each period as a sub-row
+                    const hasPartial = periods.some((p) => p.isPartial)
+                    return (
+                      <li
+                        key={tracker.id}
+                        className="list-group-item px-0 py-2"
+                      >
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <span className="fw-medium small">
+                            {tracker.name}
+                          </span>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="small text-muted">
+                              ${formatMoney(spent)} total
+                            </span>
+                            {hasDelta && spendDelta !== null && (
+                              <span
+                                className="small fw-medium"
+                                style={{ color: deltaColor }}
+                              >
+                                {spendDelta > 0 ? '↑' : '↓'} $
+                                {formatMoney(Math.abs(spendDelta))} vs{' '}
+                                {prevMonthBounds?.label}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {periods.map((p) => (
+                          <div
+                            key={p.periodStart}
+                            className="mb-2"
+                            style={{ paddingLeft: 8 }}
+                          >
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span
+                                className="text-muted"
+                                style={{ fontSize: '0.75rem' }}
+                              >
+                                {p.label}
+                                {p.isPartial && ' *'}
+                              </span>
+                              <span style={{ fontSize: '0.75rem' }}>
+                                <span
+                                  style={{ color: trackerBarColor(p.progress) }}
+                                >
+                                  ${formatMoney(p.spent)}
+                                </span>
+                                <span className="text-muted">
+                                  {' '}
+                                  / ${formatMoney(p.budget)}
+                                </span>
+                              </span>
+                            </div>
+                            <TrackerProgressBar
+                              progress={p.progress}
+                              label={`${Math.round(p.progress)}%`}
+                            />
+                          </div>
+                        ))}
+                        {hasPartial && (
+                          <div
+                            className="text-muted"
+                            style={{ fontSize: '0.7rem', paddingLeft: 8 }}
+                          >
+                            * Partial week — spans into adjacent month
+                          </div>
+                        )}
+                      </li>
+                    )
+                  }
+
+                  // Monthly — single bar
+                  const progress = budget > 0 ? (spent / budget) * 100 : 0
+                  const overBudget = spent > budget
                   return (
                     <OverlayTrigger
                       key={tracker.id}
@@ -668,7 +984,7 @@ export function AnalyticsReports() {
                             >
                               ${formatMoney(spent)}
                             </span>{' '}
-                            spent · ${formatMoney(tracker.budget_amount)} budget
+                            spent · ${formatMoney(budget)} budget
                           </div>
                           {prevSpent !== null && prevMonthBounds && (
                             <div style={{ opacity: 0.75 }}>
@@ -693,11 +1009,16 @@ export function AnalyticsReports() {
                             {tracker.name}
                           </span>
                           <div className="d-flex align-items-center gap-2">
-                            <span
-                              className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
-                            >
-                              ${formatMoney(spent)} / $
-                              {formatMoney(tracker.budget_amount)}
+                            <span className="small">
+                              <span
+                                style={{ color: trackerBarColor(progress) }}
+                              >
+                                ${formatMoney(spent)}
+                              </span>
+                              <span className="text-muted">
+                                {' '}
+                                / ${formatMoney(budget)}
+                              </span>
                             </span>
                             {hasDelta && spendDelta !== null && (
                               <span
@@ -710,12 +1031,9 @@ export function AnalyticsReports() {
                             )}
                           </div>
                         </div>
-                        <ProgressBar
-                          now={Math.min(100, progress)}
-                          variant={style.variant}
-                          striped={style.striped}
-                          animated={style.animated}
-                          style={{ height: 6 }}
+                        <TrackerProgressBar
+                          progress={progress}
+                          label={`${Math.round(progress)}%`}
                         />
                       </li>
                     </OverlayTrigger>
@@ -723,14 +1041,10 @@ export function AnalyticsReports() {
                 })}
               </ul>
             ) : (
+              /* ── Card view (detailed, ≤4 trackers) ── */
               <Row className="g-3">
-                {trackerSpend.map(({ tracker, spent, prevSpent }) => {
-                  const progress =
-                    tracker.budget_amount > 0
-                      ? (spent / tracker.budget_amount) * 100
-                      : 0
-                  const style = trackerProgressStyle(progress)
-                  const overBudget = spent > tracker.budget_amount
+                {filteredTrackerSpend.map(({ tracker, spent, prevSpent }) => {
+                  const budget = tracker.budget_amount
                   const spendDelta =
                     prevSpent !== null ? spent - prevSpent : null
                   const hasDelta =
@@ -740,6 +1054,79 @@ export function AnalyticsReports() {
                       ? 'var(--bs-danger)'
                       : 'var(--bs-success)'
                     : undefined
+                  const periods = trackerPeriodBreakdowns[tracker.id]
+
+                  if (periods) {
+                    // Weekly / fortnightly card — per-period breakdown
+                    const hasPartial = periods.some((p) => p.isPartial)
+                    return (
+                      <Col key={tracker.id} xs={12} md={6}>
+                        <div className="border rounded p-3">
+                          <div className="d-flex justify-content-between align-items-start mb-1">
+                            <span className="fw-medium">{tracker.name}</span>
+                            <span
+                              className="badge bg-secondary"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              {tracker.reset_frequency}
+                            </span>
+                          </div>
+                          <div className="small text-muted mb-3">
+                            ${formatMoney(spent)} total
+                            {hasDelta && spendDelta !== null && (
+                              <span
+                                className="ms-2 fw-medium"
+                                style={{ color: deltaColor }}
+                              >
+                                {spendDelta > 0 ? '↑' : '↓'} $
+                                {formatMoney(Math.abs(spendDelta))} vs{' '}
+                                {prevMonthBounds?.label}
+                              </span>
+                            )}
+                          </div>
+                          {periods.map((p) => (
+                            <div key={p.periodStart} className="mb-3">
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="small text-muted">
+                                  {p.label}
+                                  {p.isPartial && ' *'}
+                                </span>
+                                <span className="small">
+                                  <span
+                                    style={{
+                                      color: trackerBarColor(p.progress),
+                                    }}
+                                  >
+                                    ${formatMoney(p.spent)}
+                                  </span>
+                                  <span className="text-muted">
+                                    {' '}
+                                    / ${formatMoney(p.budget)}
+                                  </span>
+                                </span>
+                              </div>
+                              <TrackerProgressBar
+                                progress={p.progress}
+                                label={`${Math.round(p.progress)}%`}
+                              />
+                            </div>
+                          ))}
+                          {hasPartial && (
+                            <div
+                              className="text-muted mt-1"
+                              style={{ fontSize: '0.7rem' }}
+                            >
+                              * Partial week — spans into adjacent month
+                            </div>
+                          )}
+                        </div>
+                      </Col>
+                    )
+                  }
+
+                  // Monthly card — single bar
+                  const progress = budget > 0 ? (spent / budget) * 100 : 0
+                  const overBudget = spent > budget
                   return (
                     <Col key={tracker.id} xs={12} md={6}>
                       <OverlayTrigger
@@ -757,8 +1144,7 @@ export function AnalyticsReports() {
                               >
                                 ${formatMoney(spent)}
                               </span>{' '}
-                              spent · ${formatMoney(tracker.budget_amount)}{' '}
-                              budget
+                              spent · ${formatMoney(budget)} budget
                             </div>
                             {prevSpent !== null && prevMonthBounds && (
                               <div style={{ opacity: 0.75 }}>
@@ -787,25 +1173,26 @@ export function AnalyticsReports() {
                               {tracker.reset_frequency}
                             </span>
                           </div>
-                          <ProgressBar
-                            now={Math.min(100, progress)}
-                            variant={style.variant}
-                            striped={style.striped}
-                            animated={style.animated}
+                          <TrackerProgressBar
+                            progress={progress}
                             label={`${Math.round(progress)}%`}
-                            className="mb-2"
                           />
-                          <div
-                            className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
-                          >
-                            ${formatMoney(spent)} spent · $
-                            {formatMoney(tracker.budget_amount)} budget
-                            {overBudget && (
-                              <span className="ms-1 fw-medium">
-                                (${formatMoney(spent - tracker.budget_amount)}{' '}
-                                over)
-                              </span>
-                            )}
+                          <div className="small mt-2">
+                            <span style={{ color: trackerBarColor(progress) }}>
+                              ${formatMoney(spent)} spent
+                            </span>
+                            <span className="text-muted">
+                              {' '}
+                              · ${formatMoney(budget)} budget
+                              {overBudget && (
+                                <span
+                                  className="ms-1 fw-medium"
+                                  style={{ color: trackerBarColor(progress) }}
+                                >
+                                  (${formatMoney(spent - budget)} over)
+                                </span>
+                              )}
+                            </span>
                           </div>
                           {hasDelta && spendDelta !== null && (
                             <div
@@ -829,42 +1216,107 @@ export function AnalyticsReports() {
         </Card>
       )}
 
-      {/* ─── Block 4: Committed Charges ───────────────────────────────────── */}
+      {/* ─── Block 4: Upcoming Charges ────────────────────────────────────── */}
       {!isCustomRange && chargeGroups.length > 0 && (
         <Card className="grid-margin">
           <Card.Header>
-            <Card.Title className="mb-0">
-              Committed Charges — {monthNameLong(year, month)} {year}
-            </Card.Title>
-            <Card.Text as="div" className="small text-muted mt-1">
-              Recurring and scheduled charges for this month.
-            </Card.Text>
+            <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
+              <div>
+                <Card.Title className="mb-0">
+                  Upcoming Charges — {monthNameLong(year, month)} {year}
+                </Card.Title>
+                <Card.Text as="div" className="small text-muted mt-1">
+                  Upcoming charges for this month.
+                </Card.Text>
+              </div>
+              <Form.Select
+                size="sm"
+                value={chargeFreqFilter}
+                onChange={(e) => setChargeFreqFilter(e.target.value)}
+                aria-label="Filter by frequency"
+                style={{ width: 'auto', minWidth: 150 }}
+              >
+                {availableChargeFrequencies.length > 1 && (
+                  <option value="">All frequencies</option>
+                )}
+                {availableChargeFrequencies.map((f) => (
+                  <option key={f} value={f}>
+                    {formatFrequency(f)}
+                  </option>
+                ))}
+              </Form.Select>
+            </div>
           </Card.Header>
           <Card.Body>
-            <ul className="list-group list-group-flush">
-              {chargeGroups.map((g) => (
-                <li
-                  key={g.id}
-                  className="list-group-item d-flex justify-content-between align-items-center px-0"
-                >
-                  <span>
-                    {g.name}
-                    {g.occurrences > 1 && (
+            {(() => {
+              const maxTotal = filteredChargeGroups[0]?.total ?? 1
+              return filteredChargeGroups.map((g) => {
+                const perOccurrence = g.total / g.occurrences
+                const barWidth = (g.total / maxTotal) * 100
+                return (
+                  <div key={g.id} className="mb-3">
+                    <div className="d-flex align-items-baseline justify-content-between gap-2 mb-1">
                       <span
-                        className="ms-2 badge bg-secondary"
-                        style={{ fontSize: '0.65rem' }}
+                        className="fw-medium small"
+                        style={{ flex: 1, minWidth: 0 }}
                       >
-                        ×{g.occurrences}
+                        {g.name}
                       </span>
-                    )}
-                  </span>
-                  <span className="fw-medium">${formatMoney(g.total)}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2 pt-2 border-top d-flex justify-content-between fw-medium">
-              <span>Total committed</span>
-              <span>${formatMoney(committedTotal)}</span>
+                      <span className="fw-medium small">
+                        ${formatMoney(g.total)}
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2 mb-1">
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '0.65rem',
+                          background: 'var(--vantura-surface)',
+                          color: 'var(--vantura-text-secondary)',
+                          border: '1px solid var(--vantura-border)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {formatFrequency(g.frequency)}
+                      </span>
+                      <span
+                        className="text-muted"
+                        style={{ fontSize: '0.75rem' }}
+                      >
+                        ${formatMoney(perOccurrence)}
+                        {g.occurrences > 1 && <> × {g.occurrences}</>}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 7,
+                        borderRadius: 4,
+                        background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${barWidth}%`,
+                          height: '100%',
+                          borderRadius: 4,
+                          background: 'var(--bs-primary)',
+                          opacity: 0.75,
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+            <div className="pt-2 border-top d-flex justify-content-between fw-medium small">
+              <span>Total upcoming</span>
+              <span>
+                $
+                {formatMoney(
+                  filteredChargeGroups.reduce((s, g) => s + g.total, 0)
+                )}
+              </span>
             </div>
           </Card.Body>
         </Card>

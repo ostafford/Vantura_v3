@@ -316,7 +316,7 @@ html[data-theme='dark'] .app-boot-shell {
 
 /* Phase 8: Purple React layout structure */
 .container-scroller {
-  overflow: hidden;
+  overflow-x: clip; /* clip without creating a scroll container — allows position:sticky in children */
   background-color: var(--vantura-background);
 }
 .page-body-wrapper {
@@ -330,7 +330,7 @@ html[data-theme='dark'] .app-boot-shell {
 }
 .content-wrapper {
   background: var(--vantura-content-bg);
-  padding: 2.75rem 2.25rem;
+  padding: 1.25rem 2.25rem 2.75rem;
   width: 100%;
   flex-grow: 1;
   max-width: 1400px;
@@ -797,6 +797,30 @@ html[data-theme='dark'] .app-boot-shell {
 .page-title-icon[draggable='true'] {
   cursor: grab;
 }
+/* Sticky toolbar — spans full panel width by escaping content-wrapper horizontal padding */
+.sticky-toolbar {
+  position: sticky;
+  top: 70px; /* matches fixed navbar height */
+  z-index: 200;
+  background: var(--vantura-content-bg);
+  border-bottom: 1px solid var(--vantura-border);
+  margin-left: -2.25rem;
+  margin-right: -2.25rem;
+  padding-left: 2.25rem;
+  padding-right: 2.25rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 768px) {
+  .sticky-toolbar {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 .page-title-icon[draggable='true']:active {
   cursor: grabbing;
 }

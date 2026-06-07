@@ -370,41 +370,46 @@ export function Transactions() {
 
   return (
     <>
-      <div className="page-header">
-        <h3 className="page-title">
-          <span className="page-title-icon">
-            <i className="mdi mdi-credit-card-multiple" aria-hidden />
-          </span>
-          Transactions
-        </h3>
-        <div className="d-flex flex-wrap align-items-center gap-2 ms-auto">
-          <PageBreadcrumb
-            items={[{ label: 'Dashboard', to: '/' }, { label: 'Transactions' }]}
-          />
-          <Button
-            type="button"
-            className="btn-gradient-primary"
-            size="sm"
-            onClick={handleReSync}
-            disabled={syncing || isDemoMode}
-            aria-label="Re-sync with Up Bank"
-            aria-busy={syncing}
-          >
-            {syncing ? (
-              <>
-                <Spinner
-                  animation="border"
-                  size="sm"
-                  className="me-1"
-                  role="status"
-                  aria-hidden="true"
-                />
-                Syncing…
-              </>
-            ) : (
-              'Re-sync now'
-            )}
-          </Button>
+      <div className="sticky-toolbar">
+        <div className="page-header" style={{ margin: 0 }}>
+          <h3 className="page-title">
+            <span className="page-title-icon">
+              <i className="mdi mdi-credit-card-multiple" aria-hidden />
+            </span>
+            Transactions
+          </h3>
+          <div className="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <PageBreadcrumb
+              items={[
+                { label: 'Dashboard', to: '/' },
+                { label: 'Transactions' },
+              ]}
+            />
+            <Button
+              type="button"
+              className="btn-gradient-primary"
+              size="sm"
+              onClick={handleReSync}
+              disabled={syncing || isDemoMode}
+              aria-label="Re-sync with Up Bank"
+              aria-busy={syncing}
+            >
+              {syncing ? (
+                <>
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    className="me-1"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Syncing…
+                </>
+              ) : (
+                'Re-sync now'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
       {syncError ? (

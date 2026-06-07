@@ -82,17 +82,25 @@ export function AnalyticsLayout() {
     [matches]
   )
 
+  const suppressHeader = matches.some(
+    (m) => (m.handle as AppRouteHandle | undefined)?.noLayoutHeader === true
+  )
+
   return (
     <div>
-      <div className="page-header">
-        <h3 className="page-title">
-          <span className="page-title-icon bg-gradient-primary text-white mr-2">
-            <i className={`mdi ${pageTitleIcon}`} aria-hidden />
-          </span>
-          {pageTitle}
-        </h3>
-        <PageBreadcrumb items={breadcrumbItems} />
-      </div>
+      {!suppressHeader && (
+        <div className="sticky-toolbar">
+          <div className="page-header" style={{ margin: 0 }}>
+            <h3 className="page-title">
+              <span className="page-title-icon bg-gradient-primary text-white mr-2">
+                <i className={`mdi ${pageTitleIcon}`} aria-hidden />
+              </span>
+              {pageTitle}
+            </h3>
+            <PageBreadcrumb items={breadcrumbItems} />
+          </div>
+        </div>
+      )}
 
       <Outlet />
     </div>
