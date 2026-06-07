@@ -2,7 +2,7 @@
  * Local account rows synced from Up Bank (see sync upsertAccount).
  */
 
-import { getDb, schedulePersist } from '@/db'
+import { getDb, schedulePersist, getAppSetting, setAppSetting } from '@/db'
 
 export interface AccountRow {
   id: string
@@ -196,6 +196,18 @@ export function updateSaverGoal(
     saverId,
   ])
   schedulePersist()
+}
+
+export function getSaverGoalDate(saverId: string): string | null {
+  const raw = getAppSetting(`saver_goal_date_${saverId}`)
+  return raw && raw.length > 0 ? raw : null
+}
+
+export function updateSaverGoalDate(
+  saverId: string,
+  date: string | null
+): void {
+  setAppSetting(`saver_goal_date_${saverId}`, date ?? '')
 }
 
 export interface SaverMonthlyFlowPoint {

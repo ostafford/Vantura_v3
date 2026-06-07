@@ -14,8 +14,10 @@ import {
 import {
   getAccountsByTypes,
   getSaverMonthlyFlow,
+  getSaverGoalDate,
   sumAccountBalancesCents,
   updateSaverGoal,
+  updateSaverGoalDate,
   type SaverBalanceSnapshot,
   type SaverMonthlyFlowPoint,
 } from '@/services/accounts'
@@ -70,6 +72,57 @@ function deriveMonthlyBalances(
     b += p.flowCents
   }
   return result
+}
+
+interface ProjectionResult {
+  onTrack: boolean
+  lastMonthCents: number
+  projectedBalanceCents: number
+  monthsRemaining: number
+  requiredMonthlyCents: number
+}
+
+function computeProjection(
+  currentBalanceCents: number,
+  goalCents: number,
+  monthlyFlow: SaverMonthlyFlowPoint[],
+  goalDate: string
+): ProjectionResult {
+  // Use the most recent complete month as the projected rate — matches Up Bank's
+  // payday-split behaviour where each month's contribution is consistent and
+  // the latest month is the most representative of the ongoing rate.
+  const complete = monthlyFlow.slice(0, -1)
+  const lastMonth = complete[complete.length - 1]
+  // flowCents is negative for savings; negate to get positive = monthly saving rate
+  const lastMonthCents = lastMonth ? -lastMonth.flowCents : 0
+
+  const today = new Date()
+  const target = new Date(goalDate)
+  const monthsRemaining = Math.max(
+    0,
+    (target.getFullYear() - today.getFullYear()) * 12 +
+      (target.getMonth() - today.getMonth())
+  )
+
+  const projectedBalanceCents =
+    currentBalanceCents + lastMonthCents * monthsRemaining
+  const requiredMonthlyCents =
+    monthsRemaining > 0
+      ? (goalCents - currentBalanceCents) / monthsRemaining
+      : Infinity
+
+  return {
+    onTrack: projectedBalanceCents >= goalCents,
+    lastMonthCents,
+    projectedBalanceCents,
+    monthsRemaining,
+    requiredMonthlyCents,
+  }
+}
+
+function formatGoalDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
 function KpiCell({
@@ -177,7 +230,8 @@ export function AnalyticsSavers() {
           s.id,
           s.balance
         )
-        return { account: s, monthlyFlow, derivedBalances }
+        const goalDate = getSaverGoalDate(s.id)
+        return { account: s, monthlyFlow, derivedBalances, goalDate }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [savers.map((s) => s.id).join(','), lastSyncCompletedAt]
@@ -319,9 +373,13 @@ export function AnalyticsSavers() {
   // Goal editing state — one saver editable at a time
   const [editingGoalFor, setEditingGoalFor] = useState<string | null>(null)
   const [goalDraft, setGoalDraft] = useState('')
-  // Local overrides so progress bar updates instantly without re-fetching DB
+  const [goalDateDraft, setGoalDateDraft] = useState('')
+  // Local overrides so UI updates instantly without re-fetching DB
   const [goalOverrides, setGoalOverrides] = useState<
     Record<string, number | null>
+  >({})
+  const [goalDateOverrides, setGoalDateOverrides] = useState<
+    Record<string, string | null>
   >({})
 
   function getGoal(id: string, dbGoal: number | null): number | null {
@@ -330,9 +388,20 @@ export function AnalyticsSavers() {
       : dbGoal
   }
 
-  function startEditGoal(id: string, currentGoal: number | null) {
+  function getGoalDate(id: string, dbDate: string | null): string | null {
+    return Object.prototype.hasOwnProperty.call(goalDateOverrides, id)
+      ? goalDateOverrides[id]
+      : dbDate
+  }
+
+  function startEditGoal(
+    id: string,
+    currentGoal: number | null,
+    currentDate: string | null
+  ) {
     setEditingGoalFor(id)
     setGoalDraft(currentGoal ? (currentGoal / 100).toFixed(2) : '')
+    setGoalDateDraft(currentDate ?? '')
   }
 
   function saveGoal(id: string) {
@@ -341,18 +410,25 @@ export function AnalyticsSavers() {
       isNaN(dollars) || dollars <= 0 ? null : Math.round(dollars * 100)
     updateSaverGoal(id, cents)
     setGoalOverrides((prev) => ({ ...prev, [id]: cents }))
+    const dateTrimmed = goalDateDraft.trim()
+    updateSaverGoalDate(id, dateTrimmed || null)
+    setGoalDateOverrides((prev) => ({ ...prev, [id]: dateTrimmed || null }))
     setEditingGoalFor(null)
     setGoalDraft('')
+    setGoalDateDraft('')
   }
 
   function cancelEdit() {
     setEditingGoalFor(null)
     setGoalDraft('')
+    setGoalDateDraft('')
   }
 
   function removeGoal(id: string) {
     updateSaverGoal(id, null)
     setGoalOverrides((prev) => ({ ...prev, [id]: null }))
+    updateSaverGoalDate(id, null)
+    setGoalDateOverrides((prev) => ({ ...prev, [id]: null }))
   }
 
   return (
@@ -434,322 +510,422 @@ export function AnalyticsSavers() {
           </Card.Body>
         </Card>
       )}
-      {sortedSaverData.map(({ account, monthlyFlow, derivedBalances }) => {
-        const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
-        const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
-        const goalCents = getGoal(account.id, account.target_amount_cents)
-        const goalPct =
-          goalCents && goalCents > 0
-            ? Math.min(100, (account.balance / goalCents) * 100)
-            : 0
-        const goalReached =
-          goalCents != null && goalCents > 0 && account.balance >= goalCents
+      {sortedSaverData.map(
+        ({ account, monthlyFlow, derivedBalances, goalDate: dbGoalDate }) => {
+          const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
+          const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
+          const goalCents = getGoal(account.id, account.target_amount_cents)
+          const goalPct =
+            goalCents && goalCents > 0
+              ? Math.min(100, (account.balance / goalCents) * 100)
+              : 0
+          const goalReached =
+            goalCents != null && goalCents > 0 && account.balance >= goalCents
+          const activeGoalDate = getGoalDate(account.id, dbGoalDate)
+          const projection =
+            goalCents && goalCents > 0 && activeGoalDate
+              ? computeProjection(
+                  account.balance,
+                  goalCents,
+                  monthlyFlow,
+                  activeGoalDate
+                )
+              : null
 
-        return (
-          <div
-            key={account.id}
-            className="mb-4"
-            onDragOver={(e) => handleDragOver(e, account.id)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, account.id)}
-            onDragEnd={handleDragEnd}
-            style={{
-              outline:
-                dragOverId === account.id
-                  ? '2px dashed var(--vantura-primary)'
-                  : undefined,
-              borderRadius: 8,
-            }}
-          >
-            <Card className="border">
-              {/* Card header: saver identity + goal — mirrors tracker card layout */}
-              <Card.Header className="py-3">
-                {/* Row 1: name (left) + balance (right) */}
-                <div className="d-flex justify-content-between align-items-start">
-                  <strong
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, account.id)}
-                    title="Drag to reorder"
-                    aria-label="Drag to reorder"
-                    style={{ cursor: 'grab' }}
-                  >
-                    {account.display_name}
-                  </strong>
-                  <span
-                    className={`fw-semibold ${account.balance > 0 ? 'text-success' : ''}`}
-                  >
-                    ${formatMoney(account.balance)}
-                  </span>
-                </div>
-
-                {/* Goal section */}
-                {editingGoalFor === account.id ? (
-                  <div className="d-flex align-items-center gap-2 mt-2">
-                    <div
-                      className="input-group input-group-sm"
-                      style={{ maxWidth: 180 }}
+          return (
+            <div
+              key={account.id}
+              className="mb-4"
+              onDragOver={(e) => handleDragOver(e, account.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, account.id)}
+              onDragEnd={handleDragEnd}
+              style={{
+                outline:
+                  dragOverId === account.id
+                    ? '2px dashed var(--vantura-primary)'
+                    : undefined,
+                borderRadius: 8,
+              }}
+            >
+              <Card className="border">
+                {/* Card header: saver identity + goal — mirrors tracker card layout */}
+                <Card.Header className="py-3">
+                  {/* Row 1: name (left) + balance (right) */}
+                  <div className="d-flex justify-content-between align-items-start">
+                    <strong
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, account.id)}
+                      title="Drag to reorder"
+                      aria-label="Drag to reorder"
+                      style={{ cursor: 'grab' }}
                     >
-                      <span className="input-group-text">$</span>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={goalDraft}
-                        onChange={(e) => setGoalDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveGoal(account.id)
-                          if (e.key === 'Escape') cancelEdit()
-                        }}
-                        autoFocus
-                      />
-                    </div>
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => saveGoal(account.id)}
+                      {account.display_name}
+                    </strong>
+                    <span
+                      className={`fw-semibold ${account.balance > 0 ? 'text-success' : ''}`}
                     >
-                      Save
-                    </button>
-                    <button
-                      className="btn btn-sm btn-link p-0 text-muted"
-                      onClick={cancelEdit}
-                    >
-                      Cancel
-                    </button>
+                      ${formatMoney(account.balance)}
+                    </span>
                   </div>
-                ) : goalCents && goalCents > 0 ? (
-                  <>
-                    {/* Row 2: remaining / reached (right-aligned) — mirrors tracker "X left" */}
-                    <div
-                      className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
-                    >
-                      {goalReached
-                        ? 'Goal reached!'
-                        : `$${formatMoney(goalCents - account.balance)} to go`}
-                    </div>
-                    {/* Row 3: progress bar — mirrors tracker ProgressBar */}
-                    <ProgressBar
-                      now={Math.min(100, goalPct)}
-                      variant="success"
-                      striped={goalReached}
-                      animated={goalReached}
-                      label={`${Math.round(goalPct)}%`}
-                    />
-                    {/* Row 4: "balance of goal" + actions — mirrors tracker "spent of budget" */}
-                    <div className="d-flex justify-content-between align-items-center mt-1">
-                      <small className="text-muted">
-                        ${formatMoney(account.balance)} of $
-                        {formatMoney(goalCents)}
-                      </small>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-link p-0 text-muted"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={() => startEditGoal(account.id, goalCents)}
+
+                  {/* Goal section */}
+                  {editingGoalFor === account.id ? (
+                    <div className="mt-2">
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <div
+                          className="input-group input-group-sm"
+                          style={{ maxWidth: 180 }}
                         >
-                          Edit goal
-                        </button>
-                        <button
-                          className="btn btn-link p-0 text-danger"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={() => removeGoal(account.id)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <button
-                    className="btn btn-link p-0 mt-1 text-muted small"
-                    onClick={() => startEditGoal(account.id, null)}
-                  >
-                    + Set goal
-                  </button>
-                )}
-
-                {/* Charts toggle — mirrors Trackers expand row */}
-                <div
-                  className="d-flex justify-content-between align-items-center mt-2"
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => toggleCharts(account.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      toggleCharts(account.id)
-                    }
-                  }}
-                  aria-expanded={expandedCharts.has(account.id)}
-                >
-                  <small className="text-muted">
-                    {expandedCharts.has(account.id)
-                      ? 'Hide charts'
-                      : 'Show charts'}
-                  </small>
-                  <i
-                    className={`mdi ${expandedCharts.has(account.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'} text-muted`}
-                    aria-hidden
-                  />
-                </div>
-              </Card.Header>
-
-              {/* Card body: charts — collapsed by default */}
-              <Collapse in={expandedCharts.has(account.id)}>
-                <div>
-                  <Card.Body>
-                    <p className="small text-muted mb-2">
-                      Monthly contributions — last 12 months
-                    </p>
-                    {hasMonthlyActivity ? (
-                      <div
-                        style={{ width: '100%', height: 200 }}
-                        className="mb-4"
-                      >
-                        <SaverMonthlyFlowChart
-                          data={monthlyFlow}
-                          aria-label={`${account.display_name} monthly contributions`}
-                        />
-                      </div>
-                    ) : (
-                      <p className="small text-muted mb-4">
-                        No transfers recorded for this saver in the last 12
-                        months.
-                      </p>
-                    )}
-
-                    <p className="small text-muted mb-2">Balance over time</p>
-                    {hasBalance && derivedBalances.length >= 2 ? (
-                      <div
-                        style={{ width: '100%', height: 180 }}
-                        className="mb-4"
-                      >
-                        <SaverBalanceChart
-                          data={derivedBalances}
-                          aria-label={`${account.display_name} balance trend`}
-                        />
-                      </div>
-                    ) : (
-                      <p className="small text-muted mb-4">
-                        Current balance:{' '}
-                        <span className="fw-semibold">
-                          ${formatMoney(account.balance)}
-                        </span>
-                      </p>
-                    )}
-
-                    {/* Data verification panel — dev mode only */}
-                    {import.meta.env.DEV &&
-                      (() => {
-                        const impliedStart =
-                          account.balance +
-                          monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
-                        const totalTx = monthlyFlow.reduce(
-                          (s, p) => s + p.txCount,
-                          0
-                        )
-                        const totalSaved = monthlyFlow.reduce(
-                          (s, p) =>
-                            p.flowCents < 0 ? s + Math.abs(p.flowCents) : s,
-                          0
-                        )
-                        const totalWithdrawn = monthlyFlow.reduce(
-                          (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
-                          0
-                        )
-                        const netChange =
-                          account.balance - Math.max(0, impliedStart)
-                        return (
-                          <div
-                            className="rounded p-3"
-                            style={{
-                              background:
-                                'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
-                              fontSize: '0.78rem',
+                          <span className="input-group-text">$</span>
+                          <Form.Control
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={goalDraft}
+                            onChange={(e) => setGoalDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveGoal(account.id)
+                              if (e.key === 'Escape') cancelEdit()
                             }}
+                            autoFocus
+                          />
+                        </div>
+                        <Form.Control
+                          type="date"
+                          size="sm"
+                          value={goalDateDraft}
+                          onChange={(e) => setGoalDateDraft(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                          style={{ maxWidth: 160 }}
+                          title="Target date (optional)"
+                        />
+                        <button
+                          className="btn btn-sm btn-success"
+                          onClick={() => saveGoal(account.id)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="btn btn-sm btn-link p-0 text-muted"
+                          onClick={cancelEdit}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="small text-muted mt-1">
+                        Target date is optional — used to project whether
+                        you&apos;re on track.
+                      </div>
+                    </div>
+                  ) : goalCents && goalCents > 0 ? (
+                    <>
+                      {/* Row 2: remaining / reached + optional deadline */}
+                      <div
+                        className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
+                      >
+                        {goalReached
+                          ? 'Goal reached!'
+                          : `$${formatMoney(goalCents - account.balance)} to go`}
+                        {activeGoalDate && (
+                          <span className="fw-normal ms-1">
+                            · by {formatGoalDate(activeGoalDate)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Row 3: progress bar */}
+                      <ProgressBar
+                        now={Math.min(100, goalPct)}
+                        variant="success"
+                        striped={goalReached}
+                        animated={goalReached}
+                        label={`${Math.round(goalPct)}%`}
+                      />
+                      {/* Row 4: "balance of goal" + actions */}
+                      <div className="d-flex justify-content-between align-items-center mt-1">
+                        <small className="text-muted">
+                          ${formatMoney(account.balance)} of $
+                          {formatMoney(goalCents)}
+                        </small>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-link p-0 text-muted"
+                            style={{ fontSize: '0.75rem' }}
+                            onClick={() =>
+                              startEditGoal(
+                                account.id,
+                                goalCents,
+                                activeGoalDate
+                              )
+                            }
                           >
-                            <p
-                              className="fw-semibold mb-2 text-muted"
+                            Edit goal
+                          </button>
+                          <button
+                            className="btn btn-link p-0 text-danger"
+                            style={{ fontSize: '0.75rem' }}
+                            onClick={() => removeGoal(account.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      {/* Row 5: on-track projection badge (only when a target date is set) */}
+                      {projection && projection.monthsRemaining > 0 && (
+                        <div
+                          className="d-flex justify-content-end mt-2 pt-2"
+                          style={{
+                            borderTop: '1px solid var(--bs-border-color)',
+                          }}
+                        >
+                          {projection.lastMonthCents <= 0 ? (
+                            <span className="badge bg-secondary">
+                              No history
+                            </span>
+                          ) : projection.onTrack ? (
+                            <span className="badge bg-success">On track</span>
+                          ) : (
+                            <OverlayTrigger
+                              placement="top"
+                              container={document.body}
+                              overlay={
+                                <Tooltip>
+                                  <div>
+                                    <span
+                                      style={{ color: 'var(--bs-warning)' }}
+                                    >
+                                      Need $
+                                      {formatMoney(
+                                        projection.requiredMonthlyCents
+                                      )}
+                                      /mo
+                                    </span>{' '}
+                                    to reach goal by{' '}
+                                    {formatGoalDate(activeGoalDate!)}
+                                  </div>
+                                  <div style={{ opacity: 0.75 }}>
+                                    Last mo. $
+                                    {formatMoney(projection.lastMonthCents)} ·
+                                    +$
+                                    {formatMoney(
+                                      projection.requiredMonthlyCents -
+                                        projection.lastMonthCents
+                                    )}
+                                    /mo more needed
+                                  </div>
+                                </Tooltip>
+                              }
+                            >
+                              <span
+                                className="badge bg-warning text-dark"
+                                style={{ cursor: 'default' }}
+                              >
+                                Behind pace
+                              </span>
+                            </OverlayTrigger>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-link p-0 mt-1 text-muted small"
+                      onClick={() => startEditGoal(account.id, null, null)}
+                    >
+                      + Set goal
+                    </button>
+                  )}
+
+                  {/* Charts toggle — mirrors Trackers expand row */}
+                  <div
+                    className="d-flex justify-content-between align-items-center mt-2"
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => toggleCharts(account.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleCharts(account.id)
+                      }
+                    }}
+                    aria-expanded={expandedCharts.has(account.id)}
+                  >
+                    <small className="text-muted">
+                      {expandedCharts.has(account.id)
+                        ? 'Hide charts'
+                        : 'Show charts'}
+                    </small>
+                    <i
+                      className={`mdi ${expandedCharts.has(account.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'} text-muted`}
+                      aria-hidden
+                    />
+                  </div>
+                </Card.Header>
+
+                {/* Card body: charts — collapsed by default */}
+                <Collapse in={expandedCharts.has(account.id)}>
+                  <div>
+                    <Card.Body>
+                      <p className="small text-muted mb-2">
+                        Monthly contributions — last 12 months
+                      </p>
+                      {hasMonthlyActivity ? (
+                        <div
+                          style={{ width: '100%', height: 200 }}
+                          className="mb-4"
+                        >
+                          <SaverMonthlyFlowChart
+                            data={monthlyFlow}
+                            aria-label={`${account.display_name} monthly contributions`}
+                          />
+                        </div>
+                      ) : (
+                        <p className="small text-muted mb-4">
+                          No transfers recorded for this saver in the last 12
+                          months.
+                        </p>
+                      )}
+
+                      <p className="small text-muted mb-2">Balance over time</p>
+                      {hasBalance && derivedBalances.length >= 2 ? (
+                        <div
+                          style={{ width: '100%', height: 180 }}
+                          className="mb-4"
+                        >
+                          <SaverBalanceChart
+                            data={derivedBalances}
+                            aria-label={`${account.display_name} balance trend`}
+                          />
+                        </div>
+                      ) : (
+                        <p className="small text-muted mb-4">
+                          Current balance:{' '}
+                          <span className="fw-semibold">
+                            ${formatMoney(account.balance)}
+                          </span>
+                        </p>
+                      )}
+
+                      {/* Data verification panel — dev mode only */}
+                      {import.meta.env.DEV &&
+                        (() => {
+                          const impliedStart =
+                            account.balance +
+                            monthlyFlow.reduce((s, p) => s + p.flowCents, 0)
+                          const totalTx = monthlyFlow.reduce(
+                            (s, p) => s + p.txCount,
+                            0
+                          )
+                          const totalSaved = monthlyFlow.reduce(
+                            (s, p) =>
+                              p.flowCents < 0 ? s + Math.abs(p.flowCents) : s,
+                            0
+                          )
+                          const totalWithdrawn = monthlyFlow.reduce(
+                            (s, p) => (p.flowCents > 0 ? s + p.flowCents : s),
+                            0
+                          )
+                          const netChange =
+                            account.balance - Math.max(0, impliedStart)
+                          return (
+                            <div
+                              className="rounded p-3"
                               style={{
-                                fontSize: '0.72rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
+                                background:
+                                  'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+                                fontSize: '0.78rem',
                               }}
                             >
-                              Data check
-                            </p>
-                            <div className="d-flex flex-wrap gap-3">
-                              <div>
-                                <span className="text-muted">
-                                  Implied balance 12 mo. ago
-                                </span>
-                                <br />
-                                <span className="fw-semibold">
-                                  ${formatMoney(Math.max(0, impliedStart))}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted">
-                                  Current balance
-                                </span>
-                                <br />
-                                <span className="fw-semibold">
-                                  ${formatMoney(account.balance)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted">
-                                  Net change (12 mo.)
-                                </span>
-                                <br />
-                                <span
-                                  className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
-                                >
-                                  {netChange >= 0 ? '+' : '−'}$
-                                  {formatMoney(Math.abs(netChange))}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted">Contributed</span>
-                                <br />
-                                <span className="fw-semibold text-success">
-                                  +${formatMoney(totalSaved)}
-                                </span>
-                              </div>
-                              {totalWithdrawn > 0 && (
+                              <p
+                                className="fw-semibold mb-2 text-muted"
+                                style={{
+                                  fontSize: '0.72rem',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
+                                Data check
+                              </p>
+                              <div className="d-flex flex-wrap gap-3">
                                 <div>
-                                  <span className="text-muted">Withdrawn</span>
+                                  <span className="text-muted">
+                                    Implied balance 12 mo. ago
+                                  </span>
                                   <br />
-                                  <span className="fw-semibold text-danger">
-                                    −${formatMoney(totalWithdrawn)}
+                                  <span className="fw-semibold">
+                                    ${formatMoney(Math.max(0, impliedStart))}
                                   </span>
                                 </div>
-                              )}
-                              <div>
-                                <span className="text-muted">Transactions</span>
-                                <br />
-                                <span className="fw-semibold">{totalTx}</span>
+                                <div>
+                                  <span className="text-muted">
+                                    Current balance
+                                  </span>
+                                  <br />
+                                  <span className="fw-semibold">
+                                    ${formatMoney(account.balance)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted">
+                                    Net change (12 mo.)
+                                  </span>
+                                  <br />
+                                  <span
+                                    className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
+                                  >
+                                    {netChange >= 0 ? '+' : '−'}$
+                                    {formatMoney(Math.abs(netChange))}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted">
+                                    Contributed
+                                  </span>
+                                  <br />
+                                  <span className="fw-semibold text-success">
+                                    +${formatMoney(totalSaved)}
+                                  </span>
+                                </div>
+                                {totalWithdrawn > 0 && (
+                                  <div>
+                                    <span className="text-muted">
+                                      Withdrawn
+                                    </span>
+                                    <br />
+                                    <span className="fw-semibold text-danger">
+                                      −${formatMoney(totalWithdrawn)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-muted">
+                                    Transactions
+                                  </span>
+                                  <br />
+                                  <span className="fw-semibold">{totalTx}</span>
+                                </div>
                               </div>
+                              <p
+                                className="mb-0 mt-2 text-muted"
+                                style={{ fontSize: '0.7rem' }}
+                              >
+                                Cross-check: compare &quot;Implied balance 12
+                                mo. ago&quot; and &quot;Current balance&quot;
+                                against Up Bank&apos;s account history.
+                              </p>
                             </div>
-                            <p
-                              className="mb-0 mt-2 text-muted"
-                              style={{ fontSize: '0.7rem' }}
-                            >
-                              Cross-check: compare &quot;Implied balance 12 mo.
-                              ago&quot; and &quot;Current balance&quot; against
-                              Up Bank&apos;s account history.
-                            </p>
-                          </div>
-                        )
-                      })()}
-                  </Card.Body>
-                </div>
-              </Collapse>
-            </Card>
-          </div>
-        )
-      })}
+                          )
+                        })()}
+                    </Card.Body>
+                  </div>
+                </Collapse>
+              </Card>
+            </div>
+          )
+        }
+      )}
 
       {sortedSaverData.length > 0 && (
         <div className="mb-4">
