@@ -5,8 +5,6 @@ import { AnalyticsAtAGlanceSection } from '@/components/analytics/AnalyticsAtAGl
 export function AnalyticsIndex() {
   return (
     <div className="grid-margin">
-      <AnalyticsAtAGlanceSection />
-
       <p className="mb-3 fw-medium">Explore your analytics:</p>
       <Row className="mb-4 g-3">
         <Col xs={12} md={6} lg={4}>
@@ -110,23 +108,7 @@ export function AnalyticsIndex() {
         </Col>
       </Row>
 
-      <Card className="border">
-        <Card.Body>
-          <p className="mb-3 text-muted small">
-            Use your Dashboard for trackers, upcoming charges, and the weekly
-            insights summary. Browse and filter all transactions on the
-            Transactions page.
-          </p>
-          <div className="d-flex flex-wrap gap-2">
-            <Link to="/" className="btn btn-primary">
-              Go to Dashboard
-            </Link>
-            <Link to="/transactions" className="btn btn-outline-secondary">
-              Browse Transactions
-            </Link>
-          </div>
-        </Card.Body>
-      </Card>
+      <AnalyticsAtAGlanceSection />
     </div>
   )
 }
