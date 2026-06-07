@@ -98,9 +98,21 @@ function buildWhereClause(filters: TransactionFilters): {
     params.push(filters.dateTo + 'T23:59:59.999Z')
   }
   if (filters.categoryIds?.length) {
-    const placeholders = filters.categoryIds.map(() => '?').join(',')
-    conditions.push(`t.category_id IN (${placeholders})`)
-    params.push(...filters.categoryIds)
+    const hasUncategorised = filters.categoryIds.includes('__uncategorised__')
+    const realIds = filters.categoryIds.filter(
+      (id) => id !== '__uncategorised__'
+    )
+    const parts: string[] = []
+    if (hasUncategorised)
+      parts.push(
+        '(t.category_id IS NULL AND t.transfer_account_id IS NULL AND t.is_categorizable = 1)'
+      )
+    if (realIds.length) {
+      const placeholders = realIds.map(() => '?').join(',')
+      parts.push(`t.category_id IN (${placeholders})`)
+      params.push(...realIds)
+    }
+    conditions.push(`(${parts.join(' OR ')})`)
   }
   if (filters.amountMin != null) {
     conditions.push('ABS(t.amount) >= ?')

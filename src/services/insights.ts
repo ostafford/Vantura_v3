@@ -178,7 +178,7 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
   // Money Out + Charges share the same filter — one query returns both
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([startIso, endIso])
@@ -284,7 +284,7 @@ export function getMonthlyInsights(
 
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([startIso, endIso])
@@ -359,7 +359,7 @@ export function getWeeklyCategoryBreakdown(
     `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
      FROM transactions t
      LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
      AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
      GROUP BY t.category_id ORDER BY total DESC LIMIT 15`
   )
@@ -392,7 +392,7 @@ export function getCategoryBreakdownForDateRange(
     `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
      FROM transactions t
      LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
      AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
      GROUP BY t.category_id ORDER BY total DESC LIMIT 20`
   )
@@ -478,7 +478,7 @@ export function getInsightsForDateRange(
   // Money Out + Charges share the same filter — one query returns both
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([dateFrom, endStr])
@@ -913,7 +913,7 @@ function getDailyMoneyInOutForRange(
   const stmt = db.prepare(
     `SELECT CAST(substr(COALESCE(created_at, settled_at), 9, 2) AS INTEGER) AS day,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY day
@@ -971,7 +971,7 @@ function getDailyMoneyInOutByDateInRange(
   const stmt = db.prepare(
     `SELECT date(COALESCE(created_at, settled_at)) AS d,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY d
@@ -1187,7 +1187,7 @@ export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
   const stmt = db.prepare(
     `SELECT CAST(strftime('%m', COALESCE(created_at, settled_at)) AS INTEGER) AS m,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY m

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Card,
   Row,
@@ -207,9 +208,14 @@ const SPENDING_LIST_DEFAULT_VISIBLE = 8
 
 function SpendingCategoryList({
   chartData,
+  from,
+  to,
 }: {
   chartData: InsightsChartDatum[]
+  from: string
+  to: string
 }) {
+  const navigate = useNavigate()
   const [showAll, setShowAll] = useState(false)
   const totalDollars = chartData.reduce((s, d) => s + d.totalDollars, 0)
   const maxDollars = chartData[0]?.totalDollars ?? 1
@@ -242,7 +248,26 @@ function SpendingCategoryList({
               />
               <span
                 className="small fw-medium"
-                style={{ flex: 1, minWidth: 0 }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  cursor: 'pointer',
+                  color: 'var(--bs-primary)',
+                  textDecoration: 'underline',
+                  textDecorationStyle: 'dotted',
+                  textUnderlineOffset: '2px',
+                }}
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  params.set('dateFrom', from)
+                  params.set('dateTo', to)
+                  params.append(
+                    'categoryId',
+                    d.category_id || '__uncategorised__'
+                  )
+                  navigate(`/transactions?${params.toString()}`)
+                }}
+                title={`View ${d.name} transactions`}
               >
                 {d.name}
               </span>
@@ -833,7 +858,7 @@ export function AnalyticsReports() {
               No spending recorded for this period.
             </p>
           ) : (
-            <SpendingCategoryList chartData={chartData} />
+            <SpendingCategoryList chartData={chartData} from={from} to={to} />
           )}
         </Card.Body>
       </Card>
