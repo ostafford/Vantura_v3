@@ -334,14 +334,31 @@ export function AnalyticsReports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt]
   )
+  const prevMonthBounds = useMemo(() => {
+    if (isCustomRange) return null
+    const { year: py, month: pm } = previousCalendarMonth(year, month)
+    return {
+      from: getMonthBounds(py, pm).from,
+      exclusiveEnd: getExclusiveMonthEnd(py, pm),
+      label: monthNameLong(py, pm),
+    }
+  }, [isCustomRange, year, month])
+
   const trackerSpend = useMemo(
     () =>
       trackers.map((t) => ({
         tracker: t,
         spent: getTrackerSpentInPeriod(t.id, from, exclusiveEnd),
+        prevSpent: prevMonthBounds
+          ? getTrackerSpentInPeriod(
+              t.id,
+              prevMonthBounds.from,
+              prevMonthBounds.exclusiveEnd
+            )
+          : null,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trackers, from, exclusiveEnd, lastSyncCompletedAt]
+    [trackers, from, exclusiveEnd, prevMonthBounds, lastSyncCompletedAt]
   )
   const upcomingCharges = useMemo(
     () => (!isCustomRange ? getUpcomingChargesForMonth(year, month) : []),
@@ -606,87 +623,203 @@ export function AnalyticsReports() {
       {trackerSpend.length > 0 && (
         <Card className="grid-margin">
           <Card.Header>
-            <Card.Title className="mb-0">Tracker Performance</Card.Title>
+            <Card.Title className="mb-0">
+              Tracker Performance — {periodLabel}
+            </Card.Title>
             <Card.Text as="div" className="small text-muted mt-1">
-              Spend vs budget for this period.
               {!isCustomRange &&
-                ` ${trackersWithinBudget} of ${trackerSpend.length} within budget.`}
+                `${trackersWithinBudget} of ${trackerSpend.length} within budget.`}
+              {prevMonthBounds && ` Compared to ${prevMonthBounds.label}.`}
             </Card.Text>
           </Card.Header>
           <Card.Body>
             {trackerSpend.length > 4 ? (
               <ul className="list-group list-group-flush">
-                {trackerSpend.map(({ tracker, spent }) => {
+                {trackerSpend.map(({ tracker, spent, prevSpent }) => {
                   const progress =
                     tracker.budget_amount > 0
                       ? (spent / tracker.budget_amount) * 100
                       : 0
                   const style = trackerProgressStyle(progress)
                   const overBudget = spent > tracker.budget_amount
+                  const spendDelta =
+                    prevSpent !== null ? spent - prevSpent : null
+                  const hasDelta =
+                    spendDelta !== null && Math.abs(spendDelta) >= 1
+                  const deltaColor = hasDelta
+                    ? spendDelta! > 0
+                      ? 'var(--bs-danger)'
+                      : 'var(--bs-success)'
+                    : undefined
                   return (
-                    <li key={tracker.id} className="list-group-item px-0 py-2">
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <span className="fw-medium small">{tracker.name}</span>
-                        <span
-                          className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
-                        >
-                          ${formatMoney(spent)} / $
-                          {formatMoney(tracker.budget_amount)}
-                        </span>
-                      </div>
-                      <ProgressBar
-                        now={Math.min(100, progress)}
-                        variant={style.variant}
-                        striped={style.striped}
-                        animated={style.animated}
-                        style={{ height: 6 }}
-                      />
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <Row className="g-3">
-                {trackerSpend.map(({ tracker, spent }) => {
-                  const progress =
-                    tracker.budget_amount > 0
-                      ? (spent / tracker.budget_amount) * 100
-                      : 0
-                  const style = trackerProgressStyle(progress)
-                  const overBudget = spent > tracker.budget_amount
-                  return (
-                    <Col key={tracker.id} xs={12} md={6}>
-                      <div className="border rounded p-3">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
-                          <span className="fw-medium">{tracker.name}</span>
-                          <span
-                            className="badge bg-secondary"
-                            style={{ fontSize: '0.65rem' }}
-                          >
-                            {tracker.reset_frequency}
+                    <OverlayTrigger
+                      key={tracker.id}
+                      placement="top"
+                      container={document.body}
+                      overlay={
+                        <Tooltip>
+                          <div>
+                            <span
+                              style={{
+                                color: overBudget
+                                  ? 'var(--bs-danger)'
+                                  : 'var(--bs-success)',
+                              }}
+                            >
+                              ${formatMoney(spent)}
+                            </span>{' '}
+                            spent · ${formatMoney(tracker.budget_amount)} budget
+                          </div>
+                          {prevSpent !== null && prevMonthBounds && (
+                            <div style={{ opacity: 0.75 }}>
+                              ${formatMoney(prevSpent)} in{' '}
+                              {prevMonthBounds.label}
+                            </div>
+                          )}
+                          {hasDelta && spendDelta !== null && (
+                            <div style={{ color: deltaColor }}>
+                              {spendDelta > 0 ? '↑' : '↓'} $
+                              {formatMoney(Math.abs(spendDelta))}{' '}
+                              {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                              {prevMonthBounds?.label}
+                            </div>
+                          )}
+                        </Tooltip>
+                      }
+                    >
+                      <li className="list-group-item px-0 py-2">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <span className="fw-medium small">
+                            {tracker.name}
                           </span>
+                          <div className="d-flex align-items-center gap-2">
+                            <span
+                              className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
+                            >
+                              ${formatMoney(spent)} / $
+                              {formatMoney(tracker.budget_amount)}
+                            </span>
+                            {hasDelta && spendDelta !== null && (
+                              <span
+                                className="small fw-medium"
+                                style={{ color: deltaColor }}
+                              >
+                                {spendDelta > 0 ? '↑' : '↓'} $
+                                {formatMoney(Math.abs(spendDelta))}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <ProgressBar
                           now={Math.min(100, progress)}
                           variant={style.variant}
                           striped={style.striped}
                           animated={style.animated}
-                          label={`${Math.round(progress)}%`}
-                          className="mb-2"
+                          style={{ height: 6 }}
                         />
-                        <div
-                          className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
-                        >
-                          ${formatMoney(spent)} spent · $
-                          {formatMoney(tracker.budget_amount)} budget
-                          {overBudget && (
-                            <span className="ms-1 fw-medium">
-                              (${formatMoney(spent - tracker.budget_amount)}{' '}
-                              over)
+                      </li>
+                    </OverlayTrigger>
+                  )
+                })}
+              </ul>
+            ) : (
+              <Row className="g-3">
+                {trackerSpend.map(({ tracker, spent, prevSpent }) => {
+                  const progress =
+                    tracker.budget_amount > 0
+                      ? (spent / tracker.budget_amount) * 100
+                      : 0
+                  const style = trackerProgressStyle(progress)
+                  const overBudget = spent > tracker.budget_amount
+                  const spendDelta =
+                    prevSpent !== null ? spent - prevSpent : null
+                  const hasDelta =
+                    spendDelta !== null && Math.abs(spendDelta) >= 1
+                  const deltaColor = hasDelta
+                    ? spendDelta! > 0
+                      ? 'var(--bs-danger)'
+                      : 'var(--bs-success)'
+                    : undefined
+                  return (
+                    <Col key={tracker.id} xs={12} md={6}>
+                      <OverlayTrigger
+                        placement="top"
+                        container={document.body}
+                        overlay={
+                          <Tooltip>
+                            <div>
+                              <span
+                                style={{
+                                  color: overBudget
+                                    ? 'var(--bs-danger)'
+                                    : 'var(--bs-success)',
+                                }}
+                              >
+                                ${formatMoney(spent)}
+                              </span>{' '}
+                              spent · ${formatMoney(tracker.budget_amount)}{' '}
+                              budget
+                            </div>
+                            {prevSpent !== null && prevMonthBounds && (
+                              <div style={{ opacity: 0.75 }}>
+                                ${formatMoney(prevSpent)} in{' '}
+                                {prevMonthBounds.label}
+                              </div>
+                            )}
+                            {hasDelta && spendDelta !== null && (
+                              <div style={{ color: deltaColor }}>
+                                {spendDelta > 0 ? '↑' : '↓'} $
+                                {formatMoney(Math.abs(spendDelta))}{' '}
+                                {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                                {prevMonthBounds?.label}
+                              </div>
+                            )}
+                          </Tooltip>
+                        }
+                      >
+                        <div className="border rounded p-3">
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <span className="fw-medium">{tracker.name}</span>
+                            <span
+                              className="badge bg-secondary"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              {tracker.reset_frequency}
                             </span>
+                          </div>
+                          <ProgressBar
+                            now={Math.min(100, progress)}
+                            variant={style.variant}
+                            striped={style.striped}
+                            animated={style.animated}
+                            label={`${Math.round(progress)}%`}
+                            className="mb-2"
+                          />
+                          <div
+                            className={`small ${overBudget ? 'text-danger' : 'text-muted'}`}
+                          >
+                            ${formatMoney(spent)} spent · $
+                            {formatMoney(tracker.budget_amount)} budget
+                            {overBudget && (
+                              <span className="ms-1 fw-medium">
+                                (${formatMoney(spent - tracker.budget_amount)}{' '}
+                                over)
+                              </span>
+                            )}
+                          </div>
+                          {hasDelta && spendDelta !== null && (
+                            <div
+                              className="small mt-1 fw-medium"
+                              style={{ color: deltaColor }}
+                            >
+                              {spendDelta > 0 ? '↑' : '↓'} $
+                              {formatMoney(Math.abs(spendDelta))}{' '}
+                              {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                              {prevMonthBounds?.label}
+                            </div>
                           )}
                         </div>
-                      </div>
+                      </OverlayTrigger>
                     </Col>
                   )
                 })}
