@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
-import { Card, Row, Col, Badge, Form } from 'react-bootstrap'
+import { Card, Row, Col, Form } from 'react-bootstrap'
 import {
   getTrackersWithProgressForPeriod,
   type TrackerResetFrequency,
@@ -77,43 +77,59 @@ export function AnalyticsTrackers() {
                   RESET_FREQUENCIES.find((f) => f.value === t.reset_frequency)
                     ?.label ?? t.reset_frequency
                 return (
-                  <Card key={t.id} className="border">
-                    <Card.Body className="py-3">
-                      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <div>
-                          <strong>{t.name}</strong>
-                          <div className="d-flex gap-1 mt-1 flex-wrap">
-                            {t.badge_color && t.badge_color.trim() ? (
-                              <Badge
-                                style={{
-                                  backgroundColor: t.badge_color.trim(),
-                                  color: 'white',
-                                }}
-                              >
-                                {frequencyLabel}
-                              </Badge>
-                            ) : (
-                              <Badge bg="secondary">{frequencyLabel}</Badge>
-                            )}
-                            <span className="small text-muted">
-                              ${formatMoney(t.spent)} of $
-                              {formatMoney(t.budget_amount)} spent
-                            </span>
+                  <Link
+                    key={t.id}
+                    to={`/analytics/trackers/${t.id}`}
+                    className="text-decoration-none text-reset"
+                  >
+                    <Card
+                      style={{
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+                        transition: 'box-shadow 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.boxShadow =
+                          '0 3px 10px rgba(0,0,0,0.11)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.boxShadow =
+                          '0 1px 4px rgba(0,0,0,0.07)'
+                      }}
+                    >
+                      <Card.Body className="py-3">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                          <div>
+                            <strong>{t.name}</strong>
+                            <div className="d-flex gap-1 mt-1 flex-wrap align-items-center">
+                              {t.badge_color && t.badge_color.trim() ? (
+                                <span
+                                  className="badge badge-frequency-custom"
+                                  style={{
+                                    backgroundColor: t.badge_color.trim(),
+                                  }}
+                                >
+                                  {frequencyLabel}
+                                </span>
+                              ) : (
+                                <span className="badge badge-frequency-default">
+                                  {frequencyLabel}
+                                </span>
+                              )}
+                              <span className="small text-muted">
+                                ${formatMoney(t.spent)} of $
+                                {formatMoney(t.budget_amount)} spent
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <Link
-                          to={`/analytics/trackers/${t.id}`}
-                          className="btn btn-outline-primary btn-sm"
-                        >
-                          View analytics
                           <i
-                            className="mdi mdi-chevron-right ms-1"
+                            className="mdi mdi-chevron-right text-muted fs-5"
                             aria-hidden
                           />
-                        </Link>
-                      </div>
-                    </Card.Body>
-                  </Card>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Link>
                 )
               })}
             </div>

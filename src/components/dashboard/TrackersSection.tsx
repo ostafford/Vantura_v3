@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useStore } from 'zustand'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Button,
@@ -13,6 +13,7 @@ import {
   Tooltip,
 } from 'react-bootstrap'
 import {
+  getTracker,
   getTrackersWithProgress,
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
@@ -144,6 +145,7 @@ export function TrackersSection({
     FORTNIGHTLY: 0,
     MONTHLY: 0,
   })
+  const [searchParams, setSearchParams] = useSearchParams()
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
@@ -172,6 +174,18 @@ export function TrackersSection({
       setSelectedFrequencyScope('ALL')
     }
   }, [trackerList, selectedFrequencyScope])
+
+  useEffect(() => {
+    const rawId = searchParams.get('editTracker')
+    if (!rawId) return
+    const targetId = parseInt(rawId, 10)
+    if (Number.isNaN(targetId)) return
+    const row = getTracker(targetId)
+    if (!row) return
+    openEdit(row)
+    setSearchParams({}, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const activePeriodOffset = offsetByScope[selectedFrequencyScope]
   const resetActiveScopeToCurrentPeriod = () =>

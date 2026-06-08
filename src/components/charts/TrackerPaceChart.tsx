@@ -16,7 +16,6 @@ import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
 const BORDER_COLOR = 'var(--vantura-border, #ebedf2)'
-const SPEND_COLOR = 'var(--vantura-primary)'
 const PACE_LINE_COLOR = '#aaa'
 const BUDGET_CEIL_COLOR = 'var(--vantura-danger)'
 const AREA_OPACITY = 0.15
@@ -65,6 +64,14 @@ export function TrackerPaceChart({
     const lastCumulative =
       data.length > 0 ? data[data.length - 1].cumulativeSpent : 0
     const maxVal = Math.max(budget, lastCumulative, 1) * 1.1
+
+    const spendProgress = budget > 0 ? (lastCumulative / budget) * 100 : 0
+    const spendColor =
+      spendProgress >= 81
+        ? 'var(--vantura-danger)'
+        : spendProgress > 50
+          ? 'var(--vantura-warning)'
+          : 'var(--vantura-success)'
 
     type ChartPoint = {
       date: Date
@@ -142,7 +149,7 @@ export function TrackerPaceChart({
 
     g.append('path')
       .datum(chartPoints)
-      .attr('fill', SPEND_COLOR)
+      .attr('fill', spendColor)
       .attr('fill-opacity', AREA_OPACITY)
       .attr('d', areaGen)
 
@@ -154,7 +161,7 @@ export function TrackerPaceChart({
     g.append('path')
       .datum(chartPoints)
       .attr('fill', 'none')
-      .attr('stroke', SPEND_COLOR)
+      .attr('stroke', spendColor)
       .attr('stroke-width', 2)
       .attr('stroke-linecap', 'round')
       .attr('stroke-linejoin', 'round')
@@ -169,7 +176,7 @@ export function TrackerPaceChart({
       .attr('cx', (d) => xScale(d.date))
       .attr('cy', (d) => yScale(Math.min(d.cumulativeSpent, maxVal)))
       .attr('r', 3)
-      .attr('fill', SPEND_COLOR)
+      .attr('fill', spendColor)
       .style('cursor', 'pointer')
       .on('mouseover', function (event: MouseEvent, d) {
         if (!tooltipEl || !container.parentElement) return
@@ -220,6 +227,7 @@ export function TrackerPaceChart({
       .tickSizeOuter(0)
 
     const yAxis = axisLeft(yScale)
+      .ticks(5)
       .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
       .tickSizeOuter(0)
 

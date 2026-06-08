@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useStore } from 'zustand'
 import { useParams, Link } from 'react-router-dom'
 import {
@@ -25,6 +25,13 @@ import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import { syncStore } from '@/stores/syncStore'
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  WEEKLY: 'Weekly',
+  FORTNIGHTLY: 'Fortnightly',
+  MONTHLY: 'Monthly',
+  PAYDAY: 'Payday',
+}
 
 const PERIOD_OPTIONS = [
   { value: 3, label: 'Last 3 periods' },
@@ -56,6 +63,7 @@ export function AnalyticsTrackersDetail() {
   const [page, setPage] = useState(0)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const periodInitialized = useRef(false)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
@@ -78,6 +86,16 @@ export function AnalyticsTrackersDetail() {
     () => periodHistory.find((p) => p.periodOffset === 0) ?? null,
     [periodHistory]
   )
+
+  // Initialise date filter to current period on first load; ignore subsequent recomputes
+  useEffect(() => {
+    if (currentPeriod && !periodInitialized.current) {
+      periodInitialized.current = true
+      setDateFrom(currentPeriod.periodStart.slice(0, 10))
+      setDateTo(displayPeriodEnd(currentPeriod.periodEnd))
+      setPage(0)
+    }
+  }, [currentPeriod])
 
   const selectedPacePeriod = useMemo(
     () =>
@@ -197,27 +215,40 @@ export function AnalyticsTrackersDetail() {
 
   return (
     <>
-      <div className="d-flex align-items-start gap-2 mb-3">
-        <Link
-          to="/analytics/trackers"
-          className="btn btn-outline-secondary btn-sm flex-shrink-0"
-          aria-label="Back to trackers"
-        >
-          <i className="mdi mdi-arrow-left" aria-hidden />
-        </Link>
-        <div className="small text-muted d-flex flex-wrap gap-2 align-items-center pt-1">
-          {tracker.badge_color && (
-            <Badge
-              style={{
-                backgroundColor: tracker.badge_color,
-                color: 'white',
-              }}
-            >
-              {tracker.reset_frequency}
-            </Badge>
-          )}
-          {categoryNames && <span>Categories: {categoryNames}</span>}
+      <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
+        <div className="d-flex align-items-start gap-2">
+          <Link
+            to="/analytics/trackers"
+            className="btn btn-outline-secondary btn-sm flex-shrink-0"
+            aria-label="Back to trackers"
+          >
+            <i className="mdi mdi-arrow-left" aria-hidden />
+          </Link>
+          <div className="small text-muted d-flex flex-wrap gap-2 align-items-center pt-1">
+            {tracker.badge_color && tracker.badge_color.trim() ? (
+              <span
+                className="badge badge-frequency-custom"
+                style={{ backgroundColor: tracker.badge_color.trim() }}
+              >
+                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                  tracker.reset_frequency}
+              </span>
+            ) : (
+              <span className="badge badge-frequency-default">
+                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                  tracker.reset_frequency}
+              </span>
+            )}
+            {categoryNames && <span>Categories: {categoryNames}</span>}
+          </div>
         </div>
+        <Link
+          to={`/?editTracker=${id}`}
+          className="btn btn-outline-secondary btn-sm flex-shrink-0"
+        >
+          <i className="mdi mdi-pencil me-1" aria-hidden />
+          Edit tracker
+        </Link>
       </div>
 
       {/* Current Period Summary */}
@@ -341,9 +372,6 @@ export function AnalyticsTrackersDetail() {
                   />
                 </div>
               )}
-              <div className="small text-muted mt-2">
-                Gray = budget, Purple = spent (red when over budget)
-              </div>
             </Card.Body>
           </Card>
         </Col>
@@ -387,18 +415,6 @@ export function AnalyticsTrackersDetail() {
                   />
                 </div>
               )}
-              <div className="d-flex flex-wrap gap-3 small text-muted mt-2">
-                <span>
-                  <span style={{ color: 'var(--vantura-primary)' }}>
-                    &#9472;
-                  </span>{' '}
-                  Actual spending
-                </span>
-                <span style={{ color: '#aaa' }}>- - Budget pace</span>
-                <span style={{ color: 'var(--vantura-danger)' }}>
-                  - - Budget ceiling
-                </span>
-              </div>
             </Card.Body>
           </Card>
         </Col>
@@ -418,7 +434,10 @@ export function AnalyticsTrackersDetail() {
                 <Form.Control
                   type="date"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value)
+                    setPage(0)
+                  }}
                   placeholder="From"
                   className="w-auto"
                   aria-label="Date from"
@@ -426,23 +445,29 @@ export function AnalyticsTrackersDetail() {
                 <Form.Control
                   type="date"
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  onChange={(e) => {
+                    setDateTo(e.target.value)
+                    setPage(0)
+                  }}
                   placeholder="To"
                   className="w-auto"
                   aria-label="Date to"
                 />
-                {(dateFrom || dateTo) && (
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => {
-                      setDateFrom('')
-                      setDateTo('')
-                    }}
-                  >
-                    Clear
-                  </Button>
-                )}
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => {
+                    setDateFrom(currentPeriod?.periodStart.slice(0, 10) ?? '')
+                    setDateTo(
+                      currentPeriod
+                        ? displayPeriodEnd(currentPeriod.periodEnd)
+                        : ''
+                    )
+                    setPage(0)
+                  }}
+                >
+                  Reset
+                </Button>
               </div>
             </Card.Header>
             <Card.Body>

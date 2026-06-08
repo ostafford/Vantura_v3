@@ -9,17 +9,15 @@ import {
 } from 'd3'
 import type { TrackerPeriodHistoryRow } from '@/services/trackers'
 import { formatMoney } from '@/lib/format'
-import {
-  estimateLeftAxisValueLabelSpace,
-  estimateBottomAxisLabelSpace,
-} from '@/lib/chartLabelSpace'
+import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
 const BORDER_COLOR = 'var(--vantura-border, #ebedf2)'
-const BUDGET_COLOR = 'var(--vantura-border, #ebedf2)'
-const SPENT_COLOR = 'var(--vantura-primary)'
-const SPENT_OVER_COLOR = 'var(--vantura-danger)'
+const STRIPE_ID = 'tracker-history-stripe'
+const GRAD_SUCCESS_ID = 'tracker-history-success'
+const GRAD_WARNING_ID = 'tracker-history-warning'
+const GRAD_DANGER_ID = 'tracker-history-danger'
 const MARGIN_TOP = 8
 const MARGIN_RIGHT = 24
 
@@ -53,17 +51,31 @@ export function TrackerHistoryChart({
 
     const maxVal =
       maxDomainProp ?? Math.max(...data.flatMap((d) => [d.budget, d.spent]), 1)
-    const labels = data.map((d) => d.periodLabel)
+
+    // Newest period (Now) on the left
+    const chartData = [...data].reverse()
+
+    // Abbreviated date labels; fall back to "d MMM" if any month repeats
+    const monthLabels = chartData.map((d) => {
+      const date = new Date(d.periodStart + 'T12:00:00Z')
+      return date.toLocaleString('en-AU', { month: 'short', timeZone: 'UTC' })
+    })
+    const hasDuplicateMonths = monthLabels.length !== new Set(monthLabels).size
+    const displayLabels = chartData.map((d, i) => {
+      if (!hasDuplicateMonths) return monthLabels[i]
+      const date = new Date(d.periodStart + 'T12:00:00Z')
+      return `${date.getUTCDate()} ${monthLabels[i]}`
+    })
 
     const left = estimateLeftAxisValueLabelSpace(maxVal / 100, 11)
-    const bottom = estimateBottomAxisLabelSpace(labels, 11)
+    const bottom = 30
     const right = MARGIN_RIGHT
 
     const innerWidth = dimensions.width - left - right
     const innerHeight = dimensions.height - MARGIN_TOP - bottom
 
     const xScale = scaleBand()
-      .domain(labels)
+      .domain(displayLabels)
       .range([0, innerWidth])
       .paddingInner(0.2)
       .paddingOuter(0.1)
@@ -74,12 +86,56 @@ export function TrackerHistoryChart({
       .nice()
 
     const bandwidth = xScale.bandwidth()
-    const barWidth = bandwidth * 0.35
+    const barWidth = bandwidth * 0.6
 
     const svg = select(container)
       .append('svg')
       .attr('width', dimensions.width)
       .attr('height', dimensions.height)
+
+    const defs = svg.append('defs')
+
+    // Stripe pattern for over-budget bars
+    const stripePattern = defs
+      .append('pattern')
+      .attr('id', STRIPE_ID)
+      .attr('patternUnits', 'userSpaceOnUse')
+      .attr('width', 8)
+      .attr('height', 8)
+      .attr('patternTransform', 'rotate(45)')
+    stripePattern
+      .append('rect')
+      .attr('width', 4)
+      .attr('height', 8)
+      .attr('fill', 'rgba(255,255,255,0.28)')
+
+    // Gradient defs matching progress-bar colour tokens
+    const makeGrad = (id: string, fromVar: string, toVar: string) => {
+      const grad = defs
+        .append('linearGradient')
+        .attr('id', id)
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '0%')
+      grad.append('stop').attr('offset', '0%').style('stop-color', fromVar)
+      grad.append('stop').attr('offset', '100%').style('stop-color', toVar)
+    }
+    makeGrad(
+      GRAD_SUCCESS_ID,
+      'var(--vantura-chart-bar-success-from)',
+      'var(--vantura-chart-bar-success-to)'
+    )
+    makeGrad(
+      GRAD_WARNING_ID,
+      'var(--vantura-chart-bar-warning-from)',
+      'var(--vantura-chart-bar-warning-to)'
+    )
+    makeGrad(
+      GRAD_DANGER_ID,
+      'var(--vantura-chart-bar-danger-from)',
+      'var(--vantura-chart-bar-danger-to)'
+    )
 
     const g = svg
       .append('g')
@@ -91,10 +147,11 @@ export function TrackerHistoryChart({
 
     const showTooltip = (row: TrackerPeriodHistoryRow, event: MouseEvent) => {
       if (!tooltipEl || !container.parentElement) return
-      const over = row.spent > row.budget
+      const pct =
+        row.budget > 0 ? Math.round((row.spent / row.budget) * 100) : 0
       setTooltipContent(tooltipEl, row.periodLabel, [
+        `Spent: $${formatMoney(row.spent)} (${pct}%)`,
         `Budget: $${formatMoney(row.budget)}`,
-        `Spent: $${formatMoney(row.spent)}${over ? ' (over)' : ''}`,
       ])
       tooltipEl.style.display = 'block'
       positionTooltip(tooltipEl, container, event, 120, 44)
@@ -104,44 +161,29 @@ export function TrackerHistoryChart({
       if (tooltipRef.current) tooltipRef.current.style.display = 'none'
     }
 
-    data.forEach((row) => {
-      const x =
-        (xScale(row.periodLabel) ?? 0) + (bandwidth - barWidth * 2 - 2) / 2
-      const budgetY = yScale(Math.min(row.budget, maxVal))
+    chartData.forEach((row, i) => {
+      const label = displayLabels[i]
+      const x = (xScale(label) ?? 0) + (bandwidth - barWidth) / 2
       const spentY = yScale(Math.min(row.spent, maxVal))
-      const budgetBarHeight = innerHeight - budgetY
       const spentBarHeight = innerHeight - spentY
-      const spentColor = row.spent > row.budget ? SPENT_OVER_COLOR : SPENT_COLOR
 
-      g.append('rect')
-        .attr('class', 'bar-budget')
-        .attr('x', x)
-        .attr('y', budgetY)
-        .attr('width', barWidth)
-        .attr('height', budgetBarHeight)
-        .attr('fill', BUDGET_COLOR)
-        .attr('rx', 2)
-        .attr('ry', 2)
-        .style('cursor', onBarClick ? 'pointer' : 'default')
-        .on('mouseover', function (event: MouseEvent) {
-          showTooltip(row, event)
-          if (!reduceMotion) select(this).style('opacity', 0.8)
-        })
-        .on('mouseout', function () {
-          hideTooltip()
-          select(this).style('opacity', null)
-        })
-        .on('click', () => onBarClick?.(row))
+      const gradId =
+        row.progress >= 81
+          ? GRAD_DANGER_ID
+          : row.progress > 50
+            ? GRAD_WARNING_ID
+            : GRAD_SUCCESS_ID
+      const isOver = row.progress >= 100
 
       g.append('rect')
         .attr('class', 'bar-spent')
-        .attr('x', x + barWidth + 2)
+        .attr('x', x)
         .attr('y', spentY)
         .attr('width', barWidth)
         .attr('height', spentBarHeight)
-        .attr('fill', spentColor)
-        .attr('rx', 2)
-        .attr('ry', 2)
+        .attr('fill', `url(#${gradId})`)
+        .attr('rx', 6)
+        .attr('ry', 6)
         .style('cursor', onBarClick ? 'pointer' : 'default')
         .on('mouseover', function (event: MouseEvent) {
           showTooltip(row, event)
@@ -152,6 +194,37 @@ export function TrackerHistoryChart({
           select(this).style('opacity', null)
         })
         .on('click', () => onBarClick?.(row))
+
+      if (isOver) {
+        g.append('rect')
+          .attr('class', 'bar-spent-stripe')
+          .attr('x', x)
+          .attr('y', spentY)
+          .attr('width', barWidth)
+          .attr('height', spentBarHeight)
+          .attr('fill', `url(#${STRIPE_ID})`)
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .style('pointer-events', 'none')
+      }
+
+      // Percentage label — inside bar if tall enough, above bar if short
+      if (row.progress > 0 && spentBarHeight >= 8) {
+        const pct = Math.round(row.progress)
+        const insideBar = spentBarHeight >= 22
+        g.append('text')
+          .attr('class', 'bar-label')
+          .attr('x', x + barWidth / 2)
+          .attr('y', insideBar ? spentY + spentBarHeight / 2 : spentY - 4)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', insideBar ? 'central' : 'auto')
+          .attr('fill', insideBar ? 'white' : 'currentColor')
+          .attr('font-size', '10')
+          .attr('font-weight', '600')
+          .style('opacity', '0.5')
+          .style('pointer-events', 'none')
+          .text(`${pct}%`)
+      }
     })
 
     const xAxis = axisBottom(xScale)
@@ -159,6 +232,7 @@ export function TrackerHistoryChart({
       .tickSizeOuter(0)
 
     const yAxis = axisLeft(yScale)
+      .ticks(5)
       .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
       .tickSizeOuter(0)
 

@@ -889,7 +889,8 @@ export function getTrackerTransactionsForTable(
     params.push(options.dateFrom)
   }
   if (options?.dateTo) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) < ?'
+    dateFilter +=
+      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
     params.push(options.dateTo)
   }
   params.push(limit, offset)
@@ -947,7 +948,8 @@ export function getTrackerTransactionsCount(
     params.push(options.dateFrom)
   }
   if (options?.dateTo) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) < ?'
+    dateFilter +=
+      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
     params.push(options.dateTo)
   }
   const stmt = db.prepare(

@@ -97,6 +97,13 @@
   --vantura-chart-accent-soft: rgba(255, 159, 67, 0.15);
   --vantura-chart-previous: #6c757d;
   --vantura-chart-average: var(--vantura-chart-series-5);
+  /* Chart bar gradient stops — match --vantura-gradient-* for SVG fills (light) */
+  --vantura-chart-bar-success-from: #84d9d2;
+  --vantura-chart-bar-success-to: #07cdae;
+  --vantura-chart-bar-warning-from: #fed89a;
+  --vantura-chart-bar-warning-to: #e08620;
+  --vantura-chart-bar-danger-from: #ffbf96;
+  --vantura-chart-bar-danger-to: #fe7096;
   /* Tracker / meta badges (light) */
   --vantura-badge-frequency-bg: rgba(242, 166, 84, 0.12);
   --vantura-badge-frequency-fg: #e08620;
@@ -198,6 +205,13 @@
   --vantura-chart-accent-soft: rgba(242, 166, 84, 0.18);
   --vantura-chart-previous: #b0b3c1;
   --vantura-chart-average: var(--vantura-chart-series-5);
+  /* Chart bar gradient stops — match --vantura-gradient-* for SVG fills (dark) */
+  --vantura-chart-bar-success-from: #1a7a6a;
+  --vantura-chart-bar-success-to: #0d4d42;
+  --vantura-chart-bar-warning-from: #b8860b;
+  --vantura-chart-bar-warning-to: #8b6914;
+  --vantura-chart-bar-danger-from: #8b3a4d;
+  --vantura-chart-bar-danger-to: #5c2836;
   /* Tracker / meta badges (dark) */
   --vantura-badge-frequency-bg: rgba(242, 166, 84, 0.22);
   --vantura-badge-frequency-fg: #f2a654;
@@ -1582,6 +1596,17 @@ html[data-theme='dark'] .app-boot-shell {
 .btn-primary:hover {
   background-color: var(--vantura-primary);
   border-color: var(--vantura-primary);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--vantura-primary);
+  --bs-btn-border-color: var(--vantura-primary);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--vantura-primary);
+  --bs-btn-hover-border-color: var(--vantura-primary);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--vantura-primary);
+  --bs-btn-active-border-color: var(--vantura-primary);
+  --bs-btn-focus-shadow-rgb: 182, 109, 255;
 }
 .text-primary {
   color: var(--vantura-primary) !important;
