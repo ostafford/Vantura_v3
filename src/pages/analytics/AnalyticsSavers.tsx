@@ -440,7 +440,7 @@ export function AnalyticsSavers() {
       </p>
 
       {/* Monthly KPIs */}
-      <Card className="mb-4 border">
+      <Card className="grid-margin">
         <Card.Body>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h6 className="text-muted mb-0">{monthName} at a glance</h6>
@@ -500,7 +500,7 @@ export function AnalyticsSavers() {
 
       {/* Per-saver cards */}
       {saverData.length === 0 && (
-        <Card className="mb-4 border">
+        <Card className="grid-margin">
           <Card.Body>
             <p className="text-muted mb-0 small">
               No saver accounts in your synced data. Re-sync after creating
@@ -535,7 +535,7 @@ export function AnalyticsSavers() {
           return (
             <div
               key={account.id}
-              className="mb-4"
+              className="grid-margin"
               onDragOver={(e) => handleDragOver(e, account.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, account.id)}
@@ -548,7 +548,7 @@ export function AnalyticsSavers() {
                 borderRadius: 8,
               }}
             >
-              <Card className="border">
+              <Card>
                 {/* Card header: saver identity + goal — mirrors tracker card layout */}
                 <Card.Header className="py-3">
                   {/* Row 1: name (left) + balance (right) */}
@@ -768,19 +768,21 @@ export function AnalyticsSavers() {
                 <Collapse in={expandedCharts.has(account.id)}>
                   <div>
                     <Card.Body>
-                      <p className="small text-muted mb-2">
-                        Monthly contributions — last 12 months
-                      </p>
                       {hasMonthlyActivity ? (
-                        <div
-                          style={{ width: '100%', height: 200 }}
-                          className="mb-4"
-                        >
-                          <SaverMonthlyFlowChart
-                            data={monthlyFlow}
-                            aria-label={`${account.display_name} monthly contributions`}
-                          />
-                        </div>
+                        <>
+                          <p className="small text-muted mb-2">
+                            Monthly contributions — last 12 months
+                          </p>
+                          <div
+                            style={{ width: '100%', height: 200 }}
+                            className="mb-4"
+                          >
+                            <SaverMonthlyFlowChart
+                              data={monthlyFlow}
+                              aria-label={`${account.display_name} monthly contributions`}
+                            />
+                          </div>
+                        </>
                       ) : (
                         <p className="small text-muted mb-4">
                           No transfers recorded for this saver in the last 12
@@ -788,17 +790,21 @@ export function AnalyticsSavers() {
                         </p>
                       )}
 
-                      <p className="small text-muted mb-2">Balance over time</p>
                       {hasBalance && derivedBalances.length >= 2 ? (
-                        <div
-                          style={{ width: '100%', height: 180 }}
-                          className="mb-4"
-                        >
-                          <SaverBalanceChart
-                            data={derivedBalances}
-                            aria-label={`${account.display_name} balance trend`}
-                          />
-                        </div>
+                        <>
+                          <p className="small text-muted mb-2">
+                            Balance over time
+                          </p>
+                          <div
+                            style={{ width: '100%', height: 180 }}
+                            className="mb-4"
+                          >
+                            <SaverBalanceChart
+                              data={derivedBalances}
+                              aria-label={`${account.display_name} balance trend`}
+                            />
+                          </div>
+                        </>
                       ) : (
                         <p className="small text-muted mb-4">
                           Current balance:{' '}
@@ -940,7 +946,7 @@ export function AnalyticsSavers() {
 
       {/* Home loan */}
       {homeLoans.length > 0 ? (
-        <Card className="border">
+        <Card className="grid-margin">
           <Card.Body>
             <h6 className="text-muted mb-2">Home loan</h6>
             <p className="small text-muted mb-3">
@@ -953,7 +959,7 @@ export function AnalyticsSavers() {
             <Row className="g-3">
               {homeLoans.map((a) => (
                 <Col key={a.id} xs={12} md={6} lg={4}>
-                  <Card className="h-100 border">
+                  <Card className="h-100">
                     <Card.Body>
                       <h6 className="mb-1">{a.display_name}</h6>
                       <p className="mb-0 h5">${formatMoney(a.balance)}</p>

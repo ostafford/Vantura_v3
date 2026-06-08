@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
-import { Card, Row, Col, Form } from 'react-bootstrap'
+import { Card, Row, Col, Form, ProgressBar } from 'react-bootstrap'
 import {
   getTrackersWithProgressForPeriod,
   type TrackerResetFrequency,
@@ -22,20 +22,40 @@ const FREQUENCY_ORDER: TrackerResetFrequency[] = [
   'MONTHLY',
 ]
 
+function getTrackerProgressStyle(progress: number): {
+  variant: 'success' | 'warning' | 'danger'
+  striped: boolean
+  animated: boolean
+} {
+  if (progress >= 100)
+    return { variant: 'danger', striped: true, animated: true }
+  if (progress >= 81)
+    return { variant: 'danger', striped: false, animated: false }
+  if (progress > 50)
+    return { variant: 'warning', striped: false, animated: false }
+  return { variant: 'success', striped: false, animated: false }
+}
+
 export function AnalyticsTrackers() {
   const [frequencyFilter, setFrequencyFilter] = useState<string>('')
-  useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
-  const trackers = getTrackersWithProgressForPeriod(0)
-  const filtered = frequencyFilter
-    ? trackers.filter((t) => t.reset_frequency === frequencyFilter)
-    : trackers
-
-  const sortedTrackers = [...filtered].sort(
-    (a, b) =>
-      FREQUENCY_ORDER.indexOf(a.reset_frequency as TrackerResetFrequency) -
-      FREQUENCY_ORDER.indexOf(b.reset_frequency as TrackerResetFrequency)
+  const trackers = useMemo(
+    () => getTrackersWithProgressForPeriod(0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lastSyncCompletedAt]
   )
+
+  const sortedTrackers = useMemo(() => {
+    const filtered = frequencyFilter
+      ? trackers.filter((t) => t.reset_frequency === frequencyFilter)
+      : trackers
+    return [...filtered].sort(
+      (a, b) =>
+        FREQUENCY_ORDER.indexOf(a.reset_frequency as TrackerResetFrequency) -
+        FREQUENCY_ORDER.indexOf(b.reset_frequency as TrackerResetFrequency)
+    )
+  }, [trackers, frequencyFilter])
 
   return (
     <>
@@ -65,7 +85,7 @@ export function AnalyticsTrackers() {
             </Col>
           </Row>
           {sortedTrackers.length === 0 ? (
-            <p className="text-muted mb-0">
+            <p className="text-muted small mb-0">
               {trackers.length === 0
                 ? 'No trackers yet. Add one from the dashboard to get started.'
                 : 'No trackers match the selected frequency.'}
@@ -125,6 +145,13 @@ export function AnalyticsTrackers() {
                           <i
                             className="mdi mdi-chevron-right text-muted fs-5"
                             aria-hidden
+                          />
+                        </div>
+                        <div className="mt-2">
+                          <ProgressBar
+                            now={Math.min(100, t.progress)}
+                            {...getTrackerProgressStyle(t.progress)}
+                            style={{ height: 8 }}
                           />
                         </div>
                       </Card.Body>

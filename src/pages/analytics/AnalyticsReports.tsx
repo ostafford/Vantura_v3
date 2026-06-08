@@ -8,6 +8,7 @@ import {
   Button,
   OverlayTrigger,
   Tooltip,
+  ProgressBar,
 } from 'react-bootstrap'
 import {
   getMonthComparison,
@@ -39,7 +40,7 @@ import {
 } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
-import { formatMoney, formatDollars } from '@/lib/format'
+import { formatMoney, formatDollars, formatDate } from '@/lib/format'
 import {
   monthNameLong,
   previousCalendarMonth,
@@ -84,68 +85,31 @@ function nextCalendarMonth(
   return { year, month: month + 1 }
 }
 
+const FREQUENCY_LABELS: Record<string, string> = {
+  WEEKLY: 'Weekly',
+  FORTNIGHTLY: 'Fortnightly',
+  MONTHLY: 'Monthly',
+  PAYDAY: 'Payday',
+}
+
 function trackerBarColor(progress: number): string {
-  if (progress >= 100) return 'var(--bs-danger)'
   if (progress >= 81) return 'var(--bs-danger)'
   if (progress > 50) return 'var(--bs-warning)'
   return 'var(--bs-success)'
 }
 
-function TrackerProgressBar({
-  progress,
-  label,
-}: {
-  progress: number
-  label?: string
-}) {
-  const isOver = progress >= 100
-  const barWidth = Math.min(100, progress)
-  const color = trackerBarColor(progress)
-  return (
-    <div
-      style={{
-        height: 14,
-        borderRadius: 4,
-        background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      <div
-        style={{
-          width: `${barWidth}%`,
-          height: '100%',
-          borderRadius: 4,
-          background: color,
-          transition: 'width 0.3s ease',
-          ...(isOver && {
-            backgroundImage:
-              'repeating-linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)',
-            backgroundSize: '1rem 1rem',
-            animation: 'progress-bar-stripes 1s linear infinite',
-          }),
-        }}
-      />
-      {label && (
-        <span
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.7rem',
-            fontWeight: 700,
-            color: 'white',
-            textShadow: '0 0 4px rgba(0,0,0,0.5)',
-            pointerEvents: 'none',
-          }}
-        >
-          {label}
-        </span>
-      )}
-    </div>
-  )
+function getProgressVariant(progress: number): {
+  variant: 'success' | 'warning' | 'danger'
+  striped: boolean
+  animated: boolean
+} {
+  if (progress >= 100)
+    return { variant: 'danger', striped: true, animated: true }
+  if (progress >= 81)
+    return { variant: 'danger', striped: false, animated: false }
+  if (progress > 50)
+    return { variant: 'warning', striped: false, animated: false }
+  return { variant: 'success', striped: false, animated: false }
 }
 
 type ChargeGroup = {
@@ -592,7 +556,9 @@ export function AnalyticsReports() {
 
   const availableFrequencies = useMemo(() => {
     const seen = new Set(trackers.map((t) => t.reset_frequency.toUpperCase()))
-    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'].filter((f) => seen.has(f))
+    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY', 'PAYDAY'].filter((f) =>
+      seen.has(f)
+    )
   }, [trackers])
 
   useEffect(() => {
@@ -652,7 +618,7 @@ export function AnalyticsReports() {
     moneyIn > 0 ? Math.round((committedTotal / moneyIn) * 100) : 0
 
   const periodLabel = isCustomRange
-    ? `${dateFrom} → ${dateTo}`
+    ? `${formatDate(dateFrom)} → ${formatDate(dateTo)}`
     : `${monthNameLong(year, month)} ${year}`
 
   // --- Navigation ---
@@ -854,7 +820,7 @@ export function AnalyticsReports() {
         </Card.Header>
         <Card.Body>
           {chartData.length === 0 ? (
-            <p className="text-muted mb-0">
+            <p className="text-muted small mb-0">
               No spending recorded for this period.
             </p>
           ) : (
@@ -890,7 +856,7 @@ export function AnalyticsReports() {
                 )}
                 {availableFrequencies.map((f) => (
                   <option key={f} value={f}>
-                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                    {FREQUENCY_LABELS[f] ?? f}
                   </option>
                 ))}
               </Form.Select>
@@ -971,9 +937,11 @@ export function AnalyticsReports() {
                                 </span>
                               </span>
                             </div>
-                            <TrackerProgressBar
-                              progress={p.progress}
+                            <ProgressBar
+                              now={Math.min(100, p.progress)}
+                              {...getProgressVariant(p.progress)}
                               label={`${Math.round(p.progress)}%`}
+                              style={{ height: 8 }}
                             />
                           </div>
                         ))}
@@ -1056,9 +1024,11 @@ export function AnalyticsReports() {
                             )}
                           </div>
                         </div>
-                        <TrackerProgressBar
-                          progress={progress}
+                        <ProgressBar
+                          now={Math.min(100, progress)}
+                          {...getProgressVariant(progress)}
                           label={`${Math.round(progress)}%`}
+                          style={{ height: 8 }}
                         />
                       </li>
                     </OverlayTrigger>
@@ -1089,12 +1059,22 @@ export function AnalyticsReports() {
                         <div className="border rounded p-3">
                           <div className="d-flex justify-content-between align-items-start mb-1">
                             <span className="fw-medium">{tracker.name}</span>
-                            <span
-                              className="badge bg-secondary"
-                              style={{ fontSize: '0.65rem' }}
-                            >
-                              {tracker.reset_frequency}
-                            </span>
+                            {tracker.badge_color?.trim() ? (
+                              <span
+                                className="badge badge-frequency-custom"
+                                style={{
+                                  backgroundColor: tracker.badge_color.trim(),
+                                }}
+                              >
+                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                  tracker.reset_frequency}
+                              </span>
+                            ) : (
+                              <span className="badge badge-frequency-default">
+                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                  tracker.reset_frequency}
+                              </span>
+                            )}
                           </div>
                           <div className="small text-muted mb-3">
                             ${formatMoney(spent)} total
@@ -1130,9 +1110,11 @@ export function AnalyticsReports() {
                                   </span>
                                 </span>
                               </div>
-                              <TrackerProgressBar
-                                progress={p.progress}
+                              <ProgressBar
+                                now={Math.min(100, p.progress)}
+                                {...getProgressVariant(p.progress)}
                                 label={`${Math.round(p.progress)}%`}
+                                style={{ height: 8 }}
                               />
                             </div>
                           ))}
@@ -1191,16 +1173,29 @@ export function AnalyticsReports() {
                         <div className="border rounded p-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <span className="fw-medium">{tracker.name}</span>
-                            <span
-                              className="badge bg-secondary"
-                              style={{ fontSize: '0.65rem' }}
-                            >
-                              {tracker.reset_frequency}
-                            </span>
+                            {tracker.badge_color?.trim() ? (
+                              <span
+                                className="badge badge-frequency-custom"
+                                style={{
+                                  backgroundColor: tracker.badge_color.trim(),
+                                }}
+                              >
+                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                  tracker.reset_frequency}
+                              </span>
+                            ) : (
+                              <span className="badge badge-frequency-default">
+                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                  tracker.reset_frequency}
+                              </span>
+                            )}
                           </div>
-                          <TrackerProgressBar
-                            progress={progress}
+                          <ProgressBar
+                            now={Math.min(100, progress)}
+                            {...getProgressVariant(progress)}
                             label={`${Math.round(progress)}%`}
+                            style={{ height: 8 }}
+                            className="mb-2"
                           />
                           <div className="small mt-2">
                             <span style={{ color: trackerBarColor(progress) }}>

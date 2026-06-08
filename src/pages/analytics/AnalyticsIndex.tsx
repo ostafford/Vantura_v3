@@ -13,7 +13,7 @@ export function AnalyticsIndex() {
             className="text-decoration-none"
             style={{ color: 'inherit' }}
           >
-            <Card className="h-100 border">
+            <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
                   className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
@@ -46,7 +46,7 @@ export function AnalyticsIndex() {
             className="text-decoration-none"
             style={{ color: 'inherit' }}
           >
-            <Card className="h-100 border">
+            <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
                   className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
@@ -79,7 +79,7 @@ export function AnalyticsIndex() {
             className="text-decoration-none"
             style={{ color: 'inherit' }}
           >
-            <Card className="h-100 border">
+            <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
                   className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
@@ -94,8 +94,8 @@ export function AnalyticsIndex() {
                 <div>
                   <h6 className="mb-1 fw-semibold">Savers</h6>
                   <p className="mb-0 text-muted small">
-                    Saver balances from Up (API account type SAVER), plus links
-                    to saver-related transactions.
+                    Track saver account balances, set savings goals, and view
+                    monthly contribution history.
                   </p>
                   <span className="small text-primary mt-1 d-inline-block">
                     View savers{' '}
