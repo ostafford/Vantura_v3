@@ -5,9 +5,6 @@
 import { getAppSetting, setAppSetting } from '@/db'
 
 export const DASHBOARD_SECTION_ORDER_KEY = 'dashboard_section_order'
-export const DASHBOARD_SECTION_SIZES_KEY = 'dashboard_section_sizes'
-
-export type DashboardSectionSize = 'full' | 'compact'
 
 export const DASHBOARD_SECTION_IDS = [
   'month_summary',
@@ -74,44 +71,4 @@ export const DASHBOARD_SECTION_LABELS: Record<DashboardSectionId, string> = {
   insights: 'Weekly insights',
   trackers: 'Trackers',
   upcoming: 'Upcoming transactions',
-}
-
-export function getDashboardSectionSizes(): Record<
-  DashboardSectionId,
-  DashboardSectionSize
-> {
-  try {
-    const raw = getAppSetting(DASHBOARD_SECTION_SIZES_KEY)
-    if (!raw || typeof raw !== 'string') return defaultSectionSizes()
-    const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object') return defaultSectionSizes()
-    const p = parsed as Record<string, string>
-    const result = { ...defaultSectionSizes() }
-    for (const id of DASHBOARD_SECTION_IDS) {
-      const v = p[id]
-      if (v === 'full' || v === 'compact') result[id] = v
-    }
-    return result
-  } catch {
-    return defaultSectionSizes()
-  }
-}
-
-function defaultSectionSizes(): Record<
-  DashboardSectionId,
-  DashboardSectionSize
-> {
-  return DASHBOARD_SECTION_IDS.reduce(
-    (acc, id) => {
-      acc[id] = 'full'
-      return acc
-    },
-    {} as Record<DashboardSectionId, DashboardSectionSize>
-  )
-}
-
-export function setDashboardSectionSizes(
-  sizes: Record<DashboardSectionId, DashboardSectionSize>
-): void {
-  setAppSetting(DASHBOARD_SECTION_SIZES_KEY, JSON.stringify(sizes))
 }

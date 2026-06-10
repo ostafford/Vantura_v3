@@ -940,8 +940,12 @@ export function AnalyticsReports() {
                             <ProgressBar
                               now={Math.min(100, p.progress)}
                               {...getProgressVariant(p.progress)}
-                              label={`${Math.round(p.progress)}%`}
-                              style={{ height: 8 }}
+                              label={
+                                <span
+                                  style={{ opacity: 0.5 }}
+                                >{`${Math.round(p.progress)}%`}</span>
+                              }
+                              style={{ height: 13 }}
                             />
                           </div>
                         ))}
@@ -1027,8 +1031,12 @@ export function AnalyticsReports() {
                         <ProgressBar
                           now={Math.min(100, progress)}
                           {...getProgressVariant(progress)}
-                          label={`${Math.round(progress)}%`}
-                          style={{ height: 8 }}
+                          label={
+                            <span
+                              style={{ opacity: 0.5 }}
+                            >{`${Math.round(progress)}%`}</span>
+                          }
+                          style={{ height: 13 }}
                         />
                       </li>
                     </OverlayTrigger>
@@ -1113,8 +1121,12 @@ export function AnalyticsReports() {
                               <ProgressBar
                                 now={Math.min(100, p.progress)}
                                 {...getProgressVariant(p.progress)}
-                                label={`${Math.round(p.progress)}%`}
-                                style={{ height: 8 }}
+                                label={
+                                  <span
+                                    style={{ opacity: 0.5 }}
+                                  >{`${Math.round(p.progress)}%`}</span>
+                                }
+                                style={{ height: 13 }}
                               />
                             </div>
                           ))}
@@ -1193,8 +1205,12 @@ export function AnalyticsReports() {
                           <ProgressBar
                             now={Math.min(100, progress)}
                             {...getProgressVariant(progress)}
-                            label={`${Math.round(progress)}%`}
-                            style={{ height: 8 }}
+                            label={
+                              <span
+                                style={{ opacity: 0.5 }}
+                              >{`${Math.round(progress)}%`}</span>
+                            }
+                            style={{ height: 13 }}
                             className="mb-2"
                           />
                           <div className="small mt-2">

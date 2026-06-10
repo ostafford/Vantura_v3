@@ -179,5 +179,5 @@ export function getSpendableBalance(): number {
   const available = getAvailableBalance()
   const reserved = getReservedAmount()
   const held = getHeldTransactionTotal()
-  return Math.max(0, available - reserved - held)
+  return available - reserved - held
 }

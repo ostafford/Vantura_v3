@@ -36,6 +36,8 @@ import {
   markNotifiedToday,
   showNotification,
 } from '@/lib/notifications'
+import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
+import { toast } from '@/stores/toastStore'
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
 const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
 
@@ -47,6 +49,7 @@ const TOUR_DATA_ATTRS: Partial<Record<DashboardSectionId, string>> = {
 
 export function Dashboard() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const isSyncing = useStore(syncStore, (s) => s.syncing)
   const [dataVersion, setDataVersion] = useState(0)
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>(() =>
     getDashboardSectionOrder()
@@ -105,8 +108,12 @@ export function Dashboard() {
     effectiveThresholdCents != null &&
     effectiveThresholdCents > 0 &&
     spendableCents < effectiveThresholdCents
-  const spendableGradient = isSpendableLow ? 'danger' : 'success'
-
+  const spendableGradient =
+    spendableCents < 0 || isSpendableLow ? 'danger' : 'success'
+  const spendableDisplayValue =
+    spendableCents < 0
+      ? `−$${formatMoney(Math.abs(spendableCents))}`
+      : undefined
   const isStale = lastSyncAgeMs != null && lastSyncAgeMs > 60 * 60 * 1000
   const staleHours =
     isStale && lastSyncAgeMs != null
@@ -117,8 +124,7 @@ export function Dashboard() {
     (nextPayday && nextPayday.trim() !== ''
       ? `$${formatMoney(reservedCents)} reserved until ${formatShortDate(nextPayday)}`
       : `$${formatMoney(reservedCents)} reserved for upcoming`) +
-    (heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : '') +
-    (isStale ? ` · data ${staleHours}h old` : '')
+    (heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : '')
   const availableProjectedSubtitle =
     payAmountCents != null
       ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}${heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : ''}`
@@ -130,36 +136,76 @@ export function Dashboard() {
       : ''
 
   const spendableTooltip =
-    (isSpendableLow
-      ? 'Spendable is below your alert threshold.'
-      : 'Spendable = Available minus held transactions minus reserved upcoming charges. Click to set alert threshold.') +
+    (spendableCents < 0
+      ? 'Spendable is negative — reserved charges and held transactions exceed your available balance.'
+      : isSpendableLow
+        ? 'Spendable is below your alert threshold.'
+        : 'Spendable = Available minus held transactions minus reserved upcoming charges. Click to set alert threshold.') +
     heldNote +
     (payAmountCents != null
-      ? ` After payday (before new spending): about $${formatMoney(spendableCents)} + $${formatMoney(payAmountCents)} = $${formatMoney(spendableCents + payAmountCents)}.`
+      ? (() => {
+          const projected = spendableCents + payAmountCents
+          const fmtSigned = (c: number) =>
+            c < 0 ? `−$${formatMoney(Math.abs(c))}` : `$${formatMoney(c)}`
+          return ` After payday (before new spending): about ${fmtSigned(spendableCents)} + $${formatMoney(payAmountCents)} = ${fmtSigned(projected)}.`
+        })()
       : '')
 
-  const headerDate = useMemo(() => {
-    const now = new Date()
-    return `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
-  }, [])
+  const now = new Date()
+  const headerDate = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
 
   const dueSoon = useMemo(
     () => getDueSoonCharges(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, dataVersion]
   )
-  const reservedSubtitle = useMemo(() => {
+  const dueSoonAlert = useMemo(() => {
     const nextDue = dueSoon[0]
-    if (!nextDue) return undefined
+    if (!nextDue) return null
     const days = daysUntilCharge(nextDue.next_charge_date)
-    const dayText = days === 0 ? 'today' : `${days} day${days === 1 ? '' : 's'}`
+    const dayText =
+      days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`
     return (
-      <>
-        <i className="mdi mdi-bell-ring me-1" aria-hidden />
-        Due: {nextDue.name} (${formatMoney(nextDue.amount)}) - {dayText}
-      </>
+      <div
+        className="alert alert-warning d-flex align-items-center gap-2 py-2 mb-4"
+        role="alert"
+      >
+        <i className="mdi mdi-bell-ring flex-shrink-0" aria-hidden />
+        <span>
+          <strong>Due soon:</strong> {nextDue.name} ($
+          {formatMoney(nextDue.amount)}) — {dayText}
+          {dueSoon.length > 1 && (
+            <span className="text-muted ms-2">+{dueSoon.length - 1} more</span>
+          )}
+        </span>
+      </div>
     )
   }, [dueSoon])
+
+  const handleManualSync = useCallback(async () => {
+    const token = sessionStore.getState().getToken()
+    if (!token || syncStore.getState().syncing) return
+    if (getAppSetting('demo_mode') === '1') {
+      toast.info('Demo mode – no sync.')
+      return
+    }
+    syncStore.getState().setSyncing(true)
+    try {
+      await performSync(token, () => {})
+      syncStore.getState().syncCompleted()
+      toast.success('Sync complete. Data updated.')
+    } catch (err) {
+      const message =
+        err instanceof UpBankUnauthorizedError
+          ? SYNC_401_MESSAGE
+          : err instanceof Error
+            ? err.message
+            : 'Sync failed. Please try again.'
+      toast.error(message)
+    } finally {
+      syncStore.getState().setSyncing(false)
+    }
+  }, [])
 
   const openThresholdModal = useCallback(() => {
     const raw = getAppSetting(SPENDABLE_ALERT_KEY)
@@ -343,20 +389,54 @@ export function Dashboard() {
     <div>
       <div className="page-header">
         <h3 className="page-title dashboard-title">Dashboard</h3>
-        <span className="text-muted" style={{ fontSize: '0.875rem' }}>
-          {headerDate}
-        </span>
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted" style={{ fontSize: '0.875rem' }}>
+            {headerDate}
+          </span>
+          {isStale && (
+            <span
+              className="badge bg-warning text-dark"
+              title={`Data is ${staleHours}h old — sync to refresh`}
+            >
+              {staleHours}h old
+            </span>
+          )}
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            aria-busy={isSyncing}
+            aria-label="Sync now"
+            title={
+              lastSyncAgeMs != null
+                ? `Last synced ${Math.round(lastSyncAgeMs / 60000)} min ago`
+                : 'Sync now'
+            }
+          >
+            {isSyncing ? (
+              <span
+                className="spinner-border spinner-border-sm"
+                role="status"
+                aria-hidden="true"
+              />
+            ) : (
+              <i className="mdi mdi-sync" aria-hidden />
+            )}
+          </Button>
+        </div>
       </div>
       <Row className="g-3 mb-4" data-tour="balance-cards">
-        <Col md={4} className="stretch-card">
+        <Col md={6} className="stretch-card">
           <StatCard
             title="Available"
             value={availableCents}
             subtitle={availableProjectedSubtitle}
             gradient="success"
+            tooltip="Sum of all transactional account balances (excludes savers). Spendable deducts reserved upcoming charges and any held transactions."
           />
         </Col>
-        <Col md={4} className="stretch-card">
+        <Col md={6} className="stretch-card">
           <div
             role="button"
             tabIndex={0}
@@ -373,21 +453,15 @@ export function Dashboard() {
             <StatCard
               title="Spendable"
               value={spendableCents}
+              displayValue={spendableDisplayValue}
               subtitle={spendableSubtitle}
               gradient={spendableGradient}
               tooltip={spendableTooltip}
             />
           </div>
         </Col>
-        <Col md={4} className="stretch-card">
-          <StatCard
-            title="Reserved"
-            value={reservedCents}
-            subtitle={reservedSubtitle}
-            gradient="danger"
-          />
-        </Col>
       </Row>
+      {dueSoonAlert}
 
       <Modal
         show={showThresholdModal}

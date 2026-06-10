@@ -123,15 +123,23 @@ function UpcomingCalendar({
                     <button
                       key={c.id}
                       type="button"
-                      className="btn btn-link btn-sm p-0 text-start text-truncate"
+                      className="btn btn-link btn-sm p-0 text-start d-flex flex-column"
                       style={{ fontSize: '0.7rem', maxWidth: '100%' }}
                       onClick={(e) => {
                         e.stopPropagation()
                         onChargeClick(c)
                       }}
-                      title={`${c.name} $${formatMoney(c.amount)}`}
+                      aria-label={`${c.name} $${formatMoney(c.amount)}`}
                     >
-                      {c.name}
+                      <span
+                        className="text-truncate"
+                        style={{ maxWidth: '100%' }}
+                      >
+                        {c.name}
+                      </span>
+                      <span className="text-muted">
+                        ${formatMoney(c.amount)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -167,6 +175,7 @@ export function UpcomingSection({
   const [reminderDaysBefore, setReminderDaysBefore] = useState<string>('')
   const [isSubscription, setIsSubscription] = useState(false)
   const [cancelByDate, setCancelByDate] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date()
@@ -283,11 +292,8 @@ export function UpcomingSection({
 
   function handleDelete() {
     if (!editingCharge) return
-    if (
-      !window.confirm(`Delete "${editingCharge.name}"? This cannot be undone.`)
-    )
-      return
     deleteUpcomingCharge(editingCharge.id)
+    setShowDeleteConfirm(false)
     setShowModal(false)
     setRefresh((r) => r + 1)
     onUpcomingChange?.()
@@ -334,7 +340,7 @@ export function UpcomingSection({
             <span className="badge badge-reminder ms-1">{dueLabel}</span>
           )}
         </td>
-        <td>{c.frequency}</td>
+        <td>{c.frequency.charAt(0) + c.frequency.slice(1).toLowerCase()}</td>
         <td className="text-end">${formatMoney(c.amount)}</td>
       </tr>
     )
@@ -724,7 +730,7 @@ export function UpcomingSection({
             <Button
               variant="outline-danger"
               className="me-auto"
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               Delete
             </Button>
@@ -734,6 +740,33 @@ export function UpcomingSection({
           </Button>
           <Button variant="primary" onClick={handleSave}>
             Save
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Delete upcoming charge</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Delete <strong>{editingCharge?.name}</strong>? This cannot be
+            undone.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleDelete}>
+            Delete
           </Button>
         </Modal.Footer>
       </Modal>
