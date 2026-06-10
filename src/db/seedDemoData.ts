@@ -91,9 +91,29 @@ export function seedDemoData(): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
 
-  const nextPay = new Date()
-  nextPay.setDate(nextPay.getDate() + 14)
-  const nextPayday = nextPay.toISOString().slice(0, 10)
+  // Payday: MONTHLY on the 15th. Derive next_payday correctly so the dashboard
+  // "reserved until" date and PAYDAY tracker period match the payday_day setting.
+  const today = new Date()
+  const payDayNum = 15
+  let nextPayDateObj = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), payDayNum)
+  )
+  if (nextPayDateObj.getTime() <= today.getTime()) {
+    nextPayDateObj = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, payDayNum)
+    )
+  }
+  const nextPayday = nextPayDateObj.toISOString().slice(0, 10)
+  // Last payday = one month before next payday (used for PAYDAY tracker period start)
+  const lastPaydayStr = new Date(
+    Date.UTC(
+      nextPayDateObj.getUTCFullYear(),
+      nextPayDateObj.getUTCMonth() - 1,
+      payDayNum
+    )
+  )
+    .toISOString()
+    .slice(0, 10)
 
   setAppSetting('payday_frequency', 'MONTHLY')
   setAppSetting('payday_day', '15')
@@ -119,6 +139,31 @@ export function seedDemoData(): void {
     `INSERT OR REPLACE INTO accounts (id, display_name, account_type, balance, created_at, updated_at, synced_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [DEMO_SAVER_2_ID, 'Holiday Fund', 'SAVER', 200000, NOW, NOW, NOW]
+  )
+
+  // Saver goals: Rainy Day is on-track (rate > required), Holiday Fund is behind pace
+  run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
+    300000,
+    DEMO_SAVER_ID,
+  ]) // $3,000 goal
+  run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
+    500000,
+    DEMO_SAVER_2_ID,
+  ]) // $5,000 goal
+  // Goal target dates stored as app_settings (6 months for Rainy Day, 3 months for Holiday Fund)
+  const sixMonthsOut = new Date()
+  sixMonthsOut.setUTCMonth(sixMonthsOut.getUTCMonth() + 6)
+  sixMonthsOut.setUTCDate(1)
+  const threeMonthsOut = new Date()
+  threeMonthsOut.setUTCMonth(threeMonthsOut.getUTCMonth() + 3)
+  threeMonthsOut.setUTCDate(1)
+  setAppSetting(
+    `saver_goal_date_${DEMO_SAVER_ID}`,
+    sixMonthsOut.toISOString().slice(0, 10)
+  )
+  setAppSetting(
+    `saver_goal_date_${DEMO_SAVER_2_ID}`,
+    threeMonthsOut.toISOString().slice(0, 10)
   )
 
   // Categories: parent + children (expanded)
@@ -445,7 +490,10 @@ export function seedDemoData(): void {
     )
   }
 
-  // Round-up transactions: 7 parents from last 2 weeks
+  // Round-up transactions: 7 round-ups from the last 2 weeks.
+  // Spending side: negative amount (deducted from everyday account, transferred to saver).
+  // Saver side: positive credit with transaction_type = 'Round Up' so the Savers page
+  // can compute the "Loose Change accumulation" KPI via the saverRoundUps query.
   const roundUpParents = [0, 2, 4, 6, 8, 10, 12]
   const roundUpCents = [23, 47, 12, 88, 56, 31, 94]
   roundUpParents.forEach((parentD, ruIdx) => {
@@ -453,6 +501,8 @@ export function seedDemoData(): void {
     date.setDate(date.getDate() - parentD)
     const dateStr = date.toISOString().slice(0, 10)
     const iso = dateStr + 'T12:01:00.000Z'
+    const amount = roundUpCents[ruIdx]
+    // Spending account side (debit — round-up leaves the everyday account)
     run(
       `INSERT OR REPLACE INTO transactions (
         id, account_id, status, raw_text, description, message, is_categorizable,
@@ -467,10 +517,10 @@ export function seedDemoData(): void {
         null,
         'Round Up',
         null,
-        1,
+        0,
         null,
         null,
-        roundUpCents[ruIdx],
+        -amount,
         'AUD',
         dateStr,
         iso,
@@ -479,12 +529,42 @@ export function seedDemoData(): void {
         DEMO_SAVER_ID,
         null,
         NOW,
-        roundUpCents[ruIdx],
+        amount,
+      ]
+    )
+    // Saver account side (credit) — transaction_type lets the saverRoundUps query find it
+    run(
+      `INSERT OR REPLACE INTO transactions (
+        id, account_id, status, raw_text, description, message, is_categorizable,
+        category_id, parent_category_id, amount, currency, settled_at, created_at,
+        is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at,
+        transaction_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `demo-roundup-${parentD}-credit`,
+        DEMO_SAVER_ID,
+        'SETTLED',
+        null,
+        'Round Up',
+        null,
+        0,
+        null,
+        null,
+        amount,
+        'AUD',
+        dateStr,
+        iso,
+        0,
+        null,
+        DEMO_ACCOUNT_ID,
+        null,
+        NOW,
+        'Round Up',
       ]
     )
   })
 
-  // Trackers: MONTHLY, WEEKLY, FORTNIGHTLY for variety
+  // Trackers: MONTHLY, WEEKLY, FORTNIGHTLY, PAYDAY for full frequency coverage
   const todayStr = new Date().toISOString().slice(0, 10)
   const lastResetStr = firstOfCurrentMonthUTC()
   const nextResetStr = firstOfNextMonthUTC()
@@ -494,12 +574,12 @@ export function seedDemoData(): void {
   const fortNext = fortnightlyNextReset(fortLast)
 
   run(
-    `DELETE FROM trackers WHERE name IN ('Groceries', 'Dining & Takeaway', 'Coffee', 'Entertainment')`
+    `DELETE FROM trackers WHERE name IN ('Groceries', 'Dining & Takeaway', 'Coffee', 'Entertainment', 'Transport')`
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       'Groceries',
       80000,
@@ -509,6 +589,7 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
+      '#16a34a',
     ]
   )
   const tracker1Result = db.exec('SELECT last_insert_rowid()')
@@ -519,8 +600,8 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       'Dining & Takeaway',
       30000,
@@ -530,6 +611,7 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
+      '#dc2626',
     ]
   )
   const tracker2Result = db.exec('SELECT last_insert_rowid()')
@@ -540,9 +622,19 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-    ['Coffee', 8000, 'WEEKLY', 1, weeklyLast, weeklyLast, weeklyNext, NOW]
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    [
+      'Coffee',
+      8000,
+      'WEEKLY',
+      1,
+      weeklyLast,
+      weeklyLast,
+      weeklyNext,
+      NOW,
+      '#f59e0b',
+    ]
   )
   const tracker3Result = db.exec('SELECT last_insert_rowid()')
   const tracker3Id = (tracker3Result[0]?.values?.[0]?.[0] as number) ?? 3
@@ -552,8 +644,8 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       'Entertainment',
       20000,
@@ -563,6 +655,7 @@ export function seedDemoData(): void {
       fortLast,
       fortNext,
       NOW,
+      '#8b5cf6',
     ]
   )
   const tracker4Result = db.exec('SELECT last_insert_rowid()')
@@ -572,9 +665,34 @@ export function seedDemoData(): void {
     [tracker4Id, catEntertainment]
   )
 
-  // Upcoming charges with bill reminders
+  // PAYDAY tracker: period aligned to the monthly payday on the 15th.
+  // This demonstrates the PAYDAY frequency and shows a different period tab on the dashboard.
   run(
-    `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain')`
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    [
+      'Transport',
+      15000,
+      'PAYDAY',
+      null,
+      lastPaydayStr,
+      lastPaydayStr,
+      nextPayday,
+      NOW,
+      '#0891b2',
+    ]
+  )
+  const tracker5Result = db.exec('SELECT last_insert_rowid()')
+  const tracker5Id = (tracker5Result[0]?.values?.[0]?.[0] as number) ?? 5
+  run(
+    `INSERT OR IGNORE INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
+    [tracker5Id, catTransport]
+  )
+
+  // Upcoming charges with bill reminders — covers all supported frequencies and
+  // both subscription and non-subscription types so the full UI surface is populated.
+  run(
+    `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain', 'Spotify')`
   )
 
   const nextCharge1 = new Date()
@@ -582,6 +700,8 @@ export function seedDemoData(): void {
   const rentNextChargeDate = firstOfNextMonthUTC()
   const gymNext = new Date()
   gymNext.setDate(gymNext.getDate() + 2)
+  const spotifyNext = new Date()
+  spotifyNext.setDate(spotifyNext.getDate() + 12)
   const insuranceNext = new Date()
   insuranceNext.setMonth(insuranceNext.getMonth() + 2)
   insuranceNext.setDate(15)
@@ -633,6 +753,22 @@ export function seedDemoData(): void {
     `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
+      'Spotify',
+      1299,
+      'MONTHLY',
+      spotifyNext.toISOString().slice(0, 10),
+      catSubscriptions,
+      1,
+      3,
+      1,
+      null,
+      NOW,
+    ]
+  )
+  run(
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       'Insurance',
       45000,
       'QUARTERLY',
@@ -662,7 +798,19 @@ export function seedDemoData(): void {
     ]
   )
 
-  // Transaction user data: example notes and category overrides
+  // Transaction user data: notes and category overrides showcasing both features.
+  // demo-tx-0  = Woolworths (today)
+  // demo-tx-5  = Uber Eats (5 days ago) — dinner note
+  // demo-tx-7  = McDonald's (7 days ago)
+  // demo-tx-10 = Caltex (10 days ago) — work expense note
+  // demo-tx-15 = Kmart (15 days ago) — category overridden to Groceries
+  // demo-tx-22 = Starbucks (22 days ago) — coffee note
+  // demo-income-0-0 = Salary credit — labelled for clarity
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-tx-0', 'Weekly grocery run', null]
+  )
   run(
     `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
      VALUES (?, ?, ?)`,
@@ -671,7 +819,12 @@ export function seedDemoData(): void {
   run(
     `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
      VALUES (?, ?, ?)`,
-    ['demo-tx-10', 'Work reimbursable', null]
+    ['demo-tx-7', 'Quick lunch on the go', null]
+  )
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-tx-10', 'Work trip — reimbursable', null]
   )
   run(
     `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
@@ -681,7 +834,33 @@ export function seedDemoData(): void {
   run(
     `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
      VALUES (?, ?, ?)`,
-    ['demo-income-0-0', 'Monthly salary - March', null]
+    ['demo-tx-22', 'Morning coffee before the meeting', null]
+  )
+  run(
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES (?, ?, ?)`,
+    ['demo-income-0-0', 'Monthly salary', null]
+  )
+
+  // Tags: 3 demo tags attached to representative transactions.
+  // Shows the tag feature on the Transactions page without cluttering everything.
+  run(`INSERT OR IGNORE INTO tags (id) VALUES (?)`, ['work-expense'])
+  run(`INSERT OR IGNORE INTO tags (id) VALUES (?)`, ['holiday'])
+  run(`INSERT OR IGNORE INTO tags (id) VALUES (?)`, ['coffee-run'])
+  // demo-tx-10 = Caltex (work reimbursable)
+  run(
+    `INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)`,
+    ['demo-tx-10', 'work-expense']
+  )
+  // demo-tx-22 = Starbucks
+  run(
+    `INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)`,
+    ['demo-tx-22', 'coffee-run']
+  )
+  // demo-transfer-hol-0 = Transfer to Holiday Fund (most recent week)
+  run(
+    `INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)`,
+    ['demo-transfer-hol-0', 'holiday']
   )
 
   // Saver balance snapshots (last 30 days, every 3 days) so "Balance over time" charts render
