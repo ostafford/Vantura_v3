@@ -1,119 +1,8 @@
-/* Theme: data-theme from inline hint until DB hydrates; then app store. See 07_UI_UX_Design.md */
+/* Design tokens — dark theme only. data-theme="dark" set statically in index.html. */
 /* Phase 8: Purple React design tokens */
 @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
 
-:root,
-[data-theme='light'] {
-  --vantura-primary: #b66dff;
-  --vantura-primary-gradient: linear-gradient(to right, #da8cff, #9a55ff);
-  --vantura-secondary: #d8d8d8;
-  --vantura-success: #1bcfb4;
-  --vantura-info: #198ae3;
-  --vantura-warning: #fed713;
-  --vantura-danger: #fe7c96;
-  --vantura-content-bg: #f2edf3;
-  --vantura-background: #f2edf3;
-  --vantura-surface: #ffffff;
-  --vantura-border: #ebedf2;
-  --vantura-text: #343a40;
-  --vantura-text-secondary: #9c9fa6;
-  --vantura-sidebar-bg: #ffffff;
-  --vantura-sidebar-menu-color: #3e4b5b;
-  --vantura-sidebar-active-bg: transparent;
-  --vantura-sidebar-active-color: #b66dff;
-  --vantura-sidebar-hover-bg: #f8f8f8;
-  --vantura-navbar-bg: #ffffff;
-  --vantura-bg-elevated: #ffffff;
-  /* Phase 11: Chart translucent fills — Purple React style */
-  --vantura-chart-opacity: 0.3;
-  /* Chart bar base opacity (soft, not solid) */
-  --vantura-chart-bar-opacity: 0.75;
-  /* Theme-aware striped table */
-  --vantura-table-striped-bg: rgba(0, 0, 0, 0.03);
-  /* Theme-aware table hover */
-  --vantura-table-hover-bg: rgba(0, 0, 0, 0.06);
-  /* Stat card semantic backgrounds (light theme) */
-  --vantura-stat-success-bg: #d4f4ee;
-  --vantura-stat-danger-bg: #ffe4ec;
-  --vantura-stat-info-bg: #e3f2fd;
-  --vantura-stat-primary-bg: #f3e5f5;
-  /* Stat card subtle gradients (light) */
-  --vantura-stat-success-gradient: linear-gradient(
-    135deg,
-    #d4f4ee 0%,
-    #b8ebe2 100%
-  );
-  --vantura-stat-danger-gradient: linear-gradient(
-    135deg,
-    #ffe4ec 0%,
-    #ffc9d4 100%
-  );
-  --vantura-stat-info-gradient: linear-gradient(
-    135deg,
-    #e3f2fd 0%,
-    #bbdefb 100%
-  );
-  --vantura-stat-primary-gradient: linear-gradient(
-    135deg,
-    #f3e5f5 0%,
-    #e1bee7 100%
-  );
-  /* Compact gradient cards (light) — theme-aware */
-  --vantura-gradient-success: linear-gradient(to right, #84d9d2, #07cdae);
-  --vantura-gradient-danger: linear-gradient(to right, #ffbf96, #fe7096);
-  --vantura-gradient-info: linear-gradient(to right, #90caf9, #047edf 99%);
-  --vantura-gradient-primary: var(--vantura-primary-gradient);
-  /* Appearance card (Settings) — theme-aware subtle gradient */
-  --vantura-appearance-card-bg: linear-gradient(
-    135deg,
-    var(--vantura-surface) 0%,
-    var(--vantura-content-bg) 100%
-  );
-  /* Default card background — soft gradient, theme-aware */
-  --vantura-card-bg: linear-gradient(
-    135deg,
-    var(--vantura-surface) 0%,
-    var(--vantura-content-bg) 100%
-  );
-  /* Progress bar warning gradient (light) */
-  --vantura-gradient-warning: linear-gradient(to right, #fed89a, #e08620);
-  /* Chart colors — theme-aware (light) */
-  --vantura-chart-money-in: #1bcfb4;
-  --vantura-chart-money-out: #fe7c96;
-  --vantura-chart-category-1: #b66dff;
-  --vantura-chart-category-2: #1bcfb4;
-  --vantura-chart-category-3: #fe7c96;
-  --vantura-chart-category-4: #f2a654;
-  --vantura-chart-category-5: #198ae3;
-  --vantura-chart-category-6: #ff9f43;
-  --vantura-chart-series-1: #b66dff;
-  --vantura-chart-series-2: #1bcfb4;
-  --vantura-chart-series-3: #fe7c96;
-  --vantura-chart-series-4: #f2a654;
-  --vantura-chart-series-5: #198ae3;
-  --vantura-chart-series-6: #ff9f43;
-  /* Month comparison / time-series defaults (light) */
-  --vantura-chart-accent: var(--vantura-chart-series-6);
-  --vantura-chart-accent-soft: rgba(255, 159, 67, 0.15);
-  --vantura-chart-previous: #6c757d;
-  --vantura-chart-average: var(--vantura-chart-series-5);
-  /* Chart bar gradient stops — match --vantura-gradient-* for SVG fills (light) */
-  --vantura-chart-bar-success-from: #84d9d2;
-  --vantura-chart-bar-success-to: #07cdae;
-  --vantura-chart-bar-warning-from: #fed89a;
-  --vantura-chart-bar-warning-to: #e08620;
-  --vantura-chart-bar-danger-from: #ffbf96;
-  --vantura-chart-bar-danger-to: #fe7096;
-  /* Tracker / meta badges (light) */
-  --vantura-badge-frequency-bg: rgba(242, 166, 84, 0.12);
-  --vantura-badge-frequency-fg: #e08620;
-  --vantura-badge-meta-bg: rgba(25, 138, 227, 0.12);
-  --vantura-badge-meta-fg: #047edf;
-  --vantura-badge-frequency-text: var(--vantura-badge-frequency-fg);
-  --vantura-badge-meta-text: var(--vantura-badge-meta-fg);
-}
-
-[data-theme='dark'] {
+:root {
   --vantura-primary: #b66dff;
   --vantura-primary-gradient: linear-gradient(to right, #da8cff, #9a55ff);
   --vantura-secondary: #d8d8d8;
@@ -125,67 +14,70 @@
   --vantura-background: #1a142d;
   --vantura-surface: #282037;
   --vantura-border: #3e3a4a;
-  --vantura-text: #ffffff;
-  --vantura-text-secondary: #a0a0a0;
+  --vantura-text: #eae6f5;
+  --vantura-text-secondary: #9691a8;
   --vantura-sidebar-bg: #18151e;
   --vantura-sidebar-menu-color: #ffffff;
+  --vantura-sidebar-icon-color: rgba(187, 168, 191, 0.96);
   --vantura-sidebar-active-bg: #282037;
-  --vantura-sidebar-active-color: rgba(255, 255, 255, 0.7);
+  --vantura-sidebar-active-color: var(--vantura-primary);
   --vantura-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
   --vantura-navbar-bg: #18151e;
   --vantura-bg-elevated: #282037;
+  /* Chart translucent fills — slightly higher opacity for dark background readability */
+  --vantura-chart-opacity: 0.4;
   /* Chart bar base opacity (soft, not solid) */
   --vantura-chart-bar-opacity: 0.75;
-  /* Theme-aware striped table */
+  /* Striped table */
   --vantura-table-striped-bg: rgba(255, 255, 255, 0.05);
-  /* Theme-aware table hover — stronger so hover is clear in dark mode */
+  /* Table hover */
   --vantura-table-hover-bg: rgba(255, 255, 255, 0.12);
-  /* Stat card semantic backgrounds (dark theme) */
-  --vantura-stat-success-bg: #0f4d44;
-  --vantura-stat-danger-bg: #4a2430;
-  --vantura-stat-info-bg: #0d2d4a;
-  --vantura-stat-primary-bg: #2a1b3d;
-  /* Stat card subtle gradients (dark) */
+  /* Stat card semantic backgrounds */
+  --vantura-stat-success-bg: #145c50;
+  --vantura-stat-danger-bg: #5a2c3a;
+  --vantura-stat-info-bg: #0f3558;
+  --vantura-stat-primary-bg: #321f4a;
+  /* Stat card subtle gradients */
   --vantura-stat-success-gradient: linear-gradient(
     135deg,
-    #0f4d44 0%,
-    #0a3d36 100%
+    #145c50 0%,
+    #0d4d42 100%
   );
   --vantura-stat-danger-gradient: linear-gradient(
     135deg,
-    #4a2430 0%,
-    #3a1c28 100%
+    #5a2c3a 0%,
+    #3d1e28 100%
   );
   --vantura-stat-info-gradient: linear-gradient(
     135deg,
-    #0d2d4a 0%,
-    #0a2240 100%
+    #0f3558 0%,
+    #0a2845 100%
   );
   --vantura-stat-primary-gradient: linear-gradient(
     135deg,
-    #2a1b3d 0%,
-    #1f1430 100%
+    #321f4a 0%,
+    #24163a 100%
   );
-  /* Compact gradient cards (dark) — theme-aware */
+  /* Compact gradient cards */
   --vantura-gradient-success: linear-gradient(to right, #1a7a6a, #0d4d42);
   --vantura-gradient-danger: linear-gradient(to right, #8b3a4d, #5c2836);
   --vantura-gradient-info: linear-gradient(to right, #0d47a1, #01579b);
   --vantura-gradient-primary: var(--vantura-primary-gradient);
-  /* Appearance card (Settings) — theme-aware subtle gradient */
+  /* Appearance card (Settings) — subtle gradient */
   --vantura-appearance-card-bg: linear-gradient(
     135deg,
     var(--vantura-surface) 0%,
     var(--vantura-content-bg) 100%
   );
-  /* Default card background — soft gradient, theme-aware */
+  /* Default card background — soft gradient */
   --vantura-card-bg: linear-gradient(
     135deg,
     var(--vantura-surface) 0%,
     var(--vantura-content-bg) 100%
   );
-  /* Progress bar warning gradient (dark) */
+  /* Progress bar warning gradient */
   --vantura-gradient-warning: linear-gradient(to right, #b8860b, #8b6914);
-  /* Chart colors — theme-aware (dark) */
+  /* Chart colors */
   --vantura-chart-money-in: #2a9d8a;
   --vantura-chart-money-out: #e8456a;
   --vantura-chart-category-1: #da8cff;
@@ -200,19 +92,19 @@
   --vantura-chart-series-4: #e08620;
   --vantura-chart-series-5: #5eb8ff;
   --vantura-chart-series-6: #f2a654;
-  /* Month comparison / time-series defaults (dark) */
+  /* Month comparison / time-series defaults */
   --vantura-chart-accent: #f2a654;
   --vantura-chart-accent-soft: rgba(242, 166, 84, 0.18);
   --vantura-chart-previous: #b0b3c1;
   --vantura-chart-average: var(--vantura-chart-series-5);
-  /* Chart bar gradient stops — match --vantura-gradient-* for SVG fills (dark) */
+  /* Chart bar gradient stops */
   --vantura-chart-bar-success-from: #1a7a6a;
   --vantura-chart-bar-success-to: #0d4d42;
   --vantura-chart-bar-warning-from: #b8860b;
   --vantura-chart-bar-warning-to: #8b6914;
   --vantura-chart-bar-danger-from: #8b3a4d;
   --vantura-chart-bar-danger-to: #5c2836;
-  /* Tracker / meta badges (dark) */
+  /* Tracker / meta badges */
   --vantura-badge-frequency-bg: rgba(242, 166, 84, 0.22);
   --vantura-badge-frequency-fg: #f2a654;
   --vantura-badge-meta-bg: rgba(94, 184, 255, 0.22);
@@ -229,20 +121,20 @@
   );
 }
 
-/* Form check / switch — clear on/off in dark mode */
-[data-theme='dark'] .form-check-input {
+/* Form check / switch */
+.form-check-input {
   background-color: var(--vantura-surface);
   border-color: var(--vantura-border);
 }
-[data-theme='dark'] .form-check-input:checked {
+.form-check-input:checked {
   background-color: var(--vantura-primary);
   border-color: var(--vantura-primary);
 }
-[data-theme='dark'] .form-check-input:focus {
+.form-check-input:focus {
   border-color: var(--vantura-primary);
   box-shadow: 0 0 0 0.2rem rgba(182, 109, 255, 0.25);
 }
-[data-theme='dark'] .form-check-label {
+.form-check-label {
   color: var(--vantura-text);
 }
 
@@ -304,19 +196,15 @@ body {
   background-color: var(--vantura-background);
 }
 
-/* Full-screen boot / storage error: matches first-paint theme, no placeholder shimmer */
+/* Full-screen boot / storage error */
 .app-boot-shell {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-color: var(--vantura-background);
-  color: var(--vantura-text);
-}
-
-html[data-theme='dark'] .app-boot-shell {
   background: linear-gradient(135deg, #1a142d 0%, #282037 50%, #18151e 100%);
+  color: var(--vantura-text);
 }
 
 .app-boot-shell--padded {
@@ -500,10 +388,6 @@ html[data-theme='dark'] .app-boot-shell {
   outline-offset: -2px;
 }
 .settings-accordion .accordion-button::after {
-  filter: none;
-  opacity: 0.8;
-}
-[data-theme='dark'] .settings-accordion .accordion-button::after {
   filter: invert(1);
 }
 .settings-accordion .accordion-body {
@@ -532,22 +416,6 @@ html[data-theme='dark'] .app-boot-shell {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .accent-swatch:focus-visible {
-  outline: 2px solid var(--vantura-primary);
-  outline-offset: 2px;
-}
-
-/* Theme toggle (sidebar) — theme-aware so it aligns with light/dark choice */
-.theme-toggle-btn {
-  border-color: var(--vantura-border);
-  background-color: transparent;
-  color: var(--vantura-text);
-}
-.theme-toggle-btn:hover {
-  border-color: var(--vantura-border);
-  background-color: var(--vantura-sidebar-hover-bg);
-  color: var(--vantura-text);
-}
-.theme-toggle-btn:focus-visible {
   outline: 2px solid var(--vantura-primary);
   outline-offset: 2px;
 }
@@ -733,27 +601,25 @@ html[data-theme='dark'] .app-boot-shell {
 .transactions-category-menu {
   max-height: min(60vh, 26rem);
   overflow-y: auto;
+  background-color: var(--vantura-surface);
+  border-color: var(--vantura-border);
+  color: var(--vantura-text);
 }
 .transactions-category-menu .dropdown-item .form-check {
   width: 100%;
   margin-bottom: 0;
 }
-[data-theme='dark'] .transactions-category-menu {
-  background-color: var(--vantura-surface);
-  border-color: var(--vantura-border);
+.transactions-category-menu .dropdown-item {
   color: var(--vantura-text);
 }
-[data-theme='dark'] .transactions-category-menu .dropdown-item {
-  color: var(--vantura-text);
-}
-[data-theme='dark'] .transactions-category-menu .dropdown-item:hover,
-[data-theme='dark'] .transactions-category-menu .dropdown-item:focus,
-[data-theme='dark'] .transactions-category-menu .dropdown-item.active,
-[data-theme='dark'] .transactions-category-menu .dropdown-item:active {
+.transactions-category-menu .dropdown-item:hover,
+.transactions-category-menu .dropdown-item:focus,
+.transactions-category-menu .dropdown-item.active,
+.transactions-category-menu .dropdown-item:active {
   background-color: color-mix(in srgb, var(--vantura-primary) 20%, transparent);
   color: var(--vantura-text);
 }
-[data-theme='dark'] .transactions-category-menu .dropdown-divider {
+.transactions-category-menu .dropdown-divider {
   border-top-color: var(--vantura-border);
 }
 
@@ -1000,9 +866,9 @@ html[data-theme='dark'] .app-boot-shell {
   margin-left: auto;
   padding: 0.22rem 0.5rem;
   border-radius: 0.375rem;
-  border: 1px solid color-mix(in srgb, var(--vantura-warning) 55%, #5c4a14);
-  background: color-mix(in srgb, var(--vantura-warning) 22%, #fff8df);
-  color: #2f2610;
+  border: 1px solid color-mix(in srgb, var(--vantura-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--vantura-warning) 18%, transparent);
+  color: var(--vantura-warning);
   font-weight: 500;
 }
 
@@ -1045,7 +911,7 @@ html[data-theme='dark'] .app-boot-shell {
   font-size: 1.125rem;
   line-height: 1;
   margin-left: auto;
-  color: rgba(187, 168, 191, 0.96);
+  color: var(--vantura-sidebar-icon-color);
 }
 .sidebar .nav-item.active .nav-link {
   color: var(--vantura-sidebar-active-color);
@@ -1109,13 +975,6 @@ html[data-theme='dark'] .app-boot-shell {
 .sidebar .sidebar-brand .brand-text {
   font-size: 1.5rem;
   font-weight: 500;
-  background: var(--vantura-primary-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
-}
-[data-theme='dark'] .sidebar .sidebar-brand .brand-text {
   background: var(--vantura-primary-gradient);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1203,7 +1062,7 @@ html[data-theme='dark'] .app-boot-shell {
   font-size: 1.125rem;
   line-height: 1;
   margin-right: 0.75rem;
-  color: rgba(187, 168, 191, 0.96);
+  color: var(--vantura-sidebar-icon-color);
 }
 
 .sidebar .sidebar-footer-btn:hover,
@@ -1585,7 +1444,7 @@ html[data-theme='dark'] .app-boot-shell {
   border-radius: 2px;
 }
 .form-control::placeholder {
-  color: #c9c8c8;
+  color: var(--vantura-text-secondary);
 }
 
 /* Phase 8: Bootstrap primary override for purple theme */

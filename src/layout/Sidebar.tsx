@@ -1,9 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useStore } from 'zustand'
-import { themeStore } from '@/stores/themeStore'
 import { sessionStore } from '@/stores/sessionStore'
 import { uiStore } from '@/stores/uiStore'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { getAppSetting } from '@/db'
 
 const SIDEBAR_WIDTH = 260
@@ -31,7 +28,6 @@ export function Sidebar({
   mobileOpen = false,
 }: SidebarProps) {
   const location = useLocation()
-  useStore(themeStore, (s) => s.theme) // subscribe for theme re-renders
   const isDemoMode = getAppSetting('demo_mode') === '1'
 
   const width = overlay
@@ -170,9 +166,6 @@ export function Sidebar({
             <i className="mdi mdi-lock menu-icon" aria-hidden />
             {showLabels && <span className="menu-title">Lock</span>}
           </button>
-          <div className="sidebar-footer-btn-wrapper">
-            <ThemeToggle showLabel={showLabels} />
-          </div>
         </div>
       </div>
     </nav>

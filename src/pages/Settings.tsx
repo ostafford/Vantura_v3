@@ -88,8 +88,6 @@ function formatLastSync(iso: string | null): string {
 function formatSettingsSummary(settings: Record<string, string>): string {
   if (!settings || Object.keys(settings).length === 0) return 'None'
   const parts: string[] = []
-  const theme = settings.theme
-  if (theme) parts.push(theme === 'light' ? 'Light theme' : 'Dark theme')
   const accent = settings.accent_color
   if (accent && ACCENT_PALETTES[accent as AccentId]) {
     parts.push(ACCENT_PALETTES[accent as AccentId].label + ' accent')

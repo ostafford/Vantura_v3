@@ -15,11 +15,11 @@ import {
 } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 
-const BORDER_COLOR = 'var(--vantura-border, #ebedf2)'
+const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
 const MARGIN_TOP = 8
 const MARGIN_RIGHT = 24
 const DEFAULT_LINE_COLOR = 'var(--vantura-primary, #b66dff)'
-const GOAL_LINE_COLOR = 'var(--vantura-text-secondary, #9c9fa6)'
+const GOAL_LINE_COLOR = 'var(--vantura-text-secondary, #9691a8)'
 
 export interface ProgressDataPoint {
   date: string
@@ -119,7 +119,7 @@ export function ProgressChart({
           .tickSizeOuter(0)
       )
       .selectAll('text')
-      .attr('fill', 'var(--vantura-text-secondary, #9c9fa6)')
+      .attr('fill', 'var(--vantura-text-secondary, #9691a8)')
       .attr('font-size', 10)
 
     g.append('g')
@@ -129,7 +129,7 @@ export function ProgressChart({
           .tickSizeOuter(0)
       )
       .selectAll('text')
-      .attr('fill', 'var(--vantura-text-secondary, #9c9fa6)')
+      .attr('fill', 'var(--vantura-text-secondary, #9691a8)')
       .attr('font-size', 10)
 
     g.selectAll('.domain, .tick line').attr('stroke', BORDER_COLOR)
@@ -184,7 +184,7 @@ export function ProgressChart({
       .attr('cy', (d) => yScale(d.amount))
       .attr('r', 3)
       .attr('fill', lineColor)
-      .attr('stroke', 'var(--vantura-surface, #fff)')
+      .attr('stroke', 'var(--vantura-surface, #282037)')
       .attr('stroke-width', 1)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event, d) {

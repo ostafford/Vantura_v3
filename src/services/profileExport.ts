@@ -25,7 +25,6 @@ const EXPORT_FILE_VERSION = 1
  * Any key not in this list is NEVER exported.
  */
 export const SETTINGS_WHITELIST: readonly string[] = [
-  'theme',
   'accent_color',
   'payday_frequency',
   'payday_day',

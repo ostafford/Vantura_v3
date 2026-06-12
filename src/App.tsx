@@ -3,7 +3,6 @@ import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
-import { themeStore } from '@/stores/themeStore'
 import { accentStore } from '@/stores/accentStore'
 import { applyCustomAccentHex, CUSTOM_ACCENT_KEY } from '@/lib/accentPalettes'
 import { sessionStore } from '@/stores/sessionStore'
@@ -18,17 +17,9 @@ function AppContent() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null
   )
-  const theme = useStore(themeStore, (s) => s.theme)
-  const themeHydrated = useStore(themeStore, (s) => s.hydrated)
   const accent = useStore(accentStore, (s) => s.accent)
   const accentHydrated = useStore(accentStore, (s) => s.hydrated)
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
-
-  useEffect(() => {
-    if (!themeHydrated) return
-    document.documentElement.setAttribute('data-theme', theme)
-    document.documentElement.setAttribute('data-bs-theme', theme)
-  }, [theme, themeHydrated])
 
   useEffect(() => {
     if (!accentHydrated) return
@@ -50,8 +41,6 @@ function AppContent() {
         return
       }
       if (cancelled) return
-      themeStore.getState().hydrateFromDb()
-      if (cancelled) return
       accentStore.getState().hydrateFromDb()
       if (cancelled) return
       const customHex = getAppSetting(CUSTOM_ACCENT_KEY)
@@ -61,10 +50,7 @@ function AppContent() {
       if (cancelled) return
       recalculateTrackers()
       if (cancelled) return
-      const theme = themeStore.getState().theme
       const accent = accentStore.getState().accent
-      document.documentElement.setAttribute('data-theme', theme)
-      document.documentElement.setAttribute('data-bs-theme', theme)
       document.documentElement.setAttribute('data-accent', accent)
       if (!cancelled) setReady(true)
     }

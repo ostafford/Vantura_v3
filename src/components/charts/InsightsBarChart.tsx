@@ -18,7 +18,7 @@ import {
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const BORDER_COLOR = 'var(--vantura-border, #ebedf2)'
+const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
 const BAR_MAX_WIDTH = 32
 const MARGIN_TOP = 8
 const MARGIN_RIGHT_DESKTOP = 24
@@ -330,7 +330,7 @@ export function InsightsBarChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #ebedf2)',
+          border: '1px solid var(--vantura-border, #3e3a4a)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

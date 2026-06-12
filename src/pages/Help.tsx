@@ -127,8 +127,7 @@ export function Help() {
                   <p className="mb-0">
                     You can collapse the sidebar by clicking the brand area at
                     the top. At the bottom of the sidebar, <strong>Lock</strong>{' '}
-                    secures the app and the theme control switches between light
-                    and dark mode.
+                    secures the app.
                   </p>
                 </>
               )}
@@ -265,8 +264,7 @@ export function Help() {
                   </p>
                   <p className="mb-2">
                     <strong>Appearance:</strong> You can change the accent color
-                    in Settings (Appearance) and switch between light and dark
-                    theme via the theme control in the sidebar footer.
+                    in Settings (Appearance).
                   </p>
                   <p className="mb-2">
                     <strong>Dashboard tour:</strong> A guided tour runs

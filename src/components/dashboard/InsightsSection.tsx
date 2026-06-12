@@ -23,7 +23,6 @@ import {
   formatDollars,
 } from '@/lib/format'
 import { accentStore } from '@/stores/accentStore'
-import { themeStore } from '@/stores/themeStore'
 import { syncStore } from '@/stores/syncStore'
 import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import {
@@ -64,9 +63,6 @@ export function InsightsSection({
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   const accent = useStore(accentStore, (s) => s.accent)
-  // Subscribed for its side-effect: re-renders this component when the theme
-  // changes so CSS variable colours (chart categories) are picked up fresh.
-  useStore(themeStore, (s) => s.theme)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
   const { startStr, endIso } = weekRange

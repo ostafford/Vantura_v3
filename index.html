@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./vite.svg" />
@@ -9,40 +9,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Vantura</title>
-    <script>
-      ;(function () {
-        var K = 'vantura-theme'
-        var root = document.documentElement
-        var stored = localStorage.getItem(K)
-        if (stored === 'dark' || stored === 'light') {
-          root.setAttribute('data-theme', stored)
-          return
-        }
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          root.setAttribute('data-theme', 'dark')
-        } else {
-          root.setAttribute('data-theme', 'light')
-        }
-      })()
-    </script>
     <style>
       html {
-        color-scheme: light dark;
+        color-scheme: dark;
       }
       html,
       body {
         margin: 0;
         min-height: 100%;
-      }
-      html[data-theme='light'],
-      html[data-theme='light'] body {
-        background-color: #f2edf3;
-        color: #343a40;
-      }
-      html[data-theme='dark'],
-      html[data-theme='dark'] body {
         background-color: #1a142d;
-        color: #ced4da;
+        color: #eae6f5;
       }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" crossorigin="anonymous" />

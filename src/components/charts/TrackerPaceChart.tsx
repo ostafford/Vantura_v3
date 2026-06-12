@@ -15,7 +15,7 @@ import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const BORDER_COLOR = 'var(--vantura-border, #ebedf2)'
+const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
 const PACE_LINE_COLOR = '#aaa'
 const BUDGET_CEIL_COLOR = 'var(--vantura-danger)'
 const AREA_OPACITY = 0.15
@@ -280,7 +280,7 @@ export function TrackerPaceChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #ebedf2)',
+          border: '1px solid var(--vantura-border, #3e3a4a)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

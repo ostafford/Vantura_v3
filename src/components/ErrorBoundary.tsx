@@ -55,8 +55,8 @@ export class ErrorBoundary extends Component<Props, State> {
             justifyContent: 'center',
             minHeight: '100vh',
             padding: 24,
-            backgroundColor: 'var(--vantura-background, #f7f7f7)',
-            color: 'var(--vantura-text, #1a1a1a)',
+            backgroundColor: 'var(--vantura-background, #1a142d)',
+            color: 'var(--vantura-text, #eae6f5)',
           }}
         >
           <h2 className="mb-3">Something went wrong</h2>

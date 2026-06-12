@@ -166,7 +166,7 @@ describe('profileExport', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.settings.theme).toBe('dark')
+      expect(payload.settings.theme).toBeUndefined()
       expect(payload.settings.payday_frequency).toBe('MONTHLY')
       expect(payload.settings.api_token_encrypted).toBeUndefined()
     })
@@ -230,8 +230,7 @@ describe('profileExport', () => {
     it('applySettings updates only whitelisted keys', async () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)
-      applySettings({ theme: 'dark', payday_frequency: 'WEEKLY' })
-      expect(setAppSettingMock).toHaveBeenCalledWith('theme', 'dark')
+      applySettings({ payday_frequency: 'WEEKLY' })
       expect(setAppSettingMock).toHaveBeenCalledWith(
         'payday_frequency',
         'WEEKLY'
@@ -242,10 +241,10 @@ describe('profileExport', () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)
       applySettings({
-        theme: 'dark',
+        accent_color: 'teal',
         api_token_encrypted: 'evil',
       } as Record<string, string>)
-      expect(setAppSettingMock).toHaveBeenCalledWith('theme', 'dark')
+      expect(setAppSettingMock).toHaveBeenCalledWith('accent_color', 'teal')
       expect(setAppSettingMock).not.toHaveBeenCalledWith(
         'api_token_encrypted',
         expect.anything()

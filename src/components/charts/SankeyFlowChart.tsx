@@ -124,7 +124,7 @@ export function SankeyFlowChart({
       .attr('x', leftX - 4)
       .attr('y', centerY + 4)
       .attr('text-anchor', 'end')
-      .attr('fill', 'var(--vantura-text, #1a1a1a)')
+      .attr('fill', 'var(--vantura-text, #eae6f5)')
       .attr('font-size', 11)
       .text('Income')
     categoryNodes.forEach((cat) => {
@@ -133,7 +133,7 @@ export function SankeyFlowChart({
         .attr('x', rightX + NODE_WIDTH + 4)
         .attr('y', cat.y + NODE_WIDTH / 2 + 4)
         .attr('text-anchor', 'start')
-        .attr('fill', 'var(--vantura-text, #1a1a1a)')
+        .attr('fill', 'var(--vantura-text, #eae6f5)')
         .attr('font-size', 10)
         .text(
           cat.category_name.length > 12

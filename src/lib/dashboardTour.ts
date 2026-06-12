@@ -67,7 +67,7 @@ export function startDashboardTour(onCompleted?: () => void): void {
       popover: {
         title: 'Navigation',
         description:
-          'Dashboard, Analytics (trends and reports), Transactions (filter and search), Settings (sync, payday, theme), and Help (user guide).',
+          'Dashboard, Analytics (trends and reports), Transactions (filter and search), Settings (sync, payday, appearance), and Help (user guide).',
         side: 'right' as const,
         align: 'start' as const,
       },
