@@ -147,7 +147,9 @@ function KpiCell({
       ? buildDeltaTooltip(delta, vsPriorLabel, monetary)
       : null
   const deltaColor =
-    delta?.direction === 'up' ? 'var(--bs-success)' : 'var(--bs-danger)'
+    delta?.direction === 'up'
+      ? 'var(--vantura-success)'
+      : 'var(--vantura-danger)'
 
   const cell = (
     <div
@@ -676,7 +678,8 @@ export function AnalyticsSavers() {
                         <div
                           className="d-flex justify-content-end mt-2 pt-2"
                           style={{
-                            borderTop: '1px solid var(--bs-border-color)',
+                            borderTop:
+                              '1px solid var(--bs-border-color, var(--vantura-border))',
                           }}
                         >
                           {projection.lastMonthCents <= 0 ? (
@@ -693,7 +696,9 @@ export function AnalyticsSavers() {
                                 <Tooltip>
                                   <div>
                                     <span
-                                      style={{ color: 'var(--bs-warning)' }}
+                                      style={{
+                                        color: 'var(--vantura-warning)',
+                                      }}
                                     >
                                       Need $
                                       {formatMoney(

@@ -22,11 +22,11 @@ import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComp
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
+const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 12
 const MARGIN_BOTTOM = 24
 const MARGIN_RIGHT = 24
-const SUCCESS_COLOR = 'var(--vantura-success, #1bcfb4)'
+const SUCCESS_COLOR = 'var(--vantura-success, #8EC5A0)'
 const SUCCESS_FILL =
   'color-mix(in srgb, var(--vantura-success) 18%, transparent)'
 const DANGER_FILL = 'color-mix(in srgb, var(--vantura-danger) 18%, transparent)'
@@ -175,8 +175,7 @@ export function MonthSpendingComparisonChart({
     const { points, yDomain, avg } = prepared
     const semanticStrokes = getMonthComparisonSemanticStrokes(points, metric)
     const currentStroke =
-      semanticStrokes?.currentStroke ??
-      'var(--vantura-chart-accent, var(--bs-primary, #ff9f43))'
+      semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
     const previousStroke =
       semanticStrokes?.previousStroke ??
       'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'
@@ -313,7 +312,7 @@ export function MonthSpendingComparisonChart({
             .attr('cy', yScale(v))
             .attr('r', 4)
             .attr('fill', currentStroke)
-            .attr('stroke', 'var(--vantura-surface, #282037)')
+            .attr('stroke', 'var(--vantura-surface, #1c1c28)')
             .attr('stroke-width', 2)
         }
       }
@@ -522,7 +521,7 @@ export function MonthSpendingComparisonChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #3e3a4a)',
+          border: '1px solid var(--vantura-border, #2c2c3c)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

@@ -71,7 +71,7 @@ export function Sidebar({
         bottom: 0,
         width,
         minWidth: width,
-        backgroundColor: 'var(--vantura-sidebar-bg)',
+        background: 'var(--vantura-sidebar-gradient)',
         color: 'var(--vantura-sidebar-menu-color)',
         zIndex: 1031,
         transition:

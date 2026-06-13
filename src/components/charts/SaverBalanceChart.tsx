@@ -15,9 +15,9 @@ import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const LINE_COLOR = 'var(--vantura-success, #1bcfb4)'
-const AREA_COLOR = 'rgba(27, 207, 180, 0.15)'
-const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
+const LINE_COLOR = 'var(--vantura-success, #8EC5A0)'
+const AREA_COLOR = 'rgba(142, 197, 160, 0.18)'
+const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 8
 const MARGIN_RIGHT = 16
 
@@ -145,7 +145,7 @@ export function SaverBalanceChart({
           .attr('cy', yScale(point.balance))
           .attr('r', 4)
           .attr('fill', LINE_COLOR)
-          .attr('stroke', 'var(--vantura-surface, #282037)')
+          .attr('stroke', 'var(--vantura-surface, #1c1c28)')
           .attr('stroke-width', 2)
           .attr('pointer-events', 'none')
 
@@ -202,7 +202,7 @@ export function SaverBalanceChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #3e3a4a)',
+          border: '1px solid var(--vantura-border, #2c2c3c)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

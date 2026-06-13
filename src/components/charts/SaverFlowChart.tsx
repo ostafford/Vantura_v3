@@ -16,9 +16,9 @@ import {
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const SAVE_COLOR = 'var(--vantura-success, #1bcfb4)'
-const WITHDRAW_COLOR = 'var(--vantura-danger)'
-const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
+const SAVE_COLOR = 'var(--vantura-success, #8EC5A0)'
+const WITHDRAW_COLOR = 'var(--vantura-danger, #E89898)'
+const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 8
 const MARGIN_RIGHT = 16
 
@@ -170,7 +170,7 @@ export function SaverFlowChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #3e3a4a)',
+          border: '1px solid var(--vantura-border, #2c2c3c)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

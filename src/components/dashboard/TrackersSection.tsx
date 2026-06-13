@@ -680,7 +680,8 @@ export function TrackersSection({
                             >
                               <Link
                                 to={`/analytics/trackers/${t.id}`}
-                                className="btn btn-link btn-sm p-0 text-primary"
+                                className="btn btn-link btn-sm p-0"
+                                style={{ color: 'var(--vantura-primary)' }}
                                 onClick={(e) => e.stopPropagation()}
                                 aria-label={`View analytics for ${t.name}`}
                               >
@@ -692,7 +693,6 @@ export function TrackersSection({
                                 className="badge badge-frequency-custom"
                                 style={{
                                   backgroundColor: t.badge_color.trim(),
-                                  color: 'white',
                                 }}
                               >
                                 {frequencyLabel}
@@ -917,11 +917,8 @@ export function TrackersSection({
                     >
                       {isSelected && (
                         <i
-                          className="mdi mdi-check text-white"
-                          style={{
-                            fontSize: '1rem',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                          }}
+                          className="mdi mdi-check"
+                          style={{ fontSize: '1rem', color: '#1a1a2e' }}
                           aria-hidden
                         />
                       )}

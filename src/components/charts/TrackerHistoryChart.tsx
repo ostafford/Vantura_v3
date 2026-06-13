@@ -13,7 +13,7 @@ import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
+const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const STRIPE_ID = 'tracker-history-stripe'
 const GRAD_SUCCESS_ID = 'tracker-history-success'
 const GRAD_WARNING_ID = 'tracker-history-warning'
@@ -276,7 +276,7 @@ export function TrackerHistoryChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #3e3a4a)',
+          border: '1px solid var(--vantura-border, #2c2c3c)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

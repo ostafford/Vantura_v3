@@ -7,15 +7,15 @@ import { getAppSetting, setAppSetting } from '@/db'
 import type { AccentId } from '@/lib/accentPalettes'
 
 const ACCENT_SETTINGS_KEY = 'accent_color'
-const DEFAULT_ACCENT: AccentId = 'purple'
+const DEFAULT_ACCENT: AccentId = 'sky'
 
 const VALID_ACCENTS: AccentId[] = [
-  'purple',
-  'blue',
-  'teal',
-  'green',
-  'amber',
-  'rose',
+  'sky',
+  'mint',
+  'lavender',
+  'peach',
+  'blush',
+  'lemon',
 ]
 
 function isValidAccent(value: unknown): value is AccentId {

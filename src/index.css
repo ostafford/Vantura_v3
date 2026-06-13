@@ -1,114 +1,96 @@
 /* Design tokens — dark theme only. data-theme="dark" set statically in index.html. */
-/* Phase 8: Purple React design tokens */
 @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
 
 :root {
-  --vantura-primary: #b66dff;
-  --vantura-primary-gradient: linear-gradient(to right, #da8cff, #9a55ff);
+  /* Pastel accent — Sky is the default; overridden by [data-accent] rules below */
+  --vantura-primary: #7eb8d8;
+  --vantura-primary-gradient: linear-gradient(to right, #a8d8f0, #5090b8);
+  /* Dark text for use ON pastel-coloured surfaces (badges, filled buttons, etc.) */
+  --vantura-text-on-pastel: #1a1a2e;
+  /* Softened white for text ON deep gradient backgrounds — removes harshness of pure white */
+  --vantura-text-on-gradient: rgba(255, 255, 255, 0.88);
+  /* Sidebar gradient — subtly lighter at top, darker at bottom */
+  --vantura-sidebar-gradient: linear-gradient(135deg, #1a1a26 0%, #0f0f18 100%);
   --vantura-secondary: #d8d8d8;
-  --vantura-success: #1bcfb4;
-  --vantura-info: #198ae3;
-  --vantura-warning: #fed713;
-  --vantura-danger: #fe7c96;
-  --vantura-content-bg: #1a142d;
-  --vantura-background: #1a142d;
-  --vantura-surface: #282037;
-  --vantura-border: #3e3a4a;
-  --vantura-text: #eae6f5;
-  --vantura-text-secondary: #9691a8;
-  --vantura-sidebar-bg: #18151e;
+  /* Fixed semantic pastels — not user-selectable */
+  --vantura-success: #8ec5a0;
+  --vantura-info: #7eb8d8;
+  --vantura-warning: #e8b888;
+  --vantura-danger: #e89898;
+  /* Neutral dark backgrounds — purple tint removed */
+  --vantura-content-bg: #13131c;
+  --vantura-background: #13131c;
+  --vantura-surface: #1c1c28;
+  --vantura-border: #2c2c3c;
+  --vantura-text: #e4e4f0;
+  --vantura-text-secondary: #8888a0;
+  --vantura-sidebar-bg: #0f0f18;
   --vantura-sidebar-menu-color: #ffffff;
-  --vantura-sidebar-icon-color: rgba(187, 168, 191, 0.96);
-  --vantura-sidebar-active-bg: #282037;
+  --vantura-sidebar-icon-color: rgba(180, 175, 200, 0.96);
+  --vantura-sidebar-active-bg: #1c1c28;
   --vantura-sidebar-active-color: var(--vantura-primary);
-  --vantura-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
-  --vantura-navbar-bg: #18151e;
-  --vantura-bg-elevated: #282037;
-  /* Chart translucent fills — slightly higher opacity for dark background readability */
+  --vantura-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  --vantura-navbar-bg: #0f0f18;
+  --vantura-bg-elevated: #1c1c28;
+  /* Chart translucent fills */
   --vantura-chart-opacity: 0.4;
-  /* Chart bar base opacity (soft, not solid) */
   --vantura-chart-bar-opacity: 0.75;
   /* Striped table */
-  --vantura-table-striped-bg: rgba(255, 255, 255, 0.05);
+  --vantura-table-striped-bg: rgba(255, 255, 255, 0.04);
   /* Table hover */
-  --vantura-table-hover-bg: rgba(255, 255, 255, 0.12);
-  /* Stat card semantic backgrounds */
-  --vantura-stat-success-bg: #145c50;
-  --vantura-stat-danger-bg: #5a2c3a;
-  --vantura-stat-info-bg: #0f3558;
-  --vantura-stat-primary-bg: #321f4a;
-  /* Stat card subtle gradients */
-  --vantura-stat-success-gradient: linear-gradient(
-    135deg,
-    #145c50 0%,
-    #0d4d42 100%
-  );
-  --vantura-stat-danger-gradient: linear-gradient(
-    135deg,
-    #5a2c3a 0%,
-    #3d1e28 100%
-  );
-  --vantura-stat-info-gradient: linear-gradient(
-    135deg,
-    #0f3558 0%,
-    #0a2845 100%
-  );
-  --vantura-stat-primary-gradient: linear-gradient(
-    135deg,
-    #321f4a 0%,
-    #24163a 100%
-  );
-  /* Compact gradient cards */
-  --vantura-gradient-success: linear-gradient(to right, #1a7a6a, #0d4d42);
-  --vantura-gradient-danger: linear-gradient(to right, #8b3a4d, #5c2836);
-  --vantura-gradient-info: linear-gradient(to right, #0d47a1, #01579b);
-  --vantura-gradient-primary: var(--vantura-primary-gradient);
-  /* Appearance card (Settings) — subtle gradient */
+  --vantura-table-hover-bg: rgba(255, 255, 255, 0.1);
+  /* Stat card semantic backgrounds — deep tones, white text on these */
+  /* Statement gradient cards — floors raised, no longer bottoming out near-black */
+  --vantura-gradient-success: linear-gradient(to right, #226038, #183825);
+  --vantura-gradient-danger: linear-gradient(to right, #6a2430, #481820);
+  --vantura-gradient-info: linear-gradient(to right, #224570, #183050);
+  --vantura-gradient-primary: linear-gradient(to right, #244870, #183050);
+  /* Appearance card (Settings) */
   --vantura-appearance-card-bg: linear-gradient(
     135deg,
     var(--vantura-surface) 0%,
     var(--vantura-content-bg) 100%
   );
-  /* Default card background — soft gradient */
+  /* Default card background */
   --vantura-card-bg: linear-gradient(
     135deg,
     var(--vantura-surface) 0%,
     var(--vantura-content-bg) 100%
   );
-  /* Progress bar warning gradient */
-  --vantura-gradient-warning: linear-gradient(to right, #b8860b, #8b6914);
-  /* Chart colors */
-  --vantura-chart-money-in: #2a9d8a;
-  --vantura-chart-money-out: #e8456a;
-  --vantura-chart-category-1: #da8cff;
-  --vantura-chart-category-2: #2a9d8a;
-  --vantura-chart-category-3: #e8456a;
-  --vantura-chart-category-4: #e08620;
-  --vantura-chart-category-5: #5eb8ff;
-  --vantura-chart-category-6: #f2a654;
-  --vantura-chart-series-1: #da8cff;
-  --vantura-chart-series-2: #2a9d8a;
-  --vantura-chart-series-3: #e8456a;
-  --vantura-chart-series-4: #e08620;
-  --vantura-chart-series-5: #5eb8ff;
-  --vantura-chart-series-6: #f2a654;
-  /* Month comparison / time-series defaults */
-  --vantura-chart-accent: #f2a654;
-  --vantura-chart-accent-soft: rgba(242, 166, 84, 0.18);
-  --vantura-chart-previous: #b0b3c1;
-  --vantura-chart-average: var(--vantura-chart-series-5);
-  /* Chart bar gradient stops */
-  --vantura-chart-bar-success-from: #1a7a6a;
-  --vantura-chart-bar-success-to: #0d4d42;
-  --vantura-chart-bar-warning-from: #b8860b;
-  --vantura-chart-bar-warning-to: #8b6914;
-  --vantura-chart-bar-danger-from: #8b3a4d;
-  --vantura-chart-bar-danger-to: #5c2836;
-  /* Tracker / meta badges */
-  --vantura-badge-frequency-bg: rgba(242, 166, 84, 0.22);
-  --vantura-badge-frequency-fg: #f2a654;
-  --vantura-badge-meta-bg: rgba(94, 184, 255, 0.22);
-  --vantura-badge-meta-fg: #5eb8ff;
+  /* Progress bar warning gradient — dark, white text safe */
+  --vantura-gradient-warning: linear-gradient(to right, #7a5010, #584008);
+  /* Chart colours — full pastel palette */
+  --vantura-chart-money-in: #8ec5a0;
+  --vantura-chart-money-out: #e89898;
+  --vantura-chart-category-1: #7eb8d8;
+  --vantura-chart-category-2: #8ec5a0;
+  --vantura-chart-category-3: #e89898;
+  --vantura-chart-category-4: #e8b888;
+  --vantura-chart-category-5: #b0a8d8;
+  --vantura-chart-category-6: #7ec8c0;
+  --vantura-chart-series-1: #7eb8d8;
+  --vantura-chart-series-2: #8ec5a0;
+  --vantura-chart-series-3: #e89898;
+  --vantura-chart-series-4: #e8b888;
+  --vantura-chart-series-5: #b0a8d8;
+  --vantura-chart-series-6: #7ec8c0;
+  /* Month comparison / time-series */
+  --vantura-chart-accent: #e8b888;
+  --vantura-chart-accent-soft: rgba(232, 184, 136, 0.18);
+  --vantura-chart-previous: #a0a0b8;
+  --vantura-chart-average: #7eb8d8;
+  /* Chart bar gradient stops — deep tones */
+  --vantura-chart-bar-success-from: #1a5530;
+  --vantura-chart-bar-success-to: #0a3018;
+  --vantura-chart-bar-warning-from: #7a5010;
+  --vantura-chart-bar-warning-to: #584008;
+  --vantura-chart-bar-danger-from: #5a1c22;
+  --vantura-chart-bar-danger-to: #380f14;
+  /* Tracker / meta badges — semi-transparent tints */
+  --vantura-badge-frequency-bg: rgba(232, 184, 136, 0.22);
+  --vantura-badge-frequency-fg: #e8b888;
+  --vantura-badge-meta-bg: rgba(126, 184, 216, 0.22);
+  --vantura-badge-meta-fg: #7eb8d8;
   --vantura-badge-frequency-text: color-mix(
     in srgb,
     #ffffff 80%,
@@ -119,6 +101,19 @@
     #ffffff 80%,
     var(--vantura-badge-meta-fg) 20%
   );
+  /* Bootstrap semantic vars — bridged to Vantura's pastel palette so Bootstrap
+     utility classes (.text-success, .bg-danger, .progress-bar variants, etc.)
+     all render in Vantura colours instead of Bootstrap's default blue/green/red */
+  --bs-primary-rgb: 126, 184, 216;
+  --bs-success-rgb: 142, 197, 160;
+  --bs-danger-rgb: 232, 152, 152;
+  --bs-warning-rgb: 232, 184, 136;
+  --bs-info-rgb: 126, 184, 216;
+  /* Progress bar — consistent track and label across all instances */
+  --bs-progress-bg: var(--vantura-border);
+  --bs-progress-bar-color: var(--vantura-text-on-pastel);
+  /* Softer dark for text inside pastel progress bars — avoids both jarring white and stamped-on black */
+  --vantura-progress-label: rgba(26, 26, 46, 0.75);
 }
 
 /* Form check / switch */
@@ -132,42 +127,43 @@
 }
 .form-check-input:focus {
   border-color: var(--vantura-primary);
-  box-shadow: 0 0 0 0.2rem rgba(182, 109, 255, 0.25);
+  box-shadow: 0 0 0 0.2rem
+    color-mix(in srgb, var(--vantura-primary) 25%, transparent);
 }
 .form-check-label {
   color: var(--vantura-text);
 }
 
-/* Phase 12: Accent color overrides — user choice from Settings */
-[data-accent='purple'] {
-  --vantura-primary: #b66dff;
-  --vantura-primary-gradient: linear-gradient(to right, #da8cff, #9a55ff);
-  --vantura-sidebar-active-color: #b66dff;
+/* Pastel accent overrides — user choice from Settings */
+[data-accent='sky'] {
+  --vantura-primary: #7eb8d8;
+  --vantura-primary-gradient: linear-gradient(to right, #a8d8f0, #5090b8);
+  --vantura-sidebar-active-color: #7eb8d8;
 }
-[data-accent='blue'] {
-  --vantura-primary: #198ae3;
-  --vantura-primary-gradient: linear-gradient(to right, #5eb8ff, #047edf);
-  --vantura-sidebar-active-color: #198ae3;
+[data-accent='mint'] {
+  --vantura-primary: #7ec8c0;
+  --vantura-primary-gradient: linear-gradient(to right, #a8e0d8, #50a098);
+  --vantura-sidebar-active-color: #7ec8c0;
 }
-[data-accent='teal'] {
-  --vantura-primary: #1bcfb4;
-  --vantura-primary-gradient: linear-gradient(to right, #84d9d2, #07cdae);
-  --vantura-sidebar-active-color: #1bcfb4;
+[data-accent='lavender'] {
+  --vantura-primary: #b0a8d8;
+  --vantura-primary-gradient: linear-gradient(to right, #ccc8ee, #9088b8);
+  --vantura-sidebar-active-color: #b0a8d8;
 }
-[data-accent='green'] {
-  --vantura-primary: #46c35f;
-  --vantura-primary-gradient: linear-gradient(to right, #7dd97d, #2a9d3a);
-  --vantura-sidebar-active-color: #46c35f;
+[data-accent='peach'] {
+  --vantura-primary: #e8b888;
+  --vantura-primary-gradient: linear-gradient(to right, #f8d0a8, #c89858);
+  --vantura-sidebar-active-color: #e8b888;
 }
-[data-accent='amber'] {
-  --vantura-primary: #f2a654;
-  --vantura-primary-gradient: linear-gradient(to right, #fed89a, #e08620);
-  --vantura-sidebar-active-color: #f2a654;
+[data-accent='blush'] {
+  --vantura-primary: #e8a8c0;
+  --vantura-primary-gradient: linear-gradient(to right, #f8c8d8, #c888a0);
+  --vantura-sidebar-active-color: #e8a8c0;
 }
-[data-accent='rose'] {
-  --vantura-primary: #fe7c96;
-  --vantura-primary-gradient: linear-gradient(to right, #ffa8b8, #e8456a);
-  --vantura-sidebar-active-color: #fe7c96;
+[data-accent='lemon'] {
+  --vantura-primary: #d8d088;
+  --vantura-primary-gradient: linear-gradient(to right, #ece888, #b8b060);
+  --vantura-sidebar-active-color: #d8d088;
 }
 
 :root {
@@ -196,6 +192,14 @@ body {
   background-color: var(--vantura-background);
 }
 
+a:not(.btn):not(.nav-link):not(.dropdown-item) {
+  color: var(--vantura-primary);
+}
+a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
+  color: var(--vantura-primary);
+  opacity: 0.8;
+}
+
 /* Full-screen boot / storage error */
 .app-boot-shell {
   display: flex;
@@ -203,7 +207,7 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a142d 0%, #282037 50%, #18151e 100%);
+  background: linear-gradient(135deg, #13131c 0%, #1c1c28 50%, #0f0f18 100%);
   color: var(--vantura-text);
 }
 
@@ -420,19 +424,19 @@ body {
   outline-offset: 2px;
 }
 
-/* Phase 10: Dark theme modal and surfaces */
+/* Dark theme modal and surfaces — subtle gradient matches card depth */
 .modal-content {
-  background-color: var(--vantura-surface);
+  background: var(--vantura-card-bg);
   color: var(--vantura-text);
   border-color: var(--vantura-border);
 }
 .modal-header,
 .modal-footer {
   border-color: var(--vantura-border);
-  background-color: var(--vantura-surface);
+  background: transparent;
 }
 .offcanvas {
-  background-color: var(--vantura-surface);
+  background: var(--vantura-card-bg);
   color: var(--vantura-text);
 }
 .offcanvas-header {
@@ -458,7 +462,8 @@ body {
   background-color: var(--vantura-surface);
   border-color: var(--vantura-primary);
   color: var(--vantura-text);
-  box-shadow: 0 0 0 0.2rem rgba(182, 109, 255, 0.25);
+  box-shadow: 0 0 0 0.2rem
+    color-mix(in srgb, var(--vantura-primary) 25%, transparent);
 }
 .bg-surface {
   background-color: var(--vantura-surface);
@@ -669,10 +674,10 @@ body {
   border-radius: 4px;
   text-align: center;
   line-height: 36px;
-  background: var(--vantura-primary-gradient);
-  color: white;
+  background: var(--vantura-gradient-primary);
+  color: var(--vantura-text-on-gradient);
   margin-right: 0.5rem;
-  box-shadow: 0 3px 8.3px 0.7px rgba(163, 93, 255, 0.35);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
 }
 .page-title-icon[draggable='true'] {
   cursor: grab;
@@ -733,21 +738,21 @@ body {
   font-size: 1rem;
 }
 
-/* Phase 8: Purple React gradient button */
+/* Gradient primary button — pastel background, dark text for contrast */
 .btn-gradient-primary {
   background: var(--vantura-primary-gradient);
   border: 0;
-  color: white;
+  color: var(--vantura-text-on-pastel);
 }
 .btn-gradient-primary:hover,
 .btn-gradient-primary:focus {
   background: var(--vantura-primary-gradient);
-  color: white;
+  color: var(--vantura-text-on-pastel);
   opacity: 0.9;
 }
 .btn-gradient-primary:active {
   background: var(--vantura-primary);
-  color: white;
+  color: var(--vantura-text-on-pastel);
 }
 
 /* Phase 8: Purple React card decoration (stat cards) */
@@ -761,22 +766,64 @@ body {
   height: 100%;
 }
 
-/* Phase 8: Purple React gradient card backgrounds — theme-aware */
+/* Statement gradient card backgrounds — softened white text, not harsh pure white */
 .bg-gradient-primary {
   background: var(--vantura-gradient-primary);
-  color: white;
+  color: var(--vantura-text-on-gradient);
 }
 .bg-gradient-success {
   background: var(--vantura-gradient-success);
-  color: white;
+  color: var(--vantura-text-on-gradient);
 }
 .bg-gradient-info {
   background: var(--vantura-gradient-info);
-  color: white;
+  color: var(--vantura-text-on-gradient);
 }
 .bg-gradient-danger {
   background: var(--vantura-gradient-danger);
-  color: white;
+  color: var(--vantura-text-on-gradient);
+}
+/* Override explicit text-white within gradient cards so it also softens */
+.bg-gradient-primary .text-white,
+.bg-gradient-success .text-white,
+.bg-gradient-info .text-white,
+.bg-gradient-danger .text-white {
+  color: var(--vantura-text-on-gradient) !important;
+}
+
+/* Pastel fill classes — compact StatCard (Money In / Out / Savers / Charges)
+   Gradient: 15% lighter at top-left → 15% deeper at bottom-right for soft depth */
+.bg-pastel-success {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-success) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-success) 82%, #13131c) 100%
+  );
+  color: rgba(26, 26, 46, 0.82);
+}
+.bg-pastel-danger {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-danger) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-danger) 82%, #13131c) 100%
+  );
+  color: rgba(26, 26, 46, 0.82);
+}
+.bg-pastel-info {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-info) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-info) 82%, #13131c) 100%
+  );
+  color: rgba(26, 26, 46, 0.82);
+}
+.bg-pastel-primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-primary) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-primary) 82%, #13131c) 100%
+  );
+  color: rgba(26, 26, 46, 0.82);
 }
 
 /* Flat stat card (Monarch-inspired) */
@@ -792,20 +839,72 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .stat-card-flat--success {
-  background: var(--vantura-stat-success-gradient);
-  border-left-color: var(--vantura-success);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-success) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-success) 82%, #13131c) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--vantura-success) 60%, #13131c);
 }
 .stat-card-flat--danger {
-  background: var(--vantura-stat-danger-gradient);
-  border-left-color: var(--vantura-danger);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-danger) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-danger) 82%, #13131c) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--vantura-danger) 60%, #13131c);
 }
 .stat-card-flat--info {
-  background: var(--vantura-stat-info-gradient);
-  border-left-color: var(--vantura-info);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-info) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-info) 82%, #13131c) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--vantura-info) 60%, #13131c);
 }
 .stat-card-flat--primary {
-  background: var(--vantura-stat-primary-gradient);
-  border-left-color: var(--vantura-primary);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-primary) 82%, white) 0%,
+    color-mix(in srgb, var(--vantura-primary) 82%, #13131c) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--vantura-primary) 60%, #13131c);
+}
+/* Pastel gradient → soft dark text throughout */
+.stat-card-flat--success,
+.stat-card-flat--danger,
+.stat-card-flat--info,
+.stat-card-flat--primary {
+  color: rgba(26, 26, 46, 0.82);
+}
+.stat-card-flat--success .stat-card-flat__title,
+.stat-card-flat--danger .stat-card-flat__title,
+.stat-card-flat--info .stat-card-flat__title,
+.stat-card-flat--primary .stat-card-flat__title,
+.stat-card-flat--success .stat-card-flat__subtitle,
+.stat-card-flat--danger .stat-card-flat__subtitle,
+.stat-card-flat--info .stat-card-flat__subtitle,
+.stat-card-flat--primary .stat-card-flat__subtitle,
+.stat-card-flat--success .stat-card-flat__info,
+.stat-card-flat--danger .stat-card-flat__info,
+.stat-card-flat--info .stat-card-flat__info,
+.stat-card-flat--primary .stat-card-flat__info {
+  color: rgba(26, 26, 46, 0.58);
+}
+.stat-card-flat--success .stat-card-flat__value,
+.stat-card-flat--danger .stat-card-flat__value,
+.stat-card-flat--info .stat-card-flat__value,
+.stat-card-flat--primary .stat-card-flat__value {
+  color: rgba(26, 26, 46, 0.88);
+}
+/* Warning chip on a pastel card background — neutral dark tint instead of orange-on-pastel */
+.stat-card-flat--success .stat-card-flat__subtitle--warningChip,
+.stat-card-flat--danger .stat-card-flat__subtitle--warningChip,
+.stat-card-flat--info .stat-card-flat__subtitle--warningChip,
+.stat-card-flat--primary .stat-card-flat__subtitle--warningChip {
+  border-color: rgba(26, 26, 46, 0.25);
+  background: rgba(26, 26, 46, 0.12);
+  color: var(--vantura-text-on-pastel);
 }
 .stat-card-flat__body {
   padding: 1.25rem 1.5rem !important;
@@ -936,7 +1035,7 @@ body {
   margin-left: 0.4rem;
   border-radius: 4px;
   background: var(--vantura-primary-gradient);
-  color: white;
+  color: var(--vantura-text-on-pastel);
   white-space: nowrap;
 }
 .sidebar .sidebar-brand {
@@ -1136,10 +1235,9 @@ body {
 }
 
 .badge-frequency-custom {
-  border: 1px solid rgba(0, 0, 0, 0.55);
-  color: rgba(255, 255, 255, 0.88);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: var(--vantura-text-on-pastel);
+  font-weight: 600;
 }
 
 /* Phase 8: Purple React navbar */
@@ -1159,7 +1257,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--vantura-navbar-bg);
+  background: var(--vantura-sidebar-gradient);
   transition:
     width 0.25s ease,
     background 0.25s ease;
@@ -1251,7 +1349,7 @@ body {
   align-items: center;
   padding-left: 24px;
   padding-right: 24px;
-  background: var(--vantura-surface);
+  background: var(--vantura-card-bg);
   border-bottom: 1px solid var(--vantura-border);
   color: var(--vantura-text-secondary);
 }
@@ -1344,20 +1442,22 @@ body {
 
 /* Phase 8: Purple React progress bar — theme-aware track and gradient fills */
 .progress {
-  background-color: var(--vantura-content-bg);
+  background-color: var(--vantura-border);
+  /* Override Bootstrap's class-level default (#fff) — must be here, not just :root */
+  --bs-progress-bar-color: var(--vantura-progress-label);
 }
 .progress .bg-primary {
-  background: var(--vantura-primary-gradient) !important;
+  background: var(--vantura-primary) !important;
 }
 .progress .progress-bar-striped.bg-primary {
-  background: var(--vantura-primary-gradient);
-  background-image: linear-gradient(
+  background-color: var(--vantura-primary);
+  background-image: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.25) 25%,
+    rgba(0, 0, 0, 0.1) 25%,
     transparent 25%,
     transparent 50%,
-    rgba(255, 255, 255, 0.25) 50%,
-    rgba(255, 255, 255, 0.25) 75%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 75%,
     transparent 75%,
     transparent
   );
@@ -1368,19 +1468,22 @@ body {
 }
 .progress .progress-bar {
   transition: width 0.35s ease-out;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--vantura-progress-label);
 }
 .progress .bg-success {
-  background: var(--vantura-gradient-success) !important;
+  background: var(--vantura-success) !important;
 }
 .progress .progress-bar-striped.bg-success {
-  background: var(--vantura-gradient-success);
-  background-image: linear-gradient(
+  background-color: var(--vantura-success);
+  background-image: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.25) 25%,
+    rgba(0, 0, 0, 0.1) 25%,
     transparent 25%,
     transparent 50%,
-    rgba(255, 255, 255, 0.25) 50%,
-    rgba(255, 255, 255, 0.25) 75%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 75%,
     transparent 75%,
     transparent
   );
@@ -1389,19 +1492,18 @@ body {
 .progress .progress-bar-striped.progress-bar-animated.bg-success {
   animation: progress-bar-stripes 1s linear infinite;
 }
-/* Tracker progress bar threshold colors: warning (51-80%), danger (81%+), striped overspent (100%+) */
 .progress .bg-warning {
-  background: var(--vantura-gradient-warning) !important;
+  background: var(--vantura-warning) !important;
 }
 .progress .progress-bar-striped.bg-warning {
-  background: var(--vantura-gradient-warning);
-  background-image: linear-gradient(
+  background-color: var(--vantura-warning);
+  background-image: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.25) 25%,
+    rgba(0, 0, 0, 0.1) 25%,
     transparent 25%,
     transparent 50%,
-    rgba(255, 255, 255, 0.25) 50%,
-    rgba(255, 255, 255, 0.25) 75%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 75%,
     transparent 75%,
     transparent
   );
@@ -1411,17 +1513,17 @@ body {
   animation: progress-bar-stripes 1s linear infinite;
 }
 .progress .bg-danger {
-  background: var(--vantura-gradient-danger) !important;
+  background: var(--vantura-danger) !important;
 }
 .progress .progress-bar-striped.bg-danger {
-  background: var(--vantura-gradient-danger);
-  background-image: linear-gradient(
+  background-color: var(--vantura-danger);
+  background-image: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.25) 25%,
+    rgba(0, 0, 0, 0.1) 25%,
     transparent 25%,
     transparent 50%,
-    rgba(255, 255, 255, 0.25) 50%,
-    rgba(255, 255, 255, 0.25) 75%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 75%,
     transparent 75%,
     transparent
   );
@@ -1447,25 +1549,33 @@ body {
   color: var(--vantura-text-secondary);
 }
 
-/* Phase 8: Bootstrap primary override for purple theme */
+/* Primary button — pastel background needs dark text for contrast */
 .btn-primary {
+  --bs-btn-color: var(--vantura-text-on-pastel);
+  --bs-btn-hover-color: var(--vantura-text-on-pastel);
+  --bs-btn-active-color: var(--vantura-text-on-pastel);
   background-color: var(--vantura-primary);
   border-color: var(--vantura-primary);
+  color: var(--vantura-text-on-pastel);
 }
 .btn-primary:hover {
   background-color: var(--vantura-primary);
   border-color: var(--vantura-primary);
+  color: var(--vantura-text-on-pastel);
 }
 .btn-outline-primary {
   --bs-btn-color: var(--vantura-primary);
   --bs-btn-border-color: var(--vantura-primary);
-  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-color: var(--vantura-text-on-pastel);
   --bs-btn-hover-bg: var(--vantura-primary);
   --bs-btn-hover-border-color: var(--vantura-primary);
-  --bs-btn-active-color: #fff;
+  --bs-btn-active-color: var(--vantura-text-on-pastel);
   --bs-btn-active-bg: var(--vantura-primary);
   --bs-btn-active-border-color: var(--vantura-primary);
-  --bs-btn-focus-shadow-rgb: 182, 109, 255;
+}
+.btn-outline-primary:focus-visible {
+  box-shadow: 0 0 0 0.25rem
+    color-mix(in srgb, var(--vantura-primary) 25%, transparent);
 }
 .text-primary {
   color: var(--vantura-primary) !important;
@@ -1480,14 +1590,14 @@ body {
   background-color: var(--vantura-primary) !important;
 }
 
-/* Phase 8: Auth screens gradient background */
+/* Auth screens gradient background */
 .auth-full-bg {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-  background: linear-gradient(135deg, #1a142d 0%, #282037 50%, #18151e 100%);
+  background: linear-gradient(135deg, #13131c 0%, #1c1c28 50%, #0f0f18 100%);
 }
 .auth-full-bg .card,
 .auth-full-bg .auth-card {
@@ -1522,4 +1632,5 @@ body {
 .month-summary-legend-toggle.btn:focus-visible {
   outline: 2px solid var(--vantura-primary);
   outline-offset: 2px;
+  box-shadow: none;
 }

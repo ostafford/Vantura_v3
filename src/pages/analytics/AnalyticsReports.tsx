@@ -93,9 +93,9 @@ const FREQUENCY_LABELS: Record<string, string> = {
 }
 
 function trackerBarColor(progress: number): string {
-  if (progress >= 81) return 'var(--bs-danger)'
-  if (progress > 50) return 'var(--bs-warning)'
-  return 'var(--bs-success)'
+  if (progress >= 81) return 'var(--vantura-danger)'
+  if (progress > 50) return 'var(--vantura-warning)'
+  return 'var(--vantura-success)'
 }
 
 function getProgressVariant(progress: number): {
@@ -216,10 +216,7 @@ function SpendingCategoryList({
                   flex: 1,
                   minWidth: 0,
                   cursor: 'pointer',
-                  color: 'var(--bs-primary)',
-                  textDecoration: 'underline',
-                  textDecorationStyle: 'dotted',
-                  textUnderlineOffset: '2px',
+                  color: 'var(--vantura-primary)',
                 }}
                 onClick={() => {
                   const params = new URLSearchParams()
@@ -277,7 +274,7 @@ function SpendingCategoryList({
             padding: '0.25rem 0',
             cursor: 'pointer',
             fontSize: '0.8rem',
-            color: 'var(--bs-primary)',
+            color: 'var(--vantura-primary)',
             display: 'flex',
             alignItems: 'center',
             gap: '0.25rem',
@@ -319,7 +316,9 @@ function KpiCell({
   const isPositive = invert
     ? delta?.direction === 'down'
     : delta?.direction === 'up'
-  const deltaColor = isPositive ? 'var(--bs-success)' : 'var(--bs-danger)'
+  const deltaColor = isPositive
+    ? 'var(--vantura-success)'
+    : 'var(--vantura-danger)'
 
   const cell = (
     <div
@@ -878,8 +877,8 @@ export function AnalyticsReports() {
                     spendDelta !== null && Math.abs(spendDelta) >= 1
                   const deltaColor = hasDelta
                     ? spendDelta! > 0
-                      ? 'var(--bs-danger)'
-                      : 'var(--bs-success)'
+                      ? 'var(--vantura-danger)'
+                      : 'var(--vantura-success)'
                     : undefined
                   const periods = trackerPeriodBreakdowns[tracker.id]
 
@@ -940,11 +939,7 @@ export function AnalyticsReports() {
                             <ProgressBar
                               now={Math.min(100, p.progress)}
                               {...getProgressVariant(p.progress)}
-                              label={
-                                <span
-                                  style={{ opacity: 0.5 }}
-                                >{`${Math.round(p.progress)}%`}</span>
-                              }
+                              label={`${Math.round(p.progress)}%`}
                               style={{ height: 13 }}
                             />
                           </div>
@@ -975,8 +970,8 @@ export function AnalyticsReports() {
                             <span
                               style={{
                                 color: overBudget
-                                  ? 'var(--bs-danger)'
-                                  : 'var(--bs-success)',
+                                  ? 'var(--vantura-danger)'
+                                  : 'var(--vantura-success)',
                               }}
                             >
                               ${formatMoney(spent)}
@@ -1031,11 +1026,7 @@ export function AnalyticsReports() {
                         <ProgressBar
                           now={Math.min(100, progress)}
                           {...getProgressVariant(progress)}
-                          label={
-                            <span
-                              style={{ opacity: 0.5 }}
-                            >{`${Math.round(progress)}%`}</span>
-                          }
+                          label={`${Math.round(progress)}%`}
                           style={{ height: 13 }}
                         />
                       </li>
@@ -1054,8 +1045,8 @@ export function AnalyticsReports() {
                     spendDelta !== null && Math.abs(spendDelta) >= 1
                   const deltaColor = hasDelta
                     ? spendDelta! > 0
-                      ? 'var(--bs-danger)'
-                      : 'var(--bs-success)'
+                      ? 'var(--vantura-danger)'
+                      : 'var(--vantura-success)'
                     : undefined
                   const periods = trackerPeriodBreakdowns[tracker.id]
 
@@ -1121,11 +1112,7 @@ export function AnalyticsReports() {
                               <ProgressBar
                                 now={Math.min(100, p.progress)}
                                 {...getProgressVariant(p.progress)}
-                                label={
-                                  <span
-                                    style={{ opacity: 0.5 }}
-                                  >{`${Math.round(p.progress)}%`}</span>
-                                }
+                                label={`${Math.round(p.progress)}%`}
                                 style={{ height: 13 }}
                               />
                             </div>
@@ -1157,8 +1144,8 @@ export function AnalyticsReports() {
                               <span
                                 style={{
                                   color: overBudget
-                                    ? 'var(--bs-danger)'
-                                    : 'var(--bs-success)',
+                                    ? 'var(--vantura-danger)'
+                                    : 'var(--vantura-success)',
                                 }}
                               >
                                 ${formatMoney(spent)}
@@ -1205,11 +1192,7 @@ export function AnalyticsReports() {
                           <ProgressBar
                             now={Math.min(100, progress)}
                             {...getProgressVariant(progress)}
-                            label={
-                              <span
-                                style={{ opacity: 0.5 }}
-                              >{`${Math.round(progress)}%`}</span>
-                            }
+                            label={`${Math.round(progress)}%`}
                             style={{ height: 13 }}
                             className="mb-2"
                           />
@@ -1335,7 +1318,7 @@ export function AnalyticsReports() {
                           width: `${barWidth}%`,
                           height: '100%',
                           borderRadius: 4,
-                          background: 'var(--bs-primary)',
+                          background: 'var(--vantura-primary)',
                           opacity: 0.75,
                           transition: 'width 0.3s ease',
                         }}

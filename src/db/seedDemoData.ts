@@ -589,7 +589,7 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
-      '#16a34a',
+      '#8EC5A0',
     ]
   )
   const tracker1Result = db.exec('SELECT last_insert_rowid()')
@@ -611,7 +611,7 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
-      '#dc2626',
+      '#E89898',
     ]
   )
   const tracker2Result = db.exec('SELECT last_insert_rowid()')
@@ -633,7 +633,7 @@ export function seedDemoData(): void {
       weeklyLast,
       weeklyNext,
       NOW,
-      '#f59e0b',
+      '#E8B888',
     ]
   )
   const tracker3Result = db.exec('SELECT last_insert_rowid()')
@@ -655,7 +655,7 @@ export function seedDemoData(): void {
       fortLast,
       fortNext,
       NOW,
-      '#8b5cf6',
+      '#B0A8D8',
     ]
   )
   const tracker4Result = db.exec('SELECT last_insert_rowid()')
@@ -679,7 +679,7 @@ export function seedDemoData(): void {
       lastPaydayStr,
       nextPayday,
       NOW,
-      '#0891b2',
+      '#7EB8D8',
     ]
   )
   const tracker5Result = db.exec('SELECT last_insert_rowid()')

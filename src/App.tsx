@@ -4,7 +4,6 @@ import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { accentStore } from '@/stores/accentStore'
-import { applyCustomAccentHex, CUSTOM_ACCENT_KEY } from '@/lib/accentPalettes'
 import { sessionStore } from '@/stores/sessionStore'
 import { ToastProvider } from '@/components/ToastProvider'
 import { Unlock } from '@/pages/Unlock'
@@ -43,8 +42,6 @@ function AppContent() {
       if (cancelled) return
       accentStore.getState().hydrateFromDb()
       if (cancelled) return
-      const customHex = getAppSetting(CUSTOM_ACCENT_KEY)
-      if (customHex) applyCustomAccentHex(customHex)
       if (cancelled) return
       advanceNextPaydayIfNeeded()
       if (cancelled) return

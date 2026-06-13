@@ -16,15 +16,15 @@ function getSentiment(
 }
 
 const SENTIMENT_COLOR: Record<Sentiment, string> = {
-  positive: 'var(--bs-success, #1bcfb4)',
-  negative: 'var(--bs-danger, #fc424a)',
-  neutral: 'var(--bs-secondary-color, #6c757d)',
+  positive: 'var(--vantura-success, #8EC5A0)',
+  negative: 'var(--vantura-danger, #E89898)',
+  neutral: 'var(--vantura-text-secondary, #8888a0)',
 }
 
 const SENTIMENT_BG: Record<Sentiment, string> = {
-  positive: 'color-mix(in srgb, var(--bs-success) 12%, transparent)',
-  negative: 'color-mix(in srgb, var(--bs-danger) 12%, transparent)',
-  neutral: 'var(--bs-tertiary-bg, rgba(0,0,0,0.04))',
+  positive: 'color-mix(in srgb, var(--vantura-success) 15%, transparent)',
+  negative: 'color-mix(in srgb, var(--vantura-danger) 15%, transparent)',
+  neutral: 'rgba(255, 255, 255, 0.04)',
 }
 
 function fmtAbs(cents: number) {
@@ -115,16 +115,16 @@ function ProgressBarRow({
   if (isGoodWhenUnder) {
     // Spending: under = green, over = red with stripes
     if (isOver) {
-      barColor = 'var(--bs-danger)'
+      barColor = 'var(--vantura-danger)'
       striped = true
     } else {
-      barColor = 'var(--bs-success)'
+      barColor = 'var(--vantura-success)'
     }
   } else {
     // Income: under = red, matched/over = green (over gets stripes)
-    if (rawPct < 100) barColor = 'var(--bs-danger)'
+    if (rawPct < 100) barColor = 'var(--vantura-danger)'
     else {
-      barColor = 'var(--bs-success)'
+      barColor = 'var(--vantura-success)'
       if (isOver) striped = true
     }
   }
@@ -143,7 +143,7 @@ function ProgressBarRow({
         style={{
           height: 14,
           borderRadius: 4,
-          background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+          background: 'var(--vantura-border)',
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -170,10 +170,9 @@ function ProgressBarRow({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '0.7rem',
+            fontSize: '0.65rem',
             fontWeight: 700,
-            color: 'white',
-            textShadow: '0 0 4px rgba(0,0,0,0.5)',
+            color: 'var(--vantura-progress-label)',
             pointerEvents: 'none',
           }}
         >
@@ -190,11 +189,11 @@ function ProgressBarRow({
     ? current < previous
     : current > previous
   const currentTooltipColor = currentIsBetter
-    ? 'var(--bs-success)'
-    : 'var(--bs-danger)'
+    ? 'var(--vantura-success)'
+    : 'var(--vantura-danger)'
   const previousTooltipColor = currentIsBetter
-    ? 'var(--bs-danger)'
-    : 'var(--bs-success)'
+    ? 'var(--vantura-danger)'
+    : 'var(--vantura-success)'
 
   return (
     <OverlayTrigger

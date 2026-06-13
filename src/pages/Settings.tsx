@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useStore } from 'zustand'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Modal, Spinner, Form } from 'react-bootstrap'
 import { getAppSetting, setAppSetting, deleteDatabase } from '@/db'
 import { toast } from '@/stores/toastStore'
-import {
-  ACCENT_PALETTES,
-  type AccentId,
-  CUSTOM_ACCENT_KEY,
-  applyCustomAccentHex,
-  clearCustomAccentHex,
-} from '@/lib/accentPalettes'
+import { ACCENT_PALETTES, type AccentId } from '@/lib/accentPalettes'
+import { accentStore } from '@/stores/accentStore'
 import { sessionStore } from '@/stores/sessionStore'
 import {
   deriveKeyFromPassphrase,
@@ -233,9 +229,7 @@ export function Settings() {
     trackers: true,
     upcomingCharges: true,
   })
-  const [customAccentHex, setCustomAccentHex] = useState<string | null>(
-    () => getAppSetting(CUSTOM_ACCENT_KEY) || null
-  )
+  const accent = useStore(accentStore, (s) => s.accent)
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
@@ -641,46 +635,48 @@ export function Settings() {
                 <>
                   <h6 className="text-muted mb-2">Accent colour</h6>
                   <p className="small text-muted mb-3">
-                    Applies to buttons, highlights, and gradients throughout the
-                    app.
+                    Applies to buttons, highlights, and active states throughout
+                    the app.
                   </p>
-                  <div className="d-flex align-items-center gap-3">
-                    <input
-                      type="color"
-                      value={customAccentHex ?? '#b66dff'}
-                      onChange={(e) => {
-                        const hex = e.target.value
-                        setAppSetting(CUSTOM_ACCENT_KEY, hex)
-                        setCustomAccentHex(hex)
-                        applyCustomAccentHex(hex)
-                      }}
-                      aria-label="Pick accent colour"
-                      className="rounded border"
-                      style={{
-                        width: 40,
-                        height: 40,
-                        padding: 2,
-                        cursor: 'pointer',
-                      }}
-                    />
-                    {customAccentHex != null ? (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-muted"
-                        onClick={() => {
-                          setAppSetting(CUSTOM_ACCENT_KEY, '')
-                          setCustomAccentHex(null)
-                          clearCustomAccentHex()
-                        }}
-                        aria-label="Use default accent colour"
-                      >
-                        Use default
-                      </button>
-                    ) : (
-                      <span className="small text-muted">
-                        No custom colour set
-                      </span>
-                    )}
+                  <div
+                    className="d-flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="Choose accent colour"
+                  >
+                    {(Object.keys(ACCENT_PALETTES) as AccentId[]).map((id) => {
+                      const { primary, label } = ACCENT_PALETTES[id]
+                      const isSelected = accent === id
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className="border rounded-circle p-0 d-flex align-items-center justify-content-center"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            background: primary,
+                            borderWidth: isSelected ? 3 : 1,
+                            borderColor: isSelected
+                              ? 'var(--vantura-text)'
+                              : 'var(--vantura-border)',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                          onClick={() => accentStore.getState().setAccent(id)}
+                          aria-label={`${label} accent`}
+                          aria-pressed={isSelected}
+                          title={label}
+                        >
+                          {isSelected && (
+                            <i
+                              className="mdi mdi-check"
+                              style={{ fontSize: '1rem', color: '#1a1a2e' }}
+                              aria-hidden
+                            />
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
 
                   <hr className="my-4" />

@@ -19,13 +19,13 @@ import { getYearMonthlySemanticStrokes } from '@/components/charts/monthComparis
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const BORDER_COLOR = 'var(--vantura-border, #3e3a4a)'
+const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const AVERAGE_STROKE = 'var(--vantura-chart-average, #f2994a)'
 const MARGIN_TOP = 12
 const MARGIN_BOTTOM = 24
 const MARGIN_LEFT = 60
 const MARGIN_RIGHT = 24
-const SUCCESS_COLOR = 'var(--vantura-success, #1bcfb4)'
+const SUCCESS_COLOR = 'var(--vantura-success, #8EC5A0)'
 const SUCCESS_FILL =
   'color-mix(in srgb, var(--vantura-success) 18%, transparent)'
 const DANGER_FILL = 'color-mix(in srgb, var(--vantura-danger) 18%, transparent)'
@@ -146,8 +146,7 @@ export function YearMonthlyLineChart({
       metric
     )
     const currentStroke =
-      semanticStrokes?.currentStroke ??
-      'var(--vantura-chart-accent, var(--bs-primary, #ff9f43))'
+      semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
     const previousStroke =
       semanticStrokes?.previousStroke ??
       'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'
@@ -435,7 +434,7 @@ export function YearMonthlyLineChart({
           padding: '6px 10px',
           background: 'var(--vantura-surface)',
           color: 'var(--vantura-text)',
-          border: '1px solid var(--vantura-border, #3e3a4a)',
+          border: '1px solid var(--vantura-border, #2c2c3c)',
           borderRadius: 4,
           fontSize: 12,
           pointerEvents: 'none',

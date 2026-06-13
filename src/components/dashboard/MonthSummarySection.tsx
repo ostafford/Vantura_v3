@@ -57,8 +57,7 @@ export function MonthSummarySection({
     return getMonthComparisonSemanticStrokes(monthSeries.series.points, metric)
   }, [monthSeries.series.points, metric])
   const thisMonthStroke =
-    semanticStrokes?.currentStroke ??
-    'var(--vantura-chart-accent, var(--bs-primary, #ff9f43))'
+    semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
   const lastMonthStroke =
     semanticStrokes?.previousStroke ??
     'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'

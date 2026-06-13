@@ -31,7 +31,10 @@ export function AnalyticsIndex() {
                     Spending trends per tracker, budget vs spend across periods,
                     and transaction history.
                   </p>
-                  <span className="small text-primary mt-1 d-inline-block">
+                  <span
+                    className="small mt-1 d-inline-block"
+                    style={{ color: 'var(--vantura-primary)' }}
+                  >
                     View trackers{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
                   </span>
@@ -64,7 +67,10 @@ export function AnalyticsIndex() {
                     Category spending, weekly money in/out trends, and monthly
                     reviews — all in one place.
                   </p>
-                  <span className="small text-primary mt-1 d-inline-block">
+                  <span
+                    className="small mt-1 d-inline-block"
+                    style={{ color: 'var(--vantura-primary)' }}
+                  >
                     View reports{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
                   </span>
@@ -97,7 +103,10 @@ export function AnalyticsIndex() {
                     Track saver account balances, set savings goals, and view
                     monthly contribution history.
                   </p>
-                  <span className="small text-primary mt-1 d-inline-block">
+                  <span
+                    className="small mt-1 d-inline-block"
+                    style={{ color: 'var(--vantura-primary)' }}
+                  >
                     View savers{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
                   </span>

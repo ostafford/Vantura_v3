@@ -47,26 +47,25 @@ export function StatCard({
               role="img"
               aria-label="Info"
             >
-              <i
-                className="mdi mdi-information-outline text-white"
-                aria-hidden
-              />
+              <i className="mdi mdi-information-outline" aria-hidden />
             </span>
           </OverlayTrigger>
         )}
       </>
     )
     return (
-      <Card className={`bg-gradient-${gradient} text-white`}>
+      <Card className={`bg-pastel-${gradient}`}>
         <Card.Body className="py-1 px-2">
-          <h6 className="font-weight-normal mb-0 small text-white text-center align-middle">
+          <h6 className="font-weight-normal mb-0 small text-center align-middle">
             {compactTitle}
           </h6>
-          <h6 className="mb-0 text-white text-center align-middle">
+          <h6 className="mb-0 text-center align-middle fw-bold">
             {valueContent}
           </h6>
           {subtitle && (
-            <small className="card-text opacity-75 d-block">{subtitle}</small>
+            <small className="card-text d-block" style={{ opacity: 0.7 }}>
+              {subtitle}
+            </small>
           )}
         </Card.Body>
       </Card>

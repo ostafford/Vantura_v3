@@ -1,31 +1,4 @@
-export type AccentId = 'purple' | 'blue' | 'teal' | 'green' | 'amber' | 'rose'
-
-export const CUSTOM_ACCENT_KEY = 'custom_accent_hex'
-
-function adjustHex(hex: string, amount: number): string {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!result) return hex
-  const clamp = (v: number) => Math.min(255, Math.max(0, v))
-  const r = clamp(parseInt(result[1], 16) + amount)
-  const g = clamp(parseInt(result[2], 16) + amount)
-  const b = clamp(parseInt(result[3], 16) + amount)
-  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
-}
-
-/** Apply a custom hex as the accent, overriding the data-accent CSS rules. */
-export function applyCustomAccentHex(hex: string): void {
-  document.documentElement.style.setProperty('--vantura-primary', hex)
-  document.documentElement.style.setProperty(
-    '--vantura-primary-gradient',
-    `linear-gradient(to right, ${adjustHex(hex, 40)}, ${adjustHex(hex, -30)})`
-  )
-}
-
-/** Remove custom accent overrides, letting the data-accent CSS rules take over. */
-export function clearCustomAccentHex(): void {
-  document.documentElement.style.removeProperty('--vantura-primary')
-  document.documentElement.style.removeProperty('--vantura-primary-gradient')
-}
+export type AccentId = 'sky' | 'mint' | 'lavender' | 'peach' | 'blush' | 'lemon'
 
 export const ACCENT_PALETTES: Record<
   AccentId,
@@ -37,46 +10,63 @@ export const ACCENT_PALETTES: Record<
     label: string
   }
 > = {
-  purple: {
-    primary: '#b66dff',
-    gradientStart: '#da8cff',
-    gradientEnd: '#9a55ff',
-    chartPalette: ['#da8cff', '#b66dff', '#9a55ff'],
-    label: 'Purple',
+  sky: {
+    primary: '#7EB8D8',
+    gradientStart: '#a8d8f0',
+    gradientEnd: '#5090b8',
+    chartPalette: ['#a8d8f0', '#7EB8D8', '#5090b8'],
+    label: 'Sky',
   },
-  blue: {
-    primary: '#198ae3',
-    gradientStart: '#5eb8ff',
-    gradientEnd: '#047edf',
-    chartPalette: ['#5eb8ff', '#198ae3', '#047edf'],
-    label: 'Blue',
+  mint: {
+    primary: '#7EC8C0',
+    gradientStart: '#a8e0d8',
+    gradientEnd: '#50a098',
+    chartPalette: ['#a8e0d8', '#7EC8C0', '#50a098'],
+    label: 'Mint',
   },
-  teal: {
-    primary: '#1bcfb4',
-    gradientStart: '#84d9d2',
-    gradientEnd: '#07cdae',
-    chartPalette: ['#84d9d2', '#1bcfb4', '#07cdae'],
-    label: 'Teal',
+  lavender: {
+    primary: '#B0A8D8',
+    gradientStart: '#ccc8ee',
+    gradientEnd: '#9088b8',
+    chartPalette: ['#ccc8ee', '#B0A8D8', '#9088b8'],
+    label: 'Lavender',
   },
-  green: {
-    primary: '#46c35f',
-    gradientStart: '#7dd97d',
-    gradientEnd: '#2a9d3a',
-    chartPalette: ['#7dd97d', '#46c35f', '#2a9d3a'],
-    label: 'Green',
+  peach: {
+    primary: '#E8B888',
+    gradientStart: '#f8d0a8',
+    gradientEnd: '#c89858',
+    chartPalette: ['#f8d0a8', '#E8B888', '#c89858'],
+    label: 'Peach',
   },
-  amber: {
-    primary: '#f2a654',
-    gradientStart: '#fed89a',
-    gradientEnd: '#e08620',
-    chartPalette: ['#fed89a', '#f2a654', '#e08620'],
-    label: 'Amber',
+  blush: {
+    primary: '#E8A8C0',
+    gradientStart: '#f8c8d8',
+    gradientEnd: '#c888a0',
+    chartPalette: ['#f8c8d8', '#E8A8C0', '#c888a0'],
+    label: 'Blush',
   },
-  rose: {
-    primary: '#fe7c96',
-    gradientStart: '#ffa8b8',
-    gradientEnd: '#e8456a',
-    chartPalette: ['#ffa8b8', '#fe7c96', '#e8456a'],
-    label: 'Rose',
+  lemon: {
+    primary: '#D8D088',
+    gradientStart: '#ece888',
+    gradientEnd: '#b8b060',
+    chartPalette: ['#ece888', '#D8D088', '#b8b060'],
+    label: 'Lemon',
   },
 }
+
+/** The 6 user-selectable pastel swatches (excludes reserved Sage/Rose semantic colours). */
+export const PASTEL_SWATCHES = (Object.keys(ACCENT_PALETTES) as AccentId[]).map(
+  (id) => ({
+    id,
+    hex: ACCENT_PALETTES[id].primary,
+    label: ACCENT_PALETTES[id].label,
+  })
+)
+
+/** Fixed semantic colours — not user-selectable. */
+export const SEMANTIC_COLORS = {
+  success: '#8EC5A0',
+  danger: '#E89898',
+  warning: '#E8B888',
+  info: '#7EB8D8',
+} as const
