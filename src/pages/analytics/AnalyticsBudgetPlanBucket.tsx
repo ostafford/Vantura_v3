@@ -79,7 +79,6 @@ function AddBudgetLineModal({
       setAmountStr('')
       setFrequency('MONTHLY')
     }
-     
   }, [show])
 
   function handleSave() {
