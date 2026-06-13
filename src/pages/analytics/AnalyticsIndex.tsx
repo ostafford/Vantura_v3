@@ -115,6 +115,42 @@ export function AnalyticsIndex() {
             </Card>
           </Link>
         </Col>
+        <Col xs={12} md={6} lg={4}>
+          <Link
+            to="/analytics/budget"
+            className="text-decoration-none"
+            style={{ color: 'inherit' }}
+          >
+            <Card className="h-100">
+              <Card.Body className="d-flex align-items-start">
+                <span
+                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  style={{ width: 36, height: 36, minWidth: 36 }}
+                >
+                  <i
+                    className="mdi mdi-wallet-outline"
+                    style={{ fontSize: '1.25rem' }}
+                    aria-hidden
+                  />
+                </span>
+                <div>
+                  <h6 className="mb-1 fw-semibold">Budget Plan</h6>
+                  <p className="mb-0 text-muted small">
+                    Group your expenses into buckets, see weekly, monthly and
+                    yearly totals, and test affordability with hypotheticals.
+                  </p>
+                  <span
+                    className="small mt-1 d-inline-block"
+                    style={{ color: 'var(--vantura-primary)' }}
+                  >
+                    View budget plan{' '}
+                    <i className="mdi mdi-chevron-right" aria-hidden />
+                  </span>
+                </div>
+              </Card.Body>
+            </Card>
+          </Link>
+        </Col>
       </Row>
 
       <AnalyticsAtAGlanceSection />

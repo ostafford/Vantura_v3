@@ -21,6 +21,11 @@ import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
+import {
+  getBuckets,
+  getUpcomingBucketId,
+  assignUpcomingToBucket,
+} from '@/services/budgetBuckets'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
@@ -175,6 +180,7 @@ export function UpcomingSection({
   const [reminderDaysBefore, setReminderDaysBefore] = useState<string>('')
   const [isSubscription, setIsSubscription] = useState(false)
   const [cancelByDate, setCancelByDate] = useState('')
+  const [upcomingBucketId, setUpcomingBucketId] = useState<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -205,6 +211,8 @@ export function UpcomingSection({
   const reserved = useMemo(() => getReservedAmount(), [refresh])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const categories = useMemo(() => getCategories(), [refresh])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allBuckets = useMemo(() => getBuckets(), [refresh])
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   function openCreate() {
@@ -221,6 +229,7 @@ export function UpcomingSection({
     setReminderDaysBefore('')
     setIsSubscription(false)
     setCancelByDate('')
+    setUpcomingBucketId(null)
     setShowModal(true)
   }
 
@@ -237,6 +246,7 @@ export function UpcomingSection({
     )
     setIsSubscription(c.is_subscription === 1)
     setCancelByDate(c.cancel_by_date ?? '')
+    setUpcomingBucketId(getUpcomingBucketId(c.id))
     setShowModal(true)
   }
 
@@ -270,9 +280,10 @@ export function UpcomingSection({
         isSubscription,
         cancelBy
       )
+      assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
       toast.success('Upcoming charge updated.')
     } else {
-      createUpcomingCharge(
+      const newId = createUpcomingCharge(
         name.trim(),
         amountCents,
         frequency,
@@ -283,6 +294,7 @@ export function UpcomingSection({
         isSubscription,
         cancelBy
       )
+      assignUpcomingToBucket(newId, upcomingBucketId)
       toast.success('Upcoming charge added.')
     }
     setShowModal(false)
@@ -700,6 +712,31 @@ export function UpcomingSection({
                 days.
               </Form.Text>
             </Form.Group>
+            {allBuckets.length > 0 && (
+              <Form.Group className="mb-2">
+                <Form.Label htmlFor="upcoming-charge-bucket">
+                  Budget bucket
+                </Form.Label>
+                <Form.Select
+                  id="upcoming-charge-bucket"
+                  value={
+                    upcomingBucketId != null ? String(upcomingBucketId) : ''
+                  }
+                  onChange={(e) =>
+                    setUpcomingBucketId(
+                      e.target.value ? Number(e.target.value) : null
+                    )
+                  }
+                >
+                  <option value="">None (unassigned)</option>
+                  {allBuckets.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            )}
             <Form.Group className="mb-2">
               <Form.Check
                 type="checkbox"

@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 23
+const SCHEMA_VERSION = 25
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -90,7 +90,8 @@ const DDL_STATEMENTS = [
     next_reset_date TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
-    badge_color TEXT
+    badge_color TEXT,
+    bucket_id INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS tracker_categories (
     tracker_id INTEGER NOT NULL,
@@ -111,6 +112,7 @@ const DDL_STATEMENTS = [
     is_subscription INTEGER DEFAULT 0,
     cancel_by_date TEXT,
     created_at TEXT NOT NULL,
+    bucket_id INTEGER,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
@@ -144,6 +146,24 @@ const DDL_STATEMENTS = [
     FOREIGN KEY (tag_id) REFERENCES tags(id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_transaction_tags_transaction_id ON transaction_tags(transaction_id)`,
+  `CREATE TABLE IF NOT EXISTS budget_buckets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    colour TEXT NOT NULL DEFAULT 'sky',
+    icon TEXT NOT NULL DEFAULT 'mdi-wallet',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS budget_hypotheticals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    frequency TEXT NOT NULL,
+    is_hypothetical INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE
+  )`,
   `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
     saver_id TEXT NOT NULL,
     snapshot_date TEXT NOT NULL,
@@ -515,6 +535,56 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['23']
+    )
+  }
+  if (version < 24) {
+    const trackerCols = database.exec(`PRAGMA table_info(trackers)`)
+    const trackerExisting = new Set(
+      (trackerCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!trackerExisting.has('bucket_id')) {
+      database.run(`ALTER TABLE trackers ADD COLUMN bucket_id INTEGER`)
+    }
+    const upcomingCols = database.exec(`PRAGMA table_info(upcoming_charges)`)
+    const upcomingExisting = new Set(
+      (upcomingCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!upcomingExisting.has('bucket_id')) {
+      database.run(`ALTER TABLE upcoming_charges ADD COLUMN bucket_id INTEGER`)
+    }
+    database.run(`CREATE TABLE IF NOT EXISTS budget_buckets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      colour TEXT NOT NULL DEFAULT 'sky',
+      icon TEXT NOT NULL DEFAULT 'mdi-wallet',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )`)
+    database.run(`CREATE TABLE IF NOT EXISTS budget_hypotheticals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bucket_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL,
+      frequency TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE
+    )`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['24']
+    )
+  }
+  if (version < 25) {
+    const cols = database.exec(`PRAGMA table_info(budget_hypotheticals)`)
+    const existing = new Set((cols[0]?.values ?? []).map((r) => String(r[1])))
+    if (!existing.has('is_hypothetical')) {
+      database.run(
+        `ALTER TABLE budget_hypotheticals ADD COLUMN is_hypothetical INTEGER NOT NULL DEFAULT 0`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['25']
     )
   }
 }

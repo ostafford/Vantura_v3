@@ -8,6 +8,8 @@ import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
 import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
 import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
 import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
+import { AnalyticsBudgetPlan } from '@/pages/analytics/AnalyticsBudgetPlan'
+import { AnalyticsBudgetPlanBucket } from '@/pages/analytics/AnalyticsBudgetPlanBucket'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { SaverAccountTransactionsRedirect } from '@/routing/SaverAccountTransactionsRedirect'
@@ -39,7 +41,23 @@ export const appRouter = createBrowserRouter(
             },
             {
               path: 'budget',
-              element: <Navigate to="/analytics" replace />,
+              element: <AnalyticsBudgetPlan />,
+              handle: {
+                breadcrumbLabel: 'Budget Plan',
+                pageTitle: 'Budget Plan',
+                pageTitleIcon: 'mdi-wallet-outline',
+              } satisfies AppRouteHandle,
+            },
+            {
+              path: 'budget/:bucketId',
+              element: <AnalyticsBudgetPlanBucket />,
+              handle: {
+                breadcrumbBefore: {
+                  label: 'Budget Plan',
+                  to: '/analytics/budget',
+                },
+                pageTitleIcon: 'mdi-wallet-outline',
+              } satisfies AppRouteHandle,
             },
             {
               path: 'income',
