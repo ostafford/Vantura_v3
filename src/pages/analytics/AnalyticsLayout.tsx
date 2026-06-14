@@ -6,6 +6,7 @@ import {
 } from '@/components/PageBreadcrumb'
 import type { AppRouteHandle } from '@/types/appRouteHandle'
 import { getTracker } from '@/services/trackers'
+import { getBucket } from '@/services/budgetBuckets'
 
 function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
   const items: PageBreadcrumbItem[] = [{ label: 'Dashboard', to: '/' }]
@@ -27,6 +28,16 @@ function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
       const name = !Number.isNaN(id)
         ? (getTracker(id)?.name ?? 'Tracker')
         : 'Tracker'
+      items.push({ label: name, to: undefined })
+      continue
+    }
+
+    if (h.useBucketName) {
+      const raw = m.params.bucketId
+      const id = raw != null ? parseInt(raw, 10) : NaN
+      const name = !Number.isNaN(id)
+        ? (getBucket(id)?.name ?? 'Bucket')
+        : 'Bucket'
       items.push({ label: name, to: undefined })
       continue
     }
@@ -56,6 +67,18 @@ function resolveAnalyticsPageTitle(matches: ReturnType<typeof useMatches>) {
       const title = !Number.isNaN(id)
         ? (getTracker(id)?.name ?? 'Tracker')
         : 'Tracker'
+      return {
+        pageTitle: title,
+        pageTitleIcon: h.pageTitleIcon ?? fallbackIcon,
+      }
+    }
+
+    if (h.useBucketName) {
+      const raw = m.params.bucketId
+      const id = raw != null ? parseInt(raw, 10) : NaN
+      const title = !Number.isNaN(id)
+        ? (getBucket(id)?.name ?? 'Bucket')
+        : 'Bucket'
       return {
         pageTitle: title,
         pageTitleIcon: h.pageTitleIcon ?? fallbackIcon,

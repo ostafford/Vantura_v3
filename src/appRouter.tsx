@@ -56,6 +56,7 @@ export const appRouter = createBrowserRouter(
                   label: 'Budget Plan',
                   to: '/analytics/budget',
                 },
+                useBucketName: true,
                 pageTitleIcon: 'mdi-wallet-outline',
               } satisfies AppRouteHandle,
             },
