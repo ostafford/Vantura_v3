@@ -108,6 +108,21 @@ export function createBudgetLine(
   return id
 }
 
+export function updateBudgetLine(
+  id: number,
+  name: string,
+  amountCents: number,
+  frequency: string
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(
+    `UPDATE budget_hypotheticals SET name = ?, amount_cents = ?, frequency = ? WHERE id = ?`,
+    [name, amountCents, frequency, id]
+  )
+  schedulePersist()
+}
+
 export function deleteBudgetLine(id: number): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')

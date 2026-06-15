@@ -19,6 +19,10 @@ import {
 } from '@/services/upcoming'
 import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
+import {
+  searchRecentDebits,
+  type AnchorDebitRow,
+} from '@/services/budgetTransactionAnchors'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import {
@@ -183,6 +187,11 @@ export function UpcomingSection({
   const [upcomingBucketId, setUpcomingBucketId] = useState<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [txPickerOpen, setTxPickerOpen] = useState(false)
+  const [txPickerSearch, setTxPickerSearch] = useState('')
+  const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
+    null
+  )
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date()
     return { year: d.getFullYear(), month: d.getMonth() + 1 }
@@ -230,6 +239,9 @@ export function UpcomingSection({
     setIsSubscription(false)
     setCancelByDate('')
     setUpcomingBucketId(null)
+    setTxPickerOpen(false)
+    setTxPickerSearch('')
+    setImportedFromTx(null)
     setShowModal(true)
   }
 
@@ -247,6 +259,9 @@ export function UpcomingSection({
     setIsSubscription(c.is_subscription === 1)
     setCancelByDate(c.cancel_by_date ?? '')
     setUpcomingBucketId(getUpcomingBucketId(c.id))
+    setTxPickerOpen(false)
+    setTxPickerSearch('')
+    setImportedFromTx(null)
     setShowModal(true)
   }
 
@@ -613,7 +628,148 @@ export function UpcomingSection({
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form>
+          {/* Transaction picker — only available when creating new */}
+          {!editingCharge &&
+            txPickerOpen &&
+            (() => {
+              const txResults = searchRecentDebits(txPickerSearch, 40)
+              return (
+                <div className="mb-3">
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="fw-semibold small">
+                      Pick from a recent transaction
+                    </span>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-muted"
+                      onClick={() => setTxPickerOpen(false)}
+                    >
+                      Back to manual
+                    </Button>
+                  </div>
+                  <Form.Control
+                    type="text"
+                    placeholder="Search transactions…"
+                    value={txPickerSearch}
+                    onChange={(e) => setTxPickerSearch(e.target.value)}
+                    autoFocus
+                    className="mb-2"
+                  />
+                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {txResults.length === 0 ? (
+                      <p className="text-muted small text-center py-2 mb-0">
+                        No transactions found.
+                      </p>
+                    ) : (
+                      txResults.map((tx) => (
+                        <div
+                          key={tx.id}
+                          role="button"
+                          tabIndex={0}
+                          className="d-flex justify-content-between align-items-center py-2 px-2 rounded"
+                          style={{
+                            cursor: 'pointer',
+                            borderBottom: '1px solid var(--bs-border-color)',
+                          }}
+                          onClick={() => {
+                            setName(tx.description)
+                            setAmount((tx.amount / 100).toFixed(2))
+                            setImportedFromTx(tx)
+                            setTxPickerOpen(false)
+                            setTxPickerSearch('')
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setName(tx.description)
+                              setAmount((tx.amount / 100).toFixed(2))
+                              setImportedFromTx(tx)
+                              setTxPickerOpen(false)
+                              setTxPickerSearch('')
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background =
+                              'var(--bs-tertiary-bg)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = ''
+                          }}
+                        >
+                          <div className="min-w-0 me-2">
+                            <div
+                              className="fw-medium text-truncate"
+                              style={{ maxWidth: 300 }}
+                            >
+                              {tx.description}
+                            </div>
+                            <div className="text-muted small">
+                              {formatShortDate(tx.date)}
+                            </div>
+                          </div>
+                          <div className="fw-semibold flex-shrink-0">
+                            ${formatMoney(tx.amount)}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
+          <Form
+            style={{
+              display: !editingCharge && txPickerOpen ? 'none' : undefined,
+            }}
+          >
+            {/* Import badge or "Import from transaction" link */}
+            {!editingCharge && (
+              <div className="mb-3">
+                {importedFromTx ? (
+                  <div
+                    className="d-flex align-items-center justify-content-between px-2 py-1 rounded small"
+                    style={{
+                      background: 'var(--bs-tertiary-bg)',
+                      border: '1px solid var(--bs-border-color)',
+                    }}
+                  >
+                    <span className="text-muted">
+                      <i className="mdi mdi-link-variant me-1" aria-hidden />
+                      Imported from:{' '}
+                      <strong>{importedFromTx.description}</strong>
+                    </span>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-muted ms-2"
+                      onClick={() => {
+                        setImportedFromTx(null)
+                        setName('')
+                        setAmount('')
+                      }}
+                      aria-label="Clear import"
+                    >
+                      <i className="mdi mdi-close" aria-hidden />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0 text-muted"
+                    onClick={() => {
+                      setTxPickerOpen(true)
+                      setTxPickerSearch('')
+                    }}
+                  >
+                    <i className="mdi mdi-magnify me-1" aria-hidden />
+                    Import from a transaction instead
+                  </Button>
+                )}
+              </div>
+            )}
+
             <Form.Group className="mb-2">
               <Form.Label htmlFor="upcoming-charge-name">Name</Form.Label>
               <Form.Control

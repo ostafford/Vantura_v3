@@ -1,17 +1,26 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from 'zustand'
-import { Link } from 'react-router-dom'
-import { Card, Row, Col, Button, Modal, Form } from 'react-bootstrap'
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  Card,
+  Row,
+  Col,
+  Button,
+  Modal,
+  Form,
+  ProgressBar,
+} from 'react-bootstrap'
 import {
   getBuckets,
   createBucket,
   updateBucket,
   deleteBucket,
-  getBucketTotalCents,
+  getBucketCardSummary,
   getUnassignedUpcoming,
   getIncomeCents,
   assignUpcomingToBucket,
   type BudgetBucketRow,
+  type BucketCardSummary,
 } from '@/services/budgetBuckets'
 import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
@@ -263,8 +272,8 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
       <Modal.Body>
         <p>
           Delete <strong>{bucket?.name}</strong>? Upcoming charges will become
-          unassigned. Variable budget lines and hypotheticals will be
-          permanently removed.
+          unassigned. Variable budget lines, hypotheticals, and pinned
+          transactions will be permanently removed.
         </p>
       </Modal.Body>
       <Modal.Footer>
@@ -284,7 +293,21 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 export function AnalyticsBudgetPlan() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [version, setVersion] = useState(0)
-  const [period, setPeriod] = useState<BudgetDisplayPeriod>('MONTHLY')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const periodParam = searchParams.get('period')
+  const period: BudgetDisplayPeriod =
+    periodParam === 'WEEKLY' || periodParam === 'YEARLY'
+      ? periodParam
+      : 'MONTHLY'
+  function setPeriod(p: BudgetDisplayPeriod) {
+    setSearchParams(
+      (prev) => {
+        prev.set('period', p)
+        return prev
+      },
+      { replace: true }
+    )
+  }
   const [showBucketModal, setShowBucketModal] = useState(false)
   const [editingBucket, setEditingBucket] = useState<BudgetBucketRow | null>(
     null
@@ -302,11 +325,11 @@ export function AnalyticsBudgetPlan() {
     [version, lastSyncCompletedAt]
   )
 
-  const bucketTotals = useMemo(
+  const bucketSummaries = useMemo(
     () =>
       Object.fromEntries(
-        buckets.map((b) => [b.id, getBucketTotalCents(b.id, period)])
-      ),
+        buckets.map((b) => [b.id, getBucketCardSummary(b.id, period)])
+      ) as Record<number, BucketCardSummary>,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buckets, period, version, lastSyncCompletedAt]
   )
@@ -324,8 +347,12 @@ export function AnalyticsBudgetPlan() {
   )
 
   const totalOutgoingCents = useMemo(
-    () => Object.values(bucketTotals).reduce((sum, v) => sum + v, 0),
-    [bucketTotals]
+    () =>
+      Object.values(bucketSummaries).reduce(
+        (sum, s) => sum + s.plannedCents,
+        0
+      ),
+    [bucketSummaries]
   )
 
   const freeSpendingCents =
@@ -373,9 +400,9 @@ export function AnalyticsBudgetPlan() {
               className="text-muted mb-1"
               style={{ maxWidth: 480, margin: '0 auto' }}
             >
-              Each bucket holds your upcoming charges and any variable spending
-              estimates you set, broken down by week, month, or year. Add
-              hypothetical items to test affordability before you commit.
+              Each bucket holds your upcoming charges, pinned recurring
+              transactions, and any variable spending estimates you set — broken
+              down by week, month, or year.
             </p>
             <p
               className="text-muted mb-4"
@@ -425,7 +452,7 @@ export function AnalyticsBudgetPlan() {
               onClick={() => setShowAssignModal(true)}
             >
               <i className="mdi mdi-alert-circle-outline me-1" aria-hidden />
-              {unassignedUpcoming.length} unassigned
+              {unassignedUpcoming.length} upcoming unassigned
             </Button>
           )}
           <Button variant="primary" size="sm" onClick={openCreate}>
@@ -439,11 +466,15 @@ export function AnalyticsBudgetPlan() {
       <Row className="g-3 mb-4">
         {buckets.map((b) => {
           const hex = bucketColourHex(b.colour)
-          const total = bucketTotals[b.id] ?? 0
+          const summary = bucketSummaries[b.id] ?? {
+            plannedCents: 0,
+            hypotheticalCents: 0,
+          }
+
           return (
             <Col key={b.id} xs={12} sm={6} lg={4}>
               <Link
-                to={`/analytics/budget/${b.id}`}
+                to={`/analytics/budget/${b.id}?period=${period}`}
                 className="text-decoration-none"
                 style={{ color: 'inherit' }}
               >
@@ -481,7 +512,7 @@ export function AnalyticsBudgetPlan() {
                         >
                           <i className={`mdi ${b.icon}`} aria-hidden />
                         </span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-grow-1">
                           <div className="fw-semibold text-truncate">
                             {b.name}
                           </div>
@@ -489,7 +520,7 @@ export function AnalyticsBudgetPlan() {
                             className="fw-bold"
                             style={{ color: hex, fontSize: '1.1rem' }}
                           >
-                            ${formatMoney(total)}
+                            ${formatMoney(summary.plannedCents)}
                             <span
                               className="text-muted fw-normal ms-1"
                               style={{ fontSize: '0.75rem' }}
@@ -497,6 +528,22 @@ export function AnalyticsBudgetPlan() {
                               /{periodLabel.toLowerCase()}
                             </span>
                           </div>
+                          {summary.hypotheticalCents > 0 && (
+                            <div
+                              className="mt-1 d-flex align-items-center gap-1"
+                              style={{ fontSize: '0.7rem' }}
+                            >
+                              <i
+                                className="mdi mdi-flask-outline"
+                                style={{ color: 'var(--bs-warning)' }}
+                                aria-hidden
+                              />
+                              <span className="text-muted">
+                                incl. ${formatMoney(summary.hypotheticalCents)}{' '}
+                                hypothetical
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
@@ -580,7 +627,7 @@ export function AnalyticsBudgetPlan() {
       {/* Income / Outgoing / Free Spending footer */}
       <Card>
         <Card.Body>
-          <Row className="g-3 text-center">
+          <Row className="g-3 text-center mb-3">
             <Col xs={12} sm={4}>
               <div className="text-muted small mb-1">
                 Income ({periodLabel})
@@ -598,10 +645,18 @@ export function AnalyticsBudgetPlan() {
             </Col>
             <Col xs={12} sm={4}>
               <div className="text-muted small mb-1">
-                Total outgoing ({periodLabel})
+                Committed ({periodLabel})
               </div>
               <div className="fw-bold fs-5">
                 ${formatMoney(totalOutgoingCents)}
+                {incomeCents != null && incomeCents > 0 && (
+                  <span
+                    className="text-muted fw-normal ms-1"
+                    style={{ fontSize: '0.75rem' }}
+                  >
+                    ({Math.round((totalOutgoingCents / incomeCents) * 100)}%)
+                  </span>
+                )}
               </div>
             </Col>
             <Col xs={12} sm={4}>
@@ -626,6 +681,43 @@ export function AnalyticsBudgetPlan() {
               )}
             </Col>
           </Row>
+
+          {incomeCents != null && incomeCents > 0 && (
+            <>
+              <ProgressBar
+                style={{ height: 8, borderRadius: 4 }}
+                aria-label="Income committed"
+              >
+                <ProgressBar
+                  variant={
+                    totalOutgoingCents / incomeCents >= 1
+                      ? 'danger'
+                      : totalOutgoingCents / incomeCents >= 0.85
+                        ? 'warning'
+                        : 'primary'
+                  }
+                  now={Math.min(100, (totalOutgoingCents / incomeCents) * 100)}
+                  key={1}
+                />
+                {freeSpendingCents != null && freeSpendingCents > 0 && (
+                  <ProgressBar
+                    variant="secondary"
+                    now={(freeSpendingCents / incomeCents) * 100}
+                    style={{ opacity: 0.2 }}
+                    key={2}
+                  />
+                )}
+              </ProgressBar>
+              <div className="d-flex justify-content-between mt-1">
+                <span className="text-muted" style={{ fontSize: '0.7rem' }}>
+                  Committed
+                </span>
+                <span className="text-muted" style={{ fontSize: '0.7rem' }}>
+                  Free
+                </span>
+              </div>
+            </>
+          )}
         </Card.Body>
       </Card>
 

@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 25
+const SCHEMA_VERSION = 26
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -169,6 +169,16 @@ const DDL_STATEMENTS = [
     snapshot_date TEXT NOT NULL,
     balance_cents INTEGER NOT NULL,
     PRIMARY KEY (saver_id, snapshot_date)
+  )`,
+  `CREATE TABLE IF NOT EXISTS budget_transaction_anchors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_id INTEGER NOT NULL,
+    transaction_id TEXT NOT NULL,
+    description_pattern TEXT NOT NULL,
+    frequency TEXT NOT NULL DEFAULT 'MONTHLY',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
 ]
 
@@ -585,6 +595,24 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['25']
+    )
+  }
+  if (version < 26) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS budget_transaction_anchors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bucket_id INTEGER NOT NULL,
+        transaction_id TEXT NOT NULL,
+        description_pattern TEXT NOT NULL,
+        frequency TEXT NOT NULL DEFAULT 'MONTHLY',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+      )
+    `)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['26']
     )
   }
 }

@@ -4,6 +4,7 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 import { getBudgetLines } from '@/services/budgetHypotheticals'
+import { getBucketAnchors } from '@/services/budgetTransactionAnchors'
 
 export interface BudgetBucketRow {
   id: number
@@ -114,7 +115,9 @@ export function deleteBucket(id: number): void {
   db.run(`UPDATE upcoming_charges SET bucket_id = NULL WHERE bucket_id = ?`, [
     id,
   ])
+  db.run(`UPDATE trackers SET bucket_id = NULL WHERE bucket_id = ?`, [id])
   db.run(`DELETE FROM budget_hypotheticals WHERE bucket_id = ?`, [id])
+  db.run(`DELETE FROM budget_transaction_anchors WHERE bucket_id = ?`, [id])
   db.run(`DELETE FROM budget_buckets WHERE id = ?`, [id])
   schedulePersist()
 }
@@ -162,26 +165,43 @@ export function getUpcomingBucketId(upcomingId: number): number | null {
   return val != null ? Number(val) : null
 }
 
-/** Total outgoing cents for a bucket in the given display period.
- *  Includes: upcoming charges + variable budget lines + hypotheticals.
- *  ONCE-frequency upcoming charges are excluded (one-off, not recurring).
- */
+export interface BucketCardSummary {
+  plannedCents: number
+  hypotheticalCents: number
+}
+
+export function getBucketCardSummary(
+  bucketId: number,
+  period: BudgetDisplayPeriod
+): BucketCardSummary {
+  const { upcoming } = getBucketItems(bucketId)
+  const lines = getBudgetLines(bucketId)
+  const anchors = getBucketAnchors(bucketId)
+  let plannedCents = 0
+  let hypotheticalCents = 0
+
+  for (const u of upcoming) {
+    if (u.frequency === 'ONCE') continue
+    plannedCents += toPeriodCents(u.amount, u.frequency, period)
+  }
+  for (const l of lines) {
+    const contrib = toPeriodCents(l.amount_cents, l.frequency, period)
+    if (l.is_hypothetical) hypotheticalCents += contrib
+    plannedCents += contrib
+  }
+  for (const a of anchors) {
+    plannedCents += toPeriodCents(a.latest_amount_cents, a.frequency, period)
+  }
+
+  return { plannedCents, hypotheticalCents }
+}
+
+/** Total outgoing cents for a bucket in the given display period. */
 export function getBucketTotalCents(
   bucketId: number,
   period: BudgetDisplayPeriod
 ): number {
-  const { upcoming } = getBucketItems(bucketId)
-  const lines = getBudgetLines(bucketId)
-  let total = 0
-
-  for (const u of upcoming) {
-    if (u.frequency === 'ONCE') continue
-    total += toPeriodCents(u.amount, u.frequency, period)
-  }
-  for (const l of lines) {
-    total += toPeriodCents(l.amount_cents, l.frequency, period)
-  }
-  return total
+  return getBucketCardSummary(bucketId, period).plannedCents
 }
 
 export function getUnassignedUpcoming(): BucketUpcomingItem[] {
