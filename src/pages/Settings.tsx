@@ -44,6 +44,8 @@ import {
   requestNotificationPermission,
 } from '@/lib/notifications'
 import { useFullReSync } from '@/hooks/useFullReSync'
+import { isBiometricAvailable, registerBiometric } from '@/lib/webauthn'
+import { clearBiometricSession } from '@/lib/biometricSession'
 
 const SETTINGS_ACTIVE_SECTION_KEY = 'vantura_settings_active_section'
 const LEGACY_SETTINGS_ACCORDION_KEY = 'vantura_settings_accordion'
@@ -55,6 +57,7 @@ function getSettingsSectionKeys(): string[] {
     'payday',
     'dashboard-sections',
     ...(isNotificationSupported() ? (['notifications'] as const) : []),
+    'security',
     'data',
   ]
 }
@@ -65,6 +68,7 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   payday: 'Payday',
   'dashboard-sections': 'Dashboard sections',
   notifications: 'Notifications',
+  security: 'Security',
   data: 'Data',
 }
 
@@ -234,6 +238,14 @@ export function Settings() {
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
   )
+  const [bioAvailable, setBioAvailable] = useState<boolean | null>(null)
+  const [bioEnabled, setBioEnabled] = useState(
+    () =>
+      getAppSetting('biometrics_enabled') !== '0' &&
+      !!getAppSetting('biometric_credential_id')
+  )
+  const [bioRegistering, setBioRegistering] = useState(false)
+  const [bioError, setBioError] = useState<string | null>(null)
 
   const sectionKeys = getSettingsSectionKeys()
   const { activeSection, selectSection } = useSplitNavSection({
@@ -283,6 +295,59 @@ export function Settings() {
       setPaydayPayAmount('')
     }
   }, [])
+
+  useEffect(() => {
+    isBiometricAvailable()
+      .then(setBioAvailable)
+      .catch(() => setBioAvailable(false))
+  }, [])
+
+  async function handleBiometricToggle(enable: boolean) {
+    setBioError(null)
+    if (!enable) {
+      setAppSetting('biometrics_enabled', '0')
+      setAppSetting('biometric_credential_id', '')
+      clearBiometricSession()
+      setBioEnabled(false)
+      toast.success('Biometric unlock disabled.')
+      return
+    }
+    setBioRegistering(true)
+    try {
+      const credentialId = await registerBiometric()
+      setAppSetting('biometric_credential_id', credentialId)
+      setAppSetting('biometrics_enabled', '1')
+      setBioEnabled(true)
+      toast.success('Biometric unlock enabled.')
+    } catch (err) {
+      const name = err instanceof Error ? err.name : ''
+      if (name !== 'NotAllowedError') {
+        setBioError('Biometric registration failed. Please try again.')
+      }
+    } finally {
+      setBioRegistering(false)
+    }
+  }
+
+  async function handleReRegisterBiometric() {
+    setBioError(null)
+    setBioRegistering(true)
+    try {
+      const credentialId = await registerBiometric()
+      setAppSetting('biometric_credential_id', credentialId)
+      setAppSetting('biometrics_enabled', '1')
+      clearBiometricSession()
+      setBioEnabled(true)
+      toast.success('Biometric re-registered.')
+    } catch (err) {
+      const name = err instanceof Error ? err.name : ''
+      if (name !== 'NotAllowedError') {
+        setBioError('Re-registration failed. Please try again.')
+      }
+    } finally {
+      setBioRegistering(false)
+    }
+  }
 
   async function handleClearAllData() {
     setClearing(true)
@@ -825,6 +890,69 @@ export function Settings() {
                     />
                   </>
                 )}
+              {activeSection === 'security' && (
+                <>
+                  <p className="small text-muted mb-3">
+                    Vantura locks automatically after 3 minutes of inactivity.
+                    With biometrics enabled, Touch ID or Face ID can unlock the
+                    app instead of your passphrase.
+                  </p>
+                  {bioAvailable === false && (
+                    <div
+                      className="alert alert-secondary small mb-3"
+                      role="status"
+                    >
+                      Your browser or device does not support biometric
+                      authentication. A passphrase is required to unlock.
+                    </div>
+                  )}
+                  {bioAvailable === true && (
+                    <>
+                      <Form.Check
+                        type="switch"
+                        id="settings-bio-toggle"
+                        label="Biometric unlock (Touch ID / Face ID)"
+                        checked={bioEnabled}
+                        disabled={bioRegistering}
+                        onChange={(e) =>
+                          handleBiometricToggle(e.target.checked)
+                        }
+                        className="mb-3"
+                      />
+                      {bioEnabled && (
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          onClick={handleReRegisterBiometric}
+                          disabled={bioRegistering}
+                          aria-busy={bioRegistering}
+                          className="mb-3"
+                        >
+                          {bioRegistering ? (
+                            <>
+                              <Spinner
+                                animation="border"
+                                size="sm"
+                                className="me-1"
+                                role="status"
+                                aria-hidden="true"
+                              />
+                              Registering…
+                            </>
+                          ) : (
+                            'Re-register biometric'
+                          )}
+                        </Button>
+                      )}
+                      {bioError && (
+                        <div className="text-danger small mb-2" role="alert">
+                          {bioError}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
               {activeSection === 'data' && (
                 <>
                   {isDemoMode && (

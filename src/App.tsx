@@ -9,6 +9,7 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
 import { appRouter } from '@/appRouter'
+import { useInactivityLock } from '@/hooks/useInactivityLock'
 
 function AppContent() {
   const [ready, setReady] = useState(false)
@@ -19,6 +20,7 @@ function AppContent() {
   const accent = useStore(accentStore, (s) => s.accent)
   const accentHydrated = useStore(accentStore, (s) => s.hydrated)
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
+  useInactivityLock(unlocked)
 
   useEffect(() => {
     if (!accentHydrated) return
