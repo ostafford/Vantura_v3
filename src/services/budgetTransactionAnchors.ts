@@ -17,6 +17,7 @@ export interface AnchorDebitRow {
   description: string
   amount: number
   date: string
+  category_id: string | null
 }
 
 /** Most recent debit transaction matching a description pattern (case-insensitive). */
@@ -27,13 +28,14 @@ function resolveLatestAmount(
   const db = getDb()
   if (!db) return { amount: fallbackCents, date: null }
   const stmt = db.prepare(
-    `SELECT ABS(amount), COALESCE(created_at, settled_at)
+    `SELECT ABS(amount), COALESCE(settled_at, created_at)
      FROM transactions
      WHERE LOWER(description) = LOWER(?)
        AND amount < 0
        AND transfer_account_id IS NULL
        AND is_round_up = 0
-     ORDER BY COALESCE(created_at, settled_at) DESC
+     ORDER BY substr(COALESCE(settled_at, created_at), 1, 10) DESC,
+              COALESCE(settled_at, created_at) DESC
      LIMIT 1`
   )
   stmt.bind([descriptionPattern])
@@ -145,20 +147,27 @@ export function searchRecentDebits(
   if (!db) return []
   const pattern = search.trim() ? `%${search.trim()}%` : '%'
   const stmt = db.prepare(
-    `SELECT id, description, ABS(amount), COALESCE(created_at, settled_at)
+    `SELECT id, description, ABS(amount), COALESCE(settled_at, created_at), category_id
      FROM transactions
      WHERE amount < 0
        AND transfer_account_id IS NULL
-       AND is_round_up = 0
-       AND description LIKE ? ESCAPE '\\'
-     ORDER BY COALESCE(created_at, settled_at) DESC
+       AND round_up_parent_id IS NULL
+       AND (description LIKE ? ESCAPE '\\' OR raw_text LIKE ? ESCAPE '\\')
+     ORDER BY substr(COALESCE(settled_at, created_at), 1, 10) DESC,
+              COALESCE(settled_at, created_at) DESC
      LIMIT ?`
   )
-  stmt.bind([pattern, limit])
+  stmt.bind([pattern, pattern, limit])
   const list: AnchorDebitRow[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [string, string, number, string]
-    list.push({ id: r[0], description: r[1], amount: r[2], date: r[3] })
+    const r = stmt.get() as [string, string, number, string, string | null]
+    list.push({
+      id: r[0],
+      description: r[1],
+      amount: r[2],
+      date: r[3],
+      category_id: r[4] ?? null,
+    })
   }
   stmt.free()
   return list

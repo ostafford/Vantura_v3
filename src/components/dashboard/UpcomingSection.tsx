@@ -4,6 +4,8 @@ import {
   Button,
   Modal,
   Form,
+  Row,
+  Col,
   OverlayTrigger,
   Tooltip,
   ButtonGroup,
@@ -43,6 +45,44 @@ const FREQUENCIES = [
   'YEARLY',
   'ONCE',
 ]
+
+/** Given an anchor date (from a past transaction) and a frequency, returns the
+ *  next future occurrence as a YYYY-MM-DD string. */
+function calcNextChargeDate(anchorDateStr: string, frequency: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (frequency === 'ONCE') {
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  }
+
+  const [y, m, d] = anchorDateStr.slice(0, 10).split('-').map(Number)
+  const next = new Date(y, m - 1, d)
+
+  while (next <= today) {
+    switch (frequency) {
+      case 'WEEKLY':
+        next.setDate(next.getDate() + 7)
+        break
+      case 'FORTNIGHTLY':
+        next.setDate(next.getDate() + 14)
+        break
+      case 'MONTHLY':
+        next.setMonth(next.getMonth() + 1)
+        break
+      case 'QUARTERLY':
+        next.setMonth(next.getMonth() + 3)
+        break
+      case 'YEARLY':
+        next.setFullYear(next.getFullYear() + 1)
+        break
+      default:
+        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    }
+  }
+
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+}
 
 function UpcomingCalendar({
   year,
@@ -182,13 +222,13 @@ export function UpcomingSection({
   const [categoryId, setCategoryId] = useState<string>('')
   const [isReserved, setIsReserved] = useState(true)
   const [reminderDaysBefore, setReminderDaysBefore] = useState<string>('')
-  const [isSubscription, setIsSubscription] = useState(false)
   const [cancelByDate, setCancelByDate] = useState('')
   const [upcomingBucketId, setUpcomingBucketId] = useState<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
-  const [txPickerOpen, setTxPickerOpen] = useState(false)
-  const [txPickerSearch, setTxPickerSearch] = useState('')
+  const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
+  const [txSearch, setTxSearch] = useState('')
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
     null
   )
@@ -236,11 +276,11 @@ export function UpcomingSection({
     setCategoryId('')
     setIsReserved(true)
     setReminderDaysBefore('')
-    setIsSubscription(false)
     setCancelByDate('')
     setUpcomingBucketId(null)
-    setTxPickerOpen(false)
-    setTxPickerSearch('')
+    setCreateStep('search')
+    setTxSearch('')
+    setMoreOptionsOpen(false)
     setImportedFromTx(null)
     setShowModal(true)
   }
@@ -256,12 +296,18 @@ export function UpcomingSection({
     setReminderDaysBefore(
       c.reminder_days_before != null ? String(c.reminder_days_before) : ''
     )
-    setIsSubscription(c.is_subscription === 1)
     setCancelByDate(c.cancel_by_date ?? '')
-    setUpcomingBucketId(getUpcomingBucketId(c.id))
-    setTxPickerOpen(false)
-    setTxPickerSearch('')
+    const bucketId = getUpcomingBucketId(c.id)
+    setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
+    setMoreOptionsOpen(
+      !!(
+        c.category_id ||
+        c.reminder_days_before != null ||
+        c.cancel_by_date ||
+        bucketId != null
+      )
+    )
     setShowModal(true)
   }
 
@@ -292,7 +338,7 @@ export function UpcomingSection({
         categoryId || null,
         isReserved,
         reminderDays,
-        isSubscription,
+        false,
         cancelBy
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
@@ -306,7 +352,7 @@ export function UpcomingSection({
         categoryId || null,
         isReserved,
         reminderDays,
-        isSubscription,
+        false,
         cancelBy
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
@@ -360,9 +406,6 @@ export function UpcomingSection({
         <td>{formatShortDate(c.next_charge_date)}</td>
         <td>
           {c.name}
-          {c.is_subscription === 1 && (
-            <span className="badge badge-subscription ms-1">Sub</span>
-          )}
           {dueLabel && (
             <span className="badge badge-reminder ms-1">{dueLabel}</span>
           )}
@@ -487,11 +530,6 @@ export function UpcomingSection({
                             <div>
                               <div className="fw-medium">
                                 {c.name}
-                                {c.is_subscription === 1 && (
-                                  <span className="badge badge-subscription ms-1">
-                                    Sub
-                                  </span>
-                                )}
                                 {dueLabel && (
                                   <span className="badge badge-reminder ms-1">
                                     {dueLabel}
@@ -544,11 +582,6 @@ export function UpcomingSection({
                             <div>
                               <div className="fw-medium">
                                 {c.name}
-                                {c.is_subscription === 1 && (
-                                  <span className="badge badge-subscription ms-1">
-                                    Sub
-                                  </span>
-                                )}
                                 {dueLabel && (
                                   <span className="badge badge-reminder ms-1">
                                     {dueLabel}
@@ -628,35 +661,22 @@ export function UpcomingSection({
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {/* Transaction picker — only available when creating new */}
+          {/* ── Search step (new charges only) ───────────────────────────────── */}
           {!editingCharge &&
-            txPickerOpen &&
+            createStep === 'search' &&
             (() => {
-              const txResults = searchRecentDebits(txPickerSearch, 40)
+              const txResults = searchRecentDebits(txSearch, 40)
               return (
-                <div className="mb-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span className="fw-semibold small">
-                      Pick from a recent transaction
-                    </span>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 text-muted"
-                      onClick={() => setTxPickerOpen(false)}
-                    >
-                      Back to manual
-                    </Button>
-                  </div>
+                <div>
                   <Form.Control
                     type="text"
-                    placeholder="Search transactions…"
-                    value={txPickerSearch}
-                    onChange={(e) => setTxPickerSearch(e.target.value)}
+                    placeholder="Search your transactions…"
+                    value={txSearch}
+                    onChange={(e) => setTxSearch(e.target.value)}
                     autoFocus
                     className="mb-2"
                   />
-                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                  <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                     {txResults.length === 0 ? (
                       <p className="text-muted small text-center py-2 mb-0">
                         No transactions found.
@@ -675,17 +695,27 @@ export function UpcomingSection({
                           onClick={() => {
                             setName(tx.description)
                             setAmount((tx.amount / 100).toFixed(2))
+                            setCategoryId(tx.category_id ?? '')
+                            if (tx.category_id) setMoreOptionsOpen(true)
+                            setNextChargeDate(
+                              calcNextChargeDate(tx.date, frequency)
+                            )
                             setImportedFromTx(tx)
-                            setTxPickerOpen(false)
-                            setTxPickerSearch('')
+                            setCreateStep('form')
+                            setTxSearch('')
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               setName(tx.description)
                               setAmount((tx.amount / 100).toFixed(2))
+                              setCategoryId(tx.category_id ?? '')
+                              if (tx.category_id) setMoreOptionsOpen(true)
+                              setNextChargeDate(
+                                calcNextChargeDate(tx.date, frequency)
+                              )
                               setImportedFromTx(tx)
-                              setTxPickerOpen(false)
-                              setTxPickerSearch('')
+                              setCreateStep('form')
+                              setTxSearch('')
                             }
                           }}
                           onMouseEnter={(e) => {
@@ -714,209 +744,274 @@ export function UpcomingSection({
                       ))
                     )}
                   </div>
-                </div>
-              )
-            })()}
-
-          <Form
-            style={{
-              display: !editingCharge && txPickerOpen ? 'none' : undefined,
-            }}
-          >
-            {/* Import badge or "Import from transaction" link */}
-            {!editingCharge && (
-              <div className="mb-3">
-                {importedFromTx ? (
-                  <div
-                    className="d-flex align-items-center justify-content-between px-2 py-1 rounded small"
-                    style={{
-                      background: 'var(--bs-tertiary-bg)',
-                      border: '1px solid var(--bs-border-color)',
-                    }}
-                  >
-                    <span className="text-muted">
-                      <i className="mdi mdi-link-variant me-1" aria-hidden />
-                      Imported from:{' '}
-                      <strong>{importedFromTx.description}</strong>
-                    </span>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 text-muted ms-2"
-                      onClick={() => {
-                        setImportedFromTx(null)
-                        setName('')
-                        setAmount('')
-                      }}
-                      aria-label="Clear import"
-                    >
-                      <i className="mdi mdi-close" aria-hidden />
-                    </Button>
-                  </div>
-                ) : (
+                  <hr className="my-3" />
                   <Button
                     variant="link"
                     size="sm"
                     className="p-0 text-muted"
                     onClick={() => {
-                      setTxPickerOpen(true)
-                      setTxPickerSearch('')
+                      setImportedFromTx(null)
+                      setCreateStep('form')
                     }}
                   >
-                    <i className="mdi mdi-magnify me-1" aria-hidden />
-                    Import from a transaction instead
+                    Add manually instead
                   </Button>
-                )}
-              </div>
-            )}
+                </div>
+              )
+            })()}
 
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-name">Name</Form.Label>
-              <Form.Control
-                id="upcoming-charge-name"
-                name="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-amount">
-                Amount ($)
-              </Form.Label>
-              <Form.Control
-                id="upcoming-charge-amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-frequency">
-                Frequency
-              </Form.Label>
-              <Form.Select
-                id="upcoming-charge-frequency"
-                name="frequency"
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {FREQUENCIES.map((f) => (
-                  <option key={f} value={f}>
-                    {f.charAt(0) + f.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-next-date">
-                Next charge date
-              </Form.Label>
-              <Form.Control
-                id="upcoming-charge-next-date"
-                name="nextChargeDate"
-                type="date"
-                value={nextChargeDate}
-                onChange={(e) => setNextChargeDate(e.target.value)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-category">
-                Category
-              </Form.Label>
-              <Form.Select
-                id="upcoming-charge-category"
-                name="categoryId"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-              >
-                <option value="">None</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Check
-                type="checkbox"
-                id="upcoming-charge-is-reserved"
-                name="isReserved"
-                label="Include in Spendable (reserve this amount)"
-                checked={isReserved}
-                onChange={(e) => setIsReserved(e.target.checked)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-reminder">
-                Remind me (days before)
-              </Form.Label>
-              <Form.Control
-                id="upcoming-charge-reminder"
-                type="number"
-                min={0}
-                max={90}
-                placeholder="e.g. 3"
-                value={reminderDaysBefore}
-                onChange={(e) => setReminderDaysBefore(e.target.value)}
-              />
-              <Form.Text className="text-muted">
-                Optional. Show &quot;Due in N days&quot; when within this many
-                days.
-              </Form.Text>
-            </Form.Group>
-            {allBuckets.length > 0 && (
-              <Form.Group className="mb-2">
-                <Form.Label htmlFor="upcoming-charge-bucket">
-                  Budget bucket
-                </Form.Label>
-                <Form.Select
-                  id="upcoming-charge-bucket"
-                  value={
-                    upcomingBucketId != null ? String(upcomingBucketId) : ''
-                  }
-                  onChange={(e) =>
-                    setUpcomingBucketId(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                >
-                  <option value="">None (unassigned)</option>
-                  {allBuckets.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </Form.Select>
+          {/* ── Form step (after search pick, manual entry, or editing) ───────── */}
+          {(editingCharge || createStep === 'form') && (
+            <Form>
+              {/* Imported badge / back link — create only */}
+              {!editingCharge && (
+                <div className="mb-3">
+                  {importedFromTx ? (
+                    <div
+                      className="d-flex align-items-center justify-content-between px-2 py-2 rounded"
+                      style={{
+                        background: 'var(--bs-tertiary-bg)',
+                        border: '1px solid var(--bs-border-color)',
+                      }}
+                    >
+                      <span className="small text-muted">
+                        <i className="mdi mdi-link-variant me-1" aria-hidden />
+                        Imported: <strong>{importedFromTx.description}</strong>
+                      </span>
+                      <div className="d-flex align-items-center gap-2 ms-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted small"
+                          onClick={() => {
+                            setImportedFromTx(null)
+                            setName('')
+                            setAmount('')
+                            setCreateStep('search')
+                          }}
+                        >
+                          Change
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted"
+                          onClick={() => {
+                            setImportedFromTx(null)
+                            setName('')
+                            setAmount('')
+                          }}
+                          aria-label="Clear import"
+                        >
+                          <i className="mdi mdi-close" aria-hidden />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-muted"
+                      onClick={() => setCreateStep('search')}
+                    >
+                      <i className="mdi mdi-chevron-left me-1" aria-hidden />
+                      Back to search
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* ── Core fields ────────────────────────────────────────────────── */}
+              <Form.Group className="mb-3">
+                <Form.Label htmlFor="upcoming-charge-name">Name</Form.Label>
+                <Form.Control
+                  id="upcoming-charge-name"
+                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </Form.Group>
-            )}
-            <Form.Group className="mb-2">
-              <Form.Check
-                type="checkbox"
-                id="upcoming-charge-is-subscription"
-                label="Subscription (e.g. streaming)"
-                checked={isSubscription}
-                onChange={(e) => setIsSubscription(e.target.checked)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label htmlFor="upcoming-charge-cancel-by">
-                Cancel by date (optional)
-              </Form.Label>
-              <Form.Control
-                id="upcoming-charge-cancel-by"
-                type="date"
-                value={cancelByDate}
-                onChange={(e) => setCancelByDate(e.target.value)}
-              />
-              <Form.Text className="text-muted">
-                For subscriptions you plan to cancel.
-              </Form.Text>
-            </Form.Group>
-          </Form>
+
+              <Row className="g-3 mb-3">
+                <Col xs={12} sm={6}>
+                  <Form.Group>
+                    <Form.Label htmlFor="upcoming-charge-amount">
+                      Amount ($)
+                    </Form.Label>
+                    <Form.Control
+                      id="upcoming-charge-amount"
+                      name="amount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Form.Group>
+                    <Form.Label htmlFor="upcoming-charge-frequency">
+                      Frequency
+                    </Form.Label>
+                    <Form.Select
+                      id="upcoming-charge-frequency"
+                      name="frequency"
+                      value={frequency}
+                      onChange={(e) => {
+                        const f = e.target.value
+                        setFrequency(f)
+                        if (importedFromTx) {
+                          setNextChargeDate(
+                            calcNextChargeDate(importedFromTx.date, f)
+                          )
+                        }
+                      }}
+                    >
+                      {FREQUENCIES.map((f) => (
+                        <option key={f} value={f}>
+                          {f.charAt(0) + f.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Form.Group className="mb-3">
+                <Form.Label htmlFor="upcoming-charge-next-date">
+                  Next charge date
+                </Form.Label>
+                <Form.Control
+                  id="upcoming-charge-next-date"
+                  name="nextChargeDate"
+                  type="date"
+                  value={nextChargeDate}
+                  onChange={(e) => setNextChargeDate(e.target.value)}
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Check
+                  type="checkbox"
+                  id="upcoming-charge-is-reserved"
+                  name="isReserved"
+                  label="Include in Spendable (reserve this amount)"
+                  checked={isReserved}
+                  onChange={(e) => setIsReserved(e.target.checked)}
+                />
+              </Form.Group>
+
+              {/* ── More options toggle ─────────────────────────────────────────── */}
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted mb-3"
+                onClick={() => setMoreOptionsOpen((o) => !o)}
+                aria-expanded={moreOptionsOpen}
+              >
+                <i
+                  className={`mdi mdi-chevron-${moreOptionsOpen ? 'up' : 'down'} me-1`}
+                  aria-hidden
+                />
+                {moreOptionsOpen ? 'Fewer options' : 'More options'}
+              </Button>
+
+              {moreOptionsOpen && (
+                <>
+                  <Row className="g-3 mb-3">
+                    <Col xs={12} sm={allBuckets.length > 0 ? 6 : 12}>
+                      <Form.Group>
+                        <Form.Label htmlFor="upcoming-charge-category">
+                          Category
+                        </Form.Label>
+                        <Form.Select
+                          id="upcoming-charge-category"
+                          name="categoryId"
+                          value={categoryId}
+                          onChange={(e) => setCategoryId(e.target.value)}
+                        >
+                          <option value="">None</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    {allBuckets.length > 0 && (
+                      <Col xs={12} sm={6}>
+                        <Form.Group>
+                          <Form.Label htmlFor="upcoming-charge-bucket">
+                            Budget bucket
+                          </Form.Label>
+                          <Form.Select
+                            id="upcoming-charge-bucket"
+                            value={
+                              upcomingBucketId != null
+                                ? String(upcomingBucketId)
+                                : ''
+                            }
+                            onChange={(e) =>
+                              setUpcomingBucketId(
+                                e.target.value ? Number(e.target.value) : null
+                              )
+                            }
+                          >
+                            <option value="">None (unassigned)</option>
+                            {allBuckets.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                    )}
+                  </Row>
+
+                  <Row className="g-3 mb-2">
+                    <Col xs={12} sm={6}>
+                      <Form.Group>
+                        <Form.Label htmlFor="upcoming-charge-reminder">
+                          Remind me (days before)
+                        </Form.Label>
+                        <Form.Control
+                          id="upcoming-charge-reminder"
+                          type="number"
+                          min={0}
+                          max={90}
+                          placeholder="e.g. 3"
+                          value={reminderDaysBefore}
+                          onChange={(e) =>
+                            setReminderDaysBefore(e.target.value)
+                          }
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Form.Group>
+                        <Form.Label htmlFor="upcoming-charge-cancel-by">
+                          Stop date
+                        </Form.Label>
+                        <Form.Control
+                          id="upcoming-charge-cancel-by"
+                          type="date"
+                          value={cancelByDate}
+                          onChange={(e) => setCancelByDate(e.target.value)}
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                  <Form.Text className="text-muted d-block mb-2">
+                    Reminder shows &quot;Due in N days&quot; when within the set
+                    days. Stop date removes the charge after that date.
+                  </Form.Text>
+                </>
+              )}
+            </Form>
+          )}
         </Modal.Body>
         <Modal.Footer>
           {editingCharge && (
@@ -931,9 +1026,11 @@ export function UpcomingSection({
           <Button variant="secondary" onClick={() => setShowModal(false)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSave}>
-            Save
-          </Button>
+          {(editingCharge || createStep === 'form') && (
+            <Button variant="primary" onClick={handleSave}>
+              Save
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
 

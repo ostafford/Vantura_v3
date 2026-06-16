@@ -424,16 +424,28 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   outline-offset: 2px;
 }
 
-/* Dark theme modal and surfaces — subtle gradient matches card depth */
-.modal-content {
-  background: var(--vantura-card-bg);
-  color: var(--vantura-text);
-  border-color: var(--vantura-border);
+/* Modal — elevated surface sits clearly above the darkened backdrop */
+.modal-backdrop.show {
+  opacity: 0.72;
 }
-.modal-header,
+.modal-content {
+  background: #242438;
+  color: var(--vantura-text);
+  border-color: rgba(126, 184, 216, 0.12);
+  border-radius: 14px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.65),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.modal-header {
+  border-color: var(--vantura-border);
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 14px 14px 0 0;
+}
 .modal-footer {
   border-color: var(--vantura-border);
-  background: transparent;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 14px 14px;
 }
 .offcanvas {
   background: var(--vantura-card-bg);
