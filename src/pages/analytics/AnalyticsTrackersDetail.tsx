@@ -13,25 +13,31 @@ import {
 import {
   getTracker,
   getTrackerPeriodHistory,
+  getTrackerSpentInPeriod,
   getTrackerTransactionTimeline,
   getTrackerTransactionsForTable,
   getTrackerTransactionsCount,
   getTrackerCategoryIds,
+  type TrackerResetFrequency,
+  type TrackerPeriodHistoryRow,
 } from '@/services/trackers'
+import {
+  toPeriodCents,
+  type BudgetDisplayPeriod,
+} from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
-import { formatMoney, formatDate } from '@/lib/format'
+import { formatMoney, formatDate, formatShortDate } from '@/lib/format'
 import { TrackerHistoryChart } from '@/components/charts/TrackerHistoryChart'
 import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import { syncStore } from '@/stores/syncStore'
 
-const FREQUENCY_LABELS: Record<string, string> = {
-  WEEKLY: 'Weekly',
-  FORTNIGHTLY: 'Fortnightly',
-  MONTHLY: 'Monthly',
-  PAYDAY: 'Payday',
-}
+const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'YEARLY', label: 'Yearly' },
+]
 
 const PERIOD_OPTIONS = [
   { value: 3, label: 'Last 3 periods' },
@@ -49,15 +55,92 @@ function daysBetween(a: string, b: string): number {
   )
 }
 
-// period_end is exclusive (first day of next period), subtract one day for display.
+// period_end is exclusive (first day of next period) — subtract one day for display.
 function displayPeriodEnd(isoDate: string): string {
   const d = new Date(isoDate + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() - 1)
   return d.toISOString().slice(0, 10)
 }
 
+function buildCalendarPeriodHistory(
+  trackerId: number,
+  displayPeriod: BudgetDisplayPeriod,
+  periodsBack: number,
+  trackerBudget: number,
+  trackerFrequency: TrackerResetFrequency
+): TrackerPeriodHistoryRow[] {
+  const today = new Date()
+  const normalizedFreq =
+    trackerFrequency === 'PAYDAY' ? 'MONTHLY' : trackerFrequency
+  const normalizedBudget = toPeriodCents(
+    trackerBudget,
+    normalizedFreq,
+    displayPeriod
+  )
+  const result: TrackerPeriodHistoryRow[] = []
+
+  for (let offset = -periodsBack + 1; offset <= 0; offset++) {
+    let from: string
+    let to: string // exclusive
+    let label: string
+
+    if (displayPeriod === 'WEEKLY') {
+      const day = today.getUTCDay()
+      const daysFromMonday = (day + 6) % 7
+      const mon = new Date(today)
+      mon.setUTCDate(today.getUTCDate() - daysFromMonday + offset * 7)
+      const nextMon = new Date(mon)
+      nextMon.setUTCDate(mon.getUTCDate() + 7)
+      from = mon.toISOString().slice(0, 10)
+      to = nextMon.toISOString().slice(0, 10)
+      label =
+        offset === 0
+          ? 'This week'
+          : offset === -1
+            ? 'Last week'
+            : `${-offset} weeks ago`
+    } else if (displayPeriod === 'MONTHLY') {
+      const baseYear = today.getUTCFullYear()
+      const baseMonth = today.getUTCMonth() + offset
+      const fromDate = new Date(Date.UTC(baseYear, baseMonth, 1))
+      const toDate = new Date(Date.UTC(baseYear, baseMonth + 1, 1))
+      from = fromDate.toISOString().slice(0, 10)
+      to = toDate.toISOString().slice(0, 10)
+      label =
+        offset === 0
+          ? 'Current'
+          : offset === -1
+            ? 'Previous'
+            : `${-offset} months ago`
+    } else {
+      // YEARLY
+      const year = today.getUTCFullYear() + offset
+      from = `${year}-01-01`
+      to = `${year + 1}-01-01`
+      label = offset === 0 ? 'Current' : String(year)
+    }
+
+    const spent = getTrackerSpentInPeriod(trackerId, from, to)
+    const remaining = Math.max(0, normalizedBudget - spent)
+    const progress = normalizedBudget > 0 ? (spent / normalizedBudget) * 100 : 0
+    result.push({
+      periodOffset: offset,
+      periodLabel: label,
+      periodStart: from,
+      periodEnd: to,
+      budget: normalizedBudget,
+      spent,
+      remaining,
+      progress,
+    })
+  }
+  return result
+}
+
 export function AnalyticsTrackersDetail() {
   const { trackerId } = useParams<{ trackerId: string }>()
+  const [displayPeriod, setDisplayPeriod] =
+    useState<BudgetDisplayPeriod>('MONTHLY')
   const [periodsBack, setPeriodsBack] = useState(6)
   const [paceOffset, setPaceOffset] = useState(0)
   const [page, setPage] = useState(0)
@@ -76,18 +159,48 @@ export function AnalyticsTrackersDetail() {
     [id, lastSyncCompletedAt]
   )
 
-  const periodHistory = useMemo(
-    () => (tracker ? getTrackerPeriodHistory(id, periodsBack) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tracker, id, periodsBack, lastSyncCompletedAt]
+  const nativeMatch = useMemo(
+    () =>
+      tracker != null &&
+      ((displayPeriod === 'WEEKLY' && tracker.reset_frequency === 'WEEKLY') ||
+        (displayPeriod === 'MONTHLY' && tracker.reset_frequency === 'MONTHLY')),
+    [tracker, displayPeriod]
   )
+
+  // Reset initialization when display period changes so we re-derive default dates.
+  useEffect(() => {
+    periodInitialized.current = false
+    setPaceOffset(0)
+  }, [displayPeriod])
+
+  const effectivePeriodHistory = useMemo((): TrackerPeriodHistoryRow[] => {
+    if (!tracker) return []
+    if (nativeMatch) {
+      return getTrackerPeriodHistory(id, periodsBack)
+    }
+    return buildCalendarPeriodHistory(
+      id,
+      displayPeriod,
+      periodsBack,
+      tracker.budget_amount,
+      tracker.reset_frequency as TrackerResetFrequency
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    tracker,
+    id,
+    periodsBack,
+    displayPeriod,
+    nativeMatch,
+    lastSyncCompletedAt,
+  ])
 
   const currentPeriod = useMemo(
-    () => periodHistory.find((p) => p.periodOffset === 0) ?? null,
-    [periodHistory]
+    () => effectivePeriodHistory.find((p) => p.periodOffset === 0) ?? null,
+    [effectivePeriodHistory]
   )
 
-  // Initialise date filter to current period on first load; ignore subsequent recomputes
+  // Initialise date filter when period data loads; re-initialise when display period changes.
   useEffect(() => {
     if (currentPeriod && !periodInitialized.current) {
       periodInitialized.current = true
@@ -99,11 +212,11 @@ export function AnalyticsTrackersDetail() {
 
   const selectedPacePeriod = useMemo(
     () =>
-      periodHistory.find((p) => p.periodOffset === paceOffset) ??
-      (periodHistory.length > 0
-        ? periodHistory[periodHistory.length - 1]
+      effectivePeriodHistory.find((p) => p.periodOffset === paceOffset) ??
+      (effectivePeriodHistory.length > 0
+        ? effectivePeriodHistory[effectivePeriodHistory.length - 1]
         : null),
-    [periodHistory, paceOffset]
+    [effectivePeriodHistory, paceOffset]
   )
 
   const paceData = useMemo(
@@ -153,9 +266,12 @@ export function AnalyticsTrackersDetail() {
     .join(', ')
 
   const maxDomainPeriod = useMemo(() => {
-    if (periodHistory.length === 0) return undefined
-    return Math.max(...periodHistory.flatMap((d) => [d.budget, d.spent]), 100)
-  }, [periodHistory])
+    if (effectivePeriodHistory.length === 0) return undefined
+    return Math.max(
+      ...effectivePeriodHistory.flatMap((d) => [d.budget, d.spent]),
+      100
+    )
+  }, [effectivePeriodHistory])
 
   const totalPages = Math.ceil(totalTransactions / PAGE_SIZE)
 
@@ -219,36 +335,41 @@ export function AnalyticsTrackersDetail() {
         <div className="d-flex align-items-start gap-2">
           <Link
             to="/analytics/trackers"
-            className="btn btn-outline-secondary btn-sm flex-shrink-0"
+            className="btn-icon flex-shrink-0"
             aria-label="Back to trackers"
           >
             <i className="mdi mdi-arrow-left" aria-hidden />
           </Link>
           <div className="small text-muted d-flex flex-wrap gap-2 align-items-center pt-1">
-            {tracker.badge_color && tracker.badge_color.trim() ? (
-              <span
-                className="badge badge-frequency-custom"
-                style={{ backgroundColor: tracker.badge_color.trim() }}
-              >
-                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                  tracker.reset_frequency}
-              </span>
-            ) : (
-              <span className="badge badge-frequency-default">
-                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                  tracker.reset_frequency}
-              </span>
-            )}
             {categoryNames && <span>Categories: {categoryNames}</span>}
           </div>
         </div>
-        <Link
-          to={`/?editTracker=${id}`}
-          className="btn btn-outline-secondary btn-sm flex-shrink-0"
-        >
-          <i className="mdi mdi-pencil me-1" aria-hidden />
-          Edit tracker
-        </Link>
+        <div className="d-flex gap-2 align-items-center flex-shrink-0">
+          <div
+            className="period-toggle"
+            role="group"
+            aria-label="Select display period"
+          >
+            {DISPLAY_PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                className={`segment-btn${displayPeriod === p.value ? ' active' : ''}`}
+                onClick={() => setDisplayPeriod(p.value)}
+                aria-pressed={displayPeriod === p.value}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Link
+            to={`/?editTracker=${id}`}
+            className="btn btn-outline-secondary btn-sm"
+          >
+            <i className="mdi mdi-pencil me-1" aria-hidden />
+            Edit
+          </Link>
+        </div>
       </div>
 
       {/* Current Period Summary */}
@@ -260,8 +381,8 @@ export function AnalyticsTrackersDetail() {
                 <Card.Title className="mb-0">Current Period</Card.Title>
                 {paceStats && (
                   <span className="small text-muted">
-                    {formatDate(paceStats.periodStart)} –{' '}
-                    {formatDate(displayPeriodEnd(paceStats.periodEnd))}
+                    {formatShortDate(paceStats.periodStart)} –{' '}
+                    {formatShortDate(displayPeriodEnd(paceStats.periodEnd))}
                   </span>
                 )}
               </div>
@@ -361,12 +482,12 @@ export function AnalyticsTrackersDetail() {
               </Form.Select>
             </Card.Header>
             <Card.Body>
-              {periodHistory.length === 0 ? (
+              {effectivePeriodHistory.length === 0 ? (
                 <p className="text-muted mb-0">No period data available.</p>
               ) : (
                 <div style={{ width: '100%', height: isMobile ? 220 : 280 }}>
                   <TrackerHistoryChart
-                    data={periodHistory}
+                    data={effectivePeriodHistory}
                     maxDomain={maxDomainPeriod}
                     aria-label="Tracker spend vs budget by period"
                   />
@@ -383,14 +504,14 @@ export function AnalyticsTrackersDetail() {
           <Card>
             <Card.Header>
               <Card.Title className="mb-0">Spending Pace</Card.Title>
-              {periodHistory.length > 0 && (
+              {effectivePeriodHistory.length > 0 && (
                 <Form.Select
                   value={paceOffset}
                   onChange={(e) => setPaceOffset(Number(e.target.value))}
                   className="mt-2 w-auto"
                   aria-label="Period to view"
                 >
-                  {[...periodHistory].reverse().map((p) => (
+                  {[...effectivePeriodHistory].reverse().map((p) => (
                     <option key={p.periodOffset} value={p.periodOffset}>
                       {p.periodLabel} ({formatDate(p.periodStart)} –{' '}
                       {formatDate(displayPeriodEnd(p.periodEnd))})
@@ -457,12 +578,10 @@ export function AnalyticsTrackersDetail() {
                   variant="outline-secondary"
                   size="sm"
                   onClick={() => {
-                    setDateFrom(currentPeriod?.periodStart.slice(0, 10) ?? '')
-                    setDateTo(
-                      currentPeriod
-                        ? displayPeriodEnd(currentPeriod.periodEnd)
-                        : ''
-                    )
+                    if (currentPeriod) {
+                      setDateFrom(currentPeriod.periodStart.slice(0, 10))
+                      setDateTo(displayPeriodEnd(currentPeriod.periodEnd))
+                    }
                     setPage(0)
                   }}
                 >

@@ -3,8 +3,7 @@ import {
   toPeriodCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
-import { getBudgetLines } from '@/services/budgetHypotheticals'
-import { getBucketAnchors } from '@/services/budgetTransactionAnchors'
+import { getHypotheticalLines } from '@/services/budgetHypotheticals'
 
 export interface BudgetBucketRow {
   id: number
@@ -174,9 +173,9 @@ export function getBucketCardSummary(
   bucketId: number,
   period: BudgetDisplayPeriod
 ): BucketCardSummary {
+  const db = getDb()
   const { upcoming } = getBucketItems(bucketId)
-  const lines = getBudgetLines(bucketId)
-  const anchors = getBucketAnchors(bucketId)
+  const hypotheticals = getHypotheticalLines(bucketId)
   let plannedCents = 0
   let hypotheticalCents = 0
 
@@ -184,13 +183,23 @@ export function getBucketCardSummary(
     if (u.frequency === 'ONCE') continue
     plannedCents += toPeriodCents(u.amount, u.frequency, period)
   }
-  for (const l of lines) {
-    const contrib = toPeriodCents(l.amount_cents, l.frequency, period)
-    if (l.is_hypothetical) hypotheticalCents += contrib
+  for (const h of hypotheticals) {
+    const contrib = toPeriodCents(h.amount_cents, h.frequency, period)
+    hypotheticalCents += contrib
     plannedCents += contrib
   }
-  for (const a of anchors) {
-    plannedCents += toPeriodCents(a.latest_amount_cents, a.frequency, period)
+
+  if (db) {
+    const stmt = db.prepare(
+      `SELECT budget_amount, reset_frequency FROM trackers WHERE bucket_id = ? AND is_active = 1`
+    )
+    stmt.bind([bucketId])
+    while (stmt.step()) {
+      const row = stmt.get() as [number, string]
+      const freq = row[1] === 'PAYDAY' ? 'MONTHLY' : row[1]
+      plannedCents += toPeriodCents(row[0], freq, period)
+    }
+    stmt.free()
   }
 
   return { plannedCents, hypotheticalCents }

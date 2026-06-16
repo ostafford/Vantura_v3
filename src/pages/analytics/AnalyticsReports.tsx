@@ -659,29 +659,29 @@ export function AnalyticsReports() {
         <div className="d-flex flex-wrap align-items-center gap-3 justify-content-center">
           {!isCustomRange ? (
             <div className="d-flex align-items-center gap-1">
-              <Button
-                variant="outline-secondary"
-                size="sm"
+              <button
+                type="button"
+                className="btn-icon"
                 onClick={goToPrevMonth}
                 aria-label="Previous month"
               >
                 <i className="mdi mdi-chevron-left" aria-hidden />
-              </Button>
+              </button>
               <span
                 className="fw-medium"
                 style={{ minWidth: 140, textAlign: 'center' }}
               >
                 {monthNameLong(year, month)} {year}
               </span>
-              <Button
-                variant="outline-secondary"
-                size="sm"
+              <button
+                type="button"
+                className="btn-icon"
                 onClick={goToNextMonth}
                 disabled={!canGoForward}
                 aria-label="Next month"
               >
                 <i className="mdi mdi-chevron-right" aria-hidden />
-              </Button>
+              </button>
             </div>
           ) : (
             <Row className="g-2 align-items-end">

@@ -6,7 +6,6 @@ import {
   getBucket,
   getBucketItems,
   getBucketTotalCents,
-  getBuckets,
   assignUpcomingToBucket,
   getUnassignedUpcoming,
   type BudgetBucketRow,
@@ -14,7 +13,6 @@ import {
 } from '@/services/budgetBuckets'
 import { createUpcomingCharge } from '@/services/upcoming'
 import {
-  getVariableLines,
   getHypotheticalLines,
   createBudgetLine,
   updateBudgetLine,
@@ -22,11 +20,14 @@ import {
   type BudgetLineRow,
 } from '@/services/budgetHypotheticals'
 import {
-  getBucketAnchors,
-  pinTransactionToBucket,
-  unpinAnchor,
+  getBucketTrackers,
+  assignTrackerToBucket,
+  getTrackersForPicker,
+  type BucketTrackerItem,
+  type TrackerPickerItem,
+} from '@/services/trackers'
+import {
   searchRecentDebits,
-  type BucketAnchorItem,
   type AnchorDebitRow,
 } from '@/services/budgetTransactionAnchors'
 import {
@@ -58,262 +59,28 @@ function frequencyLabel(frequency: string): string {
       return 'Yearly'
     case 'ONCE':
       return 'Once'
+    case 'PAYDAY':
+      return 'Payday'
     default:
       return frequency
   }
 }
 
-// ─── Add budget line modal ────────────────────────────────────────────────────
+// ─── Add upcoming transaction modal ──────────────────────────────────────────
 
-interface AddBudgetLineModalProps {
-  show: boolean
-  bucketId: number
-  isHypothetical: boolean
-  onClose: () => void
-  onSaved: () => void
-}
-
-function AddBudgetLineModal({
-  show,
-  bucketId,
-  isHypothetical,
-  onClose,
-  onSaved,
-}: AddBudgetLineModalProps) {
-  const [name, setName] = useState('')
-  const [amountStr, setAmountStr] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-
-  useMemo(() => {
-    if (show) {
-      setName('')
-      setAmountStr('')
-      setFrequency('MONTHLY')
-    }
-  }, [show])
-
-  function handleSave() {
-    const trimmed = name.trim()
-    const dollars = parseFloat(amountStr)
-    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
-    createBudgetLine(
-      bucketId,
-      trimmed,
-      Math.round(dollars * 100),
-      frequency,
-      isHypothetical
-    )
-    toast.success(isHypothetical ? 'Hypothetical added' : 'Variable item added')
-    onSaved()
-    onClose()
-  }
-
-  return (
-    <Modal show={show} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>
-          {isHypothetical ? 'Add hypothetical item' : 'Add variable item'}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {isHypothetical ? (
-          <p className="text-muted small mb-3">
-            Test affordability — kept separate from real expenses so you can
-            remove it any time.
-          </p>
-        ) : (
-          <p className="text-muted small mb-3">
-            Estimate a recurring variable expense (e.g. Groceries, Petrol).
-            Contributes to bucket total.
-          </p>
-        )}
-        <Form.Group className="mb-3">
-          <Form.Label>Name</Form.Label>
-          <Form.Control
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={
-              isHypothetical ? 'e.g. New apartment' : 'e.g. Groceries'
-            }
-            autoFocus
-            maxLength={80}
-          />
-        </Form.Group>
-        <Row className="g-3">
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Amount ($)</Form.Label>
-              <Form.Control
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
-              />
-            </Form.Group>
-          </Col>
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Frequency</Form.Label>
-              <Form.Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {BUDGET_FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={
-            !name.trim() ||
-            !amountStr ||
-            Number.isNaN(parseFloat(amountStr)) ||
-            parseFloat(amountStr) <= 0
-          }
-        >
-          Add item
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-// ─── Edit budget line modal ───────────────────────────────────────────────────
-
-interface EditBudgetLineModalProps {
-  line: BudgetLineRow | null
-  onClose: () => void
-  onSaved: () => void
-}
-
-function EditBudgetLineModal({
-  line,
-  onClose,
-  onSaved,
-}: EditBudgetLineModalProps) {
-  const [name, setName] = useState('')
-  const [amountStr, setAmountStr] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-
-  useMemo(() => {
-    if (line) {
-      setName(line.name)
-      setAmountStr((line.amount_cents / 100).toFixed(2))
-      setFrequency(line.frequency)
-    }
-  }, [line])
-
-  function handleSave() {
-    if (!line) return
-    const trimmed = name.trim()
-    const dollars = parseFloat(amountStr)
-    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
-    updateBudgetLine(line.id, trimmed, Math.round(dollars * 100), frequency)
-    toast.success('Item updated')
-    onSaved()
-    onClose()
-  }
-
-  return (
-    <Modal show={!!line} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>
-          {line?.is_hypothetical ? 'Edit hypothetical' : 'Edit variable item'}
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <Form.Group className="mb-3">
-          <Form.Label>Name</Form.Label>
-          <Form.Control
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-            maxLength={80}
-          />
-        </Form.Group>
-        <Row className="g-3">
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Amount ($)</Form.Label>
-              <Form.Control
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
-              />
-            </Form.Group>
-          </Col>
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Frequency</Form.Label>
-              <Form.Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {BUDGET_FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={
-            !name.trim() ||
-            !amountStr ||
-            Number.isNaN(parseFloat(amountStr)) ||
-            parseFloat(amountStr) <= 0
-          }
-        >
-          Save changes
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-// ─── Add to fixed payments modal ─────────────────────────────────────────────
-
-interface AddToFixedPaymentsModalProps {
+interface AddUpcomingTransactionModalProps {
   show: boolean
   bucketId: number
   onClose: () => void
   onSaved: () => void
 }
 
-function AddToFixedPaymentsModal({
+function AddUpcomingTransactionModal({
   show,
   bucketId,
   onClose,
   onSaved,
-}: AddToFixedPaymentsModalProps) {
-  // Step: 'pick' = choose source, 'configure' = set frequency+date for tx-based creation
+}: AddUpcomingTransactionModalProps) {
   const [step, setStep] = useState<'pick' | 'configure'>('pick')
   const [txSearch, setTxSearch] = useState('')
   const [selectedTx, setSelectedTx] = useState<AnchorDebitRow | null>(null)
@@ -338,12 +105,11 @@ function AddToFixedPaymentsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [show]
   )
-
   const txResults = useMemo(() => searchRecentDebits(txSearch, 40), [txSearch])
 
   function handleAssignExisting(charge: BucketUpcomingItem) {
     assignUpcomingToBucket(charge.id, bucketId)
-    toast.success(`"${charge.name}" added to Fixed payments`)
+    toast.success(`"${charge.name}" added`)
     onSaved()
     onClose()
   }
@@ -355,10 +121,9 @@ function AddToFixedPaymentsModal({
 
   function handleCreateAndAssign() {
     if (!selectedTx) return
-    const amountCents = selectedTx.amount
     const newId = createUpcomingCharge(
       selectedTx.description,
-      amountCents,
+      selectedTx.amount,
       frequency,
       nextChargeDate,
       null,
@@ -368,7 +133,7 @@ function AddToFixedPaymentsModal({
       null
     )
     assignUpcomingToBucket(newId, bucketId)
-    toast.success(`"${selectedTx.description}" added as upcoming charge`)
+    toast.success(`"${selectedTx.description}" added as upcoming transaction`)
     onSaved()
     onClose()
   }
@@ -379,7 +144,7 @@ function AddToFixedPaymentsModal({
         <Modal.Title>
           {step === 'configure'
             ? 'Set charge details'
-            : 'Add to Fixed payments'}
+            : 'Add upcoming transaction'}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
@@ -423,20 +188,19 @@ function AddToFixedPaymentsModal({
               </Col>
             </Row>
             <p className="text-muted small mt-3 mb-0">
-              This will create a new upcoming charge using the transaction's
-              description and amount, then assign it to this bucket.
+              Creates a new upcoming transaction using this charge's description
+              and amount, then assigns it to this bucket.
             </p>
           </>
         ) : (
           <>
-            {/* Existing upcoming charges */}
             {unassigned.length > 0 && (
               <div className="mb-4">
                 <div
                   className="fw-semibold small text-muted mb-2 text-uppercase"
                   style={{ letterSpacing: '0.05em' }}
                 >
-                  Your upcoming charges
+                  Your upcoming transactions
                 </div>
                 <div className="d-flex flex-column gap-1">
                   {unassigned.map((c) => (
@@ -464,8 +228,7 @@ function AddToFixedPaymentsModal({
                       <div>
                         <div className="fw-medium">{c.name}</div>
                         <div className="text-muted small">
-                          {c.frequency.charAt(0) +
-                            c.frequency.slice(1).toLowerCase()}
+                          {frequencyLabel(c.frequency)}
                         </div>
                       </div>
                       <div className="fw-semibold">
@@ -477,7 +240,6 @@ function AddToFixedPaymentsModal({
               </div>
             )}
 
-            {/* From a transaction */}
             <div>
               <div
                 className="fw-semibold small text-muted mb-2 text-uppercase"
@@ -562,7 +324,7 @@ function AddToFixedPaymentsModal({
               onClick={handleCreateAndAssign}
               disabled={!nextChargeDate}
             >
-              Add to Fixed payments
+              Add to bucket
             </Button>
           </>
         ) : (
@@ -575,75 +337,103 @@ function AddToFixedPaymentsModal({
   )
 }
 
-// ─── Reassign upcoming modal ──────────────────────────────────────────────────
+// ─── Add tracker modal ────────────────────────────────────────────────────────
 
-interface ReassignModalProps {
+interface AddTrackerModalProps {
   show: boolean
-  currentBucketId: number
-  upcoming: BucketUpcomingItem[]
+  bucketId: number
   onClose: () => void
   onSaved: () => void
 }
 
-function ReassignModal({
+function AddTrackerModal({
   show,
-  currentBucketId,
-  upcoming,
+  bucketId,
   onClose,
   onSaved,
-}: ReassignModalProps) {
-  const allBuckets = useMemo(
-    () => getBuckets(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+}: AddTrackerModalProps) {
+  const allTrackers: TrackerPickerItem[] = useMemo(
+    () => (show ? getTrackersForPicker() : []),
+     
     [show]
   )
 
-  function handleReassign(upcomingId: number, bucketId: string) {
-    assignUpcomingToBucket(upcomingId, bucketId ? Number(bucketId) : null)
+  const available = allTrackers.filter((t) => t.current_bucket_id !== bucketId)
+  const alreadyHere = allTrackers.filter(
+    (t) => t.current_bucket_id === bucketId
+  )
+
+  function handleAssign(tracker: TrackerPickerItem) {
+    assignTrackerToBucket(tracker.id, bucketId)
+    toast.success(`"${tracker.name}" added to bucket`)
     onSaved()
+    onClose()
   }
 
   return (
-    <Modal show={show} onHide={onClose} centered size="lg">
+    <Modal show={show} onHide={onClose} centered>
       <Modal.Header closeButton>
-        <Modal.Title>Manage upcoming charges</Modal.Title>
+        <Modal.Title>Add tracker</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        {upcoming.length === 0 ? (
+        {allTrackers.length === 0 ? (
           <p className="text-muted mb-0">
-            No upcoming charges assigned. Assign them from the Upcoming section
-            on the dashboard.
+            No trackers yet — create them from the Dashboard.
+          </p>
+        ) : available.length === 0 ? (
+          <p className="text-muted mb-0">
+            All your trackers are already in this bucket.
           </p>
         ) : (
-          <div className="d-flex flex-column gap-2">
-            {upcoming.map((u) => (
+          <div className="d-flex flex-column gap-1">
+            {available.map((t) => (
               <div
-                key={u.id}
-                className="d-flex align-items-center justify-content-between gap-2"
+                key={t.id}
+                role="button"
+                tabIndex={0}
+                className="d-flex align-items-center justify-content-between px-3 py-2 rounded"
+                style={{
+                  cursor: 'pointer',
+                  border: '1px solid var(--bs-border-color)',
+                }}
+                onClick={() => handleAssign(t)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAssign(t)
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bs-tertiary-bg)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = ''
+                }}
               >
                 <div>
-                  <span className="fw-medium">{u.name}</span>
-                  <span className="text-muted small ms-2">
-                    ${formatMoney(u.amount)}/{u.frequency.toLowerCase()}
-                  </span>
+                  <div className="fw-medium">{t.name}</div>
+                  {t.current_bucket_name && (
+                    <div className="text-warning small">
+                      Currently in "{t.current_bucket_name}" — will be moved
+                    </div>
+                  )}
                 </div>
-                <Form.Select
-                  size="sm"
-                  style={{ width: 160 }}
-                  value={String(currentBucketId)}
-                  onChange={(e) => handleReassign(u.id, e.target.value)}
-                  aria-label={`Reassign ${u.name}`}
+                <span
+                  className="badge badge-frequency-default flex-shrink-0"
+                  style={
+                    t.badge_color
+                      ? { backgroundColor: t.badge_color, color: '#1a1a2e' }
+                      : undefined
+                  }
                 >
-                  <option value="">Unassigned</option>
-                  {allBuckets.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </Form.Select>
+                  {frequencyLabel(t.reset_frequency)}
+                </span>
               </div>
             ))}
           </div>
+        )}
+        {alreadyHere.length > 0 && available.length > 0 && (
+          <p className="text-muted small mt-3 mb-0">
+            {alreadyHere.length} tracker
+            {alreadyHere.length !== 1 ? 's' : ''} already in this bucket.
+          </p>
         )}
       </Modal.Body>
       <Modal.Footer>
@@ -655,72 +445,87 @@ function ReassignModal({
   )
 }
 
-// ─── Add anchor modal (transaction picker) ───────────────────────────────────
+// ─── Add hypothetical modal ───────────────────────────────────────────────────
 
-interface AddAnchorModalProps {
+interface AddHypotheticalModalProps {
   show: boolean
   bucketId: number
   onClose: () => void
   onSaved: () => void
 }
 
-function AddAnchorModal({
+function AddHypotheticalModal({
   show,
   bucketId,
   onClose,
   onSaved,
-}: AddAnchorModalProps) {
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<AnchorDebitRow | null>(null)
+}: AddHypotheticalModalProps) {
+  const [name, setName] = useState('')
+  const [amountStr, setAmountStr] = useState('')
   const [frequency, setFrequency] = useState('MONTHLY')
 
   useMemo(() => {
     if (show) {
-      setSearch('')
-      setSelected(null)
+      setName('')
+      setAmountStr('')
       setFrequency('MONTHLY')
     }
   }, [show])
 
-  const results = useMemo(() => searchRecentDebits(search, 40), [search])
-
-  function handleConfirm() {
-    if (!selected) return
-    pinTransactionToBucket(selected.id, bucketId, frequency)
-    toast.success(`"${selected.description}" pinned to bucket`)
+  function handleSave() {
+    const trimmed = name.trim()
+    const dollars = parseFloat(amountStr)
+    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
+    createBudgetLine(
+      bucketId,
+      trimmed,
+      Math.round(dollars * 100),
+      frequency,
+      true
+    )
+    toast.success('Hypothetical added')
     onSaved()
     onClose()
   }
 
   return (
-    <Modal show={show} onHide={onClose} centered size="lg">
+    <Modal show={show} onHide={onClose} centered>
       <Modal.Header closeButton>
-        <Modal.Title>Pin a transaction to this bucket</Modal.Title>
+        <Modal.Title>Add hypothetical</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <p className="text-muted small mb-3">
-          Select a real transaction. The bucket will use the amount from this
-          charge and automatically update whenever a newer transaction with the
-          same description appears.
+          Test affordability — kept separate from real expenses so you can
+          remove it any time.
         </p>
-
-        {selected ? (
-          <>
-            <div
-              className="p-3 mb-3 rounded"
-              style={{
-                border: '1.5px solid var(--vantura-primary)',
-                background: 'var(--bs-body-bg)',
-              }}
-            >
-              <div className="fw-semibold">{selected.description}</div>
-              <div className="text-muted small">
-                ${formatMoney(selected.amount)} ·{' '}
-                {formatShortDate(selected.date)}
-              </div>
-            </div>
+        <Form.Group className="mb-3">
+          <Form.Label>Name</Form.Label>
+          <Form.Control
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. New apartment"
+            autoFocus
+            maxLength={80}
+          />
+        </Form.Group>
+        <Row className="g-3">
+          <Col xs={6}>
             <Form.Group>
-              <Form.Label>How often does this charge recur?</Form.Label>
+              <Form.Label>Amount ($)</Form.Label>
+              <Form.Control
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                placeholder="0.00"
+              />
+            </Form.Group>
+          </Col>
+          <Col xs={6}>
+            <Form.Group>
+              <Form.Label>Frequency</Form.Label>
               <Form.Select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value)}
@@ -732,192 +537,153 @@ function AddAnchorModal({
                 ))}
               </Form.Select>
             </Form.Group>
-          </>
-        ) : (
-          <>
-            <Form.Control
-              type="text"
-              placeholder="Search transactions…"
-              className="mb-2"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
-            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-              {results.length === 0 ? (
-                <p className="text-muted small text-center py-3 mb-0">
-                  No transactions found.
-                </p>
-              ) : (
-                results.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="d-flex justify-content-between align-items-center py-2 px-2 rounded"
-                    style={{
-                      cursor: 'pointer',
-                      borderBottom: '1px solid var(--bs-border-color)',
-                    }}
-                    onClick={() => setSelected(tx)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--bs-tertiary-bg)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = ''
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') setSelected(tx)
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <div
-                        className="fw-medium text-truncate"
-                        style={{ maxWidth: 380 }}
-                      >
-                        {tx.description}
-                      </div>
-                      <div className="text-muted small">
-                        {formatShortDate(tx.date)}
-                      </div>
-                    </div>
-                    <div className="fw-semibold flex-shrink-0 ms-3">
-                      ${formatMoney(tx.amount)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
+          </Col>
+        </Row>
       </Modal.Body>
       <Modal.Footer>
-        {selected ? (
-          <>
-            <Button variant="secondary" onClick={() => setSelected(null)}>
-              Back
-            </Button>
-            <Button variant="primary" onClick={handleConfirm}>
-              Pin to bucket
-            </Button>
-          </>
-        ) : (
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-        )}
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          disabled={
+            !name.trim() ||
+            !amountStr ||
+            Number.isNaN(parseFloat(amountStr)) ||
+            parseFloat(amountStr) <= 0
+          }
+        >
+          Add hypothetical
+        </Button>
       </Modal.Footer>
     </Modal>
   )
 }
 
-// ─── Item row (upcoming / variable / hypothetical) ───────────────────────────
+// ─── Edit hypothetical modal ──────────────────────────────────────────────────
 
-interface ItemRowProps {
-  name: string
-  amountCents: number
-  frequency: string
-  period: BudgetDisplayPeriod
-  periodLabel: string
-  isHypothetical?: boolean
-  onEdit?: () => void
-  onDelete?: () => void
+interface EditHypotheticalModalProps {
+  line: BudgetLineRow | null
+  onClose: () => void
+  onSaved: () => void
 }
 
-function ItemRow({
-  name,
-  amountCents,
-  frequency,
-  period,
-  periodLabel,
-  isHypothetical,
-  onEdit,
-  onDelete,
-}: ItemRowProps) {
-  const periodCents =
-    frequency !== 'ONCE' ? toPeriodCents(amountCents, frequency, period) : 0
+function EditHypotheticalModal({
+  line,
+  onClose,
+  onSaved,
+}: EditHypotheticalModalProps) {
+  const [name, setName] = useState('')
+  const [amountStr, setAmountStr] = useState('')
+  const [frequency, setFrequency] = useState('MONTHLY')
+
+  useMemo(() => {
+    if (line) {
+      setName(line.name)
+      setAmountStr((line.amount_cents / 100).toFixed(2))
+      setFrequency(line.frequency)
+    }
+  }, [line])
+
+  function handleSave() {
+    if (!line) return
+    const trimmed = name.trim()
+    const dollars = parseFloat(amountStr)
+    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
+    updateBudgetLine(line.id, trimmed, Math.round(dollars * 100), frequency)
+    toast.success('Hypothetical updated')
+    onSaved()
+    onClose()
+  }
 
   return (
-    <div
-      className="d-flex align-items-center justify-content-between py-2 px-3"
-      style={{
-        borderRadius: 8,
-        border: isHypothetical
-          ? '1.5px dashed var(--bs-border-color)'
-          : '1px solid var(--bs-border-color)',
-        marginBottom: 8,
-      }}
-    >
-      <div className="d-flex align-items-center gap-2 min-w-0">
-        {isHypothetical && (
-          <Badge bg="warning" text="dark" className="flex-shrink-0">
-            ?
-          </Badge>
-        )}
-        <span className="text-truncate">{name}</span>
-        <Badge
-          bg="secondary"
-          className="flex-shrink-0"
-          style={{ fontSize: '0.65rem' }}
+    <Modal show={!!line} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Edit hypothetical</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Form.Group className="mb-3">
+          <Form.Label>Name</Form.Label>
+          <Form.Control
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            maxLength={80}
+          />
+        </Form.Group>
+        <Row className="g-3">
+          <Col xs={6}>
+            <Form.Group>
+              <Form.Label>Amount ($)</Form.Label>
+              <Form.Control
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                placeholder="0.00"
+              />
+            </Form.Group>
+          </Col>
+          <Col xs={6}>
+            <Form.Group>
+              <Form.Label>Frequency</Form.Label>
+              <Form.Select
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+              >
+                {BUDGET_FREQUENCIES.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Col>
+        </Row>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          disabled={
+            !name.trim() ||
+            !amountStr ||
+            Number.isNaN(parseFloat(amountStr)) ||
+            parseFloat(amountStr) <= 0
+          }
         >
-          {frequencyLabel(frequency)}
-        </Badge>
-      </div>
-      <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
-        <div className="text-end">
-          {frequency === 'ONCE' ? (
-            <div className="fw-semibold text-muted">One-off</div>
-          ) : (
-            <>
-              <div className="fw-semibold">${formatMoney(periodCents)}</div>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-                /{periodLabel.toLowerCase()}
-              </div>
-            </>
-          )}
-        </div>
-        {onEdit && (
-          <Button
-            variant="link"
-            size="sm"
-            className="p-0 text-muted"
-            onClick={onEdit}
-            aria-label={`Edit ${name}`}
-          >
-            <i className="mdi mdi-pencil-outline" aria-hidden />
-          </Button>
-        )}
-        {onDelete && (
-          <Button
-            variant="link"
-            size="sm"
-            className="p-0 text-muted"
-            onClick={onDelete}
-            aria-label={`Remove ${name}`}
-          >
-            <i className="mdi mdi-close" aria-hidden />
-          </Button>
-        )}
-      </div>
-    </div>
+          Save changes
+        </Button>
+      </Modal.Footer>
+    </Modal>
   )
 }
 
-// ─── Anchor row ───────────────────────────────────────────────────────────────
+// ─── Upcoming transaction row ─────────────────────────────────────────────────
 
-interface AnchorRowProps {
-  anchor: BucketAnchorItem
+interface UpcomingRowProps {
+  item: BucketUpcomingItem
   period: BudgetDisplayPeriod
   periodLabel: string
-  onDelete: () => void
+  onUnassign: () => void
 }
 
-function AnchorRow({ anchor, period, periodLabel, onDelete }: AnchorRowProps) {
-  const periodCents = toPeriodCents(
-    anchor.latest_amount_cents,
-    anchor.frequency,
-    period
-  )
+function UpcomingRow({
+  item,
+  period,
+  periodLabel,
+  onUnassign,
+}: UpcomingRowProps) {
+  const periodCents =
+    item.frequency !== 'ONCE'
+      ? toPeriodCents(item.amount, item.frequency, period)
+      : 0
 
   return (
     <div
@@ -930,25 +696,154 @@ function AnchorRow({ anchor, period, periodLabel, onDelete }: AnchorRowProps) {
     >
       <div className="d-flex align-items-center gap-2 min-w-0">
         <i
-          className="mdi mdi-link-variant text-muted flex-shrink-0"
+          className="mdi mdi-calendar-clock text-muted flex-shrink-0"
           aria-hidden
         />
-        <div className="min-w-0">
-          <div className="text-truncate fw-medium">
-            {anchor.description_pattern}
-          </div>
-          {anchor.latest_transaction_date && (
-            <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-              Last seen {formatShortDate(anchor.latest_transaction_date)}
-            </div>
-          )}
-        </div>
+        <span className="text-truncate">{item.name}</span>
         <Badge
           bg="secondary"
           className="flex-shrink-0"
           style={{ fontSize: '0.65rem' }}
         >
-          {frequencyLabel(anchor.frequency)}
+          {frequencyLabel(item.frequency)}
+        </Badge>
+      </div>
+      <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
+        <div className="text-end">
+          {item.frequency === 'ONCE' ? (
+            <div className="fw-semibold text-muted">One-off</div>
+          ) : (
+            <>
+              <div className="fw-semibold">${formatMoney(periodCents)}</div>
+              <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                /{periodLabel.toLowerCase()}
+              </div>
+            </>
+          )}
+        </div>
+        <Button
+          variant="link"
+          size="sm"
+          className="p-0 text-muted"
+          onClick={onUnassign}
+          aria-label={`Remove ${item.name}`}
+        >
+          <i className="mdi mdi-close" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Tracker row ──────────────────────────────────────────────────────────────
+
+interface TrackerBucketRowProps {
+  tracker: BucketTrackerItem
+  period: BudgetDisplayPeriod
+  periodLabel: string
+  onUnassign: () => void
+}
+
+function TrackerBucketRow({
+  tracker,
+  period,
+  periodLabel,
+  onUnassign,
+}: TrackerBucketRowProps) {
+  const freq =
+    tracker.reset_frequency === 'PAYDAY' ? 'MONTHLY' : tracker.reset_frequency
+  const periodCents = toPeriodCents(tracker.budget_amount, freq, period)
+
+  return (
+    <div
+      className="d-flex align-items-center justify-content-between py-2 px-3"
+      style={{
+        borderRadius: 8,
+        border: '1px solid var(--bs-border-color)',
+        marginBottom: 8,
+      }}
+    >
+      <div className="d-flex align-items-center gap-2 min-w-0">
+        <i
+          className="mdi mdi-chart-line text-muted flex-shrink-0"
+          aria-hidden
+        />
+        <span className="text-truncate fw-medium">{tracker.name}</span>
+        <span
+          className="badge badge-frequency-default flex-shrink-0"
+          style={
+            tracker.badge_color
+              ? {
+                  fontSize: '0.65rem',
+                  backgroundColor: tracker.badge_color,
+                  color: '#1a1a2e',
+                }
+              : { fontSize: '0.65rem' }
+          }
+        >
+          {frequencyLabel(tracker.reset_frequency)}
+        </span>
+      </div>
+      <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
+        <div className="text-end">
+          <div className="fw-semibold">${formatMoney(periodCents)}</div>
+          <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+            /{periodLabel.toLowerCase()}
+          </div>
+        </div>
+        <Button
+          variant="link"
+          size="sm"
+          className="p-0 text-muted"
+          onClick={onUnassign}
+          aria-label={`Remove ${tracker.name} from bucket`}
+        >
+          <i className="mdi mdi-close" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Hypothetical row ─────────────────────────────────────────────────────────
+
+interface HypotheticalRowProps {
+  line: BudgetLineRow
+  period: BudgetDisplayPeriod
+  periodLabel: string
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function HypotheticalRow({
+  line,
+  period,
+  periodLabel,
+  onEdit,
+  onDelete,
+}: HypotheticalRowProps) {
+  const periodCents = toPeriodCents(line.amount_cents, line.frequency, period)
+
+  return (
+    <div
+      className="d-flex align-items-center justify-content-between py-2 px-3"
+      style={{
+        borderRadius: 8,
+        border: '1.5px dashed var(--bs-border-color)',
+        marginBottom: 8,
+      }}
+    >
+      <div className="d-flex align-items-center gap-2 min-w-0">
+        <Badge bg="warning" text="dark" className="flex-shrink-0">
+          ?
+        </Badge>
+        <span className="text-truncate">{line.name}</span>
+        <Badge
+          bg="secondary"
+          className="flex-shrink-0"
+          style={{ fontSize: '0.65rem' }}
+        >
+          {frequencyLabel(line.frequency)}
         </Badge>
       </div>
       <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
@@ -962,8 +857,17 @@ function AnchorRow({ anchor, period, periodLabel, onDelete }: AnchorRowProps) {
           variant="link"
           size="sm"
           className="p-0 text-muted"
+          onClick={onEdit}
+          aria-label={`Edit ${line.name}`}
+        >
+          <i className="mdi mdi-pencil-outline" aria-hidden />
+        </Button>
+        <Button
+          variant="link"
+          size="sm"
+          className="p-0 text-muted"
           onClick={onDelete}
-          aria-label={`Remove ${anchor.description_pattern}`}
+          aria-label={`Remove ${line.name}`}
         >
           <i className="mdi mdi-close" aria-hidden />
         </Button>
@@ -972,7 +876,7 @@ function AnchorRow({ anchor, period, periodLabel, onDelete }: AnchorRowProps) {
   )
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export function AnalyticsBudgetPlanBucket() {
   const { bucketId } = useParams<{ bucketId: string }>()
@@ -985,6 +889,7 @@ export function AnalyticsBudgetPlanBucket() {
     periodParam === 'WEEKLY' || periodParam === 'YEARLY'
       ? periodParam
       : 'MONTHLY'
+
   function setPeriod(p: BudgetDisplayPeriod) {
     setSearchParams(
       (prev) => {
@@ -995,12 +900,11 @@ export function AnalyticsBudgetPlanBucket() {
     )
   }
 
-  const [showAddVariable, setShowAddVariable] = useState(false)
+  const [showAddUpcoming, setShowAddUpcoming] = useState(false)
+  const [showAddTracker, setShowAddTracker] = useState(false)
   const [showAddHypothetical, setShowAddHypothetical] = useState(false)
-  const [editingLine, setEditingLine] = useState<BudgetLineRow | null>(null)
-  const [showAddFixed, setShowAddFixed] = useState(false)
-  const [showReassign, setShowReassign] = useState(false)
-  const [showAddAnchor, setShowAddAnchor] = useState(false)
+  const [editingHypothetical, setEditingHypothetical] =
+    useState<BudgetLineRow | null>(null)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -1012,25 +916,19 @@ export function AnalyticsBudgetPlanBucket() {
     [id, version, lastSyncCompletedAt]
   )
 
-  const items = useMemo(
-    () => (id != null ? getBucketItems(id) : { upcoming: [] }),
+  const upcomingItems = useMemo(
+    () => (id != null ? getBucketItems(id).upcoming : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, version, lastSyncCompletedAt]
   )
 
-  const anchors = useMemo(
-    () => (id != null ? getBucketAnchors(id) : []),
+  const trackers = useMemo(
+    () => (id != null ? getBucketTrackers(id) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, version, lastSyncCompletedAt]
   )
 
-  const variableLines: BudgetLineRow[] = useMemo(
-    () => (id != null ? getVariableLines(id) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, version, lastSyncCompletedAt]
-  )
-
-  const hypotheticalLines: BudgetLineRow[] = useMemo(
+  const hypotheticals = useMemo(
     () => (id != null ? getHypotheticalLines(id) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, version, lastSyncCompletedAt]
@@ -1057,15 +955,21 @@ export function AnalyticsBudgetPlanBucket() {
   const periodLabel =
     BUDGET_DISPLAY_PERIODS.find((p) => p.value === period)?.label ?? period
 
-  function handleDeleteLine(lineId: number, name: string) {
-    deleteBudgetLine(lineId)
-    toast.success(`Removed "${name}"`)
+  function handleUnassignUpcoming(item: BucketUpcomingItem) {
+    assignUpcomingToBucket(item.id, null)
+    toast.success(`"${item.name}" removed from bucket`)
     refresh()
   }
 
-  function handleDeleteAnchor(anchor: BucketAnchorItem) {
-    unpinAnchor(anchor.id)
-    toast.success(`Unpinned "${anchor.description_pattern}"`)
+  function handleUnassignTracker(tracker: BucketTrackerItem) {
+    assignTrackerToBucket(tracker.id, null)
+    toast.success(`"${tracker.name}" removed from bucket`)
+    refresh()
+  }
+
+  function handleDeleteHypothetical(line: BudgetLineRow) {
+    deleteBudgetLine(line.id)
+    toast.success(`Removed "${line.name}"`)
     refresh()
   }
 
@@ -1095,145 +999,93 @@ export function AnalyticsBudgetPlanBucket() {
             <span className="text-muted small">Budget bucket</span>
           </div>
         </div>
-        <div className="btn-group btn-group-sm">
+        <div
+          className="period-toggle"
+          role="group"
+          aria-label="Select display period"
+        >
           {BUDGET_DISPLAY_PERIODS.map((p) => (
-            <Button
+            <button
               key={p.value}
-              variant={period === p.value ? 'primary' : 'outline-secondary'}
-              size="sm"
+              type="button"
+              className={`segment-btn${period === p.value ? ' active' : ''}`}
               onClick={() => setPeriod(p.value)}
+              aria-pressed={period === p.value}
             >
               {p.label}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Fixed payments + Recurring charges */}
-      <Row className="g-3 mb-3">
-        {/* Fixed payments — upcoming charges */}
-        <Col xs={12} lg={6}>
-          <Card className="h-100">
-            <Card.Header className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-2">
-                <i className="mdi mdi-calendar-clock text-muted" aria-hidden />
-                <span className="fw-semibold">Fixed payments</span>
-              </div>
-              <div className="d-flex gap-2">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={() => setShowAddFixed(true)}
-                >
-                  <i className="mdi mdi-plus me-1" aria-hidden />
-                  Add
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => setShowReassign(true)}
-                >
-                  <i className="mdi mdi-cog-outline me-1" aria-hidden />
-                  Manage
-                </Button>
-              </div>
-            </Card.Header>
-            <Card.Body>
-              {items.upcoming.length === 0 ? (
-                <p className="text-muted small mb-0">
-                  No upcoming charges assigned. Assign them from the Upcoming
-                  section on the dashboard, or use <strong>Manage</strong>.
-                </p>
-              ) : (
-                items.upcoming.map((u) => (
-                  <ItemRow
-                    key={u.id}
-                    name={u.name}
-                    amountCents={u.amount}
-                    frequency={u.frequency}
-                    period={period}
-                    periodLabel={periodLabel}
-                  />
-                ))
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-
-        {/* Recurring charges — transaction anchors */}
-        <Col xs={12} lg={6}>
-          <Card className="h-100">
-            <Card.Header className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-2">
-                <i className="mdi mdi-link-variant text-muted" aria-hidden />
-                <span className="fw-semibold">Recurring charges</span>
-              </div>
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() => setShowAddAnchor(true)}
-              >
-                <i className="mdi mdi-plus me-1" aria-hidden />
-                Pin transaction
-              </Button>
-            </Card.Header>
-            <Card.Body>
-              {anchors.length === 0 ? (
-                <p className="text-muted small mb-0">
-                  Pin a real transaction to this bucket — the amount
-                  auto-updates whenever a newer charge with the same description
-                  appears. Perfect for subscriptions.
-                </p>
-              ) : (
-                anchors.map((a) => (
-                  <AnchorRow
-                    key={a.id}
-                    anchor={a}
-                    period={period}
-                    periodLabel={periodLabel}
-                    onDelete={() => handleDeleteAnchor(a)}
-                  />
-                ))
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Variable spending — manual estimates */}
+      {/* Upcoming Transactions */}
       <Card className="mb-3">
         <Card.Header className="d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-2">
-            <i className="mdi mdi-chart-bar text-muted" aria-hidden />
-            <span className="fw-semibold">Variable spending</span>
-            <span className="text-muted small">— estimated amounts</span>
+            <i className="mdi mdi-calendar-clock text-muted" aria-hidden />
+            <span className="fw-semibold">Upcoming Transactions</span>
           </div>
           <Button
             variant="outline-primary"
             size="sm"
-            onClick={() => setShowAddVariable(true)}
+            onClick={() => setShowAddUpcoming(true)}
           >
             <i className="mdi mdi-plus me-1" aria-hidden />
-            Add item
+            Add
           </Button>
         </Card.Header>
         <Card.Body>
-          {variableLines.length === 0 ? (
+          {upcomingItems.length === 0 ? (
             <p className="text-muted small mb-0">
-              Estimate variable recurring expenses for this bucket — e.g.
-              Groceries, Fuel, Dining out.
+              Add fixed recurring charges — subscriptions, bills, loan
+              repayments. You can assign existing upcoming transactions or
+              create one from a real transaction.
             </p>
           ) : (
-            variableLines.map((l) => (
-              <ItemRow
-                key={l.id}
-                name={l.name}
-                amountCents={l.amount_cents}
-                frequency={l.frequency}
+            upcomingItems.map((u) => (
+              <UpcomingRow
+                key={u.id}
+                item={u}
                 period={period}
                 periodLabel={periodLabel}
-                onEdit={() => setEditingLine(l)}
-                onDelete={() => handleDeleteLine(l.id, l.name)}
+                onUnassign={() => handleUnassignUpcoming(u)}
+              />
+            ))
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* Trackers */}
+      <Card className="mb-3">
+        <Card.Header className="d-flex align-items-center justify-content-between">
+          <div className="d-flex align-items-center gap-2">
+            <i className="mdi mdi-chart-line text-muted" aria-hidden />
+            <span className="fw-semibold">Trackers</span>
+          </div>
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => setShowAddTracker(true)}
+          >
+            <i className="mdi mdi-plus me-1" aria-hidden />
+            Add tracker
+          </Button>
+        </Card.Header>
+        <Card.Body>
+          {trackers.length === 0 ? (
+            <p className="text-muted small mb-0">
+              Link a spending tracker to this bucket — its budget will
+              contribute to the bucket total, normalized to your selected
+              period.
+            </p>
+          ) : (
+            trackers.map((t) => (
+              <TrackerBucketRow
+                key={t.id}
+                tracker={t}
+                period={period}
+                periodLabel={periodLabel}
+                onUnassign={() => handleUnassignTracker(t)}
               />
             ))
           )}
@@ -1246,7 +1098,7 @@ export function AnalyticsBudgetPlanBucket() {
           <div className="d-flex align-items-center gap-2">
             <i className="mdi mdi-flask-outline text-muted" aria-hidden />
             <span className="fw-semibold">Hypotheticals</span>
-            <span className="text-muted small">— can I afford X?</span>
+            <span className="text-muted small">— can I afford this?</span>
           </div>
           <Button
             variant="outline-secondary"
@@ -1254,27 +1106,24 @@ export function AnalyticsBudgetPlanBucket() {
             onClick={() => setShowAddHypothetical(true)}
           >
             <i className="mdi mdi-plus me-1" aria-hidden />
-            Add hypothetical
+            Add
           </Button>
         </Card.Header>
         <Card.Body>
-          {hypotheticalLines.length === 0 ? (
+          {hypotheticals.length === 0 ? (
             <p className="text-muted small mb-0">
               Add a hypothetical item to test "can I afford this?" — stays
               separate from real expenses and persists until you remove it.
             </p>
           ) : (
-            hypotheticalLines.map((h) => (
-              <ItemRow
+            hypotheticals.map((h) => (
+              <HypotheticalRow
                 key={h.id}
-                name={h.name}
-                amountCents={h.amount_cents}
-                frequency={h.frequency}
+                line={h}
                 period={period}
                 periodLabel={periodLabel}
-                isHypothetical
-                onEdit={() => setEditingLine(h)}
-                onDelete={() => handleDeleteLine(h.id, h.name)}
+                onEdit={() => setEditingHypothetical(h)}
+                onDelete={() => handleDeleteHypothetical(h)}
               />
             ))
           )}
@@ -1296,42 +1145,27 @@ export function AnalyticsBudgetPlanBucket() {
       </Card>
 
       {/* Modals */}
-      <AddToFixedPaymentsModal
-        show={showAddFixed}
+      <AddUpcomingTransactionModal
+        show={showAddUpcoming}
         bucketId={bucket.id}
-        onClose={() => setShowAddFixed(false)}
+        onClose={() => setShowAddUpcoming(false)}
         onSaved={refresh}
       />
-      <AddBudgetLineModal
-        show={showAddVariable}
+      <AddTrackerModal
+        show={showAddTracker}
         bucketId={bucket.id}
-        isHypothetical={false}
-        onClose={() => setShowAddVariable(false)}
+        onClose={() => setShowAddTracker(false)}
         onSaved={refresh}
       />
-      <AddBudgetLineModal
+      <AddHypotheticalModal
         show={showAddHypothetical}
         bucketId={bucket.id}
-        isHypothetical={true}
         onClose={() => setShowAddHypothetical(false)}
         onSaved={refresh}
       />
-      <EditBudgetLineModal
-        line={editingLine}
-        onClose={() => setEditingLine(null)}
-        onSaved={refresh}
-      />
-      <ReassignModal
-        show={showReassign}
-        currentBucketId={bucket.id}
-        upcoming={items.upcoming}
-        onClose={() => setShowReassign(false)}
-        onSaved={refresh}
-      />
-      <AddAnchorModal
-        show={showAddAnchor}
-        bucketId={bucket.id}
-        onClose={() => setShowAddAnchor(false)}
+      <EditHypotheticalModal
+        line={editingHypothetical}
+        onClose={() => setEditingHypothetical(null)}
         onSaved={refresh}
       />
     </div>

@@ -432,16 +432,21 @@ export function AnalyticsBudgetPlan() {
     <div className="grid-margin">
       {/* Header row */}
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <div className="btn-group btn-group-sm">
+        <div
+          className="period-toggle"
+          role="group"
+          aria-label="Select display period"
+        >
           {BUDGET_DISPLAY_PERIODS.map((p) => (
-            <Button
+            <button
               key={p.value}
-              variant={period === p.value ? 'primary' : 'outline-secondary'}
-              size="sm"
+              type="button"
+              className={`segment-btn${period === p.value ? ' active' : ''}`}
               onClick={() => setPeriod(p.value)}
+              aria-pressed={period === p.value}
             >
               {p.label}
-            </Button>
+            </button>
           ))}
         </div>
         <div className="d-flex gap-2">

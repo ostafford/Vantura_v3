@@ -17,9 +17,9 @@ import {
   getTrackersWithProgress,
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
+  getTrackerSpentInPeriod,
   getTrackerCategoryIds,
   getTrackerCategoryUsage,
-  getTrackersList,
   createTracker,
   updateTracker,
   deleteTracker,
@@ -28,12 +28,14 @@ import {
 import { getCategories } from '@/services/categories'
 import { getPayAmountCents } from '@/services/balance'
 import { getAppSetting } from '@/db'
+import {
+  toPeriodCents,
+  type BudgetDisplayPeriod,
+} from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { HelpPopover } from '@/components/HelpPopover'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import { ACCENT_PALETTES, type AccentId } from '@/lib/accentPalettes'
 import type React from 'react'
 
@@ -54,44 +56,6 @@ const FREQUENCY_ORDER: TrackerResetFrequency[] = [
   'FORTNIGHTLY',
   'MONTHLY',
 ]
-
-type FrequencyScope = 'ALL' | TrackerResetFrequency
-
-const FREQUENCY_SCOPE_OPTIONS: { value: FrequencyScope; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'PAYDAY', label: 'Payday' },
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-]
-
-function periodOffsetPhrase(offset: number): string {
-  if (offset === 0) return 'Current period'
-  if (offset === -1) return 'Previous period'
-  return `${-offset} periods ago`
-}
-
-function formatOrdinalDayMonth(isoDate: string): string {
-  const d = new Date(isoDate + (isoDate.length === 10 ? 'T12:00:00Z' : ''))
-  if (Number.isNaN(d.getTime())) return isoDate
-  const day = d.getUTCDate()
-  const mod100 = day % 100
-  const suffix =
-    mod100 >= 11 && mod100 <= 13
-      ? 'th'
-      : day % 10 === 1
-        ? 'st'
-        : day % 10 === 2
-          ? 'nd'
-          : day % 10 === 3
-            ? 'rd'
-            : 'th'
-  const month = d.toLocaleDateString(undefined, {
-    month: 'short',
-    timeZone: 'UTC',
-  })
-  return `${day}${suffix} ${month}`
-}
 
 // period_end is exclusive (the reset date / first day of next period), so subtract
 // one day to get the last inclusive day for display purposes.
@@ -118,6 +82,59 @@ function getTrackerProgressStyle(progress: number): {
   return { variant: 'success', striped: false, animated: false }
 }
 
+const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'YEARLY', label: 'Yearly' },
+]
+
+function getCalendarPeriodBounds(period: BudgetDisplayPeriod): {
+  from: string
+  to: string
+  label: string
+} {
+  const today = new Date()
+  if (period === 'WEEKLY') {
+    const day = today.getUTCDay()
+    const daysFromMonday = (day + 6) % 7
+    const monday = new Date(today)
+    monday.setUTCDate(today.getUTCDate() - daysFromMonday)
+    const nextMonday = new Date(monday)
+    nextMonday.setUTCDate(monday.getUTCDate() + 7)
+    return {
+      from: monday.toISOString().slice(0, 10),
+      to: nextMonday.toISOString().slice(0, 10),
+      label: `${formatShortDate(monday.toISOString().slice(0, 10))} – ${formatShortDate(new Date(nextMonday.getTime() - 86400000).toISOString().slice(0, 10))}`,
+    }
+  }
+  if (period === 'YEARLY') {
+    const year = today.getUTCFullYear()
+    return {
+      from: `${year}-01-01`,
+      to: `${year + 1}-01-01`,
+      label: String(year),
+    }
+  }
+  // MONTHLY: calendar month
+  const year = today.getUTCFullYear()
+  const month = today.getUTCMonth()
+  const from = new Date(Date.UTC(year, month, 1))
+  const to = new Date(Date.UTC(year, month + 1, 1))
+  const toDisplay = new Date(to.getTime() - 86400000)
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    label: `${formatShortDate(from.toISOString().slice(0, 10))} – ${formatShortDate(toDisplay.toISOString().slice(0, 10))}`,
+  }
+}
+
+function calendarDaysLeft(toExclusive: string): number {
+  const today = new Date().toISOString().slice(0, 10)
+  const a = new Date(today + 'T12:00:00Z').getTime()
+  const b = new Date(toExclusive + 'T12:00:00Z').getTime()
+  return Math.max(0, Math.round((b - a) / 86400000))
+}
+
 export function TrackersSection({
   dragHandleProps,
 }: {
@@ -134,46 +151,10 @@ export function TrackersSection({
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [badgeColor, setBadgeColor] = useState<string | null>(null)
   const [categoryUsage, setCategoryUsage] = useState<Record<string, string>>({})
-  const [selectedFrequencyScope, setSelectedFrequencyScope] =
-    useState<FrequencyScope>('ALL')
-  const [offsetByScope, setOffsetByScope] = useState<
-    Record<FrequencyScope, number>
-  >({
-    ALL: 0,
-    PAYDAY: 0,
-    WEEKLY: 0,
-    FORTNIGHTLY: 0,
-    MONTHLY: 0,
-  })
+  const [displayPeriod, setDisplayPeriod] =
+    useState<BudgetDisplayPeriod>('MONTHLY')
   const [searchParams, setSearchParams] = useSearchParams()
-  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
-
-  const trackerList = useMemo(
-    () => getTrackersList(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
-  )
-  const usedFrequencies = new Set(
-    trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
-  )
-  const visibleScopeOptions = FREQUENCY_SCOPE_OPTIONS.filter((opt) =>
-    opt.value === 'ALL'
-      ? trackerList.length > 0
-      : usedFrequencies.has(opt.value as TrackerResetFrequency)
-  )
-
-  useEffect(() => {
-    if (trackerList.length === 0) return
-    const used = new Set(
-      trackerList.map((t) => t.reset_frequency as TrackerResetFrequency)
-    )
-    const allowed = new Set<FrequencyScope>(['ALL'])
-    for (const f of used) allowed.add(f)
-    if (!allowed.has(selectedFrequencyScope)) {
-      setSelectedFrequencyScope('ALL')
-    }
-  }, [trackerList, selectedFrequencyScope])
 
   useEffect(() => {
     const rawId = searchParams.get('editTracker')
@@ -187,20 +168,10 @@ export function TrackersSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  const activePeriodOffset = offsetByScope[selectedFrequencyScope]
-  const resetActiveScopeToCurrentPeriod = () =>
-    setOffsetByScope((prev) => ({ ...prev, [selectedFrequencyScope]: 0 }))
   const trackers = useMemo(
-    () => getTrackersWithProgressForPeriod(activePeriodOffset),
+    () => getTrackersWithProgressForPeriod(0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activePeriodOffset, refresh, lastSyncCompletedAt]
-  )
-  const visibleTrackers = useMemo(
-    () =>
-      selectedFrequencyScope === 'ALL'
-        ? trackers
-        : trackers.filter((t) => t.reset_frequency === selectedFrequencyScope),
-    [trackers, selectedFrequencyScope]
+    [refresh, lastSyncCompletedAt]
   )
   const categories = useMemo(
     () => getCategories(),
@@ -222,16 +193,69 @@ export function TrackersSection({
       number,
       ReturnType<typeof getTrackerTransactionsInPeriod>
     > = {}
-    for (const t of visibleTrackers) {
-      map[t.id] = getTrackerTransactionsInPeriod(t.id, activePeriodOffset)
+    for (const t of trackers) {
+      map[t.id] = getTrackerTransactionsInPeriod(t.id, 0)
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleTrackers, activePeriodOffset, refresh])
+  }, [trackers, refresh])
   const paydayBudgetExceedsPay =
     payAmountCents != null &&
     payAmountCents > 0 &&
     totalPaydayBudgetCents > payAmountCents
+
+  // Effective budget/spend per display period (normalized when display period differs from native)
+  const effectiveDataByTrackerId = useMemo(() => {
+    const map: Record<
+      number,
+      {
+        spent: number
+        budget: number
+        remaining: number
+        progress: number
+        daysLeft: number
+        dateRangeLabel: string
+      }
+    > = {}
+    for (const t of trackers) {
+      const nativeMatch =
+        (displayPeriod === 'WEEKLY' && t.reset_frequency === 'WEEKLY') ||
+        (displayPeriod === 'MONTHLY' && t.reset_frequency === 'MONTHLY')
+      let spent: number
+      let budget: number
+      let daysLeft: number
+      let dateRangeLabel: string
+      if (nativeMatch) {
+        spent = t.spent
+        budget = t.budget_amount
+        daysLeft = t.daysLeft
+        dateRangeLabel =
+          t.period_start && t.period_end
+            ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
+            : ''
+      } else {
+        const bounds = getCalendarPeriodBounds(displayPeriod)
+        spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
+        const freq =
+          t.reset_frequency === 'PAYDAY' ? 'MONTHLY' : t.reset_frequency
+        budget = toPeriodCents(t.budget_amount, freq, displayPeriod)
+        daysLeft = calendarDaysLeft(bounds.to)
+        dateRangeLabel = bounds.label
+      }
+      const remaining = Math.max(0, budget - spent)
+      const progress = budget > 0 ? (spent / budget) * 100 : 0
+      map[t.id] = {
+        spent,
+        budget,
+        remaining,
+        progress,
+        daysLeft,
+        dateRangeLabel,
+      }
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackers, displayPeriod, refresh, lastSyncCompletedAt])
 
   function openCreate() {
     setEditingId(null)
@@ -357,234 +381,71 @@ export function TrackersSection({
         <HelpPopover
           id="trackers-help"
           title="Trackers"
-          content="Set a budget and reset frequency (Weekly, Fortnightly, Monthly, or Payday). Assign categories to each tracker. Use the frequency tabs to focus on one cadence at a time. Previous/Next moves the selected tab's period only, so you can browse Weekly, Payday, or Monthly history independently."
+          content="Set a budget and frequency for each tracker, then assign spending categories. Use the Weekly / Monthly / Yearly toggle to see your budget and spend normalised to any period. For full history and breakdowns, open the analytics page."
           ariaLabel="What are trackers?"
         />
       </div>
     </div>
   )
 
-  const periodNavButtons = (
-    <>
-      <OverlayTrigger
-        placement="top"
-        overlay={<Tooltip id="trackers-prev-tooltip">Previous period</Tooltip>}
-      >
-        <Button
-          variant="outline-secondary"
-          size="sm"
-          onClick={() =>
-            setOffsetByScope((prev) => ({
-              ...prev,
-              [selectedFrequencyScope]: prev[selectedFrequencyScope] - 1,
-            }))
-          }
-          aria-label="Previous period"
-        >
-          <i className="mdi mdi-chevron-left" aria-hidden />
-        </Button>
-      </OverlayTrigger>
-      <OverlayTrigger
-        placement="top"
-        overlay={
-          <Tooltip id="trackers-today-tooltip">Go to current period</Tooltip>
-        }
-      >
-        <Button
-          variant="outline-secondary"
-          size="sm"
-          onClick={resetActiveScopeToCurrentPeriod}
-          disabled={activePeriodOffset === 0}
-          aria-label="Go to current period"
-        >
-          <i className="mdi mdi-calendar-today" aria-hidden />
-        </Button>
-      </OverlayTrigger>
-      <OverlayTrigger
-        placement="top"
-        overlay={<Tooltip id="trackers-next-tooltip">Next period</Tooltip>}
-      >
-        <Button
-          variant="outline-secondary"
-          size="sm"
-          onClick={() =>
-            setOffsetByScope((prev) => ({
-              ...prev,
-              [selectedFrequencyScope]: Math.min(
-                0,
-                prev[selectedFrequencyScope] + 1
-              ),
-            }))
-          }
-          disabled={activePeriodOffset >= 0}
-          aria-label="Next period"
-        >
-          <i className="mdi mdi-chevron-right" aria-hidden />
-        </Button>
-      </OverlayTrigger>
-    </>
-  )
-
   return (
     <>
       <Card>
         <Card.Header className="d-flex flex-column gap-2 section-header">
-          {isMobile ? (
-            <>
-              <div className="d-flex align-items-center justify-content-between">
-                {titleBlock}
-                <div className="d-flex gap-1">
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-analytics-header-tooltip">
-                        View tracker analytics
-                      </Tooltip>
-                    }
-                  >
-                    <Link
-                      to="/analytics/trackers"
-                      className="btn btn-outline-secondary btn-sm"
-                      aria-label="View tracker analytics"
-                    >
-                      <i className="mdi mdi-chart-box" aria-hidden />
-                    </Link>
-                  </OverlayTrigger>
-                  <OverlayTrigger
-                    placement="top"
-                    overlay={
-                      <Tooltip id="trackers-add-tooltip">Add tracker</Tooltip>
-                    }
-                  >
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={openCreate}
-                      aria-label="Add tracker"
-                    >
-                      <i className="mdi mdi-plus" aria-hidden />
-                    </Button>
-                  </OverlayTrigger>
-                </div>
-              </div>
-              <div className="d-flex justify-content-center gap-2">
-                {periodNavButtons}
-              </div>
-            </>
-          ) : (
-            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-              <div className="d-flex align-items-center">
-                {titleBlock}
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="trackers-analytics-header-tooltip-desktop">
-                      View tracker analytics
-                    </Tooltip>
-                  }
-                >
-                  <Link
-                    to="/analytics/trackers"
-                    className="btn btn-outline-secondary btn-sm ms-2"
-                    aria-label="View tracker analytics"
-                  >
-                    <i className="mdi mdi-chart-box" aria-hidden />
-                  </Link>
-                </OverlayTrigger>
-              </div>
-              <div className="d-flex gap-1 align-items-center flex-nowrap ms-auto">
-                {periodNavButtons}
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="trackers-add-tooltip">Add tracker</Tooltip>
-                  }
-                >
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="ms-2"
-                    onClick={openCreate}
-                    aria-label="Add tracker"
-                  >
-                    <i className="mdi mdi-plus" aria-hidden />
-                  </Button>
-                </OverlayTrigger>
-              </div>
-            </div>
-          )}
-          {visibleScopeOptions.length > 0 && (
-            <div className="d-flex justify-content-center mt-1">
-              <div
-                className="btn-group btn-group-sm flex-wrap"
-                role="group"
-                aria-label="Select tracker frequency view"
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center">
+              {titleBlock}
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  <Tooltip id="trackers-analytics-header-tooltip">
+                    View tracker analytics
+                  </Tooltip>
+                }
               >
-                {visibleScopeOptions.map((scope) => (
-                  <button
-                    key={scope.value}
-                    type="button"
-                    className={`btn btn-outline-secondary ${
-                      selectedFrequencyScope === scope.value ? 'active' : ''
-                    }`}
-                    onClick={() => setSelectedFrequencyScope(scope.value)}
-                    aria-pressed={selectedFrequencyScope === scope.value}
-                  >
-                    {scope.label}
-                  </button>
-                ))}
-              </div>
+                <Link
+                  to="/analytics/trackers"
+                  className="btn-icon ms-2"
+                  aria-label="View tracker analytics"
+                >
+                  <i className="mdi mdi-chart-box" aria-hidden />
+                </Link>
+              </OverlayTrigger>
             </div>
-          )}
-          {trackers.length > 0 && (
-            <div
-              className="small text-muted text-center mt-1 px-2"
-              aria-live="polite"
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip id="trackers-add-tooltip">Add tracker</Tooltip>}
             >
-              {selectedFrequencyScope !== 'ALL' ? (
-                visibleTrackers[0]?.period_start &&
-                visibleTrackers[0]?.period_end ? (
-                  <>
-                    {FREQUENCY_SCOPE_OPTIONS.find(
-                      (o) => o.value === selectedFrequencyScope
-                    )?.label ?? ''}{' '}
-                    period
-                    {activePeriodOffset !== 0 && (
-                      <> ({periodOffsetPhrase(activePeriodOffset)})</>
-                    )}
-                    : {formatOrdinalDayMonth(visibleTrackers[0].period_start)} -{' '}
-                    {formatOrdinalDayMonth(
-                      displayPeriodEnd(visibleTrackers[0].period_end)
-                    )}
-                  </>
-                ) : null
-              ) : (
-                <>
-                  <div className="mb-1">
-                    {periodOffsetPhrase(activePeriodOffset)}
-                  </div>
-                  {FREQUENCY_ORDER.map((freq) => {
-                    const sample = trackers.find(
-                      (tr) => tr.reset_frequency === freq
-                    )
-                    if (!sample?.period_start || !sample?.period_end)
-                      return null
-                    const label =
-                      RESET_FREQUENCIES.find((f) => f.value === freq)?.label ??
-                      freq
-                    return (
-                      <div key={freq}>
-                        {label}: {formatOrdinalDayMonth(sample.period_start)} -{' '}
-                        {formatOrdinalDayMonth(
-                          displayPeriodEnd(sample.period_end)
-                        )}
-                      </div>
-                    )
-                  })}
-                </>
-              )}
+              <button
+                type="button"
+                className="btn-icon btn-icon-primary"
+                onClick={openCreate}
+                aria-label="Add tracker"
+              >
+                <i className="mdi mdi-plus" aria-hidden />
+              </button>
+            </OverlayTrigger>
+          </div>
+          {/* Display period toggle */}
+          <div className="d-flex justify-content-center">
+            <div
+              className="period-toggle"
+              role="group"
+              aria-label="Select display period"
+            >
+              {DISPLAY_PERIODS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`segment-btn${displayPeriod === p.value ? ' active' : ''}`}
+                  onClick={() => setDisplayPeriod(p.value)}
+                  aria-pressed={displayPeriod === p.value}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </Card.Header>
         <Card.Body>
           {paydayBudgetExceedsPay && (
@@ -595,18 +456,16 @@ export function TrackersSection({
               amount in Settings.
             </Alert>
           )}
-          {visibleTrackers.length === 0 ? (
+          {trackers.length === 0 ? (
             <p className="text-muted small mb-0">
-              {selectedFrequencyScope === 'ALL'
-                ? 'No trackers yet. Add one to get started.'
-                : `No ${selectedFrequencyScope.toLowerCase()} trackers yet.`}
+              No trackers yet. Add one to get started.
             </p>
           ) : (
             <div
               className="d-flex flex-column gap-3"
               style={{ paddingBottom: '0.75rem' }}
             >
-              {[...visibleTrackers]
+              {[...trackers]
                 .sort(
                   (a, b) =>
                     FREQUENCY_ORDER.indexOf(
@@ -616,44 +475,28 @@ export function TrackersSection({
                       b.reset_frequency as TrackerResetFrequency
                     )
                 )
-                .map((t, index, sorted) => {
-                  const showGroupLabel =
-                    selectedFrequencyScope === 'ALL' &&
-                    (index === 0 ||
-                      sorted[index - 1].reset_frequency !== t.reset_frequency)
-                  const groupLabel = RESET_FREQUENCIES.find(
-                    (f) => f.value === t.reset_frequency
-                  )?.label
-                  const progressStyle = getTrackerProgressStyle(t.progress)
-                  const frequencyLabel =
-                    RESET_FREQUENCIES.find((f) => f.value === t.reset_frequency)
-                      ?.label ?? t.reset_frequency
-                  const periodRangeText =
-                    t.period_start && t.period_end
-                      ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
-                      : ''
+                .map((t) => {
+                  const effectiveData = effectiveDataByTrackerId[t.id] ?? {
+                    spent: t.spent,
+                    budget: t.budget_amount,
+                    remaining: t.remaining,
+                    progress: t.progress,
+                    daysLeft: t.daysLeft,
+                    dateRangeLabel: '',
+                  }
+                  const progressStyle = getTrackerProgressStyle(
+                    effectiveData.progress
+                  )
                   const periodTxEntry = periodTxsByTrackerId[t.id]
                   const periodTxs = periodTxEntry?.list ?? []
                   const periodTxsHasMore = periodTxEntry?.hasMore ?? false
-                  const daysTooltipText = periodRangeText
-                    ? `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period (${periodRangeText})`
-                    : `${t.daysLeft} days left in this ${frequencyLabel.toLowerCase()} period`
+                  const displayPeriodLabel =
+                    DISPLAY_PERIODS.find(
+                      (p) => p.value === displayPeriod
+                    )?.label?.toLowerCase() ?? 'period'
+                  const daysTooltipText = `${effectiveData.daysLeft} days left in this ${displayPeriodLabel}`
                   return (
                     <Fragment key={t.id}>
-                      {showGroupLabel && (
-                        <>
-                          {index > 0 && (
-                            <hr className="my-2 border-secondary" />
-                          )}
-                          {/* Section heading for this frequency group (Payday, Weekly, etc.) */}
-                          <h6
-                            className={`text-center fw-semibold text-muted text-uppercase small mb-2${index > 0 ? ' mt-2' : ''}`}
-                            id={`tracker-group-${t.reset_frequency}`}
-                          >
-                            {groupLabel}
-                          </h6>
-                        </>
-                      )}
                       <div
                         role="button"
                         tabIndex={0}
@@ -680,28 +523,13 @@ export function TrackersSection({
                             >
                               <Link
                                 to={`/analytics/trackers/${t.id}`}
-                                className="btn btn-link btn-sm p-0"
-                                style={{ color: 'var(--vantura-primary)' }}
+                                className="btn-icon"
                                 onClick={(e) => e.stopPropagation()}
                                 aria-label={`View analytics for ${t.name}`}
                               >
                                 <i className="mdi mdi-chart-line" aria-hidden />
                               </Link>
                             </OverlayTrigger>
-                            {t.badge_color && t.badge_color.trim() ? (
-                              <span
-                                className="badge badge-frequency-custom"
-                                style={{
-                                  backgroundColor: t.badge_color.trim(),
-                                }}
-                              >
-                                {frequencyLabel}
-                              </span>
-                            ) : (
-                              <span className="badge badge-frequency-default">
-                                {frequencyLabel}
-                              </span>
-                            )}
                             <OverlayTrigger
                               placement="top"
                               overlay={
@@ -711,29 +539,32 @@ export function TrackersSection({
                               }
                             >
                               <span className="badge badge-meta">
-                                {t.daysLeft} days
+                                {effectiveData.daysLeft} days
                               </span>
                             </OverlayTrigger>
                           </div>
                         </div>
-                        {t.spent > t.budget_amount ? (
+                        {effectiveData.spent > effectiveData.budget ? (
                           <h6 className="text-danger mt-1 text-end">
-                            ${formatMoney(t.spent - t.budget_amount)} over
-                            budget
+                            $
+                            {formatMoney(
+                              effectiveData.spent - effectiveData.budget
+                            )}{' '}
+                            over budget
                           </h6>
                         ) : (
                           <h6
                             className={`text-${progressStyle.variant} mt-1 text-end`}
                           >
-                            ${formatMoney(t.remaining)} left
+                            ${formatMoney(effectiveData.remaining)} left
                           </h6>
                         )}
                         <ProgressBar
-                          now={Math.min(100, t.progress)}
+                          now={Math.min(100, effectiveData.progress)}
                           variant={progressStyle.variant}
                           striped={progressStyle.striped}
                           animated={progressStyle.animated}
-                          label={`${Math.round(t.progress)}%`}
+                          label={`${Math.round(effectiveData.progress)}%`}
                         />
                       </div>
                       <div
@@ -758,13 +589,12 @@ export function TrackersSection({
                         title="View transactions"
                       >
                         <small className="text-muted">
-                          ${formatMoney(t.spent)} of $
-                          {formatMoney(t.budget_amount)} spent
+                          ${formatMoney(effectiveData.spent)} of $
+                          {formatMoney(effectiveData.budget)} spent
                         </small>
-                        {t.period_start && t.period_end && (
+                        {effectiveData.dateRangeLabel && (
                           <span className="small text-muted text-end">
-                            {formatShortDate(t.period_start)} –{' '}
-                            {formatShortDate(displayPeriodEnd(t.period_end))}
+                            {effectiveData.dateRangeLabel}
                           </span>
                         )}
                       </div>
@@ -852,7 +682,7 @@ export function TrackersSection({
             </Form.Group>
             <Form.Group className="mb-2">
               <Form.Label htmlFor="tracker-edit-frequency">
-                Reset frequency
+                Frequency
               </Form.Label>
               <Form.Select
                 id="tracker-edit-frequency"

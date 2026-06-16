@@ -149,25 +149,25 @@ function DashboardSectionOrderForm() {
             className="list-group-item d-flex justify-content-between align-items-center"
           >
             <span>{DASHBOARD_SECTION_LABELS[id]}</span>
-            <div className="btn-group btn-group-sm">
-              <Button
-                variant="outline-secondary"
-                size="sm"
+            <div className="d-flex gap-1">
+              <button
+                type="button"
+                className="btn-icon"
                 onClick={() => moveUp(index)}
                 disabled={index === 0}
                 aria-label={`Move ${DASHBOARD_SECTION_LABELS[id]} up`}
               >
                 <i className="mdi mdi-chevron-up" aria-hidden />
-              </Button>
-              <Button
-                variant="outline-secondary"
-                size="sm"
+              </button>
+              <button
+                type="button"
+                className="btn-icon"
                 onClick={() => moveDown(index)}
                 disabled={index === order.length - 1}
                 aria-label={`Move ${DASHBOARD_SECTION_LABELS[id]} down`}
               >
                 <i className="mdi mdi-chevron-down" aria-hidden />
-              </Button>
+              </button>
             </div>
           </li>
         ))}

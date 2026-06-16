@@ -965,6 +965,98 @@ export function getTrackerTransactionsCount(
   return row ? Number(row[0]) : 0
 }
 
+// ─── Budget bucket integration ───────────────────────────────────────────────
+
+export interface BucketTrackerItem {
+  id: number
+  name: string
+  budget_amount: number
+  reset_frequency: string
+  badge_color?: string | null
+}
+
+export interface TrackerPickerItem extends BucketTrackerItem {
+  current_bucket_id: number | null
+  current_bucket_name: string | null
+}
+
+export function getBucketTrackers(bucketId: number): BucketTrackerItem[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, name, budget_amount, reset_frequency, badge_color
+     FROM trackers WHERE bucket_id = ? AND is_active = 1 ORDER BY name`
+  )
+  stmt.bind([bucketId])
+  const list: BucketTrackerItem[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [number, string, number, string, string | null]
+    list.push({
+      id: row[0],
+      name: row[1],
+      budget_amount: row[2],
+      reset_frequency: row[3],
+      badge_color:
+        row[4] != null && String(row[4]).trim() !== ''
+          ? String(row[4]).trim()
+          : undefined,
+    })
+  }
+  stmt.free()
+  return list
+}
+
+export function assignTrackerToBucket(
+  trackerId: number,
+  bucketId: number | null
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`UPDATE trackers SET bucket_id = ? WHERE id = ?`, [
+    bucketId,
+    trackerId,
+  ])
+  schedulePersist()
+}
+
+export function getTrackersForPicker(): TrackerPickerItem[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT t.id, t.name, t.budget_amount, t.reset_frequency, t.badge_color,
+            t.bucket_id, bb.name as bucket_name
+     FROM trackers t
+     LEFT JOIN budget_buckets bb ON t.bucket_id = bb.id
+     WHERE t.is_active = 1 ORDER BY t.name`
+  )
+  const list: TrackerPickerItem[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [
+      number,
+      string,
+      number,
+      string,
+      string | null,
+      number | null,
+      string | null,
+    ]
+    list.push({
+      id: row[0],
+      name: row[1],
+      budget_amount: row[2],
+      reset_frequency: row[3],
+      badge_color:
+        row[4] != null && String(row[4]).trim() !== ''
+          ? String(row[4]).trim()
+          : undefined,
+      current_bucket_id: row[5],
+      current_bucket_name: row[6],
+    })
+  }
+  stmt.free()
+  return list
+}
+
 /**
  * Category IDs linked to a tracker (for edit form).
  */

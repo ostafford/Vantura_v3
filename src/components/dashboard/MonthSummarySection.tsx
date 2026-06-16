@@ -1,12 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
-import {
-  Card,
-  Button,
-  OverlayTrigger,
-  Tooltip as BSTooltip,
-} from 'react-bootstrap'
+import { Card, OverlayTrigger, Tooltip as BSTooltip } from 'react-bootstrap'
 import {
   getMonthComparison,
   getMonthDayByDaySeries,
@@ -80,7 +75,7 @@ export function MonthSummarySection({
         <div className="d-flex gap-2 align-items-center">
           <Link
             to="/analytics/reports"
-            className="btn btn-outline-secondary btn-sm"
+            className="btn-icon"
             aria-label="View full monthly review"
           >
             <i className="mdi mdi-chart-box" aria-hidden />
@@ -91,14 +86,14 @@ export function MonthSummarySection({
               <BSTooltip id="month-prev-tooltip">Previous month</BSTooltip>
             }
           >
-            <Button
-              variant="outline-secondary"
-              size="sm"
+            <button
+              type="button"
+              className="btn-icon"
               onClick={() => setMonthOffset((o) => o - 1)}
               aria-label="Previous month"
             >
               <i className="mdi mdi-chevron-left" aria-hidden />
-            </Button>
+            </button>
           </OverlayTrigger>
           <OverlayTrigger
             placement="top"
@@ -108,30 +103,29 @@ export function MonthSummarySection({
               </BSTooltip>
             }
           >
-            <Button
-              variant="outline-secondary"
-              size="sm"
+            <button
+              type="button"
+              className="btn-icon"
               onClick={() => setMonthOffset(0)}
               disabled={monthOffset === 0}
               aria-label="Go to current period"
-              aria-describedby="month-today-tooltip"
             >
               <i className="mdi mdi-calendar-today" aria-hidden />
-            </Button>
+            </button>
           </OverlayTrigger>
           <OverlayTrigger
             placement="top"
             overlay={<BSTooltip id="month-next-tooltip">Next month</BSTooltip>}
           >
-            <Button
-              variant="outline-secondary"
-              size="sm"
+            <button
+              type="button"
+              className="btn-icon"
               onClick={() => setMonthOffset((o) => o + 1)}
               disabled={monthOffset >= 0}
               aria-label="Next month"
             >
               <i className="mdi mdi-chevron-right" aria-hidden />
-            </Button>
+            </button>
           </OverlayTrigger>
         </div>
       </Card.Header>
@@ -166,15 +160,13 @@ export function MonthSummarySection({
               </div>
             </div>
             <div
-              className="btn-group btn-group-sm"
+              className="period-toggle"
               role="group"
               aria-label="Select metric for month comparison chart"
             >
               <button
                 type="button"
-                className={`btn btn-outline-secondary ${
-                  metric === 'spending' ? 'active' : ''
-                }`}
+                className={`segment-btn${metric === 'spending' ? ' active' : ''}`}
                 onClick={() => setMetric('spending')}
                 aria-pressed={metric === 'spending'}
               >
@@ -182,9 +174,7 @@ export function MonthSummarySection({
               </button>
               <button
                 type="button"
-                className={`btn btn-outline-secondary ${
-                  metric === 'income' ? 'active' : ''
-                }`}
+                className={`segment-btn${metric === 'income' ? ' active' : ''}`}
                 onClick={() => setMetric('income')}
                 aria-pressed={metric === 'income'}
               >
@@ -192,9 +182,7 @@ export function MonthSummarySection({
               </button>
               <button
                 type="button"
-                className={`btn btn-outline-secondary ${
-                  metric === 'net' ? 'active' : ''
-                }`}
+                className={`segment-btn${metric === 'net' ? ' active' : ''}`}
                 onClick={() => setMetric('net')}
                 aria-pressed={metric === 'net'}
               >

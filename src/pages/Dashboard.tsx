@@ -401,9 +401,9 @@ export function Dashboard() {
               {staleHours}h old
             </span>
           )}
-          <Button
-            variant="outline-secondary"
-            size="sm"
+          <button
+            type="button"
+            className="btn-icon"
             onClick={handleManualSync}
             disabled={isSyncing}
             aria-busy={isSyncing}
@@ -423,7 +423,7 @@ export function Dashboard() {
             ) : (
               <i className="mdi mdi-sync" aria-hidden />
             )}
-          </Button>
+          </button>
         </div>
       </div>
       <Row className="g-3 mb-4" data-tour="balance-cards">

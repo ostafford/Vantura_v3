@@ -466,13 +466,16 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .form-control,
 .form-select {
   background-color: var(--vantura-surface);
-  border-color: var(--vantura-border);
+  border: none !important;
+  border-radius: 8px !important;
   color: var(--vantura-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: box-shadow 0.15s ease;
 }
 .form-control:focus,
 .form-select:focus {
   background-color: var(--vantura-surface);
-  border-color: var(--vantura-primary);
+  border: none !important;
   color: var(--vantura-text);
   box-shadow: 0 0 0 0.2rem
     color-mix(in srgb, var(--vantura-primary) 25%, transparent);
@@ -614,12 +617,40 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-text);
 }
 
+/* Dropdown toggle button — consistent radius */
+.dropdown-toggle {
+  border-radius: 8px !important;
+}
+.dropdown-toggle::after {
+  opacity: 0.6;
+}
+
+/* Global dropdown menu — dark surface, no border, elevated shadow */
+.dropdown-menu {
+  background-color: var(--vantura-surface);
+  border: none;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+}
+.dropdown-item {
+  color: var(--vantura-text);
+  border-radius: 7px;
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: color-mix(in srgb, var(--vantura-primary) 18%, transparent);
+  color: var(--vantura-text);
+}
+.dropdown-divider {
+  border-top-color: var(--vantura-border);
+}
+
 /* Transactions: category filter dropdown behavior */
 .transactions-category-menu {
   max-height: min(60vh, 26rem);
   overflow-y: auto;
-  background-color: var(--vantura-surface);
-  border-color: var(--vantura-border);
   color: var(--vantura-text);
 }
 .transactions-category-menu .dropdown-item .form-check {
@@ -724,11 +755,14 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 
 /* Phase 8: Purple React breadcrumb */
 .breadcrumb {
-  border: 1px solid var(--vantura-border);
-  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  padding: 0.3rem 0.75rem;
   margin-bottom: 0;
-  font-size: 0.875rem;
-  background: transparent;
+  font-size: 0.8rem;
 }
 .breadcrumb-item {
   color: var(--vantura-text-secondary);
@@ -736,15 +770,19 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .breadcrumb-item a {
   color: var(--vantura-primary);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 .breadcrumb-item a:hover {
-  text-decoration: underline;
+  color: var(--vantura-text);
+  text-decoration: none;
 }
 .breadcrumb-item.active {
   color: var(--vantura-text);
 }
 .breadcrumb-item + .breadcrumb-item::before {
+  content: '›';
   color: var(--vantura-text-secondary);
+  opacity: 0.5;
 }
 .icon-sm {
   font-size: 1rem;
@@ -1250,6 +1288,149 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border: 1px solid rgba(0, 0, 0, 0.2);
   color: var(--vantura-text-on-pastel);
   font-weight: 600;
+}
+
+/* ── Segmented period toggle (W/M/Y) ─────────────────────────────────────── */
+.period-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 1px;
+}
+
+.period-toggle .segment-btn {
+  border: none;
+  background: transparent;
+  color: var(--vantura-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.22rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.5;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.period-toggle .segment-btn:hover:not(.active) {
+  color: var(--vantura-text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.period-toggle .segment-btn.active {
+  background: var(--vantura-primary);
+  color: var(--vantura-text-on-pastel);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.35),
+    0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Borderless icon button ───────────────────────────────────────────────── */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  color: var(--vantura-text-secondary);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-icon:hover,
+.btn-icon:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+  color: var(--vantura-text);
+  text-decoration: none;
+  outline: none;
+}
+
+.btn-icon.btn-icon-primary {
+  color: var(--vantura-primary);
+  background: rgba(126, 184, 216, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
+.btn-icon.btn-icon-primary:hover,
+.btn-icon.btn-icon-primary:focus-visible {
+  background: rgba(126, 184, 216, 0.16);
+  box-shadow: 0 2px 6px rgba(126, 184, 216, 0.18);
+  color: var(--vantura-primary);
+}
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ── Global Bootstrap button softening ───────────────────────────────────── */
+/* Filled buttons — remove hard border, use shadow depth instead */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info,
+.btn-dark,
+.btn-light {
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: box-shadow 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-success:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
+.btn-warning:hover:not(:disabled),
+.btn-info:hover:not(:disabled),
+.btn-dark:hover:not(:disabled),
+.btn-light:hover:not(:disabled) {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+}
+
+/* Outline buttons — replace border with subtle filled tint */
+.btn-outline-primary:not(.month-summary-legend-toggle),
+.btn-outline-secondary:not(.month-summary-legend-toggle),
+.btn-outline-danger:not(.month-summary-legend-toggle),
+.btn-outline-warning:not(.month-summary-legend-toggle),
+.btn-outline-success:not(.month-summary-legend-toggle) {
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition:
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.btn-outline-primary:not(.month-summary-legend-toggle):hover:not(:disabled),
+.btn-outline-secondary:not(.month-summary-legend-toggle):hover:not(:disabled),
+.btn-outline-danger:not(.month-summary-legend-toggle):hover:not(:disabled),
+.btn-outline-warning:not(.month-summary-legend-toggle):hover:not(:disabled),
+.btn-outline-success:not(.month-summary-legend-toggle):hover:not(:disabled) {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+}
+
+/* Disabled state */
+.btn:not(.btn-link):not(.btn-close):disabled,
+.btn:not(.btn-link):not(.btn-close).disabled {
+  box-shadow: none !important;
 }
 
 /* Phase 8: Purple React navbar */

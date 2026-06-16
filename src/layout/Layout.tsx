@@ -62,6 +62,10 @@ export function Layout() {
   }, [])
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [location.pathname])
+
+  useEffect(() => {
     if (!isMobile) return
     setSidebarMobileOpen(false)
   }, [isMobile, location.pathname, setSidebarMobileOpen])

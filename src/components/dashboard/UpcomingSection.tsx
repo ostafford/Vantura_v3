@@ -8,7 +8,6 @@ import {
   Col,
   OverlayTrigger,
   Tooltip,
-  ButtonGroup,
 } from 'react-bootstrap'
 import {
   getUpcomingChargesGrouped,
@@ -118,25 +117,25 @@ function UpcomingCalendar({
   return (
     <div className="upcoming-calendar">
       <div className="d-flex justify-content-between align-items-center mb-2">
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
+          className="btn-icon"
           onClick={onPrevMonth}
           aria-label="Previous month"
         >
           <i className="mdi mdi-chevron-left" aria-hidden />
-        </Button>
+        </button>
         <span className="fw-medium">
           {MONTH_NAMES[month - 1]} {year}
         </span>
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
+          className="btn-icon"
           onClick={onNextMonth}
           aria-label="Next month"
         >
           <i className="mdi mdi-chevron-right" aria-hidden />
-        </Button>
+        </button>
       </div>
       <div className="d-flex flex-wrap small mb-1 text-muted">
         <span className="upcoming-calendar-dow">Mon</span>
@@ -428,24 +427,28 @@ export function UpcomingSection({
               <i className="mdi mdi-calendar-clock" aria-hidden />
             </span>
             <span>Upcoming transactions</span>
-            <ButtonGroup size="sm" className="ms-2">
-              <Button
-                variant={viewMode === 'list' ? 'primary' : 'outline-secondary'}
+            <div
+              className="period-toggle ms-2"
+              role="group"
+              aria-label="View mode"
+            >
+              <button
+                type="button"
+                className={`segment-btn${viewMode === 'list' ? ' active' : ''}`}
                 onClick={() => setViewMode('list')}
                 aria-pressed={viewMode === 'list'}
               >
                 List
-              </Button>
-              <Button
-                variant={
-                  viewMode === 'calendar' ? 'primary' : 'outline-secondary'
-                }
+              </button>
+              <button
+                type="button"
+                className={`segment-btn${viewMode === 'calendar' ? ' active' : ''}`}
                 onClick={() => setViewMode('calendar')}
                 aria-pressed={viewMode === 'calendar'}
               >
                 Calendar
-              </Button>
-            </ButtonGroup>
+              </button>
+            </div>
             <HelpPopover
               id="upcoming-help"
               title="Upcoming charges"
@@ -459,14 +462,14 @@ export function UpcomingSection({
               <Tooltip id="upcoming-add-tooltip">Add upcoming charge</Tooltip>
             }
           >
-            <Button
-              variant="primary"
-              size="sm"
+            <button
+              type="button"
+              className="btn-icon btn-icon-primary"
               onClick={openCreate}
               aria-label="Add upcoming charge"
             >
               <i className="mdi mdi-plus" aria-hidden />
-            </Button>
+            </button>
           </OverlayTrigger>
         </Card.Header>
         <Card.Body>

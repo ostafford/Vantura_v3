@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
   Card,
-  Button,
   Form,
   OverlayTrigger,
   Tooltip as BSTooltip,
@@ -258,7 +257,7 @@ export function AnalyticsAtAGlanceSection() {
         <div className="d-flex gap-2 align-items-center flex-wrap">
           <Link
             to="/analytics/reports"
-            className="btn btn-outline-secondary btn-sm"
+            className="btn-icon"
             aria-label="View monthly review"
           >
             <i className="mdi mdi-calendar-month" aria-hidden />
@@ -273,14 +272,14 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setYear((y) => y - 1)}
                   aria-label="Previous year"
                 >
                   <i className="mdi mdi-chevron-left" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -290,16 +289,15 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setYear(new Date().getFullYear())}
                   disabled={year === currentCalendarYear}
                   aria-label="Go to current period"
-                  aria-describedby="aag-year-today-tooltip"
                 >
                   <i className="mdi mdi-calendar-today" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -307,15 +305,15 @@ export function AnalyticsAtAGlanceSection() {
                   <BSTooltip id="aag-year-next-tooltip">Next year</BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setYear((y) => y + 1)}
                   disabled={year >= currentCalendarYear}
                   aria-label="Next year"
                 >
                   <i className="mdi mdi-chevron-right" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
             </>
           )}
@@ -329,14 +327,14 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setMonthOffset((o) => o - 1)}
                   aria-label="Previous month"
                 >
                   <i className="mdi mdi-chevron-left" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -346,16 +344,15 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setMonthOffset(0)}
                   disabled={monthOffset === 0}
                   aria-label="Go to current period"
-                  aria-describedby="aag-month-today-tooltip"
                 >
                   <i className="mdi mdi-calendar-today" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -363,15 +360,15 @@ export function AnalyticsAtAGlanceSection() {
                   <BSTooltip id="aag-month-next-tooltip">Next month</BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setMonthOffset((o) => o + 1)}
                   disabled={monthOffset >= 0}
                   aria-label="Next month"
                 >
                   <i className="mdi mdi-chevron-right" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
             </>
           )}
@@ -385,14 +382,14 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setWeekOffset((o) => o - 1)}
                   aria-label="Previous week"
                 >
                   <i className="mdi mdi-chevron-left" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -402,16 +399,15 @@ export function AnalyticsAtAGlanceSection() {
                   </BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setWeekOffset(0)}
                   disabled={weekOffset === 0}
                   aria-label="Go to current period"
-                  aria-describedby="aag-week-today-tooltip"
                 >
                   <i className="mdi mdi-calendar-today" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
               <OverlayTrigger
                 placement="top"
@@ -419,15 +415,15 @@ export function AnalyticsAtAGlanceSection() {
                   <BSTooltip id="aag-week-next-tooltip">Next week</BSTooltip>
                 }
               >
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="btn-icon"
                   onClick={() => setWeekOffset((o) => o + 1)}
                   disabled={weekOffset >= 0}
                   aria-label="Next week"
                 >
                   <i className="mdi mdi-chevron-right" aria-hidden />
-                </Button>
+                </button>
               </OverlayTrigger>
             </>
           )}
@@ -458,15 +454,13 @@ export function AnalyticsAtAGlanceSection() {
                   </div>
                 </div>
                 <div
-                  className="btn-group btn-group-sm"
+                  className="period-toggle"
                   role="group"
                   aria-label="Select metric for year chart"
                 >
                   <button
                     type="button"
-                    className={`btn btn-outline-secondary ${
-                      metric === 'spending' ? 'active' : ''
-                    }`}
+                    className={`segment-btn${metric === 'spending' ? ' active' : ''}`}
                     onClick={() => setMetric('spending')}
                     aria-pressed={metric === 'spending'}
                   >
@@ -474,9 +468,7 @@ export function AnalyticsAtAGlanceSection() {
                   </button>
                   <button
                     type="button"
-                    className={`btn btn-outline-secondary ${
-                      metric === 'income' ? 'active' : ''
-                    }`}
+                    className={`segment-btn${metric === 'income' ? ' active' : ''}`}
                     onClick={() => setMetric('income')}
                     aria-pressed={metric === 'income'}
                   >
@@ -484,9 +476,7 @@ export function AnalyticsAtAGlanceSection() {
                   </button>
                   <button
                     type="button"
-                    className={`btn btn-outline-secondary ${
-                      metric === 'net' ? 'active' : ''
-                    }`}
+                    className={`segment-btn${metric === 'net' ? ' active' : ''}`}
                     onClick={() => setMetric('net')}
                     aria-pressed={metric === 'net'}
                   >
@@ -605,15 +595,13 @@ export function AnalyticsAtAGlanceSection() {
                 </div>
               </div>
               <div
-                className="btn-group btn-group-sm"
+                className="period-toggle"
                 role="group"
                 aria-label="Select metric for month comparison chart"
               >
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'spending' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'spending' ? ' active' : ''}`}
                   onClick={() => setMetric('spending')}
                   aria-pressed={metric === 'spending'}
                 >
@@ -621,9 +609,7 @@ export function AnalyticsAtAGlanceSection() {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'income' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'income' ? ' active' : ''}`}
                   onClick={() => setMetric('income')}
                   aria-pressed={metric === 'income'}
                 >
@@ -631,9 +617,7 @@ export function AnalyticsAtAGlanceSection() {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'net' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'net' ? ' active' : ''}`}
                   onClick={() => setMetric('net')}
                   aria-pressed={metric === 'net'}
                 >
@@ -741,15 +725,13 @@ export function AnalyticsAtAGlanceSection() {
                 </div>
               </div>
               <div
-                className="btn-group btn-group-sm"
+                className="period-toggle"
                 role="group"
                 aria-label="Select metric for week comparison chart"
               >
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'spending' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'spending' ? ' active' : ''}`}
                   onClick={() => setMetric('spending')}
                   aria-pressed={metric === 'spending'}
                 >
@@ -757,9 +739,7 @@ export function AnalyticsAtAGlanceSection() {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'income' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'income' ? ' active' : ''}`}
                   onClick={() => setMetric('income')}
                   aria-pressed={metric === 'income'}
                 >
@@ -767,9 +747,7 @@ export function AnalyticsAtAGlanceSection() {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-outline-secondary ${
-                    metric === 'net' ? 'active' : ''
-                  }`}
+                  className={`segment-btn${metric === 'net' ? ' active' : ''}`}
                   onClick={() => setMetric('net')}
                   aria-pressed={metric === 'net'}
                 >

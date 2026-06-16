@@ -159,7 +159,7 @@ export function InsightsSection({
     <>
       <Link
         to="/analytics/reports"
-        className="btn btn-outline-secondary btn-sm"
+        className="btn-icon"
         aria-label="View insights analytics"
       >
         <i className="mdi mdi-chart-box" aria-hidden />
@@ -170,14 +170,14 @@ export function InsightsSection({
           <BSTooltip id="insights-prev-tooltip">Previous week</BSTooltip>
         }
       >
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
+          className="btn-icon"
           onClick={() => setWeekOffset((o) => o - 1)}
           aria-label="Previous week"
         >
           <i className="mdi mdi-chevron-left" aria-hidden />
-        </Button>
+        </button>
       </OverlayTrigger>
       <OverlayTrigger
         placement="top"
@@ -187,29 +187,29 @@ export function InsightsSection({
           </BSTooltip>
         }
       >
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
+          className="btn-icon"
           onClick={() => setWeekOffset(0)}
           disabled={weekOffset === 0}
           aria-label="Go to current period"
         >
           <i className="mdi mdi-calendar-today" aria-hidden />
-        </Button>
+        </button>
       </OverlayTrigger>
       <OverlayTrigger
         placement="top"
         overlay={<BSTooltip id="insights-next-tooltip">Next week</BSTooltip>}
       >
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
+          className="btn-icon"
           onClick={() => setWeekOffset((o) => o + 1)}
           disabled={weekOffset >= 0}
           aria-label="Next week"
         >
           <i className="mdi mdi-chevron-right" aria-hidden />
-        </Button>
+        </button>
       </OverlayTrigger>
     </>
   )
