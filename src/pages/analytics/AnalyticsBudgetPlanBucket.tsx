@@ -354,7 +354,7 @@ function AddTrackerModal({
 }: AddTrackerModalProps) {
   const allTrackers: TrackerPickerItem[] = useMemo(
     () => (show ? getTrackersForPicker() : []),
-     
+
     [show]
   )
 
