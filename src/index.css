@@ -1735,6 +1735,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 /* Phase 8: Purple React form inputs */
+/* Prevent iOS Safari auto-zoom on input focus (triggers when font-size < 16px) */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  textarea,
+  select,
+  .form-control,
+  .form-select {
+    font-size: 16px !important;
+  }
+}
+
 .form-control {
   border-radius: 2px;
 }
