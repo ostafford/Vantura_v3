@@ -246,6 +246,9 @@ export function Settings() {
   )
   const [bioRegistering, setBioRegistering] = useState(false)
   const [bioError, setBioError] = useState<string | null>(null)
+  const [lockTimeout, setLockTimeout] = useState(
+    () => getAppSetting('lock_timeout_minutes') ?? '3'
+  )
 
   const sectionKeys = getSettingsSectionKeys()
   const { activeSection, selectSection } = useSplitNavSection({
@@ -893,10 +896,34 @@ export function Settings() {
               {activeSection === 'security' && (
                 <>
                   <p className="small text-muted mb-3">
-                    Vantura locks automatically after 3 minutes of inactivity.
+                    Vantura locks automatically after a period of inactivity.
                     With biometrics enabled, Touch ID or Face ID can unlock the
                     app instead of your passphrase.
                   </p>
+                  <Form.Group className="mb-4">
+                    <Form.Label htmlFor="settings-lock-timeout">
+                      Lock after inactivity
+                    </Form.Label>
+                    <Form.Select
+                      id="settings-lock-timeout"
+                      value={lockTimeout}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setLockTimeout(val)
+                        setAppSetting('lock_timeout_minutes', val)
+                        toast.success('Lock timeout updated.')
+                      }}
+                      style={{ maxWidth: 200 }}
+                    >
+                      <option value="1">1 minute</option>
+                      <option value="3">3 minutes</option>
+                      <option value="5">5 minutes</option>
+                      <option value="10">10 minutes</option>
+                      <option value="15">15 minutes</option>
+                      <option value="30">30 minutes</option>
+                    </Form.Select>
+                  </Form.Group>
+                  <hr className="mb-4" />
                   {bioAvailable === false && (
                     <div
                       className="alert alert-secondary small mb-3"

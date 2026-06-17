@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useRef } from 'react'
+import { useState, FormEvent } from 'react'
 import { Alert, Button, Card, Form, Spinner } from 'react-bootstrap'
 import { useStore } from 'zustand'
 import { getAppSetting, setAppSetting } from '@/db'
@@ -21,42 +21,35 @@ export function Unlock() {
   const [passphrase, setPassphrase] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState<Mode>('passphrase')
   const [bioPrompting, setBioPrompting] = useState(false)
   const setUnlocked = useStore(sessionStore, (s) => s.setUnlocked)
-  const didAutoTrigger = useRef(false)
 
   const isDemoMode = getAppSetting('demo_mode') === '1'
   const credentialId = getAppSetting('biometric_credential_id')
   const bioDisabled = getAppSetting('biometrics_enabled') === '0'
+  const canUseBiometric =
+    !bioDisabled && !!credentialId && hasBiometricSession()
 
-  useEffect(() => {
-    if (isDemoMode || bioDisabled || !credentialId || didAutoTrigger.current)
-      return
-    if (!hasBiometricSession()) return
-    didAutoTrigger.current = true
-    setMode('biometric')
-    triggerBiometric(credentialId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [mode, setMode] = useState<Mode>(
+    !isDemoMode && canUseBiometric ? 'biometric' : 'passphrase'
+  )
 
-  async function triggerBiometric(credId: string) {
+  async function triggerBiometric() {
+    if (!credentialId) return
     setBioPrompting(true)
     setError(null)
     try {
-      const ok = await verifyBiometric(credId)
+      const ok = await verifyBiometric(credentialId)
       if (!ok) throw new Error('Verification returned false')
       const token = await retrieveBiometricSession()
       if (!token) throw new Error('Session expired')
       setUnlocked(token)
     } catch (err) {
       const name = err instanceof Error ? err.name : ''
-      if (name === 'NotAllowedError') {
-        setMode('passphrase')
-      } else {
+      if (name !== 'NotAllowedError') {
         setError('Biometric check failed. Use your passphrase instead.')
-        setMode('passphrase')
       }
+      setMode('passphrase')
     } finally {
       setBioPrompting(false)
     }
@@ -92,41 +85,43 @@ export function Unlock() {
       <div className="auth-full-bg">
         <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
           <Card.Body className="text-center">
-            <Card.Title className="mb-3">Unlock Vantura</Card.Title>
-            {bioPrompting ? (
-              <>
-                <Spinner animation="border" className="mb-3" role="status" />
-                <p className="text-muted small mb-3">
-                  Waiting for biometric confirmation…
-                </p>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
-                  <i className="mdi mdi-fingerprint" aria-hidden />
-                </div>
-                <p className="text-muted small mb-3">
-                  Use Touch ID or Face ID to unlock.
-                </p>
-                {error && (
-                  <Alert
-                    variant="danger"
-                    className="py-2 mb-3 text-center"
-                    role="alert"
-                  >
-                    {error}
-                  </Alert>
-                )}
-                <Button
-                  type="button"
-                  className="btn-gradient-primary mb-2"
-                  onClick={() => credentialId && triggerBiometric(credentialId)}
-                  disabled={bioPrompting}
-                >
-                  Unlock with biometrics
-                </Button>
-              </>
+            <Card.Title className="mb-3">Vantura is locked</Card.Title>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
+              <i className="mdi mdi-fingerprint" aria-hidden />
+            </div>
+            <p className="text-muted small mb-3">
+              Tap the button below to unlock with Touch ID or Face ID.
+            </p>
+            {error && (
+              <Alert
+                variant="danger"
+                className="py-2 mb-3 text-center"
+                role="alert"
+              >
+                {error}
+              </Alert>
             )}
+            <Button
+              type="button"
+              className="btn-gradient-primary mb-3"
+              onClick={triggerBiometric}
+              disabled={bioPrompting}
+            >
+              {bioPrompting ? (
+                <>
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    className="me-1"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Waiting…
+                </>
+              ) : (
+                'Unlock with biometrics'
+              )}
+            </Button>
             <div>
               <button
                 type="button"
@@ -196,7 +191,7 @@ export function Unlock() {
             stored.
           </Card.Text>
           <Form onSubmit={handleSubmit}>
-            {/* Hidden username field for a11y / password-manager heuristic (single passphrase form) */}
+            {/* Hidden username field for a11y / password-manager heuristic */}
             <input
               id="unlock-username"
               type="text"
@@ -249,7 +244,7 @@ export function Unlock() {
               </Button>
             </div>
           </Form>
-          {credentialId && !bioDisabled && (
+          {canUseBiometric && (
             <div className="text-center mt-3">
               <button
                 type="button"
@@ -257,9 +252,6 @@ export function Unlock() {
                 onClick={() => {
                   setMode('biometric')
                   setError(null)
-                  if (hasBiometricSession()) {
-                    triggerBiometric(credentialId)
-                  }
                 }}
               >
                 Use biometrics instead

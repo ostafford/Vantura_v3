@@ -1,7 +1,18 @@
 import { useEffect, useRef } from 'react'
 import { sessionStore } from '@/stores/sessionStore'
+import { getAppSetting } from '@/db'
 
-const INACTIVITY_MS = 3 * 60 * 1000
+const DEFAULT_TIMEOUT_MINUTES = 3
+
+function getLockTimeoutMs(): number {
+  const raw = getAppSetting('lock_timeout_minutes')
+  const minutes = raw ? parseInt(raw, 10) : DEFAULT_TIMEOUT_MINUTES
+  return (
+    (Number.isNaN(minutes) || minutes < 1 ? DEFAULT_TIMEOUT_MINUTES : minutes) *
+    60 *
+    1000
+  )
+}
 
 export function useInactivityLock(active: boolean) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -13,7 +24,7 @@ export function useInactivityLock(active: boolean) {
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(
         () => sessionStore.getState().lock(),
-        INACTIVITY_MS
+        getLockTimeoutMs()
       )
     }
 
