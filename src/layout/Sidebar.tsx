@@ -58,6 +58,12 @@ export function Sidebar({
       icon: 'mdi-book-open-page-variant',
       short: 'H',
     },
+    {
+      to: '/changelog',
+      label: "What's new",
+      icon: 'mdi-rocket-launch-outline',
+      short: 'N',
+    },
   ]
 
   return (

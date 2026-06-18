@@ -12,6 +12,7 @@ import { AnalyticsBudgetPlan } from '@/pages/analytics/AnalyticsBudgetPlan'
 import { AnalyticsBudgetPlanBucket } from '@/pages/analytics/AnalyticsBudgetPlanBucket'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
+import { Changelog } from '@/pages/Changelog'
 import { SaverAccountTransactionsRedirect } from '@/routing/SaverAccountTransactionsRedirect'
 import type { AppRouteHandle } from '@/types/appRouteHandle'
 
@@ -144,6 +145,7 @@ export const appRouter = createBrowserRouter(
         },
         { path: 'settings', element: <Settings /> },
         { path: 'help', element: <Help /> },
+        { path: 'changelog', element: <Changelog /> },
       ],
     },
   ],

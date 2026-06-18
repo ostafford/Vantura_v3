@@ -685,6 +685,17 @@ export function Settings() {
                     >
                       User guide
                     </Link>
+                    <Link
+                      to="/changelog"
+                      className="btn btn-outline-primary btn-sm"
+                      aria-label="See what's new"
+                    >
+                      <i
+                        className="mdi mdi-rocket-launch-outline me-1"
+                        aria-hidden
+                      />
+                      What&apos;s new
+                    </Link>
                     <Button
                       variant="outline-primary"
                       size="sm"

@@ -1,4 +1,5 @@
 import { Form } from 'react-bootstrap'
+import { Link } from 'react-router-dom'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 
@@ -778,6 +779,20 @@ export function Help() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-top d-flex align-items-center gap-2 small text-muted">
+        <i
+          className="mdi mdi-rocket-launch-outline"
+          style={{ color: 'var(--vantura-primary)' }}
+          aria-hidden
+        />
+        <span>
+          Curious what&apos;s been built?{' '}
+          <Link to="/changelog" style={{ color: 'var(--vantura-primary)' }}>
+            See what&apos;s new in Vantura
+          </Link>
+        </span>
       </div>
     </div>
   )
