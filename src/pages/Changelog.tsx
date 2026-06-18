@@ -378,18 +378,20 @@ export function Changelog({ isPublic = false }: ChangelogProps) {
 
   return (
     <div>
-      <div className="page-header">
-        <h3 className="page-title">
-          <span className="page-title-icon bg-gradient-primary text-white mr-2">
-            <i className="mdi mdi-rocket-launch-outline" aria-hidden />
-          </span>
-          What&apos;s new
-        </h3>
-        {!isPublic && (
-          <PageBreadcrumb
-            items={[{ label: 'Dashboard', to: '/' }, { label: "What's new" }]}
-          />
-        )}
+      <div className="sticky-toolbar">
+        <div className="page-header" style={{ margin: 0 }}>
+          <h3 className="page-title">
+            <span className="page-title-icon bg-gradient-primary text-white mr-2">
+              <i className="mdi mdi-rocket-launch-outline" aria-hidden />
+            </span>
+            What&apos;s new
+          </h3>
+          {!isPublic && (
+            <PageBreadcrumb
+              items={[{ label: 'Dashboard', to: '/' }, { label: "What's new" }]}
+            />
+          )}
+        </div>
       </div>
 
       {/* ── Stat bar ────────────────────────────────────────────────── */}

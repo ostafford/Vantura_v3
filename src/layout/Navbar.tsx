@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Button, Spinner } from 'react-bootstrap'
 import { useStore } from 'zustand'
 import { uiStore } from '@/stores/uiStore'
@@ -8,6 +9,7 @@ import { getAppSetting } from '@/db'
 import { performSync } from '@/services/sync'
 import { toast } from '@/stores/toastStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
+import { VanturaLogo } from '@/components/VanturaLogo'
 
 interface NavbarProps {
   sidebarCollapsed: boolean
@@ -91,30 +93,28 @@ export function Navbar({
           aria-label={isMobile ? 'Open menu' : 'Toggle sidebar'}
           aria-expanded={isMobile ? sidebarMobileOpen : undefined}
         >
-          <svg
-            className="navbar-menu-icon"
-            xmlns="http://www.w3.org/2000/svg"
-            width="1.5em"
-            height="1.5em"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden
-          >
-            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-          </svg>
+          <VanturaLogo variant="icon" height={36} />
         </button>
       </div>
       {sidebarCollapsed && !isMobile && (
-        <span className="navbar-collapsed-brand" aria-hidden>
-          <span className="navbar-brand-text">VANTURA</span>
+        <Link
+          to="/"
+          className="navbar-collapsed-brand"
+          aria-label="Go to dashboard"
+        >
+          <VanturaLogo variant="text" height={28} />
           {isDemoMode && <span className="navbar-demo-badge">DEMO</span>}
-        </span>
+        </Link>
       )}
       {isMobile && !sidebarMobileOpen && (
-        <span className="navbar-mobile-brand" aria-hidden>
-          <span className="navbar-brand-text">VANTURA</span>
+        <Link
+          to="/"
+          className="navbar-mobile-brand"
+          aria-label="Go to dashboard"
+        >
+          <VanturaLogo variant="text" height={28} />
           {isDemoMode && <span className="navbar-demo-badge">DEMO</span>}
-        </span>
+        </Link>
       )}
       <div className="navbar-menu-wrapper">
         <div className="ms-auto d-flex flex-column align-items-end gap-1">

@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react'
-import { Button, Card, Form, ProgressBar } from 'react-bootstrap'
+import { VanturaLogo } from '@/components/VanturaLogo'
+import { Button, Card, Form } from 'react-bootstrap'
 import { setAppSetting, getAppSetting } from '@/db'
 import { sessionStore } from '@/stores/sessionStore'
 import { seedDemoData } from '@/db/seedDemoData'
@@ -155,25 +156,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     <div className="auth-full-bg">
       <Card style={{ width: '100%', maxWidth: 480 }} className="auth-card">
         <Card.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <Card.Title className="mb-0">Setup</Card.Title>
-            <span className="text-muted small">
-              Step {step} of {STEPS}
-            </span>
-          </div>
-          <ProgressBar
-            now={(step / STEPS) * 100}
-            variant="primary"
-            striped
-            animated
-            className="mb-3"
-          />
-
           {step === 1 && (
             <>
               {/* Brand mark */}
               <div className="onboarding-brand-mark mb-3">
-                <i className="mdi mdi-chart-line" aria-hidden />
+                <VanturaLogo variant="icon" height={64} />
               </div>
 
               {/* "What's new" discovery chip — above the heading */}
@@ -542,6 +529,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </Button>
             </>
           )}
+          <div className="onboarding-step-dots">
+            {Array.from({ length: STEPS }, (_, i) => (
+              <span
+                key={i}
+                className={`onboarding-step-dot ${i + 1 < step ? 'completed' : ''} ${i + 1 === step ? 'active' : ''}`}
+              />
+            ))}
+          </div>
         </Card.Body>
       </Card>
     </div>

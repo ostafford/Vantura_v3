@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { sessionStore } from '@/stores/sessionStore'
 import { uiStore } from '@/stores/uiStore'
 import { getAppSetting } from '@/db'
+import { VanturaLogo } from '@/components/VanturaLogo'
 
 const SIDEBAR_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 70
@@ -90,7 +91,7 @@ export function Sidebar({
         <div className="sidebar-brand">
           {showLabels && (
             <div className="sidebar-brand-block">
-              <span className="brand-text">Vantura</span>
+              <VanturaLogo variant="icon" height={44} />
               {isDemoMode && (
                 <span className="sidebar-demo-badge" aria-hidden>
                   DEMO
@@ -105,11 +106,19 @@ export function Sidebar({
           className="sidebar-brand sidebar-brand-btn"
           onClick={() => uiStore.getState().toggleSidebar()}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={
+            showLabels
+              ? { position: 'relative', justifyContent: 'center' }
+              : undefined
+          }
         >
           {showLabels ? (
             <>
-              <div className="sidebar-brand-block">
-                <span className="brand-text">Vantura</span>
+              <div
+                className="sidebar-brand-block"
+                style={{ alignItems: 'center' }}
+              >
+                <VanturaLogo variant="icon" height={44} />
                 {isDemoMode && (
                   <span className="sidebar-demo-badge" aria-hidden>
                     DEMO
@@ -119,13 +128,11 @@ export function Sidebar({
               <i
                 className="mdi mdi-chevron-left sidebar-brand-icon"
                 aria-hidden
+                style={{ position: 'absolute', right: '1.25rem' }}
               />
             </>
           ) : (
-            <i
-              className="mdi mdi-chevron-right sidebar-brand-icon"
-              aria-hidden
-            />
+            <VanturaLogo variant="icon" height={44} />
           )}
         </button>
       )}

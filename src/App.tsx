@@ -6,6 +6,7 @@ import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
 import { accentStore } from '@/stores/accentStore'
 import { sessionStore } from '@/stores/sessionStore'
 import { ToastProvider } from '@/components/ToastProvider'
+import { VanturaLogo } from '@/components/VanturaLogo'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
 import { Changelog } from '@/pages/Changelog'
@@ -23,8 +24,7 @@ function ChangelogPublicShell() {
     <div className="changelog-public-shell">
       <header className="changelog-public-header">
         <div className="changelog-public-brand">
-          <i className="mdi mdi-rocket-launch-outline" aria-hidden />
-          <span>Vantura</span>
+          <VanturaLogo variant="wordmark" height={32} />
         </div>
         <a
           href={import.meta.env.BASE_URL || '/'}
@@ -143,8 +143,8 @@ function AppContent() {
     )
   }
 
-  // Allow /changelog to load without auth — it contains no user data
-  if (IS_CHANGELOG_PUBLIC_PATH && (!onboardingComplete || !unlocked)) {
+  // Allow /changelog to load without auth only for non-onboarded users
+  if (IS_CHANGELOG_PUBLIC_PATH && !onboardingComplete) {
     return <ChangelogPublicShell />
   }
 

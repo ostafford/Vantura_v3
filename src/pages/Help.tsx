@@ -92,16 +92,18 @@ export function Help() {
 
   return (
     <div>
-      <div className="page-header">
-        <h3 className="page-title">
-          <span className="page-title-icon bg-gradient-primary text-white mr-2">
-            <i className="mdi mdi-book-open-page-variant" aria-hidden />
-          </span>
-          User guide
-        </h3>
-        <PageBreadcrumb
-          items={[{ label: 'Dashboard', to: '/' }, { label: 'User guide' }]}
-        />
+      <div className="sticky-toolbar">
+        <div className="page-header" style={{ margin: 0 }}>
+          <h3 className="page-title">
+            <span className="page-title-icon bg-gradient-primary text-white mr-2">
+              <i className="mdi mdi-book-open-page-variant" aria-hidden />
+            </span>
+            User guide
+          </h3>
+          <PageBreadcrumb
+            items={[{ label: 'Dashboard', to: '/' }, { label: 'User guide' }]}
+          />
+        </div>
       </div>
 
       <div className="settings-layout">

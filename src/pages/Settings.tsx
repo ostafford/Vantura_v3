@@ -608,16 +608,18 @@ export function Settings() {
 
   return (
     <div>
-      <div className="page-header">
-        <h3 className="page-title">
-          <span className="page-title-icon">
-            <i className="mdi mdi-cog" aria-hidden />
-          </span>
-          Settings
-        </h3>
-        <PageBreadcrumb
-          items={[{ label: 'Dashboard', to: '/' }, { label: 'Settings' }]}
-        />
+      <div className="sticky-toolbar">
+        <div className="page-header" style={{ margin: 0 }}>
+          <h3 className="page-title">
+            <span className="page-title-icon">
+              <i className="mdi mdi-cog" aria-hidden />
+            </span>
+            Settings
+          </h3>
+          <PageBreadcrumb
+            items={[{ label: 'Dashboard', to: '/' }, { label: 'Settings' }]}
+          />
+        </div>
       </div>
 
       <div className="settings-layout">

@@ -122,6 +122,19 @@ The initial build established the full technical foundation: local-first storage
 
 ---
 
+### Brand Identity & Onboarding Polish — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 18 | **Vantura cipher monogram logo** — Designed from scratch: N + P paths that simultaneously read as V, A, N, T, U, R, A; white-to-accent gradient driven by user's accent colour selection; three variants (icon, wordmark, text); implemented in sidebar, navbar, onboarding, public changelog shell, and favicon |
+| Jun 18 | **Onboarding page redesign** — Progress bar replaced with animated step dots at the bottom; "Setup" title removed; brand mark circle (dark background, no border); deeper input and button shadows for dark theme clarity |
+| Jun 18 | **Sticky page headers** — What's new, User Guide, and Settings pages now have sticky headers matching the Analytics pattern; solid border replaced with soft shadow across all sticky toolbars |
+| Jun 18 | **Bug fix: public changelog shell** — Fixed race condition where authenticated users reloading on `/changelog` were shown the public shell instead of the unlock screen |
+| Jun 18 | **PWA manifest corrected** — Icon updated from Vite default to Vantura logo; `theme_color` and `background_color` set to dark theme (`#1a142d`); apple-touch-icon added to `index.html` |
+| Jun 18 | **Repo hygiene** — Stale planning doc removed; `public/vite.svg` deleted; Husky pre-commit updated to v9 format |
+
+---
+
 ### Documentation & UX Polish — June 2026
 
 | Date | Feature |
@@ -144,6 +157,8 @@ Features that have been discussed or noted as potential future additions. Nothin
 - **Tags / custom labels** — User-defined transaction tags for finer categorisation beyond Up Bank's category tree
 - **Saver round-up tracking** — Dedicated view for Loose Change saver accumulation over time
 - **Android / desktop PWA polish** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
+- **Logo gradient on favicon** — Static `logo-icon.svg` uses neutral silver gradient; future work to generate per-accent favicons or use a Canvas-based approach
+- **Onboarding button layout** — Full-width primary CTA with quieter secondary link; deferred from June 18 session
 
 ---
 
