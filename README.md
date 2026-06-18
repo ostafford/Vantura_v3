@@ -42,7 +42,7 @@ User- and developer-visible changes are listed in [CHANGELOG.md](CHANGELOG.md). 
 ### Phase 5: Polish — Complete
 
 - **Responsive (13"-27" desktop; mobile/portrait ≤768px):** Max-width 1400px; sidebar auto-collapses below 1280px; below 768px sidebar is an overlay drawer and content is full width. Vertical bar charts and card-based lists on mobile for better portrait use. Desktop horizontal bar charts (Weekly insights) use D3-based components with estimated axis label space for a compact left axis (`src/components/charts/InsightsBarChart.tsx`, `src/lib/chartLabelSpace.ts`). Error boundary; DB/persist error handling; loading states. Paginated transactions (50 per page). PWA (service worker, manifest, installable). See `src/layout/Layout.tsx`, `src/components/ErrorBoundary.tsx`, `vite.config.ts`.
-- **Help page (user guide at `/help`) and optional dashboard tour (first-time and re-runnable from Settings):** tour covers balance cards, Trackers, Weekly insights, Upcoming charges, navigation (Analytics and other pages), and Lock. See `src/lib/dashboardTour.ts`.
+- **Help page (user guide at `/help`) and optional dashboard tour (first-time and re-runnable from Settings):** tour covers Welcome → Balance cards → the 4 Dashboard sections in the user's current order (Month at a glance, Weekly insights, Trackers, Upcoming charges) → Navigation → Lock. Section steps adapt to match the user's saved section order. See `src/lib/dashboardTour.ts`.
 
 ### Phase 6: Deployment — Implemented
 
@@ -52,14 +52,19 @@ User- and developer-visible changes are listed in [CHANGELOG.md](CHANGELOG.md). 
 
 - **Maybuys wishlist:** Add items you're considering buying (name, price, optional URL and notes). A "days thinking" timer nudges you toward an intentional decision — mark each item as Bought or Skip it to move it to History with a days-held count. Optionally link a Saver to see how much you've already set aside. A reorderable Dashboard card previews up to 3 pending items. Full page at `/analytics/maybuys`. See `src/services/maybuys.ts`, `src/components/dashboard/MaybuySection.tsx`, `src/pages/analytics/AnalyticsMaybuys.tsx`.
 
+### Budget Plan — Implemented
+
+- **Budget Plan (`/analytics/budget`):** Organise expenses into named buckets (e.g. Subscriptions, Household, Lifestyle). Each bucket holds upcoming charges and optional hypothetical lines (marked with a flask icon) for "what if?" scenarios. The summary footer shows Income, total Committed spend, and Free Spending. Income figure requires pay amount to be set in Settings → Payday. Periods: weekly, fortnightly, monthly. See `src/services/budgetBuckets.ts`, `src/pages/analytics/AnalyticsBudgetPlan.tsx`, `src/pages/analytics/AnalyticsBudgetPlanBucket.tsx`.
+
 ### Phase 7: Settings — Implemented
 
 - **Settings page:** Re-sync (button, Last synced, error state); theme and accent colour options; "Show dashboard tour again" button; Clear all data (confirmation; deletes database, reloads to Onboarding). See `src/pages/Settings.tsx`, `src/db/index.ts`.
 - **Profile export/import:** Export whitelisted settings (theme, accent, payday and pay amount, spendable alerts, dashboard section order, insights category colours, dashboard tour state), plus trackers and upcoming charges, to a passphrase-encrypted file; import on another device. No transactions, API tokens, or bank data are ever exported. See Settings > Data section and `src/services/profileExport.ts`.
+- **Biometric unlock:** Touch ID / Face ID unlock via WebAuthn (Settings → Security). Once enrolled, the passphrase-derived key is cached in the browser credential store and recalled on unlock. Falls back to passphrase if biometrics are unavailable. Configurable inactivity lock timeout (1–30 minutes, default 3). See `src/lib/webauthn.ts`, `src/hooks/useInactivityLock.ts`, `src/pages/Unlock.tsx`.
 
 ## Security
 
-Data is stored locally in your browser (IndexedDB). Your Up Bank API token is encrypted with a key derived from your passphrase (PBKDF2 + AES-GCM); the passphrase is never stored. No secrets are committed to the repo. See [SECURITY.md](SECURITY.md) for details and how to report a vulnerability.
+Data is stored locally in your browser (IndexedDB). Your Up Bank API token is encrypted with a key derived from your passphrase (PBKDF2 + AES-GCM); the passphrase is never stored. Biometric unlock (Touch ID / Face ID) is available via WebAuthn as an optional convenience — it does not replace the passphrase. No secrets are committed to the repo. See [SECURITY.md](SECURITY.md) for details and how to report a vulnerability.
 
 ## Setup
 
