@@ -1,0 +1,150 @@
+# Vantura — Roadmap
+
+A timeline of everything built, when it shipped, and what's under consideration next.
+
+---
+
+## Shipped
+
+### Foundation — February 2026
+
+The initial build established the full technical foundation: local-first storage, encryption, Up Bank sync, and the core dashboard.
+
+| Date | Feature |
+|------|---------|
+| Feb 11 | Initial commit — project scaffolded (React, TypeScript, Vite, sql.js, IndexedDB) |
+| Feb 16 | **Onboarding wizard** — 6-step flow: welcome, passphrase creation, API token (validated + encrypted), payday schedule, initial sync with progress bar, completion |
+| Feb 16 | **Encryption & unlock** — API token encrypted with passphrase-derived key (PBKDF2 100k iterations, AES-GCM 256-bit); passphrase never stored; unlock screen on every app open |
+| Feb 16 | **Up Bank sync** — Initial and incremental sync; cursor-based pagination; rate limiting |
+| Feb 16 | **Dashboard** — Balance cards (Available, Spendable), Weekly insights, Trackers, Upcoming charges, Savers |
+| Feb 16 | **Spendable balance** — Available minus prorated upcoming charges due before next payday |
+| Feb 16 | **Trackers** — Budget categories with weekly / fortnightly / monthly / payday reset cycles; progress bar and days-to-reset |
+| Feb 16 | **Weekly insights** — Money in, money out, saver movement, category breakdown |
+| Feb 16 | **Upcoming charges** — Manual entry with frequency, due date, and Include in Spendable toggle |
+| Feb 16 | **Transactions** — Full history with date/category/amount/search filters, sort, date grouping, round-up linking |
+| Feb 16 | **Settings** — Re-sync, theme toggle, Update API token, Clear all data |
+| Feb 16 | **GitHub Pages deployment** — GitHub Actions CI/CD; SPA routing via `404.html` |
+
+---
+
+### Polish & Tooling — February 2026
+
+| Date | Feature |
+|------|---------|
+| Feb 17 | Weekly insights formula refinements — UTC date fix, payday alignment |
+| Feb 18 | Re-sync improvements and transaction list UI |
+| Feb 20 | Payday settings update and UI refinements |
+| Feb 23 | **Help page** — User guide at `/help` with sections for all core features |
+| Feb 23 | **Quality gates** — `typecheck`, `format:check`, `validate` scripts; CI runs checks before build |
+| Feb 25 | **Demo mode** — "Try with sample data" on onboarding; DEMO badge in navbar and sidebar; no Up Bank token required |
+| Feb 25 | **Tracker period navigation** — Previous/Next chevron icons with tooltips at all viewport widths |
+| Feb 25 | **Tracker badge colours** — Optional colour per tracker (schema migration) |
+| Feb 25 | **Mobile / portrait layout** — Sidebar becomes overlay drawer below 768px; vertical bar charts; card-based lists on mobile |
+| Feb 27 | **D3 bar charts** — Weekly insights and Savers charts rebuilt with D3.js; estimated axis label space for compact left axis |
+| Feb 27 | **Weekly insights category colours** — Click a category bar to set a persistent colour; applies across all weeks |
+
+---
+
+### Analytics & Navigation — March–April 2026
+
+| Date | Feature |
+|------|---------|
+| Mar 17 | **Month at a glance** — Line chart (current vs. previous month), key metrics, narrative summary; drag-and-drop section reorder |
+| Mar 18 | Responsive design fixes |
+| Mar 21 | Settings and user guide UI overhaul |
+| Mar 24 | Need vs Want feature (Beta v1) — experimental deliberate-spending tracker |
+| Mar 25 | Dashboard card UI refinements |
+| Apr 1  | Need vs Want removed; card UI updated |
+| Apr 3  | 50/30/20 budget feature removed; Plan/Goals workspace removed; legacy URLs redirected |
+| Apr 5  | **Year at a glance** — Full-year spending summary added to Analytics |
+| Apr 5  | Breadcrumb navigation; loading screen removed |
+
+---
+
+### Maybuys — April 2026
+
+| Date | Feature |
+|------|---------|
+| Apr 28 | **Maybuys wishlist** — Add items you're considering buying (name, price, optional URL and notes); "days thinking" timer; mark as Bought or Skipped; History tab with days-held count; optional Saver link; reorderable Dashboard card showing up to 3 pending items |
+
+---
+
+### Dashboard & Tracker Refinements — April–May 2026
+
+| Date | Feature |
+|------|---------|
+| Apr 29 | Transaction modal improvements |
+| Apr 30 | Dashboard section UI updates; Settings transaction option removed |
+| May 2  | Tracker UI update — grouping, layout refinements |
+| May 2  | Dashboard 2-column grid layout |
+| May 5  | Upcoming charges UI update |
+| May 6–7 | Spendable calculation refinements — proration accuracy improvements |
+
+---
+
+### Analytics Overhaul — May–June 2026
+
+| Date | Feature |
+|------|---------|
+| May 9–10 | Analytics pages UI refresh — overview, tracker detail, reports |
+| Jun 5–6 | **Savers overhaul** — Collapsible balance and contribution charts; saver card redesign; drag-to-reorder; On track / Behind pace status based on contribution rate; monthly history |
+| Jun 6  | Savers round-up display fix; saver goals on sync; delta formatting |
+| Jun 6  | KPI tooltips on Savers analytics tiles |
+| Jun 6  | Maybuys removed from Dashboard (moved to Analytics-only) |
+| Jun 7  | **Reports UI rebuild** — Category breakdown, date filters, improved chart layout |
+| Jun 7  | Saver card forecast and tooltip added |
+| Jun 8  | Tracker UI final — progress bar styling, layout polish |
+| Jun 10 | Analytics inner pages UI update |
+| Jun 11 | Demo data updated — PAYDAY tracker, tags, saver goals, badge colours |
+
+---
+
+### Budget Plan — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 13 | **Budget Plan** (`/analytics/budget`) — Named expense buckets (e.g. Subscriptions, Household, Lifestyle); assign upcoming charges to buckets; hypothetical "what if?" lines (flask icon); period toggle (weekly / fortnightly / monthly); summary footer showing Income, Committed spend, and Free Spending; Income figure sourced from pay amount in Settings |
+| Jun 14 | Budget Plan breadcrumb and bucket detail page navigation |
+| Jun 16 | Budget Plan UI refinements; modal UI improvements |
+
+---
+
+### Security, Theming & UX — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 13 | **Pastel accent colour system** — Six pastel swatches (Sky, Mint, Lavender, Peach, Blush, Lemon) replace previous purple palette; dark text on pastel surfaces; default: Sky |
+| Jun 13 | Light theme removed; dark-only UI |
+| Jun 16 | **Biometric unlock** — Touch ID / Face ID via WebAuthn (Settings → Security); credential ID stored locally; derived key cached in browser credential store; falls back to passphrase |
+| Jun 16 | **Configurable inactivity lock** — Auto-lock after 1–30 minutes of inactivity (default 3); configurable in Settings → Security |
+| Jun 18 | Biometric UX improvements — enrolment flow, error states, fallback behaviour |
+| Jun 18 | iOS Safari auto-zoom fix — input `font-size` set to 16px to prevent zoom on focus |
+
+---
+
+### Documentation & UX Polish — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 18 | **Help page redesign** — All sections rewritten with structured sub-headings, bullet lists, and Tip callouts; added Budget Plan and Savers sections |
+| Jun 18 | **Tooltip improvements** — HelpPopovers added to Weekly Insights, Budget Plan, and Savers pages; Trackers and Upcoming copy updated; balance card tooltips made more precise |
+| Jun 18 | **Dashboard tour overhaul** — Section steps now follow the user's saved section order; all 8 steps use HTML formatting (bold key terms, line breaks); Month at a glance added as a tour step |
+| Jun 18 | Internal documentation audit — README, CHANGELOG, SECURITY, Arch_Docs updated to reflect current state |
+
+---
+
+## Under Consideration
+
+Features that have been discussed or noted as potential future additions. Nothing here is committed.
+
+- **Notifications** — Browser push notifications for upcoming charge reminders or low-balance alerts (infrastructure exists: `notifications_enabled` setting)
+- **Profile export v2** — Include Budget Plan buckets in the exported profile file
+- **Recurring transaction detection** — Auto-suggest upcoming charges based on transaction history patterns
+- **Multi-currency display** — Show foreign transaction amounts alongside AUD equivalents
+- **Tags / custom labels** — User-defined transaction tags for finer categorisation beyond Up Bank's category tree
+- **Saver round-up tracking** — Dedicated view for Loose Change saver accumulation over time
+- **Android / desktop PWA polish** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
+
+---
+
+*For version-by-version change details, see [CHANGELOG.md](CHANGELOG.md). For security policy, see [SECURITY.md](SECURITY.md).*
