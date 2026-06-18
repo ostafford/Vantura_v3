@@ -1839,31 +1839,288 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   box-shadow: none;
 }
 
-/* ── Changelog timeline ─────────────────────────────────────────────── */
+/* Onboarding step 1 — brand mark */
+.onboarding-brand-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ce93d8 0%, #90caf9 55%, #80cbc4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-size: 2rem;
+  color: #1a1a2e;
+  box-shadow: 0 4px 24px rgba(144, 202, 249, 0.28);
+}
+
+/* Onboarding step 1 — "What's new" discovery chip */
+.onboarding-whats-new-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--bs-border-color);
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.onboarding-whats-new-chip:hover {
+  color: var(--vantura-primary);
+  border-color: var(--vantura-primary);
+  background: rgba(var(--vantura-primary-rgb, 0, 150, 255), 0.06);
+  text-decoration: none;
+}
+
+/* Onboarding step 1 — feature highlights grid */
+.onboarding-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0.25rem;
+  border-top: 1px solid var(--bs-border-color);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.onboarding-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+}
+.onboarding-feature-item .mdi {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Auth screens — "What's new" link */
+.auth-whats-new-link {
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.auth-whats-new-link:hover {
+  color: var(--vantura-primary);
+  text-decoration: none;
+}
+
+/* Public changelog shell (no auth required) */
+.changelog-public-shell {
+  min-height: 100vh;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+.changelog-public-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.5rem;
+  background: var(--vantura-surface, rgba(20, 20, 35, 0.96));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.changelog-public-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--bs-body-color);
+}
+.changelog-public-brand .mdi {
+  font-size: 1.2rem;
+  color: var(--vantura-primary);
+}
+.changelog-public-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 4rem;
+}
+@media (max-width: 575px) {
+  .changelog-public-header {
+    padding: 0.6rem 1rem;
+  }
+  .changelog-public-content {
+    padding: 1rem 1rem 3rem;
+  }
+}
+
+/* ── Changelog ──────────────────────────────────────────────────────── */
+
+/* Stat bar */
+.changelog-stat-bar {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1.25rem;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    rgba(206, 147, 216, 0.12) 0%,
+    rgba(144, 202, 249, 0.09) 50%,
+    rgba(128, 203, 196, 0.12) 100%
+  );
+  border: 1px solid rgba(206, 147, 216, 0.22);
+}
+.changelog-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 120px;
+}
+.changelog-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--vantura-primary);
+  line-height: 1.2;
+}
+.changelog-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bs-secondary-color);
+  margin-top: 0.1rem;
+}
+.changelog-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+.changelog-stat-delta--up {
+  color: var(--bs-success);
+  background: rgba(25, 135, 84, 0.12);
+}
+.changelog-stat-delta--down {
+  color: var(--bs-danger);
+  background: rgba(220, 53, 69, 0.12);
+}
+.changelog-stat-divider {
+  width: 1px;
+  height: 2.5rem;
+  background: var(--bs-border-color);
+  flex-shrink: 0;
+}
+
+/* Under consideration */
+.changelog-upcoming-section {
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(
+    135deg,
+    rgba(206, 147, 216, 0.06) 0%,
+    rgba(144, 202, 249, 0.04) 50%,
+    rgba(128, 203, 196, 0.06) 100%
+  );
+  border: 1.5px solid rgba(206, 147, 216, 0.35);
+}
+.changelog-upcoming-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.changelog-upcoming-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--bs-secondary-color);
+}
+.changelog-upcoming-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+/* Month navigation */
+.changelog-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.changelog-month-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 7rem;
+  text-align: center;
+  color: var(--bs-body-color);
+}
+.changelog-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bs-body-color);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.changelog-nav-btn:hover:not(:disabled) {
+  background: var(--vantura-primary);
+  border-color: var(--vantura-primary);
+  color: #fff;
+}
+.changelog-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.changelog-nav-btn .mdi {
+  font-size: 1.1rem;
+}
+.changelog-nav-latest {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--vantura-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--vantura-primary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  margin-left: 0.25rem;
+}
+.changelog-nav-latest:hover {
+  background: var(--vantura-primary);
+  color: #fff;
+}
+
+/* Timeline */
 .changelog-timeline {
   position: relative;
   padding-left: 0;
 }
 .changelog-milestone {
   display: grid;
-  grid-template-columns: 100px 1fr;
+  grid-template-columns: 108px 1fr;
   gap: 0 1rem;
   margin-bottom: 1.5rem;
-  position: relative;
-}
-.changelog-milestone::before {
-  content: '';
-  position: absolute;
-  left: 100px;
-  top: 0;
-  bottom: -1.5rem;
-  width: 2px;
-  background: var(--vantura-primary);
-  opacity: 0.2;
-  transform: translateX(-50%);
-}
-.changelog-milestone:last-child::before {
-  display: none;
 }
 .changelog-milestone-date {
   display: flex;
@@ -1882,21 +2139,30 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   white-space: nowrap;
   line-height: 1.4;
 }
+.changelog-feature-count {
+  font-size: 0.68rem;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+  text-align: right;
+}
+.changelog-latest-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--vantura-primary);
+  color: #fff;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
 .changelog-milestone-card {
   position: relative;
   align-self: start;
-}
-.changelog-milestone-card::before {
-  content: '';
-  position: absolute;
-  left: -0.6rem;
-  top: 1rem;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--vantura-primary);
-  transform: translateX(-50%);
-  z-index: 1;
+  border-left: 3px solid var(--milestone-color, var(--vantura-primary)) !important;
+  background: var(--milestone-color-bg, transparent) !important;
 }
 .changelog-item-list {
   list-style: none;
@@ -1920,18 +2186,38 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin-top: 0.05rem;
 }
 @media (max-width: 575px) {
+  .changelog-stat-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    align-items: center;
+    padding: 0.75rem 0.75rem;
+  }
+  .changelog-stat-item {
+    align-items: center;
+    min-width: unset;
+  }
+  .changelog-stat-value {
+    font-size: 1rem;
+    text-align: center;
+  }
+  .changelog-stat-label {
+    text-align: center;
+  }
+  .changelog-stat-delta {
+    align-self: center;
+  }
+  .changelog-stat-divider {
+    display: block;
+    height: 2.5rem;
+    width: 1px;
+    margin: 0 0.5rem;
+  }
   .changelog-milestone {
     grid-template-columns: 1fr;
-  }
-  .changelog-milestone::before {
-    display: none;
   }
   .changelog-milestone-date {
     justify-content: flex-start;
     padding-top: 0;
     margin-bottom: 0.4rem;
-  }
-  .changelog-milestone-card::before {
-    display: none;
   }
 }

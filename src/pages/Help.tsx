@@ -168,11 +168,45 @@ export function Help() {
                   <SectionHeading icon="mdi-harddisk">
                     Your data stays on your device
                   </SectionHeading>
-                  <p className="mb-0">
+                  <p className="mb-3">
                     When you sync, transactions are downloaded to this device
                     only — no cloud storage and no servers that hold your data.
                     Everything runs in your browser.
                   </p>
+
+                  <Link
+                    to="/changelog"
+                    className="d-flex align-items-center gap-3 p-3 rounded text-decoration-none"
+                    style={{
+                      background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.05))',
+                      border: '1px solid var(--bs-border-color)',
+                    }}
+                  >
+                    <i
+                      className="mdi mdi-rocket-launch-outline flex-shrink-0"
+                      style={{
+                        color: 'var(--vantura-primary)',
+                        fontSize: '1.5rem',
+                      }}
+                      aria-hidden
+                    />
+                    <div>
+                      <div
+                        className="fw-semibold small"
+                        style={{ color: 'var(--vantura-primary)' }}
+                      >
+                        See what&apos;s been built
+                      </div>
+                      <div className="text-muted small">
+                        9 milestones · 43+ features shipped since Feb 2026
+                      </div>
+                    </div>
+                    <i
+                      className="mdi mdi-chevron-right ms-auto"
+                      style={{ color: 'var(--vantura-primary)' }}
+                      aria-hidden
+                    />
+                  </Link>
                 </>
               )}
 

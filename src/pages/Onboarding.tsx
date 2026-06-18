@@ -171,14 +171,61 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
           {step === 1 && (
             <>
-              <h5 className="mb-2">Welcome to Vantura</h5>
-              <p className="text-muted small mb-3">
+              {/* Brand mark */}
+              <div className="onboarding-brand-mark mb-3">
+                <i className="mdi mdi-chart-line" aria-hidden />
+              </div>
+
+              {/* "What's new" discovery chip — above the heading */}
+              <div className="text-center mb-3">
+                <a
+                  href={`${import.meta.env.BASE_URL}changelog`}
+                  className="onboarding-whats-new-chip"
+                >
+                  <i className="mdi mdi-rocket-launch-outline" aria-hidden />
+                  See what we&apos;ve built
+                  <i className="mdi mdi-arrow-right" aria-hidden />
+                </a>
+              </div>
+
+              <h5 className="mb-2 text-center">Welcome to Vantura</h5>
+              <p className="text-muted small mb-3 text-center">
                 Vantura syncs with your Up Bank account to give you powerful
                 desktop-based financial insights. Your data is stored locally
-                and never leaves your device. When you sync, transactions are
-                downloaded to this device only—no cloud storage; we don&apos;t
-                have servers that store your data.
+                and never leaves your device.
               </p>
+
+              {/* Feature highlights */}
+              <div className="onboarding-features mb-4">
+                {[
+                  {
+                    icon: 'mdi-shield-lock-outline',
+                    label: 'Local-first data',
+                    color: '#ce93d8',
+                  },
+                  { icon: 'mdi-sync', label: 'Up Bank sync', color: '#90caf9' },
+                  {
+                    icon: 'mdi-chart-bar',
+                    label: 'Spending insights',
+                    color: '#80cbc4',
+                  },
+                  {
+                    icon: 'mdi-wallet-outline',
+                    label: 'Budget planning',
+                    color: '#ffab91',
+                  },
+                ].map((f) => (
+                  <div key={f.label} className="onboarding-feature-item">
+                    <i
+                      className={`mdi ${f.icon}`}
+                      style={{ color: f.color }}
+                      aria-hidden
+                    />
+                    <span>{f.label}</span>
+                  </div>
+                ))}
+              </div>
+
               <div className="d-flex flex-column gap-2">
                 <Button
                   className="btn-gradient-primary"

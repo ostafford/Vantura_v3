@@ -8,8 +8,38 @@ import { sessionStore } from '@/stores/sessionStore'
 import { ToastProvider } from '@/components/ToastProvider'
 import { Unlock } from '@/pages/Unlock'
 import { Onboarding } from '@/pages/Onboarding'
+import { Changelog } from '@/pages/Changelog'
 import { appRouter } from '@/appRouter'
 import { useInactivityLock } from '@/hooks/useInactivityLock'
+
+// Detect if the app was loaded directly at /changelog (public, no auth required)
+const _base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+const IS_CHANGELOG_PUBLIC_PATH =
+  window.location.pathname === `${_base}/changelog` ||
+  window.location.pathname === `${_base}/changelog/`
+
+function ChangelogPublicShell() {
+  return (
+    <div className="changelog-public-shell">
+      <header className="changelog-public-header">
+        <div className="changelog-public-brand">
+          <i className="mdi mdi-rocket-launch-outline" aria-hidden />
+          <span>Vantura</span>
+        </div>
+        <a
+          href={import.meta.env.BASE_URL || '/'}
+          className="btn btn-sm btn-outline-secondary"
+        >
+          <i className="mdi mdi-arrow-left me-1" aria-hidden />
+          Back to Vantura
+        </a>
+      </header>
+      <div className="changelog-public-content">
+        <Changelog isPublic />
+      </div>
+    </div>
+  )
+}
 
 function AppContent() {
   const [ready, setReady] = useState(false)
@@ -111,6 +141,11 @@ function AppContent() {
         <span className="visually-hidden">Loading</span>
       </div>
     )
+  }
+
+  // Allow /changelog to load without auth — it contains no user data
+  if (IS_CHANGELOG_PUBLIC_PATH && (!onboardingComplete || !unlocked)) {
+    return <ChangelogPublicShell />
   }
 
   if (!onboardingComplete) {
