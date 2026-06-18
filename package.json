@@ -14,7 +14,8 @@
     "validate": "npm run format:check && npm run lint && npm run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/d3": "^7.4.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -57,5 +59,8 @@
     "src/**/*.css": [
       "prettier --write"
     ]
+  },
+  "allowScripts": {
+    "@resvg/resvg-js@2.6.2": true
   }
 }

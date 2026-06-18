@@ -1,0 +1,17 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="64" height="64" role="img" aria-label="Vantura">
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="55%"  stop-color="#dde4ec"/>
+      <stop offset="100%" stop-color="#a8b8c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="0" fill="#1a142d"/>
+  <g fill="none" stroke="url(#g)" stroke-width="3"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 8 8 L 8 56  M 56 8 L 56 56  M 8 8 L 56 56"/>
+    <path d="M 8 8 L 44 8
+             A 12 13 0 0 1 44 34
+             L 8 34"/>
+  </g>
+</svg>
