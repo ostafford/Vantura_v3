@@ -31,6 +31,7 @@ import {
   normalizeCategoryIdForColor,
 } from '@/lib/chartColors'
 import { ChartColorPicker } from '@/components/ChartColorPicker'
+import { HelpPopover } from '@/components/HelpPopover'
 import { StatCard } from '@/components/StatCard'
 import { toast } from '@/stores/toastStore'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -146,7 +147,15 @@ export function InsightsSection({
         <i className="mdi mdi-chart-bar" aria-hidden />
       </span>
       <div className="d-flex flex-column">
-        <span>Weekly Insights</span>
+        <div className="d-flex align-items-center">
+          <span>Weekly Insights</span>
+          <HelpPopover
+            id="insights-help"
+            title="Weekly Insights"
+            content="Shows money in, money out, saver movement, and transaction count for the selected week. Use the arrows to browse previous weeks. The bar chart breaks spending down by category — click a bar to change its colour."
+            ariaLabel="What is Weekly Insights?"
+          />
+        </div>
         <span className="small text-muted">
           {formatShortDateFromDate(weekRange.start)} –{' '}
           {formatShortDateFromDate(weekRange.end)}

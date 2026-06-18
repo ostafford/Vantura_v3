@@ -33,6 +33,7 @@ import {
 } from '@/lib/budgetBucketMeta'
 import type { BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import type React from 'react'
+import { HelpPopover } from '@/components/HelpPopover'
 
 // ─── Bucket modal ────────────────────────────────────────────────────────────
 
@@ -432,22 +433,30 @@ export function AnalyticsBudgetPlan() {
     <div className="grid-margin">
       {/* Header row */}
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <div
-          className="period-toggle"
-          role="group"
-          aria-label="Select display period"
-        >
-          {BUDGET_DISPLAY_PERIODS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              className={`segment-btn${period === p.value ? ' active' : ''}`}
-              onClick={() => setPeriod(p.value)}
-              aria-pressed={period === p.value}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="d-flex align-items-center gap-1">
+          <div
+            className="period-toggle"
+            role="group"
+            aria-label="Select display period"
+          >
+            {BUDGET_DISPLAY_PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                className={`segment-btn${period === p.value ? ' active' : ''}`}
+                onClick={() => setPeriod(p.value)}
+                aria-pressed={period === p.value}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <HelpPopover
+            id="budget-plan-help"
+            title="Budget Plan"
+            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds upcoming charges and optional hypothetical lines (for 'what if?' scenarios). The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
+            ariaLabel="How does Budget Plan work?"
+          />
         </div>
         <div className="d-flex gap-2">
           {unassignedUpcoming.length > 0 && (

@@ -381,7 +381,7 @@ export function TrackersSection({
         <HelpPopover
           id="trackers-help"
           title="Trackers"
-          content="Set a budget and frequency for each tracker, then assign spending categories. Use the Weekly / Monthly / Yearly toggle to see your budget and spend normalised to any period. For full history and breakdowns, open the analytics page."
+          content="Set a budget and reset period for each tracker, then assign spending categories. The Weekly / Monthly / Yearly toggle rescales all amounts to that period — for example, a $200/month tracker shown in weekly view displays ~$46/week. Payday trackers reset on your next payday instead of a calendar date. For trend charts and history, go to Analytics → Trackers."
           ariaLabel="What are trackers?"
         />
       </div>

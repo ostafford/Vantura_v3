@@ -33,6 +33,7 @@ import {
 } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
 import { getSaverOrder, setSaverOrder } from '@/lib/saverOrder'
+import { HelpPopover } from '@/components/HelpPopover'
 
 // Reconstruct end-of-month balances from flow data working backwards from current balance.
 // Both charts then share the same source and time window.
@@ -435,11 +436,19 @@ export function AnalyticsSavers() {
 
   return (
     <div className="grid-margin">
-      <p className="text-muted mb-3">
-        Balances sync from Up Bank account type{' '}
-        <code className="small">SAVER</code>. &quot;Available&quot; on the
-        Dashboard still sums transactional accounts only.
-      </p>
+      <div className="d-flex align-items-start justify-content-between mb-3">
+        <p className="text-muted mb-0">
+          Balances sync from Up Bank account type{' '}
+          <code className="small">SAVER</code>. &quot;Available&quot; on the
+          Dashboard still sums transactional accounts only.
+        </p>
+        <HelpPopover
+          id="savers-help"
+          title="Savers"
+          content="Track all your Up Bank saver accounts in one place. Set a goal amount and optional target date per saver — Vantura will show a progress bar and tell you if you're On track or Behind pace based on last month's contribution rate. Expand a saver card to see monthly contributions and balance history charts. Drag cards to reorder them."
+          ariaLabel="How does Savers work?"
+        />
+      </div>
 
       {/* Monthly KPIs */}
       <Card className="grid-margin">

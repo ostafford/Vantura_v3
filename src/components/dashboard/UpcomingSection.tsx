@@ -452,7 +452,7 @@ export function UpcomingSection({
             <HelpPopover
               id="upcoming-help"
               title="Upcoming charges"
-              content="Add bills and subscriptions you know are coming. Each charge has a name, amount, frequency, and next due date. Charges marked Include in Spendable reduce your Spendable balance until that date. Grouped by next pay vs later."
+              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Charges marked Include in Spendable reduce your Spendable balance until they are due. Grouped into Next pay (before your next payday) and Later."
               ariaLabel="What are upcoming charges?"
             />
           </div>

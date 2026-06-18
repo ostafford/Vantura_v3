@@ -13,6 +13,8 @@ const HELP_SECTION_KEYS = [
   'trackers',
   'upcoming-charges',
   'analytics',
+  'budget-plan',
+  'savers',
   'transactions',
   'settings',
   'security-privacy',
@@ -27,10 +29,58 @@ const HELP_SECTION_LABELS: Record<string, string> = {
   trackers: 'Trackers',
   'upcoming-charges': 'Upcoming charges',
   analytics: 'Analytics',
+  'budget-plan': 'Budget Plan',
+  savers: 'Savers',
   transactions: 'Transactions',
   settings: 'Settings',
   'security-privacy': 'Security and privacy',
 }
+
+function SectionHeading({
+  icon,
+  children,
+  first = false,
+}: {
+  icon: string
+  children: React.ReactNode
+  first?: boolean
+}) {
+  return (
+    <h6
+      className={`d-flex align-items-center gap-2 text-muted mb-1 fw-semibold ${first ? '' : 'mt-3'}`}
+      style={{
+        fontSize: '0.8rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}
+    >
+      <i
+        className={`mdi ${icon}`}
+        style={{ color: 'var(--vantura-primary)', fontSize: '1rem' }}
+        aria-hidden
+      />
+      {children}
+    </h6>
+  )
+}
+
+function Tip({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="d-flex align-items-start gap-2 p-2 rounded mt-2 mb-0 small"
+      style={{ background: 'var(--bs-tertiary-bg, rgba(0,0,0,0.05))' }}
+    >
+      <i
+        className="mdi mdi-lightbulb-outline flex-shrink-0"
+        style={{ color: 'var(--vantura-primary)', marginTop: 1 }}
+        aria-hidden
+      />
+      <span>{children}</span>
+    </div>
+  )
+}
+
+import type React from 'react'
 
 export function Help() {
   const { activeSection, selectSection, sectionKeys } = useSplitNavSection({
@@ -101,59 +151,98 @@ export function Help() {
                 {HELP_SECTION_LABELS[activeSection] ?? activeSection}
               </h2>
 
+              {/* ── What is Vantura? ─────────────────────────────────── */}
               {activeSection === 'what-is-vantura' && (
                 <>
+                  <SectionHeading icon="mdi-bank" first>
+                    What it does
+                  </SectionHeading>
                   <p className="mb-2">
-                    Vantura is a desktop-first financial insights app that syncs
-                    with your Up Bank account. Your data is stored locally in
-                    your browser and never leaves your device. When you sync,
-                    transactions are downloaded to this device only—no cloud
-                    storage; we don&apos;t have servers that store your data.
+                    Vantura is a financial insights app for Up Bank customers in
+                    Australia. It syncs with your Up Bank account and gives you
+                    budgeting tools, spending analytics, and a real-time view of
+                    your safe-to-spend balance.
+                  </p>
+
+                  <SectionHeading icon="mdi-harddisk">
+                    Your data stays on your device
+                  </SectionHeading>
+                  <p className="mb-0">
+                    When you sync, transactions are downloaded to this device
+                    only — no cloud storage and no servers that hold your data.
+                    Everything runs in your browser.
                   </p>
                 </>
               )}
 
+              {/* ── Navigation ──────────────────────────────────────── */}
               {activeSection === 'navigation' && (
                 <>
+                  <SectionHeading icon="mdi-menu" first>
+                    Sidebar links
+                  </SectionHeading>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Dashboard</strong> — balance cards, Month at a
+                      glance, Weekly insights, Trackers, Upcoming charges
+                    </li>
+                    <li className="mb-1">
+                      <strong>Analytics</strong> — Trackers, Reports, Savers,
+                      Budget Plan
+                    </li>
+                    <li className="mb-1">
+                      <strong>Transactions</strong> — filter, search, and browse
+                      all synced transactions
+                    </li>
+                    <li className="mb-1">
+                      <strong>Settings</strong> — sync, payday, appearance,
+                      security, and more
+                    </li>
+                    <li>
+                      <strong>Help</strong> — this user guide
+                    </li>
+                  </ul>
+
+                  <SectionHeading icon="mdi-lock">Lock</SectionHeading>
                   <p className="mb-2">
-                    The sidebar gives you access to: <strong>Dashboard</strong>{' '}
-                    (balance cards, Month at a glance, Weekly insights,
-                    Trackers, Upcoming charges), <strong>Analytics</strong>{' '}
-                    (reports, trackers, insights, monthly review),{' '}
-                    <strong>Transactions</strong> (filter and search),{' '}
-                    <strong>Settings</strong>, and <strong>Help</strong> (this
-                    user guide).
+                    At the bottom of the sidebar. Secures the app and clears the
+                    session immediately — use it before stepping away from your
+                    device.
                   </p>
+
+                  <SectionHeading icon="mdi-arrow-collapse-left">
+                    Collapse
+                  </SectionHeading>
                   <p className="mb-0">
-                    You can collapse the sidebar by clicking the brand area at
-                    the top. At the bottom of the sidebar, <strong>Lock</strong>{' '}
-                    secures the app.
+                    Click the brand area at the top of the sidebar to collapse
+                    or expand it.
                   </p>
                 </>
               )}
 
+              {/* ── Getting started ──────────────────────────────────── */}
               {activeSection === 'getting-started' && (
                 <>
+                  <SectionHeading icon="mdi-numeric-1-circle-outline" first>
+                    Create a passphrase
+                  </SectionHeading>
                   <p className="mb-2">
-                    During setup you create a passphrase (used to unlock the app
-                    each time), add your Up Bank Personal Access Token, and set
-                    your payday schedule. The token is validated and encrypted
-                    with your passphrase-derived key before being stored. You
-                    can optionally set your pay amount in Settings (Payday) for
-                    Spendable context and low-balance alerts.
+                    Your passphrase encrypts your API token and is required to
+                    unlock the app. It is never stored — keep it somewhere safe.
+                  </p>
+
+                  <SectionHeading icon="mdi-numeric-2-circle-outline">
+                    Add your Up Bank token
+                  </SectionHeading>
+                  <p className="mb-2">
+                    In the Up app:{' '}
+                    <strong>
+                      Profile → Data sharing → Personal access tokens
+                    </strong>
+                    . Create a new token and paste it into Vantura. It is
+                    validated and encrypted before being stored.
                   </p>
                   <p className="mb-2">
-                    To get a Personal Access Token: in the Up Bank app go to
-                    Profile → Data sharing → Personal access tokens, create a
-                    new token, and paste it into Vantura during onboarding or in
-                    Settings when updating.
-                  </p>
-                  <p className="mb-2">
-                    On the Dashboard, the (i) icon next to some section titles
-                    (Trackers, Upcoming charges) opens a short explanation for
-                    that section.
-                  </p>
-                  <p className="mb-0">
                     <a
                       href="https://developer.up.com.au/#personal-access-tokens"
                       target="_blank"
@@ -162,153 +251,527 @@ export function Help() {
                       Learn more about Up Bank Personal Access Tokens
                     </a>
                   </p>
+
+                  <SectionHeading icon="mdi-numeric-3-circle-outline">
+                    Set your payday schedule
+                  </SectionHeading>
+                  <p className="mb-0">
+                    Choose your pay frequency (weekly, fortnightly, or monthly)
+                    and your next payday date. This drives the Spendable balance
+                    calculation, Payday tracker resets, and how Upcoming charges
+                    are grouped.
+                  </p>
+                  <Tip>
+                    You can optionally set your pay amount in Settings → Payday.
+                    This enables the Free Spending figure in Budget Plan and a
+                    post-payday projection on the Spendable card.
+                  </Tip>
                 </>
               )}
 
+              {/* ── Dashboard ────────────────────────────────────────── */}
               {activeSection === 'dashboard' && (
-                <p className="mb-0">
-                  The Dashboard shows balance cards (Available and Spendable),
-                  then sections you can reorder:{' '}
-                  <strong>Month at a glance</strong> (calendar month vs previous
-                  month, with chart legends using those month names), Weekly
-                  insights, Trackers, and Upcoming charges. You can change the
-                  order in Settings (Dashboard sections) or by dragging section
-                  headers on the Dashboard.
-                </p>
+                <>
+                  <SectionHeading icon="mdi-currency-usd" first>
+                    Balance cards
+                  </SectionHeading>
+                  <p className="mb-2">
+                    <strong>Available</strong> and <strong>Spendable</strong>{' '}
+                    sit at the top of the Dashboard. Click Spendable to set a
+                    low-balance alert. See{' '}
+                    <strong>Help → Spendable balance</strong> for how the
+                    calculation works.
+                  </p>
+
+                  <SectionHeading icon="mdi-view-grid-outline">
+                    Reorderable sections
+                  </SectionHeading>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Month at a glance</strong> — day-by-day spending
+                      for the current calendar month vs the previous month, with
+                      key metrics and a narrative summary
+                    </li>
+                    <li className="mb-1">
+                      <strong>Weekly insights</strong> — money in, money out,
+                      and category spending for the selected week
+                    </li>
+                    <li className="mb-1">
+                      <strong>Trackers</strong> — budget progress and days
+                      remaining per tracker
+                    </li>
+                    <li>
+                      <strong>Upcoming charges</strong> — bills and
+                      subscriptions grouped by Next pay and Later
+                    </li>
+                  </ul>
+                  <Tip>
+                    Drag the icon on the left of any section header to reorder,
+                    or use Settings → Dashboard sections.
+                  </Tip>
+                </>
               )}
 
+              {/* ── Spendable balance ────────────────────────────────── */}
               {activeSection === 'spendable-balance' && (
                 <>
+                  <SectionHeading icon="mdi-calculator" first>
+                    How it&apos;s calculated
+                  </SectionHeading>
                   <p className="mb-2">
-                    <strong>Spendable</strong> is your Available balance minus
-                    money reserved for upcoming charges before your next payday.
-                    Only charges due before the next payday are reserved;
-                    recurring charges (monthly, quarterly, yearly) are prorated
-                    so you see a fair &quot;safe to spend&quot; amount.
+                    <strong>
+                      Spendable = Available − held transactions − upcoming
+                      charges reserved before your next payday.
+                    </strong>
                   </p>
                   <p className="mb-2">
-                    You can set an optional low-balance alert: click the
-                    Spendable card on the Dashboard to set a dollar amount or a
-                    percentage of your pay. When Spendable drops below that
-                    threshold, the card turns red.
+                    Only charges due before the next payday are reserved.
+                    Recurring charges (monthly, quarterly, yearly) are prorated
+                    so the reserved amount reflects only the portion of the
+                    cycle left before you get paid — giving you a fair
+                    &quot;safe to spend&quot; figure.
+                  </p>
+
+                  <SectionHeading icon="mdi-bell-outline">
+                    Low-balance alert
+                  </SectionHeading>
+                  <p className="mb-0">
+                    Click the Spendable card on the Dashboard to set a threshold
+                    — either a fixed dollar amount or a percentage of your pay.
+                    When Spendable drops below that threshold, the card turns
+                    red as a visual warning.
                   </p>
                 </>
               )}
 
+              {/* ── Trackers ─────────────────────────────────────────── */}
               {activeSection === 'trackers' && (
                 <>
+                  <SectionHeading icon="mdi-information-outline" first>
+                    What they do
+                  </SectionHeading>
                   <p className="mb-2">
-                    Trackers let you set a budget and track spending by category
-                    over a period. You choose a reset frequency: Weekly,
-                    Fortnightly, Monthly, or Payday. You can assign one or more
-                    categories to each tracker.
+                    Set a budget and reset period for each tracker, then assign
+                    one or more Up Bank spending categories to it. The Dashboard
+                    shows budget progress, days left in the current period, and
+                    recent transactions.
                   </p>
                   <p className="mb-2">
-                    The dashboard shows progress (how much of the budget is
-                    used), days left in the period, and transactions in the
-                    current period. PAYDAY trackers reset on your next payday
-                    and can warn you when you&apos;re over budget before payday.
+                    Create a tracker using the{' '}
+                    <strong>
+                      <i className="mdi mdi-plus" aria-hidden /> button
+                    </strong>{' '}
+                    in the Trackers section header on the Dashboard.
                   </p>
+
+                  <SectionHeading icon="mdi-refresh">
+                    Reset frequencies
+                  </SectionHeading>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Weekly</strong> — resets each week
+                    </li>
+                    <li className="mb-1">
+                      <strong>Fortnightly</strong> — resets every two weeks
+                    </li>
+                    <li className="mb-1">
+                      <strong>Monthly</strong> — resets on the 1st of each month
+                    </li>
+                    <li>
+                      <strong>Payday</strong> — resets on your next payday
+                      instead of a fixed calendar date; useful when you want
+                      your budget to align with your income cycle
+                    </li>
+                  </ul>
+
+                  <SectionHeading icon="mdi-swap-horizontal">
+                    Period toggle
+                  </SectionHeading>
+                  <p className="mb-0">
+                    Use the <strong>Weekly / Monthly / Yearly</strong> toggle to
+                    rescale all tracker amounts to any view period — for
+                    example, a $200/month tracker in weekly view displays
+                    ~$46/week.
+                  </p>
+                  <Tip>
+                    For trend charts and full transaction history per tracker,
+                    go to <strong>Analytics → Trackers</strong>.
+                  </Tip>
                 </>
               )}
 
+              {/* ── Upcoming charges ─────────────────────────────────── */}
               {activeSection === 'upcoming-charges' && (
                 <>
+                  <SectionHeading icon="mdi-information-outline" first>
+                    What they are
+                  </SectionHeading>
                   <p className="mb-2">
-                    Upcoming charges are manual entries for bills and
-                    subscriptions you know are coming (e.g. rent, Netflix). You
-                    enter name, amount, frequency (weekly, fortnightly, monthly,
-                    etc.), and next charge date. Each charge can be marked
-                    &quot;Include in Spendable&quot; (default: yes), meaning it
-                    reduces your Spendable until that date.
+                    Manual entries for bills and subscriptions you know are
+                    coming — rent, Netflix, insurance, gym memberships, etc. The
+                    due date automatically advances to the next occurrence after
+                    each cycle.
                   </p>
+
+                  <SectionHeading icon="mdi-calendar-clock">
+                    Frequencies
+                  </SectionHeading>
                   <p className="mb-2">
-                    Charges are grouped by &quot;Next pay&quot; (before your
-                    next payday) and &quot;Later&quot; so you can see
-                    what&apos;s due soon versus later.
+                    Weekly · Fortnightly · Monthly · Quarterly · Yearly · Once
+                  </p>
+
+                  <SectionHeading icon="mdi-currency-usd">
+                    Include in Spendable
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Each charge has an <strong>Include in Spendable</strong>{' '}
+                    toggle (default: on). When on, the charge reduces your
+                    Spendable balance until its due date — so your &quot;safe to
+                    spend&quot; amount already accounts for it. Turn it off to
+                    track a charge without affecting Spendable.
+                  </p>
+
+                  <SectionHeading icon="mdi-format-list-group">
+                    Grouping
+                  </SectionHeading>
+                  <ul className="mb-0 ps-3">
+                    <li className="mb-1">
+                      <strong>Next pay</strong> — charges due before your next
+                      payday
+                    </li>
+                    <li>
+                      <strong>Later</strong> — charges due after your next
+                      payday
+                    </li>
+                  </ul>
+                </>
+              )}
+
+              {/* ── Analytics ────────────────────────────────────────── */}
+              {activeSection === 'analytics' && (
+                <>
+                  <p className="mb-3 text-muted small">
+                    Analytics (sidebar) gives you four deeper views of your
+                    finances.
+                  </p>
+
+                  <SectionHeading icon="mdi-chart-line" first>
+                    Trackers
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Spending trends per tracker, budget vs actual spend across
+                    periods, and full transaction history for each tracker.
+                  </p>
+
+                  <SectionHeading icon="mdi-file-chart">Reports</SectionHeading>
+                  <p className="mb-2">
+                    Category spending over any date range, weekly money in/out
+                    trends, monthly spending comparisons, tracker spend
+                    summaries, and an optional income-to-spending flow chart
+                    (Sankey diagram).
+                  </p>
+
+                  <SectionHeading icon="mdi-piggy-bank">Savers</SectionHeading>
+                  <p className="mb-2">
+                    Saver account balances, savings goals with on-track /
+                    behind-pace projections, and monthly contribution charts.
+                    See <strong>Help → Savers</strong> for full details.
+                  </p>
+
+                  <SectionHeading icon="mdi-wallet-outline">
+                    Budget Plan
+                  </SectionHeading>
+                  <p className="mb-0">
+                    Group your expenses into buckets, see Income vs Committed vs
+                    Free Spending, and test affordability with hypothetical
+                    expenses. See <strong>Help → Budget Plan</strong> for full
+                    details.
                   </p>
                 </>
               )}
 
-              {activeSection === 'analytics' && (
-                <p className="mb-2">
-                  The Analytics section (sidebar) is your entry point for deeper
-                  views. <strong>Reports</strong> show spending by category over
-                  a date range and an optional income-to-spending flow (Sankey).{' '}
-                  <strong>Trackers</strong> analytics show trends, budget vs
-                  spend, and history. <strong>Weekly insights</strong> compare
-                  money in vs out by week and category spending.{' '}
-                  <strong>Monthly review</strong> gives money in/out, top
-                  categories, and tracker spend for any month.
-                </p>
+              {/* ── Budget Plan ──────────────────────────────────────── */}
+              {activeSection === 'budget-plan' && (
+                <>
+                  <SectionHeading icon="mdi-information-outline" first>
+                    What it is
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Budget Plan (Analytics → Budget Plan) helps you see your
+                    complete financial picture by grouping expenses into named{' '}
+                    <strong>buckets</strong> — for example Subscriptions,
+                    Household, or Lifestyle.
+                  </p>
+
+                  <SectionHeading icon="mdi-folder-multiple-outline">
+                    What goes in a bucket
+                  </SectionHeading>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Upcoming charges</strong> you&apos;ve already set
+                      up — assign them to a bucket so they count toward that
+                      bucket&apos;s total
+                    </li>
+                    <li>
+                      <strong>Hypothetical lines</strong> — &quot;what if I add
+                      this expense?&quot; scenarios kept separate from real
+                      data; marked with a flask icon and removable any time
+                    </li>
+                  </ul>
+
+                  <SectionHeading icon="mdi-currency-usd">
+                    Summary figures
+                  </SectionHeading>
+                  <p className="mb-1">
+                    The card at the bottom shows three figures (toggle Weekly /
+                    Monthly / Yearly):
+                  </p>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Income</strong> — your pay amount from Settings
+                      (Payday)
+                    </li>
+                    <li className="mb-1">
+                      <strong>Committed</strong> — total planned spend across
+                      all buckets
+                    </li>
+                    <li>
+                      <strong>Free spending</strong> — Income minus Committed
+                      (green = surplus, red = over budget)
+                    </li>
+                  </ul>
+                  <Tip>
+                    If any upcoming charges aren&apos;t assigned to a bucket, a
+                    warning will appear — assign them to keep your totals
+                    accurate. Set your pay amount in{' '}
+                    <strong>Settings → Payday</strong> to enable the Income
+                    figure.
+                  </Tip>
+                </>
               )}
 
+              {/* ── Savers ───────────────────────────────────────────── */}
+              {activeSection === 'savers' && (
+                <>
+                  <SectionHeading icon="mdi-information-outline" first>
+                    Overview
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Savers (Analytics → Savers) syncs with your Up Bank saver
+                    accounts. The monthly overview at the top shows:
+                  </p>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Self-contributed</strong> — manual transfers to
+                      your savers this month
+                    </li>
+                    <li className="mb-1">
+                      <strong>Round-ups</strong> — Loose Change accumulation
+                      this month
+                    </li>
+                    <li className="mb-1">
+                      <strong>Total saver balance</strong> — combined balance
+                      across all savers
+                    </li>
+                    <li>
+                      A <strong>health badge</strong>: On track, No
+                      contributions, or Net withdrawal
+                    </li>
+                  </ul>
+
+                  <SectionHeading icon="mdi-flag-checkered">
+                    Setting a goal
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Tap <strong>+ Set goal</strong> on any saver card to set a
+                    target dollar amount and an optional target date. Vantura
+                    shows a progress bar and projects whether you&apos;re{' '}
+                    <strong>On track</strong> or <strong>Behind pace</strong>{' '}
+                    based on last month&apos;s contribution rate.
+                  </p>
+                  <Tip>
+                    Hover the &quot;Behind pace&quot; badge to see exactly how
+                    much more per month you&apos;d need to save to hit your goal
+                    on time.
+                  </Tip>
+
+                  <SectionHeading icon="mdi-chart-bar">Charts</SectionHeading>
+                  <p className="mb-2">
+                    Expand any saver card (tap <strong>Show charts</strong>) to
+                    see a monthly contributions chart for the last 12 months and
+                    a balance trend chart.
+                  </p>
+
+                  <SectionHeading icon="mdi-drag">Reordering</SectionHeading>
+                  <p className="mb-0">
+                    Drag saver cards by their name to reorder them — the order
+                    is saved automatically.
+                  </p>
+                </>
+              )}
+
+              {/* ── Transactions ─────────────────────────────────────── */}
               {activeSection === 'transactions' && (
-                <p className="mb-2">
-                  The Transactions page lists all synced transactions. You can
-                  filter by date range, category, amount range, and search text.
-                  Sort by date, amount, or merchant. Transactions are grouped by
-                  date. Round-ups are linked to their parent transaction when
-                  applicable.
-                </p>
+                <>
+                  <SectionHeading icon="mdi-format-list-text" first>
+                    What it shows
+                  </SectionHeading>
+                  <p className="mb-2">
+                    All synced transactions, grouped by date. Round-ups (Loose
+                    Change) are linked to their parent transaction.
+                  </p>
+
+                  <SectionHeading icon="mdi-filter-outline">
+                    Filters and sorting
+                  </SectionHeading>
+                  <ul className="mb-0 ps-3">
+                    <li className="mb-1">Date range</li>
+                    <li className="mb-1">Category</li>
+                    <li className="mb-1">Amount range</li>
+                    <li className="mb-1">
+                      Search text — merchant name or description
+                    </li>
+                    <li>
+                      Sort by: <strong>date</strong>, <strong>amount</strong>,
+                      or <strong>merchant</strong>
+                    </li>
+                  </ul>
+                </>
               )}
 
+              {/* ── Settings ─────────────────────────────────────────── */}
               {activeSection === 'settings' && (
                 <>
+                  <SectionHeading icon="mdi-sync" first>
+                    Sync and token
+                  </SectionHeading>
                   <p className="mb-2">
-                    In Settings you can re-sync with Up Bank (to pull the latest
-                    transactions and category changes), update your Personal
-                    Access Token (e.g. if it expired), change your payday
-                    schedule and pay amount, and clear all data (which deletes
-                    the database and returns you to onboarding).
+                    Re-sync to pull the latest transactions and category changes
+                    from Up Bank. Update your Personal Access Token here if it
+                    expires or you need to replace it.
                   </p>
-                  <p className="mb-2">
-                    <strong>Appearance:</strong> You can change the accent color
-                    in Settings (Appearance).
+
+                  <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
+                  <p className="mb-1">
+                    Your payday frequency and date affect three things:
                   </p>
+                  <ul className="mb-2 ps-3">
+                    <li className="mb-1">
+                      <strong>Spendable</strong> — only charges due before your
+                      next payday are reserved in the calculation
+                    </li>
+                    <li className="mb-1">
+                      <strong>Payday trackers</strong> — reset on your next
+                      payday
+                    </li>
+                    <li>
+                      <strong>Upcoming charges grouping</strong> — Next pay vs
+                      Later
+                    </li>
+                  </ul>
+                  <Tip>
+                    Set your <strong>pay amount</strong> here to enable the Free
+                    Spending figure in Budget Plan and the post-payday
+                    projection on the Spendable card.
+                  </Tip>
+
+                  <SectionHeading icon="mdi-palette-outline">
+                    Appearance
+                  </SectionHeading>
                   <p className="mb-2">
-                    <strong>Dashboard tour:</strong> A guided tour runs
-                    automatically the first time you visit the Dashboard. It
-                    walks through balance cards, Trackers, Weekly insights,
-                    Upcoming charges, Navigation, and Lock. You can run it again
-                    from Settings → Help (&quot;Show dashboard tour
-                    again&quot;).
+                    Change the app&apos;s accent colour. You can also customise
+                    the colours used for spending categories in charts.
                   </p>
+
+                  <SectionHeading icon="mdi-view-dashboard-outline">
+                    Dashboard sections
+                  </SectionHeading>
                   <p className="mb-2">
-                    <strong>Dashboard sections:</strong> You can change the
-                    order of dashboard sections in Settings (Dashboard sections)
-                    or by dragging section headers on the Dashboard.
+                    Change the order of dashboard sections here, or drag section
+                    headers directly on the Dashboard.
                   </p>
+
+                  <SectionHeading icon="mdi-export">
+                    Export and import
+                  </SectionHeading>
                   <p className="mb-2">
-                    <strong>Export and import profile:</strong> You can export
-                    your settings to an encrypted file (passphrase-protected)
-                    and import on another device to restore your setup. Export
-                    includes appearance, payday, trackers, and upcoming
-                    charges—not transactions or API tokens.
+                    Export your settings to an encrypted, passphrase-protected
+                    file and import it on another device. Includes appearance,
+                    payday settings, trackers, and upcoming charges.{' '}
+                    <em>Transactions and API tokens are not exported.</em>
                   </p>
+
+                  <SectionHeading icon="mdi-bell-outline">
+                    Notifications
+                  </SectionHeading>
                   <p className="mb-2">
-                    <strong>Notifications:</strong> If your browser supports it,
-                    you can enable bill reminders in Settings (Notifications) to
-                    get a notification when upcoming charges are due soon
-                    (within their reminder window).
+                    Enable browser notifications for bill reminders —
+                    you&apos;ll be notified when an upcoming charge is due soon
+                    (within its reminder window). Requires browser permission.
+                  </p>
+
+                  <SectionHeading icon="mdi-shield-lock-outline">
+                    Security
+                  </SectionHeading>
+                  <p className="mb-0">
+                    Set the inactivity lock timeout (1–30 minutes, default 3
+                    minutes). If your device supports it, enable biometric
+                    unlock (Touch ID / Face ID) so you can unlock without typing
+                    your passphrase each time.
                   </p>
                 </>
               )}
 
+              {/* ── Security and privacy ─────────────────────────────── */}
               {activeSection === 'security-privacy' && (
                 <>
+                  <SectionHeading icon="mdi-harddisk" first>
+                    Data storage
+                  </SectionHeading>
                   <p className="mb-2">
-                    Data is stored locally in your browser (IndexedDB). Your Up
-                    Bank API token is encrypted with a key derived from your
-                    passphrase (PBKDF2 + AES-GCM); the passphrase is never
-                    stored. No secrets are sent to our servers because we
-                    don&apos;t have any—everything runs in your browser.
+                    Your data is stored locally in your browser (IndexedDB) and
+                    never leaves your device. Nothing is sent to any server —
+                    everything runs entirely in your browser.
                   </p>
+
+                  <SectionHeading icon="mdi-key-outline">
+                    Encryption
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Your Up Bank API token is encrypted with a key derived from
+                    your passphrase. The passphrase itself is never stored —
+                    only you can decrypt your data. Keep your passphrase safe;
+                    there is no recovery option if it is lost.
+                  </p>
+
+                  <SectionHeading icon="mdi-lock">
+                    Locking the app
+                  </SectionHeading>
+                  <p className="mb-2">
+                    Use <strong>Lock</strong> (bottom of the sidebar) to secure
+                    the app and clear the session when stepping away. Your data
+                    stays on device, but authentication is required to unlock.
+                  </p>
+
+                  <SectionHeading icon="mdi-timer-outline">
+                    Auto-lock
+                  </SectionHeading>
+                  <p className="mb-2">
+                    The app locks automatically after a configurable period of
+                    inactivity. Set the timeout in{' '}
+                    <strong>Settings → Security</strong> (default: 3 minutes,
+                    options from 1 to 30 minutes).
+                  </p>
+
+                  <SectionHeading icon="mdi-fingerprint">
+                    Biometric unlock
+                  </SectionHeading>
                   <p className="mb-0">
-                    Use <strong>Lock</strong> (sidebar, bottom) to secure the
-                    app and clear the session when you step away. Your data
-                    stays on device but the app will require your passphrase to
-                    unlock when you return.
+                    If your device supports it, enable Touch ID or Face ID in{' '}
+                    <strong>Settings → Security</strong>. Once enabled, you can
+                    unlock with your biometric instead of typing your
+                    passphrase. Your passphrase remains the primary credential —
+                    biometrics is a convenience layer on top.
                   </p>
                 </>
               )}

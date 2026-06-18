@@ -41,7 +41,8 @@ import { toast } from '@/stores/toastStore'
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
 const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
 
-const TOUR_DATA_ATTRS: Partial<Record<DashboardSectionId, string>> = {
+const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
+  month_summary: 'month-summary',
   insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
@@ -139,7 +140,7 @@ export function Dashboard() {
     (spendableCents < 0
       ? 'Spendable is negative — reserved charges and held transactions exceed your available balance.'
       : isSpendableLow
-        ? 'Spendable is below your alert threshold.'
+        ? 'Below your alert threshold — check your upcoming charges or adjust the threshold by clicking this card.'
         : 'Spendable = Available minus held transactions minus reserved upcoming charges. Click to set alert threshold.') +
     heldNote +
     (payAmountCents != null
@@ -243,7 +244,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (shouldShowDashboardTour()) {
-      const t = setTimeout(() => startDashboardTour(), 400)
+      const t = setTimeout(() => startDashboardTour(sectionOrder), 400)
       return () => clearTimeout(t)
     }
   }, [])
@@ -433,7 +434,7 @@ export function Dashboard() {
             value={availableCents}
             subtitle={availableProjectedSubtitle}
             gradient="success"
-            tooltip="Sum of all transactional account balances (excludes savers). Spendable deducts reserved upcoming charges and any held transactions."
+            tooltip="Sum of your transactional account balances — excludes saver accounts. This is your Up Bank balance as reported, before any Spendable adjustments."
           />
         </Col>
         <Col md={6} className="stretch-card">
