@@ -247,7 +247,7 @@ export function Dashboard() {
       const t = setTimeout(() => startDashboardTour(sectionOrder), 400)
       return () => clearTimeout(t)
     }
-  }, [])
+  }, [sectionOrder])
 
   useEffect(() => {
     const token = sessionStore.getState().getToken()

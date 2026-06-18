@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react'
 import { VanturaLogo } from '@/components/VanturaLogo'
-import { Button, Card, Form } from 'react-bootstrap'
+import { Button, Card, Form, ProgressBar } from 'react-bootstrap'
 import { setAppSetting, getAppSetting } from '@/db'
 import { sessionStore } from '@/stores/sessionStore'
 import { seedDemoData } from '@/db/seedDemoData'

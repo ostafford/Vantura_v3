@@ -27,10 +27,8 @@ import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { SaverBalanceChart } from '@/components/charts/SaverBalanceChart'
 import { SaverMonthlyFlowChart } from '@/components/charts/SaverMonthlyFlowChart'
-import {
-  ComparisonDeltaBadge,
-  buildDeltaTooltip,
-} from '@/components/atAGlance/ComparisonDeltaBadge'
+import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
+import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
 import { getSaverOrder, setSaverOrder } from '@/lib/saverOrder'
 import { HelpPopover } from '@/components/HelpPopover'

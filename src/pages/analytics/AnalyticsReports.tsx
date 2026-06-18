@@ -34,10 +34,8 @@ import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import { useStore } from 'zustand'
 import { accentStore } from '@/stores/accentStore'
 import { syncStore } from '@/stores/syncStore'
-import {
-  ComparisonDeltaBadge,
-  buildDeltaTooltip,
-} from '@/components/atAGlance/ComparisonDeltaBadge'
+import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
+import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { formatMoney, formatDollars, formatDate } from '@/lib/format'
@@ -492,7 +490,7 @@ export function AnalyticsReports() {
         : availableChargeFrequencies[0]
       setChargeFreqFilter(preferred)
     }
-  }, [availableChargeFrequencies])
+  }, [availableChargeFrequencies, chargeFreqFilter])
 
   const filteredChargeGroups = chargeFreqFilter
     ? chargeGroups.filter((g) => g.frequency.toUpperCase() === chargeFreqFilter)
@@ -571,7 +569,7 @@ export function AnalyticsReports() {
         : availableFrequencies[0]
       setTrackerFreqFilter(preferred)
     }
-  }, [availableFrequencies])
+  }, [availableFrequencies, trackerFreqFilter])
 
   const filteredTrackerSpend = trackerFreqFilter
     ? trackerSpend.filter(
