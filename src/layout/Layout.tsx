@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { uiStore } from '@/stores/uiStore'
@@ -7,6 +7,14 @@ import { Sidebar, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './Sidebar'
 import { Navbar } from './Navbar'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY, MOBILE_BREAKPOINT_PX } from '@/lib/constants'
+import { usePwaUpdate } from '@/hooks/usePwaUpdate'
+import {
+  hasNewVersion,
+  markVersionSeen,
+  getLastSeenVersion,
+} from '@/lib/appVersion'
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
+import { WhatsNewModal } from '@/components/WhatsNewModal'
 
 const VIEWPORT_AUTO_COLLAPSE_PX = 1280
 const SIDEBAR_COLLAPSED_KEY = 'vantura_sidebar_collapsed'
@@ -20,6 +28,17 @@ export function Layout() {
   const widthRef = useRef(
     typeof window !== 'undefined' ? window.innerWidth : 1280
   )
+
+  const { updateReady, applyUpdate } = usePwaUpdate()
+  const [showWhatsNew, setShowWhatsNew] = useState(() => hasNewVersion())
+
+  // On first ever load (no version stored), silently record the current version
+  // so the next update can be detected.
+  useEffect(() => {
+    if (getLastSeenVersion() === null) {
+      markVersionSeen()
+    }
+  }, [])
 
   const sidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED_WIDTH
@@ -128,6 +147,11 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      {updateReady && <PwaUpdateBanner onReload={applyUpdate} />}
+      <WhatsNewModal
+        show={showWhatsNew}
+        onClose={() => setShowWhatsNew(false)}
+      />
     </div>
   )
 }
