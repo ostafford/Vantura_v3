@@ -101,6 +101,8 @@
     #ffffff 80%,
     var(--vantura-badge-meta-fg) 20%
   );
+  /* Elevated surface — modals, banners, drawers; one step above --vantura-surface */
+  --vantura-surface-elevated: #242438;
   /* Bootstrap semantic vars — bridged to Vantura's pastel palette so Bootstrap
      utility classes (.text-success, .bg-danger, .progress-bar variants, etc.)
      all render in Vantura colours instead of Bootstrap's default blue/green/red */
@@ -109,6 +111,12 @@
   --bs-danger-rgb: 232, 152, 152;
   --bs-warning-rgb: 232, 184, 136;
   --bs-info-rgb: 126, 184, 216;
+  /* Bootstrap body / border / secondary vars — mapped to Vantura tokens so any
+     component using --bs-* inherits the correct dark-theme values automatically */
+  --bs-body-bg: var(--vantura-background);
+  --bs-body-color: var(--vantura-text);
+  --bs-secondary-color: var(--vantura-text-secondary);
+  --bs-border-color: var(--vantura-border);
   /* Progress bar — consistent track and label across all instances */
   --bs-progress-bg: var(--vantura-border);
   --bs-progress-bar-color: var(--vantura-text-on-pastel);
@@ -429,7 +437,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   opacity: 0.72;
 }
 .modal-content {
-  background: #242438;
+  background: var(--vantura-surface-elevated);
   color: var(--vantura-text);
   border-color: rgba(126, 184, 216, 0.12);
   border-radius: 14px;
@@ -1867,7 +1875,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: #1a1a2e;
+  background: var(--vantura-sidebar-bg);
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
@@ -1964,21 +1972,25 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 /* Public changelog shell (no auth required) */
 .changelog-public-shell {
   min-height: 100vh;
+  padding-top: 54px; /* matches fixed public header height, same pattern as page-body-wrapper */
   background: var(--bs-body-bg);
   color: var(--bs-body-color);
 }
 .changelog-public-header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  height: 54px; /* explicit height — same pattern as .vantura-navbar { height: 70px } */
+  z-index: 1030;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.7rem 1.5rem;
+  padding: 0 1.5rem; /* horizontal padding only; height controls vertical size */
   background: var(--vantura-surface, rgba(20, 20, 35, 0.96));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--bs-border-color);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
 }
 .changelog-public-brand {
   display: flex;
@@ -1995,14 +2007,29 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .changelog-public-content {
   max-width: 900px;
   margin: 0 auto;
-  padding: 1.5rem 1.5rem 4rem;
+  padding: 0 1.5rem 4rem; /* no top padding — sticky toolbar sits flush under the header */
+}
+/* Sticky toolbar inside the public shell: snap flush under the public header
+   (not the 70px app navbar) and escape only the public content padding. */
+.changelog-public-content .sticky-toolbar {
+  top: 54px; /* .changelog-public-header height: 32px logo + 2×0.7rem padding (no border) */
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 @media (max-width: 575px) {
   .changelog-public-header {
-    padding: 0.6rem 1rem;
+    padding: 0 1rem;
   }
   .changelog-public-content {
-    padding: 1rem 1rem 3rem;
+    padding: 0 1rem 3rem;
+  }
+  .changelog-public-content .sticky-toolbar {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
@@ -2132,7 +2159,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .changelog-nav-btn:hover:not(:disabled) {
   background: var(--vantura-primary);
   border-color: var(--vantura-primary);
-  color: #fff;
+  color: var(--vantura-text-on-pastel);
 }
 .changelog-nav-btn:disabled {
   opacity: 0.3;
@@ -2158,7 +2185,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 .changelog-nav-latest:hover {
   background: var(--vantura-primary);
-  color: #fff;
+  color: var(--vantura-text-on-pastel);
 }
 
 /* Timeline */
@@ -2204,7 +2231,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   background: var(--vantura-primary);
-  color: #fff;
+  color: var(--vantura-text-on-pastel);
   line-height: 1.4;
   flex-shrink: 0;
 }
@@ -2279,7 +2306,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   left: 0;
   right: 0;
   z-index: 1100;
-  background: #242438;
+  background: var(--vantura-surface-elevated);
   border-top: 1px solid var(--vantura-primary);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
   padding: 12px 16px;
@@ -2345,7 +2372,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 
 .pwa-update-banner__reload {
   background: var(--vantura-primary);
-  color: #1a1a2e;
+  color: var(--vantura-text-on-pastel);
   border: none;
   border-radius: 6px;
   padding: 6px 14px;

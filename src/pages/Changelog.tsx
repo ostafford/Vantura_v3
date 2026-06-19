@@ -219,7 +219,10 @@ export function Changelog({ isPublic = false }: ChangelogProps) {
               <div className="d-flex flex-column align-items-center gap-1">
                 <span
                   className="changelog-date-pill"
-                  style={{ background: milestone.color, color: '#1a1a2e' }}
+                  style={{
+                    background: milestone.color,
+                    color: 'var(--vantura-text-on-pastel)',
+                  }}
                 >
                   {milestone.date}
                 </span>
@@ -248,7 +251,10 @@ export function Changelog({ isPublic = false }: ChangelogProps) {
                   {isLatestMonth && i === 0 && (
                     <span
                       className="changelog-latest-badge"
-                      style={{ background: milestone.color, color: '#1a1a2e' }}
+                      style={{
+                        background: milestone.color,
+                        color: 'var(--vantura-text-on-pastel)',
+                      }}
                     >
                       Latest
                     </span>
