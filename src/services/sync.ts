@@ -14,6 +14,7 @@ import {
   type UpCategory,
   type UpTag,
 } from '@/api/upBank'
+import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 /** Return today as YYYY-MM-DD in local time. */
 function todayDateString(): string {
   const d = new Date()
@@ -43,9 +44,20 @@ export function advanceNextPaydayIfNeeded(): void {
       next = new Date(current)
       next.setUTCDate(next.getUTCDate() + 14)
     } else if (frequency === 'MONTHLY') {
-      next = new Date(current)
-      next.setUTCMonth(next.getUTCMonth() + 1)
-      if (paydayDay >= 1 && paydayDay <= 28) next.setUTCDate(paydayDay)
+      if (isMonthlyLastWeekday(paydayDay)) {
+        const nextMonthStart = new Date(
+          Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 1)
+        )
+        next = monthlyPaydayDate(
+          paydayDay,
+          nextMonthStart.getUTCFullYear(),
+          nextMonthStart.getUTCMonth()
+        )
+      } else {
+        next = new Date(current)
+        next.setUTCMonth(next.getUTCMonth() + 1)
+        if (paydayDay >= 1 && paydayDay <= 28) next.setUTCDate(paydayDay)
+      }
     } else {
       break
     }

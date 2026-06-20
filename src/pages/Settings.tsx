@@ -15,7 +15,11 @@ import {
   encryptToken,
 } from '@/lib/crypto'
 import { validateUpBankToken } from '@/api/upBank'
-import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
+import {
+  type PaydayFrequency,
+  getPaydayDayOptions,
+  getPaydayDayLabel,
+} from '@/lib/payday'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
 import { CategoryColorsSection } from '@/components/CategoryColorsSection'
 import {
@@ -46,6 +50,13 @@ import {
 import { useFullReSync } from '@/hooks/useFullReSync'
 import { isBiometricAvailable, registerBiometric } from '@/lib/webauthn'
 import { clearBiometricSession } from '@/lib/biometricSession'
+import {
+  detectPaySchedule,
+  searchCreditTransactions,
+  type PaydayDetectionResult,
+  type PayeeSummary,
+} from '@/services/paydayDetection'
+import { syncStore } from '@/stores/syncStore'
 
 const SETTINGS_ACTIVE_SECTION_KEY = 'vantura_settings_active_section'
 const LEGACY_SETTINGS_ACCORDION_KEY = 'vantura_settings_accordion'
@@ -102,8 +113,16 @@ function formatSettingsSummary(settings: Record<string, string>): string {
           : freq === 'MONTHLY'
             ? 'Monthly'
             : freq
-    const day = settings.payday_day
-    parts.push(day ? `${label} payday (day ${day})` : `${label} payday`)
+    const dayStr = settings.payday_day
+    if (dayStr) {
+      const dayNum = parseInt(dayStr, 10)
+      const dayLabel = Number.isNaN(dayNum)
+        ? dayStr
+        : getPaydayDayLabel(freq, dayNum)
+      parts.push(`${label} payday (${dayLabel})`)
+    } else {
+      parts.push(`${label} payday`)
+    }
   }
   return parts.length > 0 ? parts.join(', ') : 'Some settings'
 }
@@ -213,6 +232,10 @@ export function Settings() {
   const [paydayPayAmount, setPaydayPayAmount] = useState('')
   const [paydayError, setPaydayError] = useState<string | null>(null)
   const [paydaySuccess, setPaydaySuccess] = useState(false)
+  const [txSearch, setTxSearch] = useState('')
+  const [txResults, setTxResults] = useState<PayeeSummary[]>([])
+  const [txDetectionResult, setTxDetectionResult] =
+    useState<PaydayDetectionResult | null>(null)
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportPassphrase, setExportPassphrase] = useState('')
   const [exportPassphraseConfirm, setExportPassphraseConfirm] = useState('')
@@ -465,6 +488,9 @@ export function Settings() {
         Number.isNaN(cents) || cents < 0 ? '' : String(cents)
       )
     }
+    setTxSearch('')
+    setTxResults([])
+    syncStore.getState().syncCompleted()
     setPaydaySuccess(true)
     toast.success('Payday schedule updated.')
     setTimeout(() => setPaydaySuccess(false), 5000)
@@ -767,14 +793,151 @@ export function Settings() {
               )}
               {activeSection === 'payday' && (
                 <>
-                  <p className="small text-muted mb-3">
-                    Used for spendable balance and PAYDAY trackers. Update when
-                    your pay cycle changes (e.g. new job). When Monthly, Day is
-                    the date in the month (1st–28th). If you&apos;re paid on the
-                    29th–31st, choose 28th and set Next payday to your actual
-                    date.
+                  <p className="small text-muted mb-2">
+                    Used for your spendable balance, PAYDAY trackers, and budget
+                    planning. Update when your pay cycle changes.
                   </p>
+                  <div className="changelog-upcoming-grid mb-3">
+                    <div className="changelog-upcoming-item">
+                      <i
+                        className="mdi mdi-calendar-today changelog-upcoming-icon"
+                        style={{ color: '#90caf9' }}
+                        aria-hidden
+                      />
+                      <span>
+                        <strong className="text-body">
+                          Fixed date (1st–28th)
+                        </strong>{' '}
+                        — same date every month. Days 29–31 are excluded because
+                        February doesn't always have them, which would cause a
+                        skipped pay.
+                      </span>
+                    </div>
+                    <div className="changelog-upcoming-item">
+                      <i
+                        className="mdi mdi-calendar-check changelog-upcoming-icon"
+                        style={{ color: '#80cbc4' }}
+                        aria-hidden
+                      />
+                      <span>
+                        <strong className="text-body">Last weekday</strong> —
+                        the last Mon–Fri of the month, whatever the date. Ideal
+                        if your pay always falls at the end of the month (e.g.
+                        30 Apr, 29 May, 30 Jun).
+                      </span>
+                    </div>
+                    <div className="changelog-upcoming-item">
+                      <i
+                        className="mdi mdi-calendar-week changelog-upcoming-icon"
+                        style={{ color: '#ce93d8' }}
+                        aria-hidden
+                      />
+                      <span>
+                        <strong className="text-body">
+                          Last Monday / Last Friday / etc.
+                        </strong>{' '}
+                        — the last occurrence of a specific weekday each month.
+                      </span>
+                    </div>
+                  </div>
                   <Form onSubmit={handlePaydaySubmit}>
+                    <div
+                      className="mb-3 p-2 rounded"
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.09)',
+                      }}
+                    >
+                      <Form.Label
+                        htmlFor="settings-tx-search"
+                        className="small fw-semibold mb-1 d-block"
+                      >
+                        Detect from transactions
+                      </Form.Label>
+                      <Form.Text
+                        className="text-muted d-block mb-2"
+                        style={{ fontSize: '0.74rem' }}
+                      >
+                        Search for your pay transaction — Vantura will detect
+                        your schedule from its history and fill the fields
+                        below.
+                      </Form.Text>
+                      <Form.Control
+                        id="settings-tx-search"
+                        type="search"
+                        size="sm"
+                        placeholder="Search by employer or payee name…"
+                        value={txSearch}
+                        autoComplete="off"
+                        onChange={(e) => {
+                          const q = e.target.value
+                          setTxSearch(q)
+                          setTxResults(
+                            q.trim().length >= 2
+                              ? searchCreditTransactions(q.trim())
+                              : []
+                          )
+                        }}
+                      />
+                      {txResults.length > 0 && (
+                        <div
+                          className="list-group list-group-flush mt-1"
+                          style={{
+                            maxHeight: 180,
+                            overflowY: 'auto',
+                            borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          {txResults.map((payee) => (
+                            <button
+                              key={payee.raw_text ?? payee.description}
+                              type="button"
+                              className="list-group-item list-group-item-action py-2 px-2 small"
+                              onClick={() => {
+                                const key = payee.raw_text ?? payee.description
+                                const result = detectPaySchedule(key)
+                                setTxDetectionResult(result)
+                                if (result) {
+                                  setPaydayFrequency(result.frequency)
+                                  setPaydayDay(result.paydayDay)
+                                  setNextPayday(result.nextPayday)
+                                }
+                                setTxSearch('')
+                                setTxResults([])
+                              }}
+                            >
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span
+                                  className="fw-semibold text-truncate"
+                                  style={{ maxWidth: '70%' }}
+                                >
+                                  {payee.description}
+                                </span>
+                                <span className="text-muted ms-2 flex-shrink-0">
+                                  {payee.occurrences}{' '}
+                                  {payee.occurrences === 1 ? 'pay' : 'pays'}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {txDetectionResult && (
+                        <p className="text-success small mt-2 mb-0">
+                          <i
+                            className="mdi mdi-check-circle-outline me-1"
+                            aria-hidden
+                          />
+                          Detected from {txDetectionResult.sampleDates.length}{' '}
+                          transaction
+                          {txDetectionResult.sampleDates.length !== 1
+                            ? 's'
+                            : ''}{' '}
+                          — fields updated below.
+                        </p>
+                      )}
+                    </div>
                     <Form.Group className="mb-2">
                       <Form.Label htmlFor="settings-payday-frequency">
                         Frequency

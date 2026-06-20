@@ -369,8 +369,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               <h6 className="mb-2">When do you get paid?</h6>
               <p className="text-muted small mb-3">
                 This helps calculate your Spendable balance. When Monthly, Day
-                is the date in the month (1st–28th). If you&apos;re paid on the
-                29th–31st, choose 28th and set Next payday to your actual date.
+                is the date in the month (1st–28th) or a relative rule such as
+                Last Friday — useful when your employer pays on the last weekday
+                of each month.
               </p>
               <Form.Group className="mb-2">
                 <Form.Label htmlFor="onboarding-payday-frequency">

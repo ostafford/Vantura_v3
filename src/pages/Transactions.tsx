@@ -49,6 +49,10 @@ import {
   getPaydayDayOptions,
   computeNextPaydayFromReference,
 } from '@/lib/payday'
+import {
+  detectPaySchedule,
+  type PaydayDetectionResult,
+} from '@/services/paydayDetection'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { useFullReSync } from '@/hooks/useFullReSync'
@@ -374,8 +378,28 @@ export function Transactions() {
       (getAppSetting('payday_frequency') as PaydayFrequency | null) ?? 'MONTHLY'
   )
 
+  // Run history-based detection synchronously when the panel is open.
+  const detectionResult: PaydayDetectionResult | null = useMemo(() => {
+    if (!showPaydaySetup || !editTxRow?.raw_text) return null
+    return detectPaySchedule(editTxRow.raw_text)
+  }, [showPaydaySetup, editTxRow?.raw_text])
+
+  // Pre-fill frequency select with detected value when detection succeeds.
+  useEffect(() => {
+    if (detectionResult) setPaydaySetupFreq(detectionResult.frequency)
+  }, [detectionResult])
+
   const paydaySetupPreview = useMemo(() => {
     if (!editTxRow) return null
+    // Use history-detection result when the user hasn't overridden the frequency.
+    if (detectionResult && paydaySetupFreq === detectionResult.frequency) {
+      return {
+        paydayDay: detectionResult.paydayDay,
+        nextPayday: detectionResult.nextPayday,
+        dayLabel: detectionResult.dayLabel,
+      }
+    }
+    // Fall back to single-transaction inference.
     const txDate = (editTxRow.created_at ?? editTxRow.settled_at ?? '').slice(
       0,
       10
@@ -389,13 +413,14 @@ export function Transactions() {
     const dayLabel =
       dayOptions.find((o) => o.value === paydayDay)?.label ?? String(paydayDay)
     return { paydayDay, nextPayday, dayLabel }
-  }, [editTxRow, paydaySetupFreq])
+  }, [editTxRow, paydaySetupFreq, detectionResult])
 
   function handlePaydayNominate() {
     if (!editTxRow || !paydaySetupPreview) return
     setAppSetting('payday_frequency', paydaySetupFreq)
     setAppSetting('payday_day', String(paydaySetupPreview.paydayDay))
     setAppSetting('next_payday', paydaySetupPreview.nextPayday)
+    syncStore.getState().syncCompleted()
     toast.success(
       `Payday set: ${paydaySetupFreq.charAt(0) + paydaySetupFreq.slice(1).toLowerCase()} on ${paydaySetupPreview.dayLabel}. Next: ${paydaySetupPreview.nextPayday}.`
     )
@@ -1452,6 +1477,24 @@ export function Transactions() {
                       <p className="fw-semibold mb-2">
                         Configure pay schedule from this transaction
                       </p>
+                      {detectionResult &&
+                        paydaySetupFreq === detectionResult.frequency && (
+                          <p className="text-muted mb-2">
+                            <i
+                              className="mdi mdi-check-circle-outline text-success me-1"
+                              aria-hidden
+                            />
+                            Detected from {detectionResult.sampleDates.length}{' '}
+                            {detectionResult.sampleDates.length === 1
+                              ? 'transaction'
+                              : 'transactions'}
+                            {': '}
+                            {detectionResult.sampleDates
+                              .slice(-3)
+                              .map(formatShortDate)
+                              .join(' · ')}
+                          </p>
+                        )}
                       <Form.Group className="mb-2">
                         <Form.Label htmlFor="payday-setup-freq">
                           Frequency
