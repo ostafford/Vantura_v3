@@ -80,7 +80,7 @@ export function Sidebar({
         minWidth: width,
         background: 'var(--vantura-sidebar-gradient)',
         color: 'var(--vantura-sidebar-menu-color)',
-        zIndex: 1031,
+        zIndex: 1101,
         transition:
           'width 0.25s ease, background 0.25s ease, transform 0.25s ease',
         display: 'flex',

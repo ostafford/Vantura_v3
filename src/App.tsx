@@ -12,6 +12,8 @@ import { Onboarding } from '@/pages/Onboarding'
 import { Changelog } from '@/pages/Changelog'
 import { appRouter } from '@/appRouter'
 import { useInactivityLock } from '@/hooks/useInactivityLock'
+import { usePwaUpdate } from '@/hooks/usePwaUpdate'
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
 
 // Detect if the app was loaded directly at /changelog (public, no auth required)
 const _base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
@@ -51,6 +53,7 @@ function AppContent() {
   const accentHydrated = useStore(accentStore, (s) => s.hydrated)
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
   useInactivityLock(unlocked)
+  const { updateReady, applyUpdate } = usePwaUpdate()
 
   useEffect(() => {
     if (!accentHydrated) return
@@ -160,7 +163,12 @@ function AppContent() {
   }
 
   if (!unlocked) {
-    return <Unlock />
+    return (
+      <>
+        <Unlock />
+        {updateReady && <PwaUpdateBanner onReload={applyUpdate} />}
+      </>
+    )
   }
 
   return (

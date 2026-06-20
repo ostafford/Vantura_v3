@@ -16,15 +16,17 @@ import {
 } from '@/lib/biometricSession'
 import { VanturaLogo } from '@/components/VanturaLogo'
 
-type Mode = 'biometric' | 'passphrase' | 'reset-confirm'
+type Mode = 'passphrase' | 'reset-confirm'
 
 export function Unlock() {
   const [passphrase, setPassphrase] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [passphraseInvalid, setPassphraseInvalid] = useState(false)
   const [loading, setLoading] = useState(false)
   const [bioPrompting, setBioPrompting] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>('passphrase')
   const setUnlocked = useStore(sessionStore, (s) => s.setUnlocked)
 
   const isDemoMode = getAppSetting('demo_mode') === '1'
@@ -33,16 +35,13 @@ export function Unlock() {
   const canUseBiometric =
     !bioDisabled && !!credentialId && hasBiometricSession()
 
-  const [mode, setMode] = useState<Mode>(
-    !isDemoMode && canUseBiometric ? 'biometric' : 'passphrase'
-  )
-
   const didAutoTrigger = useRef(false)
 
   async function triggerBiometric() {
     if (!credentialId) return
     setBioPrompting(true)
     setError(null)
+    setPassphraseInvalid(false)
     try {
       const ok = await verifyBiometric(credentialId)
       if (!ok) throw new Error('Verification returned false')
@@ -52,20 +51,56 @@ export function Unlock() {
     } catch (err) {
       const name = err instanceof Error ? err.name : ''
       if (name !== 'NotAllowedError') {
-        setError('Biometric check failed. Use your passphrase instead.')
+        setError('Biometric check failed. Enter your passphrase instead.')
       }
-      setMode('passphrase')
     } finally {
       setBioPrompting(false)
     }
   }
 
-  // Auto-trigger the biometric prompt on mount — saves one tap for returning users
+  // Auto-trigger biometrics when the user is actively in the app.
+  // Never fire immediately on mount — we wait for a genuine user-presence signal.
+  // Mouse/touch/key events only reach the browser when it has OS-level focus, making
+  // them far more reliable than polling hasFocus() at a single point in time.
+  // This prevents the Touch ID prompt appearing while the user is in another app.
   useEffect(() => {
-    if (mode === 'biometric' && !didAutoTrigger.current) {
+    if (!canUseBiometric || didAutoTrigger.current) return
+
+    const presenceEvents = [
+      'mousemove',
+      'touchstart',
+      'keydown',
+      'pointerdown',
+    ] as const
+
+    function attempt() {
+      if (didAutoTrigger.current) return
       didAutoTrigger.current = true
       void triggerBiometric()
+      cleanup()
     }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') attempt()
+    }
+
+    function cleanup() {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', attempt)
+      presenceEvents.forEach((e) => window.removeEventListener(e, attempt))
+    }
+
+    // visibilitychange: tab/app comes to foreground (iOS, Android, background tabs)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    // focus: browser window gains OS focus (Mac app switching)
+    window.addEventListener('focus', attempt)
+    // presence events: only fire when the window already has OS focus,
+    // so they handle the case where the user was already in the app when it locked
+    presenceEvents.forEach((e) =>
+      window.addEventListener(e, attempt, { passive: true })
+    )
+
+    return cleanup
   }, []) // intentional: only fires once on mount
 
   async function handleResetApp() {
@@ -108,69 +143,6 @@ export function Unlock() {
               >
                 Open demo
               </Button>
-            </div>
-          </Card.Body>
-        </Card>
-      </div>
-    )
-  }
-
-  if (mode === 'biometric') {
-    return (
-      <div className="auth-full-bg">
-        <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
-          <Card.Body className="text-center">
-            <div className="mb-4">
-              <VanturaLogo variant="wordmark" height={28} />
-            </div>
-            <Card.Title className="mb-3">Vantura is locked</Card.Title>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
-              <i className="mdi mdi-lock-outline" aria-hidden />
-            </div>
-            <p className="text-muted small mb-3">
-              Tap the button below to unlock with your device credentials.
-            </p>
-            {error && (
-              <Alert
-                variant="danger"
-                className="py-2 mb-3 text-center"
-                role="alert"
-              >
-                {error}
-              </Alert>
-            )}
-            <Button
-              type="button"
-              className="btn-gradient-primary mb-3"
-              onClick={triggerBiometric}
-              disabled={bioPrompting}
-            >
-              {bioPrompting ? (
-                <>
-                  <Spinner
-                    animation="border"
-                    size="sm"
-                    className="me-1"
-                    role="status"
-                    aria-hidden="true"
-                  />
-                  Waiting…
-                </>
-              ) : (
-                'Unlock with biometrics'
-              )}
-            </Button>
-            <div>
-              <button
-                type="button"
-                className="btn btn-link btn-sm text-muted p-0"
-                onClick={() => {
-                  setMode('passphrase')
-                  setError(null)
-                }}
-              >
-                Use passphrase instead
-              </button>
             </div>
           </Card.Body>
         </Card>
@@ -250,12 +222,14 @@ export function Unlock() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setPassphraseInvalid(false)
     setLoading(true)
     try {
       const salt = getAppSetting('encryption_salt')
       const encrypted = getAppSetting('api_token_encrypted')
       if (!salt || !encrypted) {
         setError('No stored credentials. Please complete onboarding.')
+        setPassphraseInvalid(true)
         return
       }
       const key = await deriveKeyFromPassphrase(passphrase, salt)
@@ -283,6 +257,7 @@ export function Unlock() {
       setUnlocked(token)
     } catch {
       setError('Incorrect passphrase. Please try again.')
+      setPassphraseInvalid(true)
     } finally {
       setLoading(false)
     }
@@ -322,46 +297,74 @@ export function Unlock() {
                 onChange={(e) => {
                   setPassphrase(e.target.value)
                   setError(null)
+                  setPassphraseInvalid(false)
                 }}
                 placeholder="Enter passphrase"
                 autoComplete="current-password"
-                disabled={loading}
-                isInvalid={!!error}
+                disabled={loading || bioPrompting}
+                isInvalid={passphraseInvalid}
                 autoFocus
               />
             </Form.Group>
             {error && (
               <Alert
                 variant="danger"
-                className="py-2 mb-2 text-center"
+                className="py-2 mb-3 text-center"
                 role="alert"
               >
                 {error}
               </Alert>
             )}
-            <div className="text-center">
+            <div className="d-flex gap-2 justify-content-center">
               <Button
                 type="submit"
                 className="btn-gradient-primary"
-                disabled={loading}
+                disabled={loading || bioPrompting}
               >
-                {loading ? 'Unlocking…' : 'Unlock'}
+                {loading ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-1"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Unlocking…
+                  </>
+                ) : (
+                  'Unlock'
+                )}
               </Button>
+              {canUseBiometric && (
+                <Button
+                  type="button"
+                  variant="outline-secondary"
+                  onClick={() => void triggerBiometric()}
+                  disabled={bioPrompting || loading}
+                  aria-label="Unlock with biometrics"
+                  title="Unlock with biometrics"
+                  style={{
+                    padding: '0.375rem 0.875rem',
+                    fontSize: '1.25rem',
+                    lineHeight: 1,
+                  }}
+                >
+                  {bioPrompting ? (
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <i className="mdi mdi-fingerprint" aria-hidden />
+                  )}
+                </Button>
+              )}
             </div>
           </Form>
           <div className="text-center mt-3">
-            {canUseBiometric && (
-              <button
-                type="button"
-                className="btn btn-link btn-sm text-muted p-0 d-block mx-auto mb-2"
-                onClick={() => {
-                  setMode('biometric')
-                  setError(null)
-                }}
-              >
-                Use biometrics instead
-              </button>
-            )}
             <button
               type="button"
               className="btn btn-link btn-sm text-muted p-0 d-block mx-auto"

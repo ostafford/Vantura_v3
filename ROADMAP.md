@@ -135,6 +135,16 @@ The initial build established the full technical foundation: local-first storage
 
 ---
 
+### PWA & Lock Screen Polish — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 20 | **PWA safe area support** — `viewport-fit=cover` + `black-translucent` status bar style; navbar, sidebar, auth screen, and content areas respect `env(safe-area-inset-*)` for iPhone notch / Dynamic Island / home indicator / rounded corners; `100dvh` replaces `100vh` for correct mobile viewport; sidebar z-index raised above update banner |
+| Jun 20 | **Lock screen UX** — Removed intermediate biometric mode screen; passphrase and fingerprint icon button now side-by-side on a single screen; tapping the fingerprint icon fires the prompt immediately; PWA update banner now visible on the lock screen |
+| Jun 20 | **Biometric privacy fix** — Auto-trigger deferred until user is actively in the app (presence events: mousemove, touch, keydown, window focus, visibilitychange); Touch ID / Face ID prompt no longer appears while user is in another application |
+
+---
+
 ### Documentation & UX Polish — June 2026
 
 | Date | Feature |
