@@ -190,13 +190,14 @@ export function getBucketCardSummary(
   }
 
   if (db) {
+    const paydayFreq = getAppSetting('payday_frequency') ?? 'MONTHLY'
     const stmt = db.prepare(
       `SELECT budget_amount, reset_frequency FROM trackers WHERE bucket_id = ? AND is_active = 1`
     )
     stmt.bind([bucketId])
     while (stmt.step()) {
       const row = stmt.get() as [number, string]
-      const freq = row[1] === 'PAYDAY' ? 'MONTHLY' : row[1]
+      const freq = row[1] === 'PAYDAY' ? paydayFreq : row[1]
       plannedCents += toPeriodCents(row[0], freq, period)
     }
     stmt.free()

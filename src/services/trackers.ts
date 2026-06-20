@@ -3,6 +3,7 @@
  */
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
+import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 
 function todayDateString(): string {
   const d = new Date()
@@ -173,6 +174,15 @@ function getPreviousPaydayDate(fromDate: string): string | null {
   } else if (frequency === 'MONTHLY') {
     prev = new Date(from)
     prev.setUTCMonth(prev.getUTCMonth() - 1)
+    if (isMonthlyLastWeekday(paydayDay)) {
+      return monthlyPaydayDate(
+        paydayDay,
+        prev.getUTCFullYear(),
+        prev.getUTCMonth()
+      )
+        .toISOString()
+        .slice(0, 10)
+    }
     if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
   } else {
     return null

@@ -267,6 +267,15 @@ function prevPaydayDate(nextPayday: string): string | null {
   if (frequency === 'MONTHLY') {
     const prev = new Date(from)
     prev.setUTCMonth(prev.getUTCMonth() - 1)
+    if (isMonthlyLastWeekday(paydayDay)) {
+      return monthlyPaydayDate(
+        paydayDay,
+        prev.getUTCFullYear(),
+        prev.getUTCMonth()
+      )
+        .toISOString()
+        .slice(0, 10)
+    }
     if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
     return prev.toISOString().slice(0, 10)
   }
