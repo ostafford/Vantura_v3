@@ -18,6 +18,30 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Lock Screen UX',
+    primaryMonth: '2026-06',
+    color: '#90caf9',
+    items: [
+      {
+        icon: 'mdi-lock-outline',
+        text: 'Vantura logo now appears on all lock screen states — passphrase, biometric, demo, and reset',
+      },
+      {
+        icon: 'mdi-fingerprint',
+        text: 'Biometric prompt auto-triggers on mount — no extra tap required when Face ID or Touch ID is available',
+      },
+      {
+        icon: 'mdi-refresh',
+        text: 'Forgot your passphrase? A new inline reset flow lets you clear all data and start over directly from the lock screen',
+      },
+      {
+        icon: 'mdi-palette-outline',
+        text: 'Lock screen background and card border now respond to your chosen accent colour; modal borders updated to match',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Documentation & UX Polish',
     primaryMonth: '2026-06',
     color: '#ce93d8',

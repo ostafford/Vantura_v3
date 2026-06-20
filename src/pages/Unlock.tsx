@@ -1,7 +1,7 @@
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { Alert, Button, Card, Form, Spinner } from 'react-bootstrap'
 import { useStore } from 'zustand'
-import { getAppSetting, setAppSetting } from '@/db'
+import { getAppSetting, setAppSetting, deleteDatabase } from '@/db'
 import { sessionStore } from '@/stores/sessionStore'
 import { deriveKeyFromPassphrase, decryptToken } from '@/lib/crypto'
 import {
@@ -14,14 +14,17 @@ import {
   retrieveBiometricSession,
   storeBiometricSession,
 } from '@/lib/biometricSession'
+import { VanturaLogo } from '@/components/VanturaLogo'
 
-type Mode = 'biometric' | 'passphrase'
+type Mode = 'biometric' | 'passphrase' | 'reset-confirm'
 
 export function Unlock() {
   const [passphrase, setPassphrase] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bioPrompting, setBioPrompting] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
   const setUnlocked = useStore(sessionStore, (s) => s.setUnlocked)
 
   const isDemoMode = getAppSetting('demo_mode') === '1'
@@ -33,6 +36,8 @@ export function Unlock() {
   const [mode, setMode] = useState<Mode>(
     !isDemoMode && canUseBiometric ? 'biometric' : 'passphrase'
   )
+
+  const didAutoTrigger = useRef(false)
 
   async function triggerBiometric() {
     if (!credentialId) return
@@ -55,15 +60,46 @@ export function Unlock() {
     }
   }
 
+  // Auto-trigger the biometric prompt on mount — saves one tap for returning users
+   
+  useEffect(() => {
+    if (mode === 'biometric' && !didAutoTrigger.current) {
+      didAutoTrigger.current = true
+      void triggerBiometric()
+    }
+  }, []) // intentional: only fires once on mount
+
+  async function handleResetApp() {
+    setResetting(true)
+    setResetError(null)
+    try {
+      localStorage.removeItem('vantura_sidebar_collapsed')
+      await deleteDatabase()
+      window.location.reload()
+    } catch (err) {
+      setResetError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to reset. Please try again.'
+      )
+      setResetting(false)
+    }
+  }
+
   if (isDemoMode) {
     return (
       <div className="auth-full-bg">
         <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
           <Card.Body>
-            <Card.Title className="mb-3">Demo mode</Card.Title>
+            <div className="text-center mb-4">
+              <VanturaLogo variant="wordmark" height={28} />
+            </div>
+            <Card.Title className="mb-2 text-center">
+              Welcome to Vantura
+            </Card.Title>
             <Card.Text className="text-muted small mb-3 text-center">
-              You&apos;re using sample data. Open the demo to explore the app
-              without connecting your Up Bank account.
+              You&apos;re exploring Vantura with sample data — no Up Bank
+              account needed.
             </Card.Text>
             <div className="text-center">
               <Button
@@ -85,12 +121,15 @@ export function Unlock() {
       <div className="auth-full-bg">
         <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
           <Card.Body className="text-center">
+            <div className="mb-4">
+              <VanturaLogo variant="wordmark" height={28} />
+            </div>
             <Card.Title className="mb-3">Vantura is locked</Card.Title>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
-              <i className="mdi mdi-fingerprint" aria-hidden />
+              <i className="mdi mdi-lock-outline" aria-hidden />
             </div>
             <p className="text-muted small mb-3">
-              Tap the button below to unlock with Touch ID or Face ID.
+              Tap the button below to unlock with your device credentials.
             </p>
             {error && (
               <Alert
@@ -133,6 +172,75 @@ export function Unlock() {
               >
                 Use passphrase instead
               </button>
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    )
+  }
+
+  if (mode === 'reset-confirm') {
+    return (
+      <div className="auth-full-bg">
+        <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
+          <Card.Body>
+            <div className="text-center mb-4">
+              <VanturaLogo variant="wordmark" height={28} />
+            </div>
+            <Card.Title className="mb-3 text-center">Reset Vantura?</Card.Title>
+            <p className="text-muted small mb-2 text-center">
+              Your passphrase is the encryption key for your data — it&apos;s
+              never stored anywhere, and Vantura has no server-side copy to
+              recover from. This is intentional: your data stays completely
+              private and only you can access it.
+            </p>
+            <p className="text-muted small mb-4 text-center">
+              Without your passphrase, your data can&apos;t be decrypted by
+              anyone. To start over, all local data must be permanently deleted.
+            </p>
+            {resetError && (
+              <Alert
+                variant="danger"
+                className="py-2 mb-3 text-center"
+                role="alert"
+              >
+                {resetError}
+              </Alert>
+            )}
+            <div className="d-grid gap-2">
+              <Button
+                variant="danger"
+                onClick={handleResetApp}
+                disabled={resetting}
+              >
+                {resetting ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-1"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Deleting…
+                  </>
+                ) : (
+                  'Delete all data'
+                )}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm text-muted p-0"
+                  onClick={() => {
+                    setMode('passphrase')
+                    setResetError(null)
+                  }}
+                  disabled={resetting}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </Card.Body>
         </Card>
@@ -185,11 +293,9 @@ export function Unlock() {
     <div className="auth-full-bg">
       <Card style={{ width: '100%', maxWidth: 400 }} className="auth-card">
         <Card.Body>
-          <Card.Title className="mb-3">Unlock Vantura</Card.Title>
-          <Card.Text className="text-muted small mb-3 text-center">
-            Enter your passphrase to access your data. Your passphrase is never
-            stored.
-          </Card.Text>
+          <div className="text-center mb-4">
+            <VanturaLogo variant="wordmark" height={28} />
+          </div>
           <Form onSubmit={handleSubmit}>
             {/* Hidden username field for a11y / password-manager heuristic */}
             <input
@@ -208,9 +314,9 @@ export function Unlock() {
               }}
             />
             <Form.Group className="mb-3">
-              <Form.Label htmlFor="unlock-passphrase">Passphrase</Form.Label>
               <Form.Control
                 id="unlock-passphrase"
+                aria-label="Passphrase"
                 name="passphrase"
                 type="password"
                 value={passphrase}
@@ -244,11 +350,11 @@ export function Unlock() {
               </Button>
             </div>
           </Form>
-          {canUseBiometric && (
-            <div className="text-center mt-3">
+          <div className="text-center mt-3">
+            {canUseBiometric && (
               <button
                 type="button"
-                className="btn btn-link btn-sm text-muted p-0"
+                className="btn btn-link btn-sm text-muted p-0 d-block mx-auto mb-2"
                 onClick={() => {
                   setMode('biometric')
                   setError(null)
@@ -256,8 +362,16 @@ export function Unlock() {
               >
                 Use biometrics instead
               </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              className="btn btn-link btn-sm text-muted p-0 d-block mx-auto"
+              style={{ fontSize: '0.75rem' }}
+              onClick={() => setMode('reset-confirm')}
+            >
+              Forgot your passphrase?
+            </button>
+          </div>
         </Card.Body>
       </Card>
     </div>
