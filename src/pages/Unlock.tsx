@@ -61,7 +61,6 @@ export function Unlock() {
   }
 
   // Auto-trigger the biometric prompt on mount — saves one tap for returning users
-   
   useEffect(() => {
     if (mode === 'biometric' && !didAutoTrigger.current) {
       didAutoTrigger.current = true
