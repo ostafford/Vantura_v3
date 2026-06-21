@@ -2369,7 +2369,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 1100;
+  z-index: 1102;
   background: var(--vantura-surface-elevated);
   border-top: 1px solid var(--vantura-primary);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);

@@ -153,6 +153,7 @@ export function Layout() {
         <PwaUpdateBanner
           onReload={applyUpdate}
           onDismiss={() => setBannerDismissed(true)}
+          sidebarOffset={contentMarginLeft}
         />
       )}
       <WhatsNewModal
