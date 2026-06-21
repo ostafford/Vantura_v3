@@ -1570,6 +1570,22 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 /* Mobile / portrait: sidebar overlay and navbar */
+
+/* Subtle left-edge pull tab — hints at the swipe-to-open gesture on mobile */
+.sidebar-pull-tab {
+  position: fixed;
+  left: 0;
+  top: 50vh;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 48px;
+  background: var(--vantura-primary);
+  border-radius: 0 4px 4px 0;
+  opacity: 0.35;
+  z-index: 1029;
+  pointer-events: none;
+}
+
 .sidebar-backdrop {
   position: fixed;
   inset: 0;

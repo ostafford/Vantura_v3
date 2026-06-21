@@ -6,6 +6,7 @@ import { persistErrorStore } from '@/stores/persistErrorStore'
 import { Sidebar, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './Sidebar'
 import { Navbar } from './Navbar'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { MOBILE_MEDIA_QUERY, MOBILE_BREAKPOINT_PX } from '@/lib/constants'
 import { usePwaUpdate } from '@/hooks/usePwaUpdate'
 import {
@@ -100,8 +101,13 @@ export function Layout() {
 
   const contentMarginLeft = isMobile ? 0 : sidebarWidth
 
+  useEdgeSwipe(isMobile)
+
   return (
     <div className="container-scroller">
+      {isMobile && !sidebarMobileOpen && (
+        <div className="sidebar-pull-tab" aria-hidden />
+      )}
       {isMobile && sidebarMobileOpen && (
         <button
           type="button"
