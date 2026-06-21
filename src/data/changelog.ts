@@ -19,6 +19,35 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Export & Import v2',
+    primaryMonth: '2026-06',
+    version: '0.5.3',
+    color: '#90caf9',
+    items: [
+      {
+        icon: 'mdi-export-variant',
+        text: 'Budget Plan now included in export — buckets, hypotheticals, and tracker/charge bucket assignments all survive the transfer',
+      },
+      {
+        icon: 'mdi-bell-outline',
+        text: 'Notification preferences exported — master toggle, per-type toggles, and large-transaction threshold all carry over to new devices',
+      },
+      {
+        icon: 'mdi-shield-lock-outline',
+        text: 'Lock timeout setting exported — your inactivity timeout preference no longer needs to be reconfigured after import',
+      },
+      {
+        icon: 'mdi-cash-clock',
+        text: 'Payday source transaction exported — payday detection state fully preserved so the app knows which credit is your salary on arrival',
+      },
+      {
+        icon: 'mdi-piggy-bank-outline',
+        text: 'Saver preferences exported — account ordering and individual goal dates transfer across devices',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Reliability & Hosting',
     primaryMonth: '2026-06',
     version: '0.5.2',
@@ -423,11 +452,6 @@ export const MILESTONES: Milestone[] = [
 ]
 
 export const UPCOMING: UpcomingItem[] = [
-  {
-    icon: 'mdi-export-variant',
-    color: '#90caf9',
-    text: 'Profile export v2 — include Budget Plan buckets in the exported profile file',
-  },
   {
     icon: 'mdi-auto-fix',
     color: '#80cbc4',

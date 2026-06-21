@@ -40,6 +40,9 @@ import {
   type ExportPayload,
   type TrackerExportRow,
   type UpcomingChargeExportRow,
+  type BudgetBucketExportRow,
+  type BudgetHypotheticalExportRow,
+  type ImportOptions,
   IMPORT_ERROR_WRONG_PASSPHRASE,
 } from '@/services/profileExport'
 import {
@@ -144,6 +147,15 @@ function formatTrackersSummary(trackers: TrackerExportRow[]): string {
 function formatUpcomingSummary(charges: UpcomingChargeExportRow[]): string {
   if (!Array.isArray(charges) || charges.length === 0) return 'None'
   return `${charges.length} upcoming charge${charges.length !== 1 ? 's' : ''}`
+}
+
+function formatBudgetSummary(
+  buckets: BudgetBucketExportRow[],
+  hypotheticals: BudgetHypotheticalExportRow[]
+): string {
+  if (!Array.isArray(buckets) || buckets.length === 0) return 'None'
+  const hypsArr = Array.isArray(hypotheticals) ? hypotheticals : []
+  return `${buckets.length} bucket${buckets.length !== 1 ? 's' : ''}, ${hypsArr.length} hypothetical${hypsArr.length !== 1 ? 's' : ''}`
 }
 
 function DashboardSectionOrderForm() {
@@ -265,10 +277,11 @@ export function Settings() {
   const [importing, setImporting] = useState(false)
   const [importStep, setImportStep] = useState<1 | 2>(1)
   const [importPreview, setImportPreview] = useState<ExportPayload | null>(null)
-  const [importOptions, setImportOptions] = useState({
+  const [importOptions, setImportOptions] = useState<ImportOptions>({
     settings: true,
     trackers: true,
     upcomingCharges: true,
+    budgetPlan: true,
   })
   const accent = useStore(accentStore, (s) => s.accent)
   const navigate = useNavigate()
@@ -643,6 +656,7 @@ export function Settings() {
         settings: true,
         trackers: true,
         upcomingCharges: true,
+        budgetPlan: true,
       })
       setImportStep(2)
     } catch (err) {
@@ -1537,11 +1551,11 @@ export function Settings() {
                   <div className="mb-4">
                     <h6 className="text-muted mb-2">Export profile settings</h6>
                     <p className="small text-muted mb-2">
-                      Exports only appearance and configuration (colors, payday
-                      setup, trackers, upcoming charges, chart preferences).
-                      Does not export bank transactions, account numbers, or API
-                      tokens. The file is encrypted with the passphrase you
-                      choose.
+                      Exports appearance and configuration (colors, payday
+                      setup, notification preferences, trackers, upcoming
+                      charges, budget plan, and chart preferences). Does not
+                      export bank transactions, account numbers, or API tokens.
+                      The file is encrypted with the passphrase you choose.
                     </p>
                     <Button
                       variant="outline-primary"
@@ -1841,8 +1855,8 @@ export function Settings() {
           <Form onSubmit={handleImportSubmit}>
             <Modal.Body id="import-modal-description">
               <p className="small text-muted mb-3">
-                Imports settings, trackers, and upcoming charges into this
-                device. Will not import transactions or API tokens.
+                Imports settings, trackers, upcoming charges, and budget plan
+                into this device. Will not import transactions or API tokens.
               </p>
               <Form.Group className="mb-3">
                 <Form.Label>Settings file</Form.Label>
@@ -1944,9 +1958,11 @@ export function Settings() {
           <Form onSubmit={handleImportConfirm}>
             <Modal.Body id="import-modal-description">
               <p className="small text-muted mb-3">
-                Choose which sections to import. Trackers and upcoming charges
-                in this browser will be overwritten only if their sections are
-                selected. Unselected sections will be left unchanged.
+                Choose which sections to import. Each selected section fully
+                replaces the existing data on this device; unselected sections
+                are left unchanged. If you import Trackers or Upcoming charges
+                without importing Budget Plan, those items will lose their
+                bucket assignments.
               </p>
               {importPreview &&
                 (() => {
@@ -1995,7 +2011,7 @@ export function Settings() {
                           {formatTrackersSummary(importPreview.trackers ?? [])}
                         </div>
                       </div>
-                      <div>
+                      <div className="mb-2">
                         <Form.Check
                           type="checkbox"
                           id="import-opt-upcoming"
@@ -2016,6 +2032,34 @@ export function Settings() {
                           New:{' '}
                           {formatUpcomingSummary(
                             importPreview.upcomingCharges ?? []
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Form.Check
+                          type="checkbox"
+                          id="import-opt-budget-plan"
+                          label="Budget Plan (buckets & hypotheticals)"
+                          checked={importOptions.budgetPlan}
+                          onChange={(e) =>
+                            setImportOptions((o) => ({
+                              ...o,
+                              budgetPlan: e.target.checked,
+                            }))
+                          }
+                          aria-label="Import budget plan"
+                        />
+                        <div className="small text-muted ms-4 mt-1">
+                          Current:{' '}
+                          {formatBudgetSummary(
+                            current.budgetBuckets,
+                            current.budgetHypotheticals
+                          )}
+                          {' → '}
+                          New:{' '}
+                          {formatBudgetSummary(
+                            importPreview.budgetBuckets ?? [],
+                            importPreview.budgetHypotheticals ?? []
                           )}
                         </div>
                       </div>
@@ -2040,7 +2084,8 @@ export function Settings() {
                   !importPreview ||
                   (!importOptions.settings &&
                     !importOptions.trackers &&
-                    !importOptions.upcomingCharges)
+                    !importOptions.upcomingCharges &&
+                    !importOptions.budgetPlan)
                 }
                 aria-busy={importing}
               >

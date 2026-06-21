@@ -1,7 +1,7 @@
 /**
  * Profile export/import: encrypted file-based transfer of non-sensitive
- * settings, trackers, and upcoming charges between devices. Never exports
- * transactions, accounts, API tokens, or keys.
+ * settings, trackers, upcoming charges, and budget plan between devices.
+ * Never exports transactions, accounts, API tokens, or keys.
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
@@ -15,14 +15,14 @@ import {
 import { SCHEMA_VERSION } from '@/db/schema'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 2
+const EXPORT_PAYLOAD_VERSION = 3
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
 
 /**
  * Strict whitelist of app_settings keys allowed in export.
- * Any key not in this list is NEVER exported.
+ * Any key not in this list is NEVER exported (except saver_goal_date_* prefix).
  */
 export const SETTINGS_WHITELIST: readonly string[] = [
   'accent_color',
@@ -30,11 +30,25 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'payday_day',
   'next_payday',
   'pay_amount_cents',
+  'payday_raw_text',
+  'payday_description',
   'spendable_alert_below_cents',
   'spendable_alert_below_pct_pay',
   'insights_category_colors',
   'dashboard_tour_completed',
   'dashboard_section_order',
+  'lock_timeout_minutes',
+  'saver_account_order',
+  'notifications_enabled',
+  'notif_bills',
+  'notif_tracker_overspent',
+  'notif_tracker_pace',
+  'notif_spendable_low',
+  'notif_payday',
+  'notif_large_tx',
+  'notif_saver_milestone',
+  'notif_sync_stale',
+  'notif_large_tx_threshold_cents',
 ] as const
 
 /**
@@ -55,6 +69,8 @@ export interface ExportPayload {
   trackers: TrackerExportRow[]
   trackerCategories: { tracker_id: number; category_id: string }[]
   upcomingCharges: UpcomingChargeExportRow[]
+  budgetBuckets: BudgetBucketExportRow[]
+  budgetHypotheticals: BudgetHypotheticalExportRow[]
 }
 
 export interface TrackerExportRow {
@@ -68,6 +84,7 @@ export interface TrackerExportRow {
   next_reset_date: string
   is_active: number
   badge_color: string | null
+  bucket_id: number | null
 }
 
 export interface UpcomingChargeExportRow {
@@ -80,6 +97,23 @@ export interface UpcomingChargeExportRow {
   reminder_days_before?: number | null
   is_subscription?: number
   cancel_by_date?: string | null
+  bucket_id?: number | null
+}
+
+export interface BudgetBucketExportRow {
+  id: number
+  name: string
+  colour: string
+  icon: string
+  sort_order: number
+}
+
+export interface BudgetHypotheticalExportRow {
+  bucket_id: number
+  name: string
+  amount_cents: number
+  frequency: string
+  is_hypothetical: number
 }
 
 export interface ExportFileWrapper {
@@ -98,6 +132,18 @@ function collectWhitelistedSettings(): Record<string, string> {
       settings[key] = value
     }
   }
+  // Dynamic per-saver goal dates (key: saver_goal_date_<accountId>)
+  const db = getDb()
+  if (db) {
+    const stmt = db.prepare(
+      `SELECT key, value FROM app_settings WHERE key LIKE 'saver_goal_date_%'`
+    )
+    while (stmt.step()) {
+      const [k, v] = stmt.get() as [string, string]
+      if (v != null && v !== '') settings[k] = v
+    }
+    stmt.free()
+  }
   return settings
 }
 
@@ -106,7 +152,7 @@ function collectTrackers(): TrackerExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT id, name, budget_amount, reset_frequency, reset_day, start_date,
-            last_reset_date, next_reset_date, is_active, badge_color
+            last_reset_date, next_reset_date, is_active, badge_color, bucket_id
      FROM trackers ORDER BY id`
   )
   const rows: TrackerExportRow[] = []
@@ -122,6 +168,7 @@ function collectTrackers(): TrackerExportRow[] {
       string,
       number,
       string | null,
+      number | null,
     ]
     rows.push({
       id: r[0],
@@ -134,6 +181,7 @@ function collectTrackers(): TrackerExportRow[] {
       next_reset_date: r[7],
       is_active: r[8],
       badge_color: r[9],
+      bucket_id: r[10] ?? null,
     })
   }
   stmt.free()
@@ -163,7 +211,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, is_subscription, cancel_by_date
+      reminder_days_before, is_subscription, cancel_by_date, bucket_id
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -178,6 +226,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       number | null,
       number,
       string | null,
+      number | null,
     ]
     rows.push({
       name: r[0],
@@ -189,6 +238,51 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       reminder_days_before: r[6] ?? null,
       is_subscription: r[7] ?? 0,
       cancel_by_date: r[8] ?? null,
+      bucket_id: r[9] ?? null,
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+function collectBudgetBuckets(): BudgetBucketExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, name, colour, icon, sort_order
+     FROM budget_buckets ORDER BY sort_order, id`
+  )
+  const rows: BudgetBucketExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [number, string, string, string, number]
+    rows.push({
+      id: r[0],
+      name: r[1],
+      colour: r[2],
+      icon: r[3],
+      sort_order: r[4],
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+function collectBudgetHypotheticals(): BudgetHypotheticalExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT bucket_id, name, amount_cents, frequency, is_hypothetical
+     FROM budget_hypotheticals ORDER BY bucket_id, id`
+  )
+  const rows: BudgetHypotheticalExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [number, string, number, string, number]
+    rows.push({
+      bucket_id: r[0],
+      name: r[1],
+      amount_cents: r[2],
+      frequency: r[3],
+      is_hypothetical: r[4],
     })
   }
   stmt.free()
@@ -203,6 +297,8 @@ export function buildExportPayload(): ExportPayload {
   const trackers = collectTrackers()
   const trackerCategories = collectTrackerCategories()
   const upcomingCharges = collectUpcomingCharges()
+  const budgetBuckets = collectBudgetBuckets()
+  const budgetHypotheticals = collectBudgetHypotheticals()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -212,6 +308,8 @@ export function buildExportPayload(): ExportPayload {
     trackers,
     trackerCategories,
     upcomingCharges,
+    budgetBuckets,
+    budgetHypotheticals,
   }
 }
 
@@ -275,25 +373,6 @@ export function parseImportFile(file: ExportFileWrapper): ExportFileWrapper {
     throw new Error(IMPORT_ERROR_INVALID_FILE)
   }
   return file
-}
-
-/**
- * Import profile from an encrypted file.
- */
-export async function importProfile(
-  file: File,
-  passphrase: string
-): Promise<void> {
-  const text = await file.text()
-  let wrapper: ExportFileWrapper
-  try {
-    wrapper = JSON.parse(text) as ExportFileWrapper
-  } catch {
-    throw new Error(IMPORT_ERROR_INVALID_FILE)
-  }
-  parseImportFile(wrapper)
-  const payload = await decryptImportFile(wrapper, passphrase)
-  importPayload(payload)
 }
 
 /**
@@ -372,25 +451,89 @@ export interface ImportOptions {
   settings: boolean
   trackers: boolean
   upcomingCharges: boolean
+  budgetPlan: boolean
 }
 
 /** Apply whitelisted settings from payload. */
 export function applySettings(settings: Record<string, string>): void {
   const whitelist = new Set(SETTINGS_WHITELIST)
   for (const [key, value] of Object.entries(settings ?? {})) {
+    if (typeof value !== 'string') continue
     if (
-      whitelist.has(key as (typeof SETTINGS_WHITELIST)[number]) &&
-      typeof value === 'string'
+      whitelist.has(key as (typeof SETTINGS_WHITELIST)[number]) ||
+      key.startsWith('saver_goal_date_')
     ) {
       setAppSetting(key, value)
     }
   }
 }
 
+/**
+ * Replace budget_buckets and budget_hypotheticals with imported data.
+ * Returns a map of old bucket ID → new bucket ID for use by replaceTrackers
+ * and replaceUpcomingCharges.
+ */
+export function replaceBudgetPlan(
+  budgetBuckets: BudgetBucketExportRow[],
+  budgetHypotheticals: BudgetHypotheticalExportRow[]
+): Map<number, number> {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+
+  // budget_transaction_anchors reference both buckets and transactions;
+  // clear them so FK constraints don't block the bucket delete.
+  db.run(`DELETE FROM budget_transaction_anchors`)
+  db.run(`DELETE FROM budget_hypotheticals`)
+  db.run(`DELETE FROM budget_buckets`)
+
+  const now = new Date().toISOString()
+  const bucketIdMap = new Map<number, number>()
+
+  const bucketsArr = Array.isArray(budgetBuckets) ? budgetBuckets : []
+  for (const b of bucketsArr) {
+    if (typeof b.name !== 'string' || b.name === '') continue
+    const colour = typeof b.colour === 'string' && b.colour ? b.colour : 'sky'
+    const icon = typeof b.icon === 'string' && b.icon ? b.icon : 'mdi-wallet'
+    const sortOrder = typeof b.sort_order === 'number' ? b.sort_order : 0
+    db.run(
+      `INSERT INTO budget_buckets (name, colour, icon, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [b.name, colour, icon, sortOrder, now]
+    )
+    const result = db.exec('SELECT last_insert_rowid()')
+    const newId = (result[0]?.values?.[0]?.[0] as number) ?? 0
+    const oldId = typeof b.id === 'number' ? b.id : bucketsArr.indexOf(b) + 1
+    bucketIdMap.set(oldId, newId)
+  }
+
+  const hypsArr = Array.isArray(budgetHypotheticals) ? budgetHypotheticals : []
+  for (const h of hypsArr) {
+    if (
+      typeof h.name !== 'string' ||
+      typeof h.amount_cents !== 'number' ||
+      typeof h.frequency !== 'string'
+    ) {
+      continue
+    }
+    const newBucketId = bucketIdMap.get(h.bucket_id)
+    if (newBucketId == null) continue
+    const isHyp = typeof h.is_hypothetical === 'number' ? h.is_hypothetical : 0
+    db.run(
+      `INSERT INTO budget_hypotheticals
+         (bucket_id, name, amount_cents, frequency, is_hypothetical, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [newBucketId, h.name, h.amount_cents, h.frequency, isHyp, now]
+    )
+  }
+
+  return bucketIdMap
+}
+
 /** Replace trackers and tracker_categories with imported data. */
 export function replaceTrackers(
   trackers: TrackerExportRow[],
-  trackerCategories: { tracker_id: number; category_id: string }[]
+  trackerCategories: { tracker_id: number; category_id: string }[],
+  bucketIdMap: Map<number, number> = new Map()
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
@@ -426,10 +569,14 @@ export function replaceTrackers(
       t.badge_color != null && typeof t.badge_color === 'string'
         ? t.badge_color
         : null
+    const bucketId =
+      t.bucket_id != null ? (bucketIdMap.get(t.bucket_id) ?? null) : null
 
     db.run(
-      `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO trackers
+         (name, budget_amount, reset_frequency, reset_day, start_date,
+          last_reset_date, next_reset_date, is_active, created_at, badge_color, bucket_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         t.name,
         t.budget_amount,
@@ -441,6 +588,7 @@ export function replaceTrackers(
         isActive,
         now,
         badgeColor,
+        bucketId,
       ]
     )
     const result = db.exec('SELECT last_insert_rowid()')
@@ -470,7 +618,8 @@ export function replaceTrackers(
 
 /** Replace upcoming_charges with imported data. */
 export function replaceUpcomingCharges(
-  upcomingCharges: UpcomingChargeExportRow[]
+  upcomingCharges: UpcomingChargeExportRow[],
+  bucketIdMap: Map<number, number> = new Map()
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
@@ -506,9 +655,14 @@ export function replaceUpcomingCharges(
       typeof uc.cancel_by_date === 'string' && uc.cancel_by_date
         ? uc.cancel_by_date.slice(0, 10)
         : null
+    const bucketId =
+      uc.bucket_id != null ? (bucketIdMap.get(uc.bucket_id) ?? null) : null
+
     db.run(
-      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO upcoming_charges
+         (name, amount, frequency, next_charge_date, category_id, is_reserved,
+          reminder_days_before, is_subscription, cancel_by_date, bucket_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -519,6 +673,7 @@ export function replaceUpcomingCharges(
         reminderDaysBefore,
         isSubscription,
         cancelByDate,
+        bucketId,
         now,
       ]
     )
@@ -527,7 +682,8 @@ export function replaceUpcomingCharges(
 
 /**
  * Import payload into the database with optional section selection.
- * Only sections with options set to true will be applied; others are left unchanged.
+ * Budget plan is applied first so bucket IDs can be remapped for trackers
+ * and upcoming charges.
  */
 export function importPayloadWithOptions(
   payload: ExportPayload,
@@ -539,23 +695,25 @@ export function importPayloadWithOptions(
   if (options.settings) {
     applySettings(payload.settings ?? {})
   }
+
+  // Budget plan must be imported before trackers/charges so the ID map is ready.
+  let bucketIdMap = new Map<number, number>()
+  if (options.budgetPlan) {
+    bucketIdMap = replaceBudgetPlan(
+      payload.budgetBuckets ?? [],
+      payload.budgetHypotheticals ?? []
+    )
+  }
+
   if (options.trackers) {
-    replaceTrackers(payload.trackers ?? [], payload.trackerCategories ?? [])
+    replaceTrackers(
+      payload.trackers ?? [],
+      payload.trackerCategories ?? [],
+      bucketIdMap
+    )
   }
   if (options.upcomingCharges) {
-    replaceUpcomingCharges(payload.upcomingCharges ?? [])
+    replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
   }
   schedulePersist()
-}
-
-/**
- * Import payload into the database. Overwrites trackers, tracker_categories,
- * and upcoming_charges. Merges whitelisted settings.
- */
-export function importPayload(payload: ExportPayload): void {
-  importPayloadWithOptions(payload, {
-    settings: true,
-    trackers: true,
-    upcomingCharges: true,
-  })
 }

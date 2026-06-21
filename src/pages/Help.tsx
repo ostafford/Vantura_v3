@@ -734,8 +734,13 @@ export function Help() {
                   <p className="mb-2">
                     Export your settings to an encrypted, passphrase-protected
                     file and import it on another device. Includes appearance,
-                    payday settings, trackers, and upcoming charges.{' '}
-                    <em>Transactions and API tokens are not exported.</em>
+                    payday schedule, notification preferences, lock timeout,
+                    chart colours, trackers, upcoming charges, and Budget Plan
+                    buckets.{' '}
+                    <em>
+                      Transactions, account data, and API tokens are never
+                      exported.
+                    </em>
                   </p>
 
                   <SectionHeading icon="mdi-bell-outline">
