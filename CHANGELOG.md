@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-21
+
+### Changed
+
+- **Hosting migrated to Netlify** (`https://vanturaup.netlify.app`): Vantura is now served from Netlify's global CDN. All sub-routes (`/settings`, `/transactions`, `/analytics`, etc.) return HTTP 200 for every user on every device — PWA and browser — with no service worker dependency. The GitHub Pages 404-on-sub-route issue is permanently resolved. See `netlify.toml`, `vite.config.ts` (base path `/ `).
+- **Base path simplified:** Removed the `/Vantura_v3/` repo-name prefix from all asset URLs. All resources now serve from root `/`.
+- **CI workflow updated:** GitHub Actions renamed from "Deploy to GitHub Pages" to "CI"; runs on all branches and pull requests. Quality gates (format, lint, typecheck, tests, audit, build) still run on every push. Netlify handles deployment automatically on push to `main`. See `.github/workflows/deploy.yml`.
+- **Toast notifications slide in/out:** Replaced Bootstrap's fade-only Toast with a custom component using CSS `@keyframes` — notifications slide down from the top on entry and slide back up on dismiss. Applies to all 50 toast calls across the app (sync, save, update check, settings changes, etc.). See `src/components/ToastProvider.tsx`, `src/index.css`.
+
+### Fixed
+
+- **What's New modal no longer shows empty:** If a version bump has no matching milestone entries in `changelog.ts`, the modal silently marks the version seen and suppresses itself rather than rendering a blank body. See `src/components/WhatsNewModal.tsx`.
+
 ## [0.5.1] - 2026-06-21
 
 ### Added
@@ -132,7 +145,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Deployment (Phase 6):** Production build with GitHub Pages base path; GitHub Actions deploy on push to `main`; SPA routing via `404.html`.
 - **Settings (Phase 7):** Re-sync, Clear all data (confirmation modal, delete DB, reload to Onboarding).
 
-[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/ostafford/Vantura_v3/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ostafford/Vantura_v3/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ostafford/Vantura_v3/compare/v0.0.2...v0.5.0
 [0.0.2]: https://github.com/ostafford/Vantura_v3/compare/v0.0.1...v0.0.2
