@@ -19,6 +19,19 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Stability Fix',
+    primaryMonth: '2026-06',
+    version: '0.5.4',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-shield-bug-outline',
+        text: 'Update banner no longer crashes the app when it appears on the lock screen — the "What\'s new" link now works safely before you unlock',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Export & Import v2',
     primaryMonth: '2026-06',
     version: '0.5.3',
