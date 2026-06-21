@@ -142,6 +142,7 @@ The initial build established the full technical foundation: local-first storage
 | Jun 20 | **PWA safe area support** — `viewport-fit=cover` + `black-translucent` status bar style; navbar, sidebar, auth screen, and content areas respect `env(safe-area-inset-*)` for iPhone notch / Dynamic Island / home indicator / rounded corners; `100dvh` replaces `100vh` for correct mobile viewport; sidebar z-index raised above update banner |
 | Jun 20 | **Lock screen UX** — Removed intermediate biometric mode screen; passphrase and fingerprint icon button now side-by-side on a single screen; tapping the fingerprint icon fires the prompt immediately; PWA update banner now visible on the lock screen |
 | Jun 20 | **Biometric privacy fix** — Auto-trigger deferred until user is actively in the app (presence events: mousemove, touch, keydown, window focus, visibilitychange); Touch ID / Face ID prompt no longer appears while user is in another application |
+| Jun 21 | **Bug fix: PWA reopen crash on iOS/macOS** — Safari's Back-Forward Cache (bfcache) restores a frozen page on app reopen, leaving the sql.js WASM handle stale and causing "Something went wrong". Fixed with a `pageshow` reload guard (`event.persisted`) and reliable `pagehide` + `visibilitychange` persist handlers (iOS does not fire `beforeunload` on swipe-away). See `src/main.tsx`, `src/db/index.ts` |
 
 ---
 
