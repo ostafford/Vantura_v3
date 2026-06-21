@@ -20,10 +20,12 @@ export default defineConfig({
       registerType: 'prompt',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Disable navigateFallback: workbox requires the fallback URL to exist in precache.
-        // With base path, precache has "index.html" (relative to dist) but createHandlerBoundToURL
-        // expects an exact match. Disabling lets navigation hit the network; 404.html handles SPA routing.
-        navigateFallback: null,
+        // Serve index.html from the SW precache for all SPA navigation requests.
+        // Must use the full base-prefixed path so Workbox finds it in the precache manifest.
+        // This eliminates the 404 console error caused by navigation requests hitting GitHub Pages
+        // for sub-routes (/settings, /transactions, etc.) when the SW is active.
+        // The 404.html in CI remains as a fallback for first-load before the SW installs.
+        navigateFallback: `${base}index.html`,
       },
       manifest: {
         name: 'Vantura',
