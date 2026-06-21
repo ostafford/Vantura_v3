@@ -15,3 +15,14 @@ export function hasNewVersion(): boolean {
   const last = getLastSeenVersion()
   return last !== null && last !== APP_VERSION
 }
+
+/** True if version string `a` is strictly greater than `b` (semver-style, e.g. "0.0.4" > "0.0.2"). */
+export function versionGt(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true
+    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false
+  }
+  return false
+}

@@ -1,13 +1,12 @@
 import { Modal, Button } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom'
 import { MILESTONES } from '@/data/changelog'
-import { APP_VERSION, markVersionSeen } from '@/lib/appVersion'
-
-const LATEST_MONTH =
-  [...new Set(MILESTONES.map((m) => m.primaryMonth))].sort().at(-1) ?? ''
-const LATEST_MILESTONES = MILESTONES.filter(
-  (m) => m.primaryMonth === LATEST_MONTH
-)
+import {
+  APP_VERSION,
+  markVersionSeen,
+  getLastSeenVersion,
+  versionGt,
+} from '@/lib/appVersion'
 
 interface WhatsNewModalProps {
   show: boolean
@@ -16,6 +15,14 @@ interface WhatsNewModalProps {
 
 export function WhatsNewModal({ show, onClose }: WhatsNewModalProps) {
   const navigate = useNavigate()
+
+  // Only show milestones that shipped after the user's last seen version.
+  // getLastSeenVersion() is read here (not at module level) so it reflects
+  // the value at the time the modal mounts, before markVersionSeen() is called.
+  const lastSeen = getLastSeenVersion()
+  const newMilestones = lastSeen
+    ? MILESTONES.filter((m) => versionGt(m.version, lastSeen))
+    : []
 
   const handleClose = () => {
     markVersionSeen()
@@ -42,7 +49,7 @@ export function WhatsNewModal({ show, onClose }: WhatsNewModalProps) {
       </Modal.Header>
 
       <Modal.Body className="whats-new-modal-body">
-        {LATEST_MILESTONES.map((milestone) => (
+        {newMilestones.map((milestone) => (
           <div key={milestone.heading} className="whats-new-group">
             <h6
               className="whats-new-group__heading"

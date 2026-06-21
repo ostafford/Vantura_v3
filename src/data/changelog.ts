@@ -8,6 +8,7 @@ export interface Milestone {
   heading: string
   primaryMonth: string
   color: string
+  version: string // app version this milestone shipped in
   items: MilestoneItem[]
 }
 
@@ -20,6 +21,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Notification Centre',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#ce93d8',
     items: [
       {
@@ -60,6 +62,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Lock Screen UX',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#90caf9',
     items: [
       {
@@ -84,6 +87,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Documentation & UX Polish',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#ce93d8',
     items: [
       {
@@ -108,6 +112,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'PWA & App Icons',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#80cbc4',
     items: [
       {
@@ -128,6 +133,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Security & Theming',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#80cbc4',
     items: [
       {
@@ -152,6 +158,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Budget Plan',
     primaryMonth: '2026-06',
+    version: '0.0.4',
     color: '#ffab91',
     items: [
       {
@@ -176,6 +183,7 @@ export const MILESTONES: Milestone[] = [
     date: 'May–Jun 2026',
     heading: 'Analytics Overhaul',
     primaryMonth: '2026-05',
+    version: '0.0.2',
     color: '#90caf9',
     items: [
       {
@@ -204,6 +212,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Apr–May 2026',
     heading: 'Dashboard & Tracker Refinements',
     primaryMonth: '2026-05',
+    version: '0.0.2',
     color: '#ffe082',
     items: [
       {
@@ -224,6 +233,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Apr 2026',
     heading: 'Maybuys',
     primaryMonth: '2026-04',
+    version: '0.0.2',
     color: '#f48fb1',
     items: [
       {
@@ -248,6 +258,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Mar–Apr 2026',
     heading: 'Analytics & Navigation',
     primaryMonth: '2026-04',
+    version: '0.0.2',
     color: '#80deea',
     items: [
       {
@@ -272,6 +283,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Feb 2026',
     heading: 'Polish & Tooling',
     primaryMonth: '2026-02',
+    version: '0.0.2',
     color: '#a5d6a7',
     items: [
       {
@@ -308,6 +320,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Feb 2026',
     heading: 'Foundation',
     primaryMonth: '2026-02',
+    version: '0.0.1',
     color: '#ffcc80',
     items: [
       {

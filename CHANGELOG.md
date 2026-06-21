@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Version display:** Current app version (`v{APP_VERSION}`) now shown in Settings → Help and as a stat on the What's New changelog page, so you can always tell which version is installed. See `src/pages/Settings.tsx`, `src/pages/Changelog.tsx`.
+- **Per-version What's New filtering:** Each milestone in the changelog is now tagged with the version it shipped in. The What's New modal compares each milestone's version against the user's last-seen version and shows only the genuinely new entries — so a single new feature in the next release shows just that one item, not the entire month's history. See `src/data/changelog.ts` (`version` field), `src/lib/appVersion.ts` (`versionGt`), `src/components/WhatsNewModal.tsx`.
 
 ### Fixed
 
