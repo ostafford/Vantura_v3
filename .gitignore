@@ -6,6 +6,7 @@ dist
 dist-ssr
 *.local
 vite.config.ts.timestamp-*.mjs
+.vite
 
 # Editor
 .vscode/*
