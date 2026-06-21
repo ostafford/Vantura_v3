@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# SPA routing: serve index.html with 200 for all routes so React Router
+# handles navigation without hitting the CDN for non-existent paths.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const pkg = require('./package.json') as { version: string }
 
-const base = '/Vantura_v3/'
+const base = '/'
 
 export default defineConfig({
   base,
