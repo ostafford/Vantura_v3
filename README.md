@@ -2,7 +2,7 @@
 
 A local-first financial insights app for Up Bank customers. All data stays on your device — nothing is sent to any server.
 
-**Live app:** [https://ostafford.github.io/Vantura_v3/](https://ostafford.github.io/Vantura_v3/)
+**Live app:** [https://vanturaup.netlify.app/](https://vanturaup.netlify.app/)
 
 ---
 
@@ -67,13 +67,15 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 ## Deployment
 
-**GitHub Pages:** In repo Settings → Pages → Build and deployment → Source, choose "GitHub Actions". Push to `main` to trigger a deploy.
+**Hosting:** Netlify — auto-deploys on every push to `main`. No manual steps required. Configuration: `netlify.toml` (build command, publish dir, SPA redirect rule).
 
-**Live site:** [https://ostafford.github.io/Vantura_v3/](https://ostafford.github.io/Vantura_v3/)
+**Live site:** [https://vanturaup.netlify.app/](https://vanturaup.netlify.app/)
 
-**Custom domain at root:** Set `base: '/'` in `vite.config.ts`.
+**Old URL redirect:** `https://ostafford.github.io/Vantura_v3/` now redirects automatically to the Netlify URL via a `gh-pages` branch redirect page.
 
-**Local preview:** `npm run preview` (uses base `/Vantura_v3/`). To preview at root: `npm run preview -- --base /`.
+**CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` on every push. Netlify handles deployment separately after CI passes.
+
+**Local preview:** `npm run preview`
 
 ---
 

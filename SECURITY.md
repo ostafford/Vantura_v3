@@ -8,6 +8,21 @@
 - **Biometric unlock (optional):** Touch ID / Face ID via WebAuthn caches a credential ID in `app_settings`. The underlying passphrase-derived key is stored in the browser credential store and never written to IndexedDB. Biometric unlock is a convenience layer — it does not replace the passphrase, which is still required for re-onboarding or clearing data.
 - **Profile export/import:** Exported files contain only non-sensitive configuration whitelisted in code (e.g. theme, accent, payday and pay amount, spendable alert thresholds, dashboard section order, insights category colours, dashboard tour completed flag), plus trackers and upcoming charges. Files are encrypted with a user-chosen passphrase (PBKDF2 + AES-GCM, same primitives as API token storage). Transactions, account data, API tokens, and encryption keys are never exported.
 
+## Hosting
+
+Vantura is served as a static bundle from Netlify's CDN (`https://vanturaup.netlify.app`). Netlify acts purely as a file server — it delivers HTML, JavaScript, and CSS to your browser and has no access to anything stored inside it.
+
+The following data never leaves your device and is invisible to the hosting provider:
+
+- IndexedDB contents (transactions, trackers, upcoming charges, settings)
+- Your Up Bank API token (encrypted in IndexedDB; never transmitted to any server other than `api.up.com.au`)
+- Your passphrase (never stored anywhere)
+- Biometric credentials (stored in the browser credential store, not IndexedDB)
+
+All Up Bank API requests are made directly from your browser to `https://api.up.com.au` — they do not pass through Netlify or any intermediate server.
+
+The previous hosting provider (GitHub Pages) offered the same privacy guarantee. The migration to Netlify was made to fix SPA sub-route 404 errors and does not change the data model in any way.
+
 ## Reporting a vulnerability
 
 If you believe you have found a security vulnerability, please report it responsibly:

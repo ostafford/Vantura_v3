@@ -19,6 +19,27 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Reliability & Hosting',
+    primaryMonth: '2026-06',
+    version: '0.5.2',
+    color: '#80deea',
+    items: [
+      {
+        icon: 'mdi-server-network',
+        text: 'Vantura has moved to Netlify hosting — all pages now load correctly on every device and browser, including direct links and PWA re-opens',
+      },
+      {
+        icon: 'mdi-shield-check-outline',
+        text: 'Your data is still 100% local — the hosting provider serves only the app files and has no access to your transactions, token, or any stored data',
+      },
+      {
+        icon: 'mdi-bell-ring-outline',
+        text: 'Toast notifications now slide in from the top and slide back out on dismiss',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Smarter App Updates',
     primaryMonth: '2026-06',
     version: '0.5.1',
