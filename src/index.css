@@ -1451,7 +1451,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 /* Phase 8: Purple React navbar */
 .vantura-navbar {
   height: calc(70px + env(safe-area-inset-top, 0px));
-  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   flex-direction: row;
   position: fixed;
@@ -1463,6 +1462,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .vantura-navbar .navbar-brand-wrapper {
   width: 260px;
   height: calc(70px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1522,7 +1522,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .vantura-navbar .navbar-collapsed-brand {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: calc(50% + env(safe-area-inset-top, 0px) / 2);
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
@@ -1554,7 +1554,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 .vantura-navbar .navbar-menu-wrapper {
   flex: 1;
-  height: 70px;
+  height: calc(70px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
   padding-left: 24px;
@@ -1608,7 +1609,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   .vantura-navbar .navbar-mobile-brand {
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: calc(50% + env(safe-area-inset-top, 0px) / 2);
     transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
