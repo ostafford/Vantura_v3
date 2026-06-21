@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 26
+const SCHEMA_VERSION = 29
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -180,6 +180,17 @@ const DDL_STATEMENTS = [
     FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
+  `CREATE TABLE IF NOT EXISTS notification_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    link_path TEXT,
+    link_label TEXT,
+    created_at TEXT NOT NULL,
+    read_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_history_created_at ON notification_history(created_at)`,
 ]
 
 export function runSchema(database: Database): void {
@@ -613,6 +624,53 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['26']
+    )
+  }
+  if (version < 27) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS notification_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        link_path TEXT,
+        link_label TEXT,
+        created_at TEXT NOT NULL,
+        read_at TEXT
+      )
+    `)
+    database.run(
+      `CREATE INDEX IF NOT EXISTS idx_notification_history_created_at ON notification_history(created_at)`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['27']
+    )
+  }
+  if (version < 28) {
+    // Fix notification_history rows written with the wrong route path before the
+    // tracker routes were confirmed to live under /analytics/trackers.
+    database.run(
+      `UPDATE notification_history SET link_path = '/analytics/trackers' WHERE link_path = '/trackers'`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['28']
+    )
+  }
+  if (version < 29) {
+    // Remove tracker notifications stored with the generic overview path — they
+    // can't be retargeted to a specific tracker ID without re-querying, so clearing
+    // them allows fresh notifications (with correct deep-link paths) to be written
+    // when the next budget period resets.
+    database.run(
+      `DELETE FROM notification_history
+       WHERE type IN ('tracker_overspent', 'tracker_pace')
+         AND link_path = '/analytics/trackers'`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['29']
     )
   }
 }

@@ -30,12 +30,8 @@ import {
   type DashboardSectionId,
 } from '@/lib/dashboardSections'
 import { daysUntilCharge, getDueSoonCharges } from '@/services/upcoming'
-import {
-  getNotificationsEnabled,
-  hasNotifiedToday,
-  markNotifiedToday,
-  showNotification,
-} from '@/lib/notifications'
+import { runNotificationChecks } from '@/services/notificationChecks'
+import { notificationStore } from '@/stores/notificationStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { toast } from '@/stores/toastStore'
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
@@ -269,15 +265,8 @@ export function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (!getNotificationsEnabled() || hasNotifiedToday()) return
-    const dueSoonCharges = getDueSoonCharges()
-    if (dueSoonCharges.length > 0) {
-      const names = dueSoonCharges
-        .map((c) => `${c.name} ($${formatMoney(c.amount)})`)
-        .join(', ')
-      showNotification('Bills due soon', names)
-      markNotifiedToday()
-    }
+    runNotificationChecks()
+    notificationStore.getState().refreshUnreadCount()
   }, [])
 
   useEffect(() => {

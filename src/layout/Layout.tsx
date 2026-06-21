@@ -15,6 +15,7 @@ import {
 } from '@/lib/appVersion'
 import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
+import { NotificationDrawer } from '@/components/NotificationDrawer'
 
 const VIEWPORT_AUTO_COLLAPSE_PX = 1280
 const SIDEBAR_COLLAPSED_KEY = 'vantura_sidebar_collapsed'
@@ -152,6 +153,7 @@ export function Layout() {
         show={showWhatsNew}
         onClose={() => setShowWhatsNew(false)}
       />
+      <NotificationDrawer />
     </div>
   )
 }

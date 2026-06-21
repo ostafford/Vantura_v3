@@ -1,0 +1,521 @@
+/**
+ * Notification check suite — runs on app open (after DB is ready).
+ * Each check is idempotent: uses guard keys in app_settings to avoid
+ * re-firing the same alert within the same day or budget period.
+ */
+
+import { getDb, getAppSetting, setAppSetting } from '@/db'
+import { formatMoney } from '@/lib/format'
+import {
+  getNotificationsEnabled,
+  getNotifTypeEnabled,
+  getLargeTxThresholdCents,
+  showNotification,
+  addNotificationToHistory,
+  hasCheckedToday,
+  markCheckedToday,
+} from '@/lib/notifications'
+import { getSpendableBalance } from '@/services/balance'
+import { getDueSoonCharges, daysUntilCharge } from '@/services/upcoming'
+import { getTrackersWithProgress } from '@/services/trackers'
+import { getAccountsByTypes } from '@/services/accounts'
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function todayDateString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ─── 1. Bills due soon ───────────────────────────────────────────────────────
+
+function checkBillsDue(): void {
+  if (!getNotifTypeEnabled('bills')) return
+  if (hasCheckedToday('notif_last_bills_date')) return
+
+  const charges = getDueSoonCharges()
+  if (charges.length === 0) return
+
+  markCheckedToday('notif_last_bills_date')
+
+  // Separate tomorrow-due from general window
+  const tomorrow = charges.filter(
+    (c) => daysUntilCharge(c.next_charge_date) <= 1
+  )
+  const soon = charges.filter((c) => daysUntilCharge(c.next_charge_date) > 1)
+
+  if (tomorrow.length > 0) {
+    const names = tomorrow
+      .map((c) => `${c.name} ($${formatMoney(c.amount)})`)
+      .join(', ')
+    const title =
+      tomorrow.length === 1
+        ? 'Bill due tomorrow'
+        : `${tomorrow.length} bills due tomorrow`
+    addNotificationToHistory('bills_due', title, names, '/', 'View Upcoming')
+    showNotification(title, names)
+  }
+
+  if (soon.length > 0) {
+    const names = soon
+      .map((c) => {
+        const days = daysUntilCharge(c.next_charge_date)
+        return `${c.name} ($${formatMoney(c.amount)}) in ${days}d`
+      })
+      .join(', ')
+    const title =
+      soon.length === 1
+        ? 'Upcoming bill reminder'
+        : `${soon.length} upcoming bills`
+    addNotificationToHistory('bills_due', title, names, '/', 'View Upcoming')
+    showNotification(title, names)
+  }
+}
+
+// ─── 2. Spendable below threshold ────────────────────────────────────────────
+
+function checkSpendableLow(): void {
+  if (!getNotifTypeEnabled('spendable_low')) return
+  if (hasCheckedToday('notif_last_spendable_low_date')) return
+
+  const spendable = getSpendableBalance()
+  const thresholdRaw = getAppSetting('spendable_alert_below_cents')
+  if (!thresholdRaw) return
+
+  const threshold = parseInt(thresholdRaw, 10)
+  if (Number.isNaN(threshold) || threshold <= 0) return
+
+  // Also check % of pay threshold
+  const pctRaw = getAppSetting('spendable_alert_below_pct_pay')
+  const payRaw = getAppSetting('pay_amount_cents')
+  let effectiveThreshold = threshold
+  if (pctRaw && payRaw) {
+    const pct = parseFloat(pctRaw)
+    const pay = parseInt(payRaw, 10)
+    if (!Number.isNaN(pct) && !Number.isNaN(pay) && pct > 0) {
+      effectiveThreshold = Math.max(threshold, Math.round((pct / 100) * pay))
+    }
+  }
+
+  if (spendable >= effectiveThreshold) return
+
+  markCheckedToday('notif_last_spendable_low_date')
+
+  const body =
+    spendable < 0
+      ? `Your spendable balance is −$${formatMoney(Math.abs(spendable))} — you've overspent.`
+      : `Your spendable balance is $${formatMoney(spendable)}, below your $${formatMoney(effectiveThreshold)} alert.`
+  addNotificationToHistory(
+    'spendable_low',
+    'Spendable balance low',
+    body,
+    '/',
+    'View Dashboard'
+  )
+  showNotification('Spendable balance low', body)
+}
+
+// ─── 3. Tracker overspent ────────────────────────────────────────────────────
+
+function checkTrackerOverspent(): void {
+  if (!getNotifTypeEnabled('tracker_overspent')) return
+
+  const trackers = getTrackersWithProgress()
+  for (const t of trackers) {
+    if (t.progress <= 100) continue
+    // Fire at most once per budget period per tracker
+    const guardKey = `notif_to_${t.id}`
+    const lastFiredPeriod = getAppSetting(guardKey)
+    if (lastFiredPeriod === t.next_reset_date) continue
+
+    setAppSetting(guardKey, t.next_reset_date)
+    const overpct = Math.round(t.progress - 100)
+    const body = `You've spent $${formatMoney(t.spent)} of your $${formatMoney(t.budget_amount)} budget — ${overpct}% over.`
+    addNotificationToHistory(
+      'tracker_overspent',
+      `${t.name} is over budget`,
+      body,
+      `/analytics/trackers/${t.id}`,
+      'View Tracker'
+    )
+    showNotification(`${t.name} is over budget`, body)
+  }
+}
+
+// ─── 4. Tracker pace warning ─────────────────────────────────────────────────
+
+function checkTrackerPace(): void {
+  if (!getNotifTypeEnabled('tracker_pace')) return
+
+  const trackers = getTrackersWithProgress()
+  const today = todayDateString()
+
+  for (const t of trackers) {
+    if (t.progress >= 100) continue // overspent check handles this
+    if (t.budget_amount <= 0) continue
+
+    // Calculate time elapsed in current period
+    const periodStart = t.last_reset_date
+    const periodEnd = t.next_reset_date
+    const totalMs =
+      new Date(periodEnd + 'T12:00:00Z').getTime() -
+      new Date(periodStart + 'T12:00:00Z').getTime()
+    const elapsedMs =
+      new Date(today + 'T12:00:00Z').getTime() -
+      new Date(periodStart + 'T12:00:00Z').getTime()
+
+    if (totalMs <= 0) continue
+    const timeElapsedPct = Math.max(0, Math.min(1, elapsedMs / totalMs))
+    const timeRemainingPct = 1 - timeElapsedPct
+
+    // Only warn if >20% of period is left (not near the end) and spending is >10% ahead of pace
+    if (timeRemainingPct < 0.2) continue
+    if (timeElapsedPct <= 0) continue
+    const pacePct = t.progress / (timeElapsedPct * 100)
+    if (pacePct < 1.1) continue
+
+    const guardKey = `notif_tp_${t.id}`
+    const lastFiredPeriod = getAppSetting(guardKey)
+    if (lastFiredPeriod === t.next_reset_date) continue
+
+    setAppSetting(guardKey, t.next_reset_date)
+    const daysLeft = t.daysLeft
+    const projectedTotal =
+      t.budget_amount > 0 ? Math.round(t.spent / timeElapsedPct) : t.spent
+    const body = `At current pace you'll spend ~$${formatMoney(projectedTotal)} — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left in the period.`
+    addNotificationToHistory(
+      'tracker_pace',
+      `${t.name} is tracking over budget`,
+      body,
+      `/analytics/trackers/${t.id}`,
+      'View Tracker'
+    )
+    showNotification(`${t.name} is tracking over budget`, body)
+  }
+}
+
+// ─── 5. Payday landed ────────────────────────────────────────────────────────
+
+function checkPaydayLanded(): void {
+  if (!getNotifTypeEnabled('payday')) return
+
+  const db = getDb()
+  if (!db) return
+
+  const lastFiredDate = getAppSetting('notif_last_payday_date')
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 2)
+  const cutoffIso = cutoff.toISOString()
+
+  let detected: { amount: number; date: string; description: string } | null =
+    null
+
+  const paydayRawText = getAppSetting('payday_raw_text')
+
+  if (paydayRawText) {
+    // Precise match: the user identified their salary source in Settings.
+    // Match on raw_text (the bank's internal reference) which is stable across pays.
+    const stmt = db.prepare(
+      `SELECT t.amount, COALESCE(t.settled_at, t.created_at) as tx_date, t.description
+       FROM transactions t
+       JOIN accounts a ON t.account_id = a.id
+       WHERE a.account_type = 'TRANSACTIONAL'
+         AND t.raw_text = ?
+         AND t.amount > 0
+         AND COALESCE(t.settled_at, t.created_at) >= ?
+       ORDER BY COALESCE(t.settled_at, t.created_at) DESC
+       LIMIT 5`
+    )
+    stmt.bind([paydayRawText, cutoffIso])
+    while (stmt.step()) {
+      const r = stmt.get() as [number, string, string]
+      const txDateStr = r[1].slice(0, 10)
+      if (lastFiredDate && txDateStr <= lastFiredDate) continue
+      detected = { amount: r[0], date: txDateStr, description: r[2] }
+      break
+    }
+    stmt.free()
+  } else {
+    // Fallback: no salary source identified yet — use amount heuristic.
+    // Requires pay_amount_cents to be set.
+    const payAmtRaw = getAppSetting('pay_amount_cents')
+    if (!payAmtRaw) return
+    const payAmt = parseInt(payAmtRaw, 10)
+    if (Number.isNaN(payAmt) || payAmt <= 0) return
+
+    const minAmt = Math.round(payAmt * 0.8)
+    const stmt = db.prepare(
+      `SELECT t.amount, COALESCE(t.settled_at, t.created_at) as tx_date, t.description
+       FROM transactions t
+       JOIN accounts a ON t.account_id = a.id
+       WHERE a.account_type = 'TRANSACTIONAL'
+         AND t.amount >= ?
+         AND t.transfer_account_id IS NULL
+         AND COALESCE(t.settled_at, t.created_at) >= ?
+       ORDER BY COALESCE(t.settled_at, t.created_at) DESC
+       LIMIT 5`
+    )
+    stmt.bind([minAmt, cutoffIso])
+    while (stmt.step()) {
+      const r = stmt.get() as [number, string, string]
+      const txDateStr = r[1].slice(0, 10)
+      if (lastFiredDate && txDateStr <= lastFiredDate) continue
+      detected = { amount: r[0], date: txDateStr, description: r[2] }
+      break
+    }
+    stmt.free()
+  }
+
+  if (!detected) return
+
+  setAppSetting('notif_last_payday_date', detected.date)
+  const spendable = getSpendableBalance()
+  const body = `$${formatMoney(detected.amount)} received. Spendable is now $${formatMoney(spendable)}.`
+  addNotificationToHistory(
+    'payday',
+    'Payday landed',
+    body,
+    '/',
+    'View Dashboard'
+  )
+  showNotification('Payday landed', body)
+}
+
+// ─── 6. Large unexpected transaction ─────────────────────────────────────────
+
+function checkLargeTransaction(): void {
+  if (!getNotifTypeEnabled('large_tx')) return
+
+  const db = getDb()
+  if (!db) return
+
+  const thresholdCents = getLargeTxThresholdCents()
+  const lastCheckIso = getAppSetting('notif_large_tx_last_check_iso')
+  const nowIso = new Date().toISOString()
+
+  // Update the check timestamp immediately so a crash doesn't cause a loop
+  setAppSetting('notif_large_tx_last_check_iso', nowIso)
+
+  const params: (string | number)[] = [thresholdCents]
+  let dateSql = ''
+  if (lastCheckIso) {
+    dateSql = `AND COALESCE(t.settled_at, t.created_at) > ?`
+    params.push(lastCheckIso)
+  } else {
+    // First run: look back 24h only
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    dateSql = `AND COALESCE(t.settled_at, t.created_at) > ?`
+    params.push(yesterday.toISOString())
+  }
+
+  const stmt = db.prepare(
+    `SELECT t.description, t.amount, COALESCE(t.settled_at, t.created_at) as tx_date
+     FROM transactions t
+     JOIN accounts a ON t.account_id = a.id
+     WHERE a.account_type = 'TRANSACTIONAL'
+       AND t.amount <= ?
+       AND t.transfer_account_id IS NULL
+       AND t.is_round_up = 0
+       ${dateSql}
+     ORDER BY COALESCE(t.settled_at, t.created_at) DESC`
+  )
+  // thresholdCents is positive; we want amount <= -thresholdCents
+  params[0] = -thresholdCents
+  stmt.bind(params)
+
+  const found: { description: string; amount: number }[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [string, number, string]
+    found.push({ description: r[0], amount: r[1] })
+  }
+  stmt.free()
+
+  if (found.length === 0) return
+
+  if (found.length === 1) {
+    const tx = found[0]
+    const body = `$${formatMoney(Math.abs(tx.amount))} at ${tx.description}`
+    addNotificationToHistory(
+      'large_tx',
+      'Large transaction',
+      body,
+      '/transactions',
+      'View Transactions'
+    )
+    showNotification('Large transaction', body)
+  } else {
+    const total = found.reduce((s, t) => s + Math.abs(t.amount), 0)
+    const body = `${found.length} transactions totalling $${formatMoney(total)}`
+    addNotificationToHistory(
+      'large_tx',
+      'Large transactions',
+      body,
+      '/transactions',
+      'View Transactions'
+    )
+    showNotification('Large transactions', body)
+  }
+}
+
+// ─── 7. Saver goal milestones ─────────────────────────────────────────────────
+
+function checkSaverMilestones(): void {
+  if (!getNotifTypeEnabled('saver_milestone')) return
+
+  const savers = getAccountsByTypes(['SAVER'])
+  for (const saver of savers) {
+    if (!saver.target_amount_cents || saver.target_amount_cents <= 0) continue
+    const pct = (saver.balance / saver.target_amount_cents) * 100
+
+    for (const milestone of [50, 75, 100] as const) {
+      if (pct < milestone) continue
+      const guardKey = `notif_sm_${saver.id}_${milestone}`
+      // Store the target at time of firing so we re-fire if the goal changes
+      const storedTarget = getAppSetting(guardKey)
+      if (storedTarget === String(saver.target_amount_cents)) continue
+
+      setAppSetting(guardKey, String(saver.target_amount_cents))
+      const milestoneLabel =
+        milestone === 100 ? 'Goal reached' : `${milestone}% milestone`
+      const body =
+        milestone === 100
+          ? `${saver.display_name} has reached its $${formatMoney(saver.target_amount_cents)} goal!`
+          : `${saver.display_name} is ${milestone}% of the way to $${formatMoney(saver.target_amount_cents)}.`
+      addNotificationToHistory(
+        'saver_milestone',
+        `${saver.display_name}: ${milestoneLabel}`,
+        body,
+        '/',
+        'View Dashboard'
+      )
+      showNotification(`${saver.display_name}: ${milestoneLabel}`, body)
+      break // only fire the highest new milestone per run
+    }
+  }
+}
+
+// ─── 8. Sync stale ───────────────────────────────────────────────────────────
+
+function checkSyncStale(): void {
+  if (!getNotifTypeEnabled('sync_stale')) return
+  if (hasCheckedToday('notif_last_sync_stale_date')) return
+
+  const lastSyncIso = getAppSetting('last_sync')
+  if (!lastSyncIso) return
+
+  const lastSync = new Date(lastSyncIso)
+  const hoursSince = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60)
+  if (hoursSince < 24) return
+
+  markCheckedToday('notif_last_sync_stale_date')
+  const hoursRounded = Math.round(hoursSince)
+  const body = `Last synced ${hoursRounded} hours ago. Open Vantura and tap Sync to refresh your data.`
+  addNotificationToHistory(
+    'sync_stale',
+    'Data may be out of date',
+    body,
+    null,
+    null
+  )
+  showNotification('Data may be out of date', body)
+}
+
+// ─── 9. Possible payday suggestion ───────────────────────────────────────────
+
+/**
+ * When no payday source has been identified, look for a recurring large credit
+ * that just appeared after a sync and suggest the user set it as their pay source.
+ *
+ * Guard: fires once per unique payee (stored as notif_possible_payday_suggested_for).
+ * Won't re-suggest the same merchant unless the user clears their payday settings.
+ */
+function checkPossiblePayday(): void {
+  // Only runs when the user hasn't identified their salary source yet
+  if (getAppSetting('payday_raw_text')) return
+
+  const db = getDb()
+  if (!db) return
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 2)
+  const cutoffIso = cutoff.toISOString()
+
+  // Find the largest qualifying credit in the last 2 days that has appeared
+  // at least twice historically (confirming it's a recurring payment, not a one-off).
+  // Threshold: $500 AUD minimum — below that it's unlikely to be a salary payment.
+  const MIN_CENTS = 50000
+  const stmt = db.prepare(
+    `SELECT
+       t.description,
+       COALESCE(t.raw_text, t.description) AS match_key,
+       t.amount
+     FROM transactions t
+     JOIN accounts a ON t.account_id = a.id
+     WHERE a.account_type = 'TRANSACTIONAL'
+       AND t.amount >= ?
+       AND t.transfer_account_id IS NULL
+       AND t.is_round_up = 0
+       AND COALESCE(t.settled_at, t.created_at) >= ?
+       AND (
+         SELECT COUNT(*)
+         FROM transactions t2
+         WHERE COALESCE(t2.raw_text, t2.description) = COALESCE(t.raw_text, t.description)
+           AND t2.amount > 0
+           AND t2.transfer_account_id IS NULL
+       ) >= 2
+     ORDER BY t.amount DESC
+     LIMIT 1`
+  )
+  stmt.bind([MIN_CENTS, cutoffIso])
+
+  let candidate: {
+    description: string
+    matchKey: string
+    amount: number
+  } | null = null
+  if (stmt.step()) {
+    const r = stmt.get() as [string, string, number]
+    candidate = { description: r[0], matchKey: r[1], amount: r[2] }
+  }
+  stmt.free()
+
+  if (!candidate) return
+
+  // Don't re-suggest the same payee we've already flagged
+  const lastSuggested = getAppSetting('notif_possible_payday_suggested_for')
+  if (lastSuggested === candidate.matchKey) return
+
+  setAppSetting('notif_possible_payday_suggested_for', candidate.matchKey)
+
+  const body = `$${formatMoney(candidate.amount)} received from "${candidate.description}" — this looks like a recurring payment. Set it as your pay source so Vantura can track your spending cycle.`
+  addNotificationToHistory(
+    'possible_payday',
+    'Possible payday detected',
+    body,
+    '/settings#payday',
+    'Set up payday'
+  )
+  showNotification('Possible payday detected', body)
+}
+
+// ─── Main entry point ─────────────────────────────────────────────────────────
+
+/**
+ * Run all enabled notification checks. Call once on app open after data loads.
+ * Safe to call multiple times — each check is individually guarded.
+ */
+export function runNotificationChecks(): void {
+  if (!getNotificationsEnabled()) return
+
+  checkBillsDue()
+  checkSpendableLow()
+  checkTrackerOverspent()
+  checkTrackerPace()
+  checkPaydayLanded()
+  checkPossiblePayday()
+  checkLargeTransaction()
+  checkSaverMilestones()
+  checkSyncStale()
+}

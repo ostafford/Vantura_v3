@@ -145,6 +145,16 @@ The initial build established the full technical foundation: local-first storage
 
 ---
 
+### Notifications & Payday Intelligence — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 20 | **Notification system** — Bell icon in navbar with numeric unread badge; slide-out drawer (desktop) / bottom sheet (mobile) showing 30-day notification history; 9 check types run on app open: bill reminders, tracker over budget, tracker pace warning, spendable balance low, payday landed, possible payday detected, large transaction (user opt-in), saver goal milestones, and data out of date (user opt-in); per-type toggles in Settings → Notifications; IntersectionObserver marks items read on scroll; "Clear all" clears history; each type uses a guard key to avoid re-firing within the same day or budget period |
+| Jun 20 | **Payday source linking** — User can search for and select their salary transaction in Settings → Payday; Vantura saves the bank's `raw_text` reference for precise payday detection; a "Linked: [employer name]" chip shows the current source with a × to remove it; "Possible payday detected" notification suggests recurring large credits as a pay source when none is configured |
+| Jun 21 | **Tracker notification deep-links** — Tracker over budget and tracker pace notifications now navigate directly to the specific tracker report page (`/analytics/trackers/:id`) instead of the overview; schema v29 migration cleans up generic-path rows from prior sessions |
+
+---
+
 ### Documentation & UX Polish — June 2026
 
 | Date | Feature |
@@ -160,7 +170,6 @@ The initial build established the full technical foundation: local-first storage
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.
 
-- **Notifications** — Browser push notifications for upcoming charge reminders or low-balance alerts (infrastructure exists: `notifications_enabled` setting)
 - **Profile export v2** — Include Budget Plan buckets in the exported profile file
 - **Recurring transaction detection** — Auto-suggest upcoming charges based on transaction history patterns
 - **Multi-currency display** — Show foreign transaction amounts alongside AUD equivalents

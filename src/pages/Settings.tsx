@@ -46,6 +46,11 @@ import {
   setNotificationsEnabled,
   getNotificationPermission,
   requestNotificationPermission,
+  getNotifTypeEnabled,
+  setNotifTypeEnabled,
+  getLargeTxThresholdCents,
+  setLargeTxThresholdCents,
+  type NotifType,
 } from '@/lib/notifications'
 import { useFullReSync } from '@/hooks/useFullReSync'
 import { isBiometricAvailable, registerBiometric } from '@/lib/webauthn'
@@ -236,6 +241,12 @@ export function Settings() {
   const [txResults, setTxResults] = useState<PayeeSummary[]>([])
   const [txDetectionResult, setTxDetectionResult] =
     useState<PaydayDetectionResult | null>(null)
+  const [selectedPayRawText, setSelectedPayRawText] = useState<string | null>(
+    () => getAppSetting('payday_raw_text')
+  )
+  const [selectedPayDescription, setSelectedPayDescription] = useState<
+    string | null
+  >(() => getAppSetting('payday_description') || null)
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportPassphrase, setExportPassphrase] = useState('')
   const [exportPassphraseConfirm, setExportPassphraseConfirm] = useState('')
@@ -260,6 +271,66 @@ export function Settings() {
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
+  )
+  const NOTIF_TYPES: { key: NotifType; label: string; desc: string }[] = [
+    {
+      key: 'bills',
+      label: 'Bill reminders',
+      desc: 'Upcoming charges within their reminder window',
+    },
+    {
+      key: 'tracker_overspent',
+      label: 'Tracker over budget',
+      desc: 'When a tracker exceeds 100% of its budget',
+    },
+    {
+      key: 'tracker_pace',
+      label: 'Tracker pace warning',
+      desc: 'When spending is >10% ahead of pace with >20% of the period left',
+    },
+    {
+      key: 'spendable_low',
+      label: 'Spendable balance low',
+      desc: 'When spendable drops below your alert threshold',
+    },
+    {
+      key: 'payday',
+      label: 'Payday landed',
+      desc: 'When a salary-sized credit appears on your account',
+    },
+    {
+      key: 'large_tx',
+      label: 'Large transaction',
+      desc: 'Unexpected debits above the threshold you set',
+    },
+    {
+      key: 'saver_milestone',
+      label: 'Saver goal milestones',
+      desc: 'When a saver reaches 50%, 75%, or 100% of its goal',
+    },
+    {
+      key: 'sync_stale',
+      label: 'Data out of date',
+      desc: "When Vantura hasn't synced in over 24 hours",
+    },
+  ]
+  const [notifTypes, setNotifTypes] = useState<Record<NotifType, boolean>>(
+    () =>
+      Object.fromEntries(
+        [
+          'bills',
+          'tracker_overspent',
+          'tracker_pace',
+          'spendable_low',
+          'payday',
+          'large_tx',
+          'saver_milestone',
+          'sync_stale',
+        ].map((k) => [k, getNotifTypeEnabled(k as NotifType)])
+      ) as Record<NotifType, boolean>
+  )
+  const [largeTxThreshold, setLargeTxThresholdState] = useState(() =>
+    String(Math.round(getLargeTxThresholdCents() / 100))
   )
   const [bioAvailable, setBioAvailable] = useState<boolean | null>(null)
   const [bioEnabled, setBioEnabled] = useState(
@@ -478,6 +549,15 @@ export function Settings() {
     setAppSetting('payday_frequency', paydayFrequency)
     setAppSetting('payday_day', String(effectivePaydayDay))
     setAppSetting('next_payday', nextPayday.trim())
+    if (selectedPayRawText) {
+      setAppSetting('payday_raw_text', selectedPayRawText)
+      setAppSetting(
+        'payday_description',
+        selectedPayDescription ?? selectedPayRawText
+      )
+      // Clear the suggestion guard so it won't re-fire now that payday is configured
+      setAppSetting('notif_possible_payday_suggested_for', '')
+    }
     const payAmtTrimmed = paydayPayAmount.trim()
     if (payAmtTrimmed === '') {
       setAppSetting('pay_amount_cents', '')
@@ -862,6 +942,58 @@ export function Settings() {
                         your schedule from its history and fill the fields
                         below.
                       </Form.Text>
+                      {(selectedPayDescription || selectedPayRawText) && (
+                        <div
+                          className="d-flex align-items-center gap-2 mb-2 px-2 py-1 rounded"
+                          style={{
+                            background:
+                              'rgba(var(--vantura-success-rgb, 56,142,60), 0.12)',
+                            border:
+                              '1px solid rgba(var(--vantura-success-rgb, 56,142,60), 0.28)',
+                            fontSize: '0.78rem',
+                          }}
+                        >
+                          <i
+                            className="mdi mdi-check-circle flex-shrink-0"
+                            style={{
+                              color: 'var(--vantura-success)',
+                              fontSize: '1rem',
+                            }}
+                            aria-hidden
+                          />
+                          <span
+                            className="text-body-secondary"
+                            style={{ lineHeight: 1.3 }}
+                          >
+                            <span
+                              className="fw-semibold"
+                              style={{ color: 'var(--vantura-success)' }}
+                            >
+                              Linked:
+                            </span>{' '}
+                            {selectedPayDescription ?? selectedPayRawText}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn-close btn-close-white ms-auto flex-shrink-0"
+                            style={{ fontSize: '0.55rem', opacity: 0.5 }}
+                            aria-label="Remove linked pay source"
+                            onClick={() => {
+                              setSelectedPayRawText(null)
+                              setSelectedPayDescription(null)
+                              setTxDetectionResult(null)
+                              setAppSetting('payday_raw_text', '')
+                              setAppSetting('payday_description', '')
+                              // Reset suggestion guard so Vantura can re-suggest
+                              // a payday source now that none is linked
+                              setAppSetting(
+                                'notif_possible_payday_suggested_for',
+                                ''
+                              )
+                            }}
+                          />
+                        </div>
+                      )}
                       <Form.Control
                         id="settings-tx-search"
                         type="search"
@@ -898,6 +1030,8 @@ export function Settings() {
                                 const key = payee.raw_text ?? payee.description
                                 const result = detectPaySchedule(key)
                                 setTxDetectionResult(result)
+                                setSelectedPayRawText(key)
+                                setSelectedPayDescription(payee.description)
                                 if (result) {
                                   setPaydayFrequency(result.frequency)
                                   setPaydayDay(result.paydayDay)
@@ -1034,14 +1168,18 @@ export function Settings() {
                 isNotificationSupported() && (
                   <>
                     <p className="small text-muted mb-3">
-                      Get a browser notification when upcoming charges are due
-                      soon (within their reminder window). Requires browser
-                      permission.
+                      Get OS notifications when Vantura detects something that
+                      needs your attention. Notifications also appear in the
+                      bell icon at the top of the screen so you can review them
+                      any time. Requires browser permission.
                     </p>
+
+                    {/* Master toggle */}
                     <Form.Check
                       type="switch"
-                      id="settings-notifications-toggle"
-                      label="Enable bill reminders"
+                      id="settings-notifications-master"
+                      label="Enable notifications"
+                      className="mb-4"
                       checked={notificationsEnabled}
                       onChange={async (e) => {
                         const next = e.target.checked
@@ -1062,11 +1200,95 @@ export function Settings() {
                         setNotificationsEnabledState(next)
                         toast.success(
                           next
-                            ? 'Bill reminders enabled.'
-                            : 'Bill reminders disabled.'
+                            ? 'Notifications enabled.'
+                            : 'Notifications disabled.'
                         )
                       }}
                     />
+
+                    {/* Per-type toggles — only shown when master is on */}
+                    {notificationsEnabled && (
+                      <div
+                        style={{
+                          borderLeft: '2px solid var(--vantura-border)',
+                          paddingLeft: '1rem',
+                        }}
+                      >
+                        <p
+                          className="small text-muted mb-3"
+                          style={{ fontWeight: 600 }}
+                        >
+                          What to notify you about
+                        </p>
+                        {NOTIF_TYPES.map(({ key, label, desc }) => (
+                          <div key={key} className="mb-3">
+                            <Form.Check
+                              type="switch"
+                              id={`settings-notif-${key}`}
+                              label={label}
+                              checked={notifTypes[key]}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                setNotifTypeEnabled(key, next)
+                                setNotifTypes((prev) => ({
+                                  ...prev,
+                                  [key]: next,
+                                }))
+                              }}
+                            />
+                            <div
+                              className="small text-muted"
+                              style={{ marginTop: 2, marginLeft: 48 }}
+                            >
+                              {desc}
+                            </div>
+                            {key === 'large_tx' && notifTypes['large_tx'] && (
+                              <Form.Group
+                                className="mt-2"
+                                style={{ marginLeft: 48, maxWidth: 200 }}
+                              >
+                                <Form.Label
+                                  htmlFor="settings-large-tx-threshold"
+                                  className="small text-muted mb-1"
+                                >
+                                  Notify me when a single debit exceeds ($)
+                                </Form.Label>
+                                <Form.Control
+                                  id="settings-large-tx-threshold"
+                                  type="number"
+                                  min={1}
+                                  size="sm"
+                                  value={largeTxThreshold}
+                                  onChange={(e) =>
+                                    setLargeTxThresholdState(e.target.value)
+                                  }
+                                  onBlur={() => {
+                                    const dollars = parseInt(
+                                      largeTxThreshold,
+                                      10
+                                    )
+                                    if (!Number.isNaN(dollars) && dollars > 0) {
+                                      setLargeTxThresholdCents(dollars * 100)
+                                      toast.success(
+                                        `Large transaction threshold set to $${dollars}.`
+                                      )
+                                    } else {
+                                      setLargeTxThresholdState(
+                                        String(
+                                          Math.round(
+                                            getLargeTxThresholdCents() / 100
+                                          )
+                                        )
+                                      )
+                                    }
+                                  }}
+                                />
+                              </Form.Group>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               {activeSection === 'security' && (
