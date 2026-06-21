@@ -20,11 +20,9 @@ export default defineConfig({
       registerType: 'prompt',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Serve index.html from the SW precache for all SPA navigation requests.
-        // Must use the full base-prefixed path so Workbox finds it in the precache manifest.
-        // This eliminates the 404 console error caused by navigation requests hitting GitHub Pages
-        // for sub-routes (/settings, /transactions, etc.) when the SW is active.
-        // The 404.html in CI remains as a fallback for first-load before the SW installs.
+        // Serve index.html from the SW precache for all SPA navigation requests
+        // so offline navigation works correctly. Must use the full base-prefixed
+        // path so Workbox finds it in the precache manifest.
         navigateFallback: `${base}index.html`,
       },
       manifest: {
