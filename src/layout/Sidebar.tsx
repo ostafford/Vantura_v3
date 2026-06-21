@@ -80,7 +80,9 @@ export function Sidebar({
         minWidth: width,
         background: 'var(--vantura-sidebar-gradient)',
         color: 'var(--vantura-sidebar-menu-color)',
-        zIndex: 1101,
+        // overlay (mobile drawer) must sit above everything including modals;
+        // desktop permanent sidebar only needs to clear the navbar (z 1030).
+        zIndex: overlay ? 1101 : 1040,
         transition:
           'width 0.25s ease, background 0.25s ease, transform 0.25s ease',
         display: 'flex',
