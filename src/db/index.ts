@@ -175,8 +175,24 @@ export async function initDb(): Promise<void> {
     schedulePersist()
   }
 
+  // Flush on normal browser close / desktop navigation away
   window.addEventListener('beforeunload', () => {
     if (persistTimeout) clearTimeout(persistTimeout)
     doPersist()
+  })
+
+  // iOS/macOS PWA: pagehide fires when the page is being put into bfcache
+  // or the app is swiped away. beforeunload is not reliably called there.
+  window.addEventListener('pagehide', () => {
+    if (persistTimeout) clearTimeout(persistTimeout)
+    doPersist()
+  })
+
+  // Belt-and-suspenders: also flush when the tab/app moves to background.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (persistTimeout) clearTimeout(persistTimeout)
+      doPersist()
+    }
   })
 }
