@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Modal, Button } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom'
 import { MILESTONES } from '@/data/changelog'
@@ -29,11 +30,22 @@ export function WhatsNewModal({ show, onClose }: WhatsNewModalProps) {
     onClose()
   }
 
+  // If the version bumped but there are no milestone entries for it yet,
+  // silently mark it seen and suppress the modal rather than showing a blank.
+  useEffect(() => {
+    if (show && newMilestones.length === 0) {
+      handleClose()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show])
+
   const handleSeeAll = () => {
     markVersionSeen()
     onClose()
     navigate('/changelog')
   }
+
+  if (newMilestones.length === 0) return null
 
   return (
     <Modal show={show} onHide={handleClose} centered scrollable size="lg">

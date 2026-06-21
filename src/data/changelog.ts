@@ -19,6 +19,27 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Smarter App Updates',
+    primaryMonth: '2026-06',
+    version: '0.5.1',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-cellphone-arrow-down-variant',
+        text: 'Vantura now checks for updates automatically when you return to the app — no force-quit needed to get the latest version',
+      },
+      {
+        icon: 'mdi-refresh',
+        text: 'New "Check for updates" button in Settings → Help lets you manually check at any time',
+      },
+      {
+        icon: 'mdi-clock-outline',
+        text: 'Update banner now has a "Later" option — dismiss it and install at your own pace from Settings',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Update & Release UX',
     primaryMonth: '2026-06',
     version: '0.5.0',
