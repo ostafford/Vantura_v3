@@ -155,6 +155,15 @@ The initial build established the full technical foundation: local-first storage
 
 ---
 
+### What's New & Changelog — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 21 | **What's New modal** — Appears automatically on first launch after a version bump; shows the latest release highlights grouped by feature area; dismissing marks the version seen; "Full changelog →" navigates to the full history page. Version tracked in `localStorage` (`vantura_last_seen_version`); first-ever install silently records the version so only genuine updates show the modal. See `src/components/WhatsNewModal.tsx`, `src/lib/appVersion.ts` |
+| Jun 21 | **Changelog page** (`/changelog`) — In-app release history with month navigation, feature-count stats, "What we're exploring next" section, and a colour-coded timeline of milestones; accessible from Settings → Help and the What's New modal footer; also served publicly without auth. See `src/pages/Changelog.tsx`, `src/data/changelog.ts` |
+
+---
+
 ### Documentation & UX Polish — June 2026
 
 | Date | Feature |
@@ -175,9 +184,8 @@ Features that have been discussed or noted as potential future additions. Nothin
 - **Multi-currency display** — Show foreign transaction amounts alongside AUD equivalents
 - **Tags / custom labels** — User-defined transaction tags for finer categorisation beyond Up Bank's category tree
 - **Saver round-up tracking** — Dedicated view for Loose Change saver accumulation over time
-- **Android / desktop PWA polish** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
+- **Android / desktop PWA biometric** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
 - **Logo gradient on favicon** — Static `logo-icon.svg` uses neutral silver gradient; future work to generate per-accent favicons or use a Canvas-based approach
-- **Onboarding button layout** — Full-width primary CTA with quieter secondary link; deferred from June 18 session
 
 ---
 

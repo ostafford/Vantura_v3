@@ -18,6 +18,46 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Notification Centre',
+    primaryMonth: '2026-06',
+    color: '#ce93d8',
+    items: [
+      {
+        icon: 'mdi-bell-badge-outline',
+        text: 'Bell icon in the navbar opens a notification inbox — review alerts any time, even after dismissing them',
+      },
+      {
+        icon: 'mdi-cash-clock',
+        text: 'Bill reminders — notified when upcoming charges are due within your reminder window',
+      },
+      {
+        icon: 'mdi-chart-line-variant',
+        text: 'Tracker alerts — get warned when a tracker exceeds its budget or is running more than 10% ahead of pace',
+      },
+      {
+        icon: 'mdi-wallet-outline',
+        text: 'Spendable balance warning — alerted when your spendable drops below a threshold you set',
+      },
+      {
+        icon: 'mdi-cash-multiple',
+        text: 'Payday landed — detects when a salary-sized credit appears and links it to your pay source',
+      },
+      {
+        icon: 'mdi-bank-alert',
+        text: 'Large transaction alert — flags unexpected debits above a dollar threshold you configure',
+      },
+      {
+        icon: 'mdi-piggy-bank',
+        text: 'Saver milestones — celebrates when a saver reaches 50%, 75%, or 100% of its goal',
+      },
+      {
+        icon: 'mdi-toggle-switch-outline',
+        text: 'Per-type controls — enable or disable each alert type individually from Settings → Notifications',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Lock Screen UX',
     primaryMonth: '2026-06',
     color: '#90caf9',
@@ -307,11 +347,6 @@ export const MILESTONES: Milestone[] = [
 ]
 
 export const UPCOMING: UpcomingItem[] = [
-  {
-    icon: 'mdi-bell-outline',
-    color: '#ce93d8',
-    text: 'Notifications — browser push reminders for upcoming charges due soon',
-  },
   {
     icon: 'mdi-export-variant',
     color: '#90caf9',

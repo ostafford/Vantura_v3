@@ -17,9 +17,11 @@ A local-first financial insights app for Up Bank customers. All data stays on yo
 - **Analytics** — Deeper trends across Trackers, Reports, and Savers.
 - **Savers** — Track Up Bank saver accounts with goal amounts, target dates, contribution history, and drag-to-reorder cards.
 - **Budget Plan** — Group expenses into named buckets with hypothetical "what if?" lines and a free-spending summary.
+- **Notifications** — Bell inbox in the navbar with 8 financial alert types (bills due, tracker overspent, low spendable, payday, large transactions, saver milestones, and more); per-type toggles in Settings.
 - **Transactions** — Full history with filters (date, category, amount, search) and round-up linking.
 - **Profile export / import** — Back up settings, trackers, and upcoming charges to an encrypted file; restore on another device.
 - **Biometric unlock** — Touch ID / Face ID via WebAuthn with configurable inactivity lock (Settings → Security).
+- **What's new** — In-app changelog shown automatically after updates; full release history at `/changelog`.
 - **Demo mode** — Try the app with sample data, no Up Bank token required.
 - **PWA** — Installable, works offline after first load.
 
