@@ -54,6 +54,7 @@ function AppContent() {
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
   useInactivityLock(unlocked)
   const { updateReady, applyUpdate } = usePwaUpdate()
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
     if (!accentHydrated) return
@@ -166,7 +167,12 @@ function AppContent() {
     return (
       <>
         <Unlock />
-        {updateReady && <PwaUpdateBanner onReload={applyUpdate} />}
+        {updateReady && !bannerDismissed && (
+          <PwaUpdateBanner
+            onReload={applyUpdate}
+            onDismiss={() => setBannerDismissed(true)}
+          />
+        )}
       </>
     )
   }

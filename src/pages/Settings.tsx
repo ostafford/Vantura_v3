@@ -21,6 +21,7 @@ import {
   getPaydayDayOptions,
   getPaydayDayLabel,
 } from '@/lib/payday'
+import { usePwaUpdate } from '@/hooks/usePwaUpdate'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
 import { CategoryColorsSection } from '@/components/CategoryColorsSection'
 import {
@@ -214,6 +215,7 @@ function DashboardSectionOrderForm() {
 }
 
 export function Settings() {
+  const { updateReady, applyUpdate, checkForUpdate, checking } = usePwaUpdate()
   const {
     lastSync,
     syncing,
@@ -817,7 +819,7 @@ export function Settings() {
                       Show dashboard tour again
                     </Button>
                   </div>
-                  <p className="small text-muted mb-0">
+                  <p className="small text-muted mb-2">
                     <i
                       className="mdi mdi-information-outline me-1"
                       aria-hidden
@@ -827,6 +829,47 @@ export function Settings() {
                       v{APP_VERSION}
                     </span>
                   </p>
+                  {updateReady ? (
+                    <Button
+                      variant="outline-success"
+                      size="sm"
+                      onClick={applyUpdate}
+                      aria-label="Install the available app update"
+                    >
+                      <i
+                        className="mdi mdi-arrow-down-circle-outline me-1"
+                        aria-hidden
+                      />
+                      Update available — Install now
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={checkForUpdate}
+                      disabled={checking}
+                      aria-label="Check for app updates"
+                      aria-busy={checking}
+                    >
+                      {checking ? (
+                        <>
+                          <Spinner
+                            animation="border"
+                            size="sm"
+                            className="me-1"
+                            role="status"
+                            aria-hidden="true"
+                          />
+                          Checking…
+                        </>
+                      ) : (
+                        <>
+                          <i className="mdi mdi-refresh me-1" aria-hidden />
+                          Check for updates
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </>
               )}
               {activeSection === 'appearance' && (

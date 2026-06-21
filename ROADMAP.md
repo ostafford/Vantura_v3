@@ -159,6 +159,7 @@ The initial build established the full technical foundation: local-first storage
 | Jun 21 | **Bug fix: PWA reopen crash on iOS/macOS** — Safari's Back-Forward Cache (bfcache) restores a frozen page on app reopen, leaving the sql.js WASM handle stale and causing "Something went wrong". Fixed with a `pageshow` reload guard (`event.persisted`) and reliable `pagehide` + `visibilitychange` persist handlers (iOS does not fire `beforeunload` on swipe-away). See `src/main.tsx`, `src/db/index.ts` |
 | Jun 21 | **Version display** — Installed version shown in Settings → Help (`v{APP_VERSION}`) and as a stat on the What's New / Changelog page; always visible without opening DevTools |
 | Jun 21 | **Semantic versioning adopted** — Vantura moves from `0.0.x` to `v0.5.0`; versioning convention documented in ROADMAP and CHANGELOG; git tags from this release onward |
+| Jun 21 | **PWA auto-update on app resume** (`v0.5.1`) — Service worker checks for updates silently on every app resume (`visibilitychange`) and on a 30-minute background interval; no force-quit required. "Check for updates" button in Settings → Help gives on-demand manual check with toast feedback (up to date / update found / error / dev-mode info). Update banner gains a "Later" dismiss and "Install" CTA alongside the existing "What's new" link. See `src/hooks/usePwaUpdate.ts`, `src/components/PwaUpdateBanner.tsx`, `src/pages/Settings.tsx` |
 
 ---
 

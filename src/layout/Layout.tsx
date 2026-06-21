@@ -31,6 +31,7 @@ export function Layout() {
   )
 
   const { updateReady, applyUpdate } = usePwaUpdate()
+  const [bannerDismissed, setBannerDismissed] = useState(false)
   const [showWhatsNew, setShowWhatsNew] = useState(() => hasNewVersion())
 
   // On first ever load (no version stored), silently record the current version
@@ -148,7 +149,12 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
-      {updateReady && <PwaUpdateBanner onReload={applyUpdate} />}
+      {updateReady && !bannerDismissed && (
+        <PwaUpdateBanner
+          onReload={applyUpdate}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
       <WhatsNewModal
         show={showWhatsNew}
         onClose={() => setShowWhatsNew(false)}

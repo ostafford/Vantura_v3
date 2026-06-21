@@ -3,9 +3,10 @@ import { APP_VERSION } from '@/lib/appVersion'
 
 interface PwaUpdateBannerProps {
   onReload: () => void
+  onDismiss: () => void
 }
 
-export function PwaUpdateBanner({ onReload }: PwaUpdateBannerProps) {
+export function PwaUpdateBanner({ onReload, onDismiss }: PwaUpdateBannerProps) {
   const navigate = useNavigate()
 
   return (
@@ -25,10 +26,18 @@ export function PwaUpdateBanner({ onReload }: PwaUpdateBannerProps) {
           </button>
           <button
             type="button"
+            className="pwa-update-banner__link"
+            onClick={onDismiss}
+            aria-label="Dismiss update banner"
+          >
+            Later
+          </button>
+          <button
+            type="button"
             className="pwa-update-banner__reload"
             onClick={onReload}
           >
-            Reload
+            Install
           </button>
         </div>
       </div>

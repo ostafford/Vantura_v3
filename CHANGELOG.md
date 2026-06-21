@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-21
+
+### Added
+
+- **PWA auto-update on app resume:** The service worker now silently checks for updates every time the user returns to the app (`visibilitychange`) and on a 30-minute background interval for long-running sessions — no force-quit required to pick up a new build. See `src/hooks/usePwaUpdate.ts`.
+- **"Check for updates" button in Settings → Help:** Manually trigger an update check at any time. Shows a spinner while checking, then a toast confirming "Vantura is up to date", "Update found! See the banner below to install.", or a connection-error message. In development (no service worker), shows an informational message explaining why the check is unavailable. See `src/pages/Settings.tsx`, `src/hooks/usePwaUpdate.ts`.
+
+### Changed
+
+- **PWA update banner actions:** "Reload" renamed to "Install" (more accurate); a "Later" button added to dismiss the banner without installing — the update remains available via Settings → Help → "Update available — Install now". See `src/components/PwaUpdateBanner.tsx`, `src/layout/Layout.tsx`, `src/App.tsx`.
+
 ## [0.5.0] - 2026-06-21
 
 > **Versioning convention from this release:** Vantura follows [Semantic Versioning](https://semver.org).
@@ -121,7 +132,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Deployment (Phase 6):** Production build with GitHub Pages base path; GitHub Actions deploy on push to `main`; SPA routing via `404.html`.
 - **Settings (Phase 7):** Re-sync, Clear all data (confirmation modal, delete DB, reload to Onboarding).
 
-[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/ostafford/Vantura_v3/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ostafford/Vantura_v3/compare/v0.0.2...v0.5.0
 [0.0.2]: https://github.com/ostafford/Vantura_v3/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/ostafford/Vantura_v3/releases/tag/v0.0.1
