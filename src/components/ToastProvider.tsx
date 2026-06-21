@@ -1,14 +1,9 @@
-import { useEffect } from 'react'
-import { Toast, ToastContainer, ToastBody } from 'react-bootstrap'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
-import { toastStore, type ToastVariant } from '@/stores/toastStore'
+import { toastStore } from '@/stores/toastStore'
 
 const AUTO_HIDE_MS = 4000
-
-function variantToBootstrap(v: ToastVariant): 'success' | 'danger' | 'info' {
-  if (v === 'error') return 'danger'
-  return v
-}
+const EXIT_MS = 240
 
 export function ToastProvider() {
   const show = useStore(toastStore, (s) => s.show)
@@ -16,30 +11,39 @@ export function ToastProvider() {
   const variant = useStore(toastStore, (s) => s.variant)
   const persistent = useStore(toastStore, (s) => s.persistent)
   const hide = useStore(toastStore, (s) => s.hide)
+  const [exiting, setExiting] = useState(false)
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>()
+  const exitTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  const triggerExit = () => {
+    clearTimeout(hideTimer.current)
+    setExiting(true)
+    exitTimer.current = setTimeout(() => {
+      setExiting(false)
+      hide()
+    }, EXIT_MS)
+  }
 
   useEffect(() => {
-    if (!show || persistent) return
-    const t = setTimeout(hide, AUTO_HIDE_MS)
-    return () => clearTimeout(t)
-  }, [show, hide, persistent])
+    if (!show) {
+      setExiting(false)
+      return
+    }
+    if (persistent) return
+    hideTimer.current = setTimeout(triggerExit, AUTO_HIDE_MS)
+    return () => clearTimeout(hideTimer.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, persistent])
+
+  if (!show) return null
 
   return (
-    <ToastContainer
-      position="top-center"
-      containerPosition="fixed"
-      className="p-3"
-      style={{ zIndex: 9999 }}
+    <div
+      className={`vantura-toast vantura-toast--${variant}${exiting ? ' vantura-toast--exit' : ''}`}
+      role="alert"
+      aria-live="polite"
     >
-      <Toast
-        show={show}
-        onClose={hide}
-        autohide={!persistent}
-        delay={AUTO_HIDE_MS}
-        bg={variantToBootstrap(variant)}
-        className="bg-opacity-90 toast-fit-content"
-      >
-        <ToastBody className="text-white text-center">{message}</ToastBody>
-      </Toast>
-    </ToastContainer>
+      {message}
+    </div>
   )
 }
