@@ -6,16 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-21
+
+> **Versioning convention from this release:** Vantura follows [Semantic Versioning](https://semver.org).
+> `MINOR` bumps for new features; `PATCH` bumps for bug fixes and polish.
+> `v1.0.0` marks the stable core milestone: sync → track → analyse → budget, no critical known issues.
+
 ### Added
 
-- **Version display:** Current app version (`v{APP_VERSION}`) now shown in Settings → Help and as a stat on the What's New changelog page, so you can always tell which version is installed. See `src/pages/Settings.tsx`, `src/pages/Changelog.tsx`.
-- **Per-version What's New filtering:** Each milestone in the changelog is now tagged with the version it shipped in. The What's New modal compares each milestone's version against the user's last-seen version and shows only the genuinely new entries — so a single new feature in the next release shows just that one item, not the entire month's history. See `src/data/changelog.ts` (`version` field), `src/lib/appVersion.ts` (`versionGt`), `src/components/WhatsNewModal.tsx`.
+- **Version display:** Current app version shown in Settings → Help and as a stat on the What's new page — always know what's installed without opening DevTools. See `src/pages/Settings.tsx`, `src/pages/Changelog.tsx`.
+- **Per-version What's New filtering:** Each milestone is tagged with the version it shipped in. The What's New modal shows only features newer than your last-seen version — a single new feature in the next release shows just that one item. See `src/data/changelog.ts` (`version` field), `src/lib/appVersion.ts` (`versionGt`), `src/components/WhatsNewModal.tsx`.
+- **What's New modal:** First-run modal that appears automatically after each app update. Shows the latest release highlights grouped by feature area; a "Full changelog →" link navigates to the full `/changelog` page. Version tracking via `localStorage`; first-ever install silently records the current version so only genuine updates trigger the modal. See `src/components/WhatsNewModal.tsx`, `src/lib/appVersion.ts`, `src/layout/Layout.tsx`.
+- **Changelog page** (`/changelog`): In-app release history with month navigation, feature count stats, "What we're exploring next" section, and a colour-coded timeline of milestones. Accessible from Settings → Help → "What's new" and from the What's New modal footer. Also served publicly at `/changelog` without auth. See `src/pages/Changelog.tsx`, `src/data/changelog.ts`.
+- **Notifications:** In-app notification inbox (bell icon in navbar) with a slide-out drawer showing up to 30 days of alert history. Nine check types run on every app open: bill reminders, tracker over budget, tracker pace warning, spendable balance low, payday landed, possible payday detected, large transaction, saver goal milestones, and data out of date. Each type has a per-type toggle in Settings → Notifications; master toggle requests browser permission on first enable. Large-transaction threshold is configurable. Unread items show a blue dot and numeric badge; scrolling past an item marks it read (IntersectionObserver). "Clear all" wipes the history. Tracker notifications deep-link directly to the specific tracker report page (`/analytics/trackers/:id`). See `src/lib/notifications.ts`, `src/services/notificationChecks.ts`, `src/stores/notificationStore.ts`, `src/components/NotificationDrawer.tsx`, `src/layout/Navbar.tsx`.
+- **Payday source indicator:** A "Linked: [employer name]" chip in Settings → Payday shows which transaction has been selected as the user's salary source. Tapping × removes the link and resets the payday suggestion guard. See `src/pages/Settings.tsx`.
+- **Improved payday detection:** Payday landed notification uses two tiers — precise `raw_text` match on the identified salary transaction, falling back to an amount heuristic (≥80% of `pay_amount_cents`). See `src/services/notificationChecks.ts`.
+- **Budget Plan:** Group expenses into named buckets at `/analytics/budget`. Each bucket holds upcoming charges and optional hypothetical "what if?" lines. Summary footer shows Income, Committed spend, and Free Spending. Period toggle: weekly / fortnightly / monthly. Tables: `budget_buckets`, `budget_hypotheticals`, `budget_transaction_anchors` (schema v24). See `src/services/budgetBuckets.ts`, `src/pages/analytics/AnalyticsBudgetPlan.tsx`.
+- **Biometric unlock:** Touch ID / Face ID via WebAuthn (Settings → Security). Configurable inactivity lock timeout (1–30 minutes, default 3 minutes). See `src/lib/webauthn.ts`, `src/hooks/useInactivityLock.ts`.
+- **Pastel accent colour system:** Six pastel swatches — Sky, Mint, Lavender, Peach, Blush, Lemon. See `src/lib/accentPalettes.ts`, `src/stores/accentStore.ts`.
+- **Maybuys:** Deliberate-spending wishlist at `/analytics/maybuys`. "Days thinking" timer; mark as Bought or Skipped; History tab. See `src/services/maybuys.ts`, `src/pages/analytics/AnalyticsMaybuys.tsx`.
+- **Analytics Savers and Up API alignment:** Collapsible balance/contribution charts, drag-to-reorder, On track / Behind pace status, saver forecasting. See `src/pages/analytics/AnalyticsSavers.tsx`.
+- **Profile export/import:** Export settings, trackers, and upcoming charges to a passphrase-encrypted file; import on another device. See `src/services/profileExport.ts`.
+- **Analytics section:** `/analytics` with overview and detail pages for Reports, Trackers, and Savers. See `src/pages/analytics/*`.
+- **Month at a glance dashboard card:** Current month vs previous month line chart, key metrics, and narrative summary. See `src/components/dashboard/MonthSummarySection.tsx`.
+
+### Removed
+
+- **Analytics Net worth:** Removed net worth hub, page, service, and tables (`net_worth_snapshots`, `net_worth_type_snapshots`, schema migration v14). Legacy URL redirects to `/analytics`.
+- **Savers dashboard section:** Moved to Analytics-only at `/analytics/savers`. Tables cleaned up (schema migration v13).
+- **Plan and standalone wants/goals:** Removed `/plan` workspace, `goals`/`goal_snapshots` tables (schema migration v12). Legacy URLs redirect to `/analytics`.
+- **50/30/20 budget:** Removed the old Analytics budget experience and `budget_3020_config` from profile export.
+- **Light theme:** Dark-only UI; theme toggle removed from Settings.
+- **Maybuys dashboard card:** Moved to Analytics-only; no longer a reorderable Dashboard section.
+
+### Changed
+
+- **PWA safe area support:** `viewport-fit=cover` + `black-translucent` status bar for iPhone notch / Dynamic Island / home indicator. `100dvh` replaces `100vh` throughout. See `index.html`, `src/index.css`.
+- **Lock screen UX:** Single screen — passphrase and fingerprint icon side-by-side; tapping fingerprint fires the prompt immediately. PWA update banner visible on the lock screen. See `src/pages/Unlock.tsx`.
+- **Biometric auto-trigger privacy fix:** Auto-trigger waits for genuine user-presence (mousemove, touch, keydown, focus, visibilitychange) before prompting — no longer interrupts the user in another app.
+- **Help page redesign:** Structured sub-headings, bullet lists, and Tip callouts; sections for Budget Plan and Savers added.
+- **Dashboard layout:** 2-column grid; drag-and-drop section reorder on the Dashboard and in Settings.
+- **Dashboard tour:** Steps follow the user's saved section order; all descriptions use HTML formatting.
 
 ### Fixed
 
-- **PWA reopen crash on iOS/macOS ("Something went wrong"):** When Safari puts a PWA into the Back-Forward Cache (bfcache) on app close or swipe-away and then restores it, the sql.js WASM database handle is stale, causing the first SQL call to throw and hit the ErrorBoundary. Fixed by listening for `pageshow` with `event.persisted === true` and forcing a clean reload so `initDb()` runs fresh. Additionally, `pagehide` and `visibilitychange === 'hidden'` handlers now flush the SQLite database to IndexedDB before iOS suspends the page — `beforeunload` is not reliably fired in these cases on iOS PWA. See `src/main.tsx`, `src/db/index.ts`.
-
-## [0.0.4] - 2026-06-21
+- **PWA reopen crash on iOS/macOS ("Something went wrong"):** Safari's Back-Forward Cache (bfcache) restored a frozen page with a stale sql.js WASM handle, causing the first SQL call to throw. Fixed with a `pageshow` reload guard (`event.persisted`) and reliable `pagehide` + `visibilitychange` persist handlers — iOS does not fire `beforeunload` on swipe-away. See `src/main.tsx`, `src/db/index.ts`.
 
 ### Added
 
@@ -86,7 +121,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Deployment (Phase 6):** Production build with GitHub Pages base path; GitHub Actions deploy on push to `main`; SPA routing via `404.html`.
 - **Settings (Phase 7):** Re-sync, Clear all data (confirmation modal, delete DB, reload to Onboarding).
 
-[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.0.4...HEAD
-[0.0.4]: https://github.com/ostafford/Vantura_v3/compare/v0.0.2...v0.0.4
+[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ostafford/Vantura_v3/compare/v0.0.2...v0.5.0
 [0.0.2]: https://github.com/ostafford/Vantura_v3/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/ostafford/Vantura_v3/releases/tag/v0.0.1

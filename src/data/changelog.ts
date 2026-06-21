@@ -19,9 +19,30 @@ export interface UpcomingItem extends MilestoneItem {
 export const MILESTONES: Milestone[] = [
   {
     date: 'Jun 2026',
+    heading: 'Update & Release UX',
+    primaryMonth: '2026-06',
+    version: '0.5.0',
+    color: '#ffe082',
+    items: [
+      {
+        icon: 'mdi-information-outline',
+        text: "App version now visible in Settings → Help and on the What's new page — always know what you're running",
+      },
+      {
+        icon: 'mdi-filter-outline',
+        text: "What's new modal now shows only features new since your last update — not the entire month's history",
+      },
+      {
+        icon: 'mdi-cellphone-check',
+        text: 'PWA reopen crash on iPhone and Mac fixed — closing and reopening the app no longer shows "Something went wrong"',
+      },
+    ],
+  },
+  {
+    date: 'Jun 2026',
     heading: 'Notification Centre',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#ce93d8',
     items: [
       {
@@ -62,7 +83,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Lock Screen UX',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#90caf9',
     items: [
       {
@@ -87,7 +108,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Documentation & UX Polish',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#ce93d8',
     items: [
       {
@@ -112,7 +133,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'PWA & App Icons',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#80cbc4',
     items: [
       {
@@ -133,7 +154,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Security & Theming',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#80cbc4',
     items: [
       {
@@ -158,7 +179,7 @@ export const MILESTONES: Milestone[] = [
     date: 'Jun 2026',
     heading: 'Budget Plan',
     primaryMonth: '2026-06',
-    version: '0.0.4',
+    version: '0.5.0',
     color: '#ffab91',
     items: [
       {

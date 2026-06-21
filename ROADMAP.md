@@ -4,6 +4,20 @@ A timeline of everything built, when it shipped, and what's under consideration 
 
 ---
 
+## Versioning
+
+Vantura follows [Semantic Versioning](https://semver.org) from `v0.5.0` onward.
+
+| Bump | When |
+|------|------|
+| `PATCH` (0.5.x) | Bug fixes, copy tweaks, small polish |
+| `MINOR` (0.x.0) | A meaningful new feature ships |
+| `MAJOR` (1.0.0) | Stable core milestone — sync → track → analyse → budget, no critical issues |
+
+Each release is git-tagged (`v0.5.0`, `v0.6.0`, …) and documented in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## Shipped
 
 ### Foundation — February 2026
@@ -144,6 +158,7 @@ The initial build established the full technical foundation: local-first storage
 | Jun 20 | **Biometric privacy fix** — Auto-trigger deferred until user is actively in the app (presence events: mousemove, touch, keydown, window focus, visibilitychange); Touch ID / Face ID prompt no longer appears while user is in another application |
 | Jun 21 | **Bug fix: PWA reopen crash on iOS/macOS** — Safari's Back-Forward Cache (bfcache) restores a frozen page on app reopen, leaving the sql.js WASM handle stale and causing "Something went wrong". Fixed with a `pageshow` reload guard (`event.persisted`) and reliable `pagehide` + `visibilitychange` persist handlers (iOS does not fire `beforeunload` on swipe-away). See `src/main.tsx`, `src/db/index.ts` |
 | Jun 21 | **Version display** — Installed version shown in Settings → Help (`v{APP_VERSION}`) and as a stat on the What's New / Changelog page; always visible without opening DevTools |
+| Jun 21 | **Semantic versioning adopted** — Vantura moves from `0.0.x` to `v0.5.0`; versioning convention documented in ROADMAP and CHANGELOG; git tags from this release onward |
 
 ---
 
