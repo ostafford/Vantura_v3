@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { APP_VERSION } from '@/lib/appVersion'
 import { useStore } from 'zustand'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
@@ -785,7 +786,7 @@ export function Settings() {
                     New to Vantura? Read the user guide or run the dashboard
                     tour to see how everything works.
                   </p>
-                  <div className="d-flex flex-wrap gap-2">
+                  <div className="d-flex flex-wrap gap-2 mb-3">
                     <Link
                       to="/help"
                       className="btn btn-gradient-primary btn-sm"
@@ -816,6 +817,16 @@ export function Settings() {
                       Show dashboard tour again
                     </Button>
                   </div>
+                  <p className="small text-muted mb-0">
+                    <i
+                      className="mdi mdi-information-outline me-1"
+                      aria-hidden
+                    />
+                    Vantura{' '}
+                    <span className="fw-semibold text-body">
+                      v{APP_VERSION}
+                    </span>
+                  </p>
                 </>
               )}
               {activeSection === 'appearance' && (

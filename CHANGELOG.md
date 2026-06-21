@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Version display:** Current app version (`v{APP_VERSION}`) now shown in Settings → Help and as a stat on the What's New changelog page, so you can always tell which version is installed. See `src/pages/Settings.tsx`, `src/pages/Changelog.tsx`.
+
 ### Fixed
 
 - **PWA reopen crash on iOS/macOS ("Something went wrong"):** When Safari puts a PWA into the Back-Forward Cache (bfcache) on app close or swipe-away and then restores it, the sql.js WASM database handle is stale, causing the first SQL call to throw and hit the ErrorBoundary. Fixed by listening for `pageshow` with `event.persisted === true` and forcing a clean reload so `initDb()` runs fresh. Additionally, `pagehide` and `visibilitychange === 'hidden'` handlers now flush the SQLite database to IndexedDB before iOS suspends the page — `beforeunload` is not reliably fired in these cases on iOS PWA. See `src/main.tsx`, `src/db/index.ts`.

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card } from 'react-bootstrap'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { MILESTONES, UPCOMING, type Milestone } from '@/data/changelog'
+import { APP_VERSION } from '@/lib/appVersion'
 
 // ── Static derived values ────────────────────────────────────────────
 function toYearMonth(d: Date): string {
@@ -130,6 +131,13 @@ export function Changelog({ isPublic = false }: ChangelogProps) {
         <div className="changelog-stat-item">
           <span className="changelog-stat-value">{SINCE_LABEL}</span>
           <span className="changelog-stat-label">shipping since</span>
+        </div>
+
+        <div className="changelog-stat-divider" aria-hidden />
+
+        <div className="changelog-stat-item">
+          <span className="changelog-stat-value">v{APP_VERSION}</span>
+          <span className="changelog-stat-label">installed</span>
         </div>
       </div>
 
