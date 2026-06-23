@@ -2739,6 +2739,25 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-weight: 500;
 }
 
+.notif-drawer__item-header-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.notif-drawer__item-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(126, 184, 216, 0.15);
+  color: var(--vantura-primary);
+  white-space: nowrap;
+}
+
 .notif-drawer__item-dot {
   position: absolute;
   left: 5px;

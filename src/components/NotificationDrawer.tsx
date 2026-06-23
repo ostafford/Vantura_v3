@@ -44,6 +44,10 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
     icon: 'mdi-sync-alert',
     color: 'var(--vantura-text-secondary)',
   },
+  whats_new: {
+    icon: 'mdi-rocket-launch-outline',
+    color: 'var(--vantura-primary)',
+  },
 }
 
 function getMeta(type: string) {
@@ -104,9 +108,14 @@ function NotifRow({ item, onRead, onClick }: NotifRowProps) {
       <div className="notif-drawer__item-content">
         <div className="notif-drawer__item-header">
           <span className="notif-drawer__item-title">{item.title}</span>
-          <span className="notif-drawer__item-time">
-            {relativeTime(item.created_at)}
-          </span>
+          <div className="notif-drawer__item-header-end">
+            {item.type === 'whats_new' && (
+              <span className="notif-drawer__item-badge">Update</span>
+            )}
+            <span className="notif-drawer__item-time">
+              {relativeTime(item.created_at)}
+            </span>
+          </div>
         </div>
         <p className="notif-drawer__item-body">{item.body}</p>
         {item.link_label && (

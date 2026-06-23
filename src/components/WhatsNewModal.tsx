@@ -8,6 +8,8 @@ import {
   getLastSeenVersion,
   versionGt,
 } from '@/lib/appVersion'
+import { seedWhatsNewNotifications } from '@/lib/notifications'
+import { notificationStore } from '@/stores/notificationStore'
 
 interface WhatsNewModalProps {
   show: boolean
@@ -29,6 +31,15 @@ export function WhatsNewModal({ show, onClose }: WhatsNewModalProps) {
     markVersionSeen()
     onClose()
   }
+
+  // Seed new milestones into notification history once per version.
+  useEffect(() => {
+    if (newMilestones.length > 0) {
+      seedWhatsNewNotifications(newMilestones)
+      notificationStore.getState().refreshUnreadCount()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // If the version bumped but there are no milestone entries for it yet,
   // silently mark it seen and suppress the modal rather than showing a blank.

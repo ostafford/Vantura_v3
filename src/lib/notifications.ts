@@ -4,6 +4,8 @@
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
+import { APP_VERSION } from '@/lib/appVersion'
+import type { Milestone } from '@/data/changelog'
 
 const NOTIFICATIONS_ENABLED_KEY = 'notifications_enabled'
 const LAST_NOTIFICATION_DATE_KEY = 'last_notification_date'
@@ -233,6 +235,36 @@ export function pruneOldNotifications(): void {
   db.run(`DELETE FROM notification_history WHERE created_at < ?`, [
     cutoff.toISOString(),
   ])
+}
+
+// ─── What's New seeding ───────────────────────────────────────────────────────
+
+const WHATS_NEW_SEEDED_KEY = 'vantura_notif_whats_new_seeded'
+
+/**
+ * Insert each milestone as a `whats_new` notification entry.
+ * Runs at most once per app version — tracked in localStorage so it
+ * survives page reloads without duplicating entries.
+ */
+export function seedWhatsNewNotifications(milestones: Milestone[]): void {
+  if (!milestones.length) return
+  if (localStorage.getItem(WHATS_NEW_SEEDED_KEY) === APP_VERSION) return
+
+  for (const m of milestones) {
+    const body =
+      m.items.length > 1
+        ? `${m.items[0].text} +${m.items.length - 1} more`
+        : m.items[0].text
+    addNotificationToHistory(
+      'whats_new',
+      `v${m.version} — ${m.heading}`,
+      body,
+      '/changelog',
+      'View changelog'
+    )
+  }
+
+  localStorage.setItem(WHATS_NEW_SEEDED_KEY, APP_VERSION)
 }
 
 // ─── Per-check guard helpers ──────────────────────────────────────────────────
