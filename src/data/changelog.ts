@@ -18,6 +18,31 @@ export interface UpcomingItem extends MilestoneItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '24 Jun 2026',
+    heading: 'Navigation Refinements',
+    primaryMonth: '2026-06',
+    version: '0.5.6',
+    color: '#ffcc80',
+    items: [
+      {
+        icon: 'mdi-view-list-outline',
+        text: 'Sidebar icons now sit on the left alongside their labels — consistent with every other navigation pattern and much easier to scan at a glance',
+      },
+      {
+        icon: 'mdi-dock-bottom',
+        text: "Settings, Help, and What's new moved to the bottom of the sidebar — primary destinations up top, utility links at the foot where they belong",
+      },
+      {
+        icon: 'mdi-chevron-left-box-outline',
+        text: 'The Vantura logo is now a pure brand mark — a dedicated ‹ › button handles sidebar collapse so the two roles are no longer conflated',
+      },
+      {
+        icon: 'mdi-filter-remove-outline',
+        text: 'Page headers cleaned up — breadcrumbs removed from top-level pages where they implied a hierarchy that does not exist',
+      },
+    ],
+  },
+  {
     date: '23 Jun 2026',
     heading: 'Now Live at myvantura.xyz',
     primaryMonth: '2026-06',
