@@ -10,7 +10,7 @@
 
 ## Hosting
 
-Vantura is served as a static bundle from Netlify's CDN (`https://vanturaup.netlify.app`). Netlify acts purely as a file server — it delivers HTML, JavaScript, and CSS to your browser and has no access to anything stored inside it.
+Vantura is served as a static bundle from Netlify's CDN (`https://myvantura.xyz`). Netlify acts purely as a file server — it delivers HTML, JavaScript, and CSS to your browser and has no access to anything stored inside it.
 
 The following data never leaves your device and is invisible to the hosting provider:
 

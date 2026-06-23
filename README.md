@@ -2,7 +2,7 @@
 
 A local-first financial insights app for Up Bank customers. All data stays on your device — nothing is sent to any server.
 
-**Live app:** [https://vanturaup.netlify.app/](https://vanturaup.netlify.app/)
+**Live app:** [https://myvantura.xyz/](https://myvantura.xyz/)
 
 ---
 
@@ -69,7 +69,7 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 **Hosting:** Netlify — auto-deploys on every push to `main`. No manual steps required. Configuration: `netlify.toml` (build command, publish dir, SPA redirect rule).
 
-**Live site:** [https://vanturaup.netlify.app/](https://vanturaup.netlify.app/)
+**Live site:** [https://myvantura.xyz/](https://myvantura.xyz/)
 
 **Old URL redirect:** `https://ostafford.github.io/Vantura_v3/` now redirects automatically to the Netlify URL via a `gh-pages` branch redirect page.
 
