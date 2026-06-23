@@ -10,7 +10,7 @@
 
 ## Hosting
 
-Vantura is served as a static bundle from Netlify's CDN (`https://myvantura.xyz`). Netlify acts purely as a file server — it delivers HTML, JavaScript, and CSS to your browser and has no access to anything stored inside it.
+Vantura is served as a static bundle from Cloudflare Pages (`https://myvantura.xyz`). Cloudflare Pages acts purely as a file server — it delivers HTML, JavaScript, and CSS to your browser and has no access to anything stored inside it. The domain, CDN, and hosting all reside within Cloudflare, eliminating any intermediate provider hops.
 
 The following data never leaves your device and is invisible to the hosting provider:
 
@@ -19,9 +19,9 @@ The following data never leaves your device and is invisible to the hosting prov
 - Your passphrase (never stored anywhere)
 - Biometric credentials (stored in the browser credential store, not IndexedDB)
 
-All Up Bank API requests are made directly from your browser to `https://api.up.com.au` — they do not pass through Netlify or any intermediate server.
+All Up Bank API requests are made directly from your browser to `https://api.up.com.au` — they do not pass through Cloudflare or any intermediate server.
 
-The previous hosting provider (GitHub Pages) offered the same privacy guarantee. The migration to Netlify was made to fix SPA sub-route 404 errors and does not change the data model in any way.
+Previous hosting providers (GitHub Pages, then Netlify) offered the same privacy guarantee. The consolidation to Cloudflare Pages was made to unify domain management, CDN, and hosting under a single provider. The data model and URL (`myvantura.xyz`) are unchanged.
 
 ## Reporting a vulnerability
 

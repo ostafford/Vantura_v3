@@ -67,13 +67,18 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 ## Deployment
 
-**Hosting:** Netlify — auto-deploys on every push to `main`. No manual steps required. Configuration: `netlify.toml` (build command, publish dir, SPA redirect rule).
+**Hosting:** Cloudflare Pages — auto-deploys on every push to `main`. No manual steps required. Configuration: `public/_redirects` (SPA routing), `public/_headers` (security headers).
 
 **Live site:** [https://myvantura.xyz/](https://myvantura.xyz/)
 
-**Old URL redirect:** `https://ostafford.github.io/Vantura_v3/` now redirects automatically to the Netlify URL via a `gh-pages` branch redirect page.
+**Old URL redirect:** `https://ostafford.github.io/Vantura_v3/` now redirects automatically to `https://myvantura.xyz/` via a `gh-pages` branch redirect page.
 
-**CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` on every push. Netlify handles deployment separately after CI passes.
+**CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` on every push. Cloudflare Pages handles deployment automatically on push to `main`.
+
+**Cloudflare Pages build settings** (configured in the Cloudflare dashboard):
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Environment variable: `NODE_VERSION=24`
 
 **Local preview:** `npm run preview`
 

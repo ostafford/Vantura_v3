@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Hosting consolidated to Cloudflare Pages:** Domain (`myvantura.xyz`), CDN, and hosting now reside within a single provider. The app URL is unchanged. SPA routing handled by `public/_redirects`; security headers (CSP, HSTS, etc.) moved to `public/_headers`. Netlify configuration (`netlify.toml`) retained for reference but is no longer the active host. See `public/_redirects`, `public/_headers`.
+
 ## [0.5.2] - 2026-06-21
 
 ### Changed
