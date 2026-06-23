@@ -833,7 +833,7 @@ export function Settings() {
                       Show dashboard tour again
                     </Button>
                   </div>
-                  <p className="small text-muted mb-2">
+                  <p className="small text-muted mb-1">
                     <i
                       className="mdi mdi-information-outline me-1"
                       aria-hidden
@@ -842,6 +842,19 @@ export function Settings() {
                     <span className="fw-semibold text-body">
                       v{APP_VERSION}
                     </span>
+                  </p>
+                  <p className="small text-muted mb-3">
+                    <i className="mdi mdi-earth me-1" aria-hidden />
+                    Live at{' '}
+                    <a
+                      href="https://myvantura.xyz"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-body fw-semibold"
+                    >
+                      myvantura.xyz
+                    </a>{' '}
+                    — permanent address
                   </p>
                   {updateReady ? (
                     <Button

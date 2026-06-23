@@ -6,9 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-23
+
+### Added
+
+- **Permanent URL — myvantura.xyz:** Vantura is now permanently live at `https://myvantura.xyz`. This URL will not change — the domain is owned independently of any hosting provider. A "Now Live" milestone appears in the in-app What's new page and modal.
+
 ### Changed
 
-- **Hosting consolidated to Cloudflare Pages:** Domain (`myvantura.xyz`), CDN, and hosting now reside within a single provider. The app URL is unchanged. SPA routing handled by `public/_redirects`; security headers (CSP, HSTS, etc.) moved to `public/_headers`. Netlify configuration (`netlify.toml`) retained for reference but is no longer the active host. See `public/_redirects`, `public/_headers`.
+- **Hosting consolidated to Cloudflare Pages:** Domain (`myvantura.xyz`), CDN, and hosting now reside within a single provider, eliminating the intermediate Netlify hop. SPA routing handled by `public/_redirects`; security headers (CSP, HSTS, etc.) served via `public/_headers`. All headers verified live (`server: cloudflare`, `cf-ray: SYD`). Netlify configuration (`netlify.toml`) retained for reference but is no longer the active host. See `public/_redirects`, `public/_headers`.
 
 ## [0.5.2] - 2026-06-21
 

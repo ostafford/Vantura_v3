@@ -18,7 +18,28 @@ export interface UpcomingItem extends MilestoneItem {
 
 export const MILESTONES: Milestone[] = [
   {
-    date: 'Jun 2026',
+    date: '23 Jun 2026',
+    heading: 'Now Live at myvantura.xyz',
+    primaryMonth: '2026-06',
+    version: '0.5.5',
+    color: '#a5d6a7',
+    items: [
+      {
+        icon: 'mdi-earth',
+        text: 'Vantura is permanently live at myvantura.xyz — this URL will not change. The domain is owned independently of any hosting provider.',
+      },
+      {
+        icon: 'mdi-cloud-check-outline',
+        text: 'Hosting consolidated to Cloudflare Pages — domain, CDN, and server all in one place for maximum reliability and speed',
+      },
+      {
+        icon: 'mdi-shield-check-outline',
+        text: 'Security headers verified live: HSTS, Content Security Policy, and frame protection all confirmed active',
+      },
+    ],
+  },
+  {
+    date: '21 Jun 2026',
     heading: 'Stability Fix',
     primaryMonth: '2026-06',
     version: '0.5.4',
@@ -31,7 +52,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Export & Import v2',
     primaryMonth: '2026-06',
     version: '0.5.3',
@@ -60,7 +81,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Reliability & Hosting',
     primaryMonth: '2026-06',
     version: '0.5.2',
@@ -81,7 +102,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Smarter App Updates',
     primaryMonth: '2026-06',
     version: '0.5.1',
@@ -102,7 +123,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Update & Release UX',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -123,7 +144,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Notification Centre',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -164,7 +185,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Lock Screen UX',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -189,7 +210,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Documentation & UX Polish',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -214,7 +235,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'PWA & App Icons',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -235,7 +256,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Security & Theming',
     primaryMonth: '2026-06',
     version: '0.5.0',
@@ -260,7 +281,7 @@ export const MILESTONES: Milestone[] = [
     ],
   },
   {
-    date: 'Jun 2026',
+    date: '21 Jun 2026',
     heading: 'Budget Plan',
     primaryMonth: '2026-06',
     version: '0.5.0',
