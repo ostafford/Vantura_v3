@@ -18,7 +18,6 @@ import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { NotificationDrawer } from '@/components/NotificationDrawer'
 
-const VIEWPORT_AUTO_COLLAPSE_PX = 1280
 const SIDEBAR_COLLAPSED_KEY = 'vantura_sidebar_collapsed'
 
 export function Layout() {
@@ -55,11 +54,9 @@ export function Layout() {
     if (w <= MOBILE_BREAKPOINT_PX) return
 
     const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-    if (stored !== null) {
-      uiStore.getState().setSidebarCollapsed(stored === '1')
-    } else {
-      uiStore.getState().setSidebarCollapsed(w < VIEWPORT_AUTO_COLLAPSE_PX)
-    }
+    uiStore
+      .getState()
+      .setSidebarCollapsed(stored !== null ? stored === '1' : true)
   }, [])
 
   useEffect(() => {
@@ -67,11 +64,9 @@ export function Layout() {
       const w = window.innerWidth
       if (w > MOBILE_BREAKPOINT_PX) {
         const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-        if (stored !== null) {
-          uiStore.getState().setSidebarCollapsed(stored === '1')
-        } else {
-          uiStore.getState().setSidebarCollapsed(w < VIEWPORT_AUTO_COLLAPSE_PX)
-        }
+        uiStore
+          .getState()
+          .setSidebarCollapsed(stored !== null ? stored === '1' : true)
       }
 
       widthRef.current = w
