@@ -37,7 +37,7 @@ function ChangelogPublicShell() {
         </a>
       </header>
       <div className="changelog-public-content">
-        <Changelog isPublic />
+        <Changelog />
       </div>
     </div>
   )

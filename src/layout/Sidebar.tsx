@@ -11,8 +11,6 @@ interface NavItem {
   to: string
   label: string
   icon: string
-  short: string
-  badge?: string
 }
 
 interface SidebarProps {
@@ -22,6 +20,22 @@ interface SidebarProps {
   /** When overlay, whether the drawer is visible (slide-in). */
   mobileOpen?: boolean
 }
+
+const PRIMARY_NAV: NavItem[] = [
+  { to: '/', label: 'Dashboard', icon: 'mdi-home' },
+  { to: '/analytics', label: 'Analytics', icon: 'mdi-chart-box' },
+  {
+    to: '/transactions',
+    label: 'Transactions',
+    icon: 'mdi-credit-card-multiple',
+  },
+]
+
+const UTILITY_NAV: NavItem[] = [
+  { to: '/settings', label: 'Settings', icon: 'mdi-cog' },
+  { to: '/help', label: 'Help', icon: 'mdi-book-open-page-variant' },
+  { to: '/changelog', label: "What's new", icon: 'mdi-rocket-launch-outline' },
+]
 
 export function Sidebar({
   collapsed,
@@ -38,34 +52,12 @@ export function Sidebar({
       : SIDEBAR_WIDTH
   const showLabels = overlay || !collapsed
 
-  const navItems: NavItem[] = [
-    { to: '/', label: 'Dashboard', icon: 'mdi-home', short: 'D' },
-    {
-      to: '/analytics',
-      label: 'Analytics',
-      icon: 'mdi-chart-box',
-      short: 'A',
-    },
-    {
-      to: '/transactions',
-      label: 'Transactions',
-      icon: 'mdi-credit-card-multiple',
-      short: 'T',
-    },
-    { to: '/settings', label: 'Settings', icon: 'mdi-cog', short: 'S' },
-    {
-      to: '/help',
-      label: 'Help',
-      icon: 'mdi-book-open-page-variant',
-      short: 'H',
-    },
-    {
-      to: '/changelog',
-      label: "What's new",
-      icon: 'mdi-rocket-launch-outline',
-      short: 'N',
-    },
-  ]
+  function isActive(to: string) {
+    return to === '/'
+      ? location.pathname === '/'
+      : location.pathname === to ||
+          (to !== '/' && location.pathname.startsWith(to + '/'))
+  }
 
   return (
     <nav
@@ -80,8 +72,6 @@ export function Sidebar({
         minWidth: width,
         background: 'var(--vantura-sidebar-gradient)',
         color: 'var(--vantura-sidebar-menu-color)',
-        // overlay (mobile drawer) must sit above everything including modals;
-        // desktop permanent sidebar only needs to clear the navbar (z 1030).
         zIndex: overlay ? 1101 : 1040,
         transition:
           'width 0.25s ease, background 0.25s ease, transform 0.25s ease',
@@ -103,80 +93,71 @@ export function Sidebar({
           )}
         </div>
       ) : (
-        <button
-          type="button"
-          className="sidebar-brand sidebar-brand-btn"
-          onClick={() => uiStore.getState().toggleSidebar()}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={
-            showLabels
-              ? { position: 'relative', justifyContent: 'center' }
-              : undefined
-          }
-        >
-          {showLabels ? (
-            <>
-              <div
-                className="sidebar-brand-block"
-                style={{ alignItems: 'center' }}
-              >
-                <VanturaLogo variant="icon" height={44} />
-                {isDemoMode && (
-                  <span className="sidebar-demo-badge" aria-hidden>
-                    DEMO
-                  </span>
-                )}
-              </div>
-              <i
-                className="mdi mdi-chevron-left sidebar-brand-icon"
-                aria-hidden
-                style={{ position: 'absolute', right: '1.25rem' }}
-              />
-            </>
-          ) : (
-            <VanturaLogo variant="icon" height={44} />
+        <div className="sidebar-brand">
+          {!collapsed && (
+            <div className="sidebar-brand-block">
+              <VanturaLogo variant="icon" height={44} />
+              {isDemoMode && (
+                <span className="sidebar-demo-badge" aria-hidden>
+                  DEMO
+                </span>
+              )}
+            </div>
           )}
-        </button>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => uiStore.getState().toggleSidebar()}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i
+              className={`mdi ${collapsed ? 'mdi-chevron-right' : 'mdi-chevron-left'}`}
+              aria-hidden
+            />
+          </button>
+        </div>
       )}
+
       <div className="sidebar-body">
         <ul className="nav">
-          {navItems.map((item) => {
-            const isActive =
-              item.to === '/'
-                ? location.pathname === '/'
-                : location.pathname === item.to ||
-                  (item.to !== '/' &&
-                    location.pathname.startsWith(item.to + '/'))
-            return (
-              <li
-                key={item.to}
-                className={`nav-item${isActive ? ' active' : ''}`}
+          {PRIMARY_NAV.map((item) => (
+            <li
+              key={item.to}
+              className={`nav-item${isActive(item.to) ? ' active' : ''}`}
+            >
+              <Link
+                className="nav-link"
+                to={item.to}
+                aria-label={!showLabels ? item.label : undefined}
+                style={{ color: 'inherit' }}
               >
-                <Link
-                  className="nav-link"
-                  to={item.to}
-                  style={{ color: 'inherit' }}
-                >
-                  <span className="menu-title">
-                    {showLabels ? item.label : item.short}
-                  </span>
-                  {showLabels && item.badge && (
-                    <span className="sidebar-nav-badge" aria-hidden>
-                      {item.badge}
-                    </span>
-                  )}
-                  <i className={`mdi ${item.icon} menu-icon`} aria-hidden />
-                </Link>
-              </li>
-            )
-          })}
+                <i className={`mdi ${item.icon} menu-icon`} aria-hidden />
+                {showLabels && <span className="menu-title">{item.label}</span>}
+              </Link>
+            </li>
+          ))}
         </ul>
-        <div className="sidebar-footer" data-tour="sidebar-lock">
+
+        <div className="sidebar-footer">
+          {UTILITY_NAV.map((item) => (
+            <Link
+              key={item.to}
+              className={`sidebar-footer-btn${isActive(item.to) ? ' active' : ''}`}
+              to={item.to}
+              aria-label={!showLabels ? item.label : undefined}
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              <i className={`mdi ${item.icon} menu-icon`} aria-hidden />
+              {showLabels && <span className="menu-title">{item.label}</span>}
+            </Link>
+          ))}
+          <div className="sidebar-footer-divider" />
           <button
             type="button"
             className="sidebar-footer-btn"
+            data-tour="sidebar-lock"
             onClick={() => sessionStore.getState().lock()}
-            aria-label="Lock"
+            aria-label={!showLabels ? 'Lock' : undefined}
           >
             <i className="mdi mdi-lock menu-icon" aria-hidden />
             {showLabels && <span className="menu-title">Lock</span>}

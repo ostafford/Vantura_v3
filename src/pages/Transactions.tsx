@@ -1,6 +1,5 @@
 import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import {
   Card,
   Form,
@@ -526,12 +525,6 @@ export function Transactions() {
             Transactions
           </h3>
           <div className="d-flex flex-wrap align-items-center gap-2 ms-auto">
-            <PageBreadcrumb
-              items={[
-                { label: 'Dashboard', to: '/' },
-                { label: 'Transactions' },
-              ]}
-            />
             <Button
               type="button"
               className="btn-gradient-primary"

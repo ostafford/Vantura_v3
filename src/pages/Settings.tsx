@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { APP_VERSION } from '@/lib/appVersion'
 import { useStore } from 'zustand'
-import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Modal, Spinner, Form } from 'react-bootstrap'
@@ -739,9 +738,6 @@ export function Settings() {
             </span>
             Settings
           </h3>
-          <PageBreadcrumb
-            items={[{ label: 'Dashboard', to: '/' }, { label: 'Settings' }]}
-          />
         </div>
       </div>
 

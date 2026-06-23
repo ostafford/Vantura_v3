@@ -37,7 +37,6 @@ export function Navbar({
   isMobile = false,
   sidebarMobileOpen = false,
 }: NavbarProps) {
-  const toggleSidebar = useStore(uiStore, (s) => s.toggleSidebar)
   const setSidebarMobileOpen = useStore(uiStore, (s) => s.setSidebarMobileOpen)
   const unreadCount = useStore(notificationStore, (s) => s.unreadCount)
   const openDrawer = useStore(notificationStore, (s) => s.openDrawer)
@@ -46,11 +45,7 @@ export function Navbar({
   const isDemoMode = getAppSetting('demo_mode') === '1'
 
   function handleNavToggle() {
-    if (isMobile) {
-      setSidebarMobileOpen(!sidebarMobileOpen)
-    } else {
-      toggleSidebar()
-    }
+    setSidebarMobileOpen(!sidebarMobileOpen)
   }
 
   useEffect(() => {
@@ -89,17 +84,19 @@ export function Navbar({
     <nav
       className={`vantura-navbar ${sidebarCollapsed && !isMobile ? 'collapsed' : ''} ${isMobile ? 'vantura-navbar-mobile' : ''}`}
     >
-      <div className="navbar-brand-wrapper">
-        <button
-          type="button"
-          className="navbar-toggler"
-          onClick={handleNavToggle}
-          aria-label={isMobile ? 'Open menu' : 'Toggle sidebar'}
-          aria-expanded={isMobile ? sidebarMobileOpen : undefined}
-        >
-          <VanturaLogo variant="icon" height={36} />
-        </button>
-      </div>
+      {isMobile && (
+        <div className="navbar-brand-wrapper">
+          <button
+            type="button"
+            className="navbar-toggler"
+            onClick={handleNavToggle}
+            aria-label="Open menu"
+            aria-expanded={sidebarMobileOpen}
+          >
+            <i className="mdi mdi-menu" aria-hidden />
+          </button>
+        </div>
+      )}
       {sidebarCollapsed && !isMobile && (
         <Link
           to="/"

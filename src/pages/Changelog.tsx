@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Card } from 'react-bootstrap'
-import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import { MILESTONES, UPCOMING, type Milestone } from '@/data/changelog'
 import { APP_VERSION } from '@/lib/appVersion'
 
@@ -32,12 +31,8 @@ const INITIAL_MONTH = AVAILABLE_MONTHS.includes(NOW_MONTH)
   ? NOW_MONTH
   : AVAILABLE_MONTHS[AVAILABLE_MONTHS.length - 1]
 
-interface ChangelogProps {
-  isPublic?: boolean
-}
-
 // ── Component ────────────────────────────────────────────────────────
-export function Changelog({ isPublic = false }: ChangelogProps) {
+export function Changelog() {
   const [selectedMonth, setSelectedMonth] = useState(INITIAL_MONTH)
 
   const idx = AVAILABLE_MONTHS.indexOf(selectedMonth)
@@ -92,11 +87,6 @@ export function Changelog({ isPublic = false }: ChangelogProps) {
             </span>
             What&apos;s new
           </h3>
-          {!isPublic && (
-            <PageBreadcrumb
-              items={[{ label: 'Dashboard', to: '/' }, { label: "What's new" }]}
-            />
-          )}
         </div>
       </div>
 
