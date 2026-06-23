@@ -47,19 +47,6 @@ export function Layout() {
     : SIDEBAR_WIDTH
 
   useEffect(() => {
-    const w =
-      typeof window !== 'undefined'
-        ? window.innerWidth
-        : VIEWPORT_AUTO_COLLAPSE_PX
-    if (w <= MOBILE_BREAKPOINT_PX) return
-
-    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-    uiStore
-      .getState()
-      .setSidebarCollapsed(stored !== null ? stored === '1' : true)
-  }, [])
-
-  useEffect(() => {
     const onResize = () => {
       const w = window.innerWidth
       if (w > MOBILE_BREAKPOINT_PX) {

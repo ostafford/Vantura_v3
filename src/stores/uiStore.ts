@@ -4,6 +4,14 @@
 
 import { createStore } from 'zustand/vanilla'
 
+const SIDEBAR_COLLAPSED_KEY = 'vantura_sidebar_collapsed'
+
+function readInitialSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') return true
+  const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+  return stored !== null ? stored === '1' : true
+}
+
 type UIStore = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
@@ -14,7 +22,7 @@ type UIStore = {
 }
 
 export const uiStore = createStore<UIStore>((set) => ({
-  sidebarCollapsed: false,
+  sidebarCollapsed: readInitialSidebarCollapsed(),
   sidebarMobileOpen: false,
 
   setSidebarCollapsed(collapsed: boolean) {
