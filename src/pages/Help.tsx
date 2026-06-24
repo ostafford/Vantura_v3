@@ -227,12 +227,11 @@ export function Help() {
                       <strong>Transactions</strong> — filter, search, and browse
                       all synced transactions
                     </li>
-                    <li className="mb-1">
-                      <strong>Settings</strong> — sync, payday, appearance,
-                      security, and more
-                    </li>
                     <li>
-                      <strong>Help</strong> — this user guide
+                      <strong>Settings</strong> — sync, payday, appearance,
+                      security, and more. The <strong>About</strong> section
+                      inside Settings links to this user guide and the
+                      changelog.
                     </li>
                   </ul>
 

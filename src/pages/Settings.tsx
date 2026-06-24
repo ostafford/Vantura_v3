@@ -72,7 +72,7 @@ const LEGACY_SETTINGS_ACCORDION_KEY = 'vantura_settings_accordion'
 
 function getSettingsSectionKeys(): string[] {
   return [
-    'help',
+    'about',
     'appearance',
     'payday',
     'dashboard-sections',
@@ -83,7 +83,7 @@ function getSettingsSectionKeys(): string[] {
 }
 
 const SETTINGS_SECTION_LABELS: Record<string, string> = {
-  help: 'Help',
+  about: 'About',
   appearance: 'Appearance',
   payday: 'Payday',
   'dashboard-sections': 'Dashboard sections',
@@ -91,6 +91,78 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   security: 'Security',
   data: 'Data',
 }
+
+const SETTINGS_SECTION_ICONS: Record<string, string> = {
+  about: 'mdi-information-outline',
+  appearance: 'mdi-palette-outline',
+  payday: 'mdi-calendar-today',
+  'dashboard-sections': 'mdi-view-dashboard-outline',
+  notifications: 'mdi-bell-outline',
+  security: 'mdi-shield-lock-outline',
+  data: 'mdi-database-outline',
+}
+
+const NOTIF_TYPES: { key: NotifType; label: string; desc: string }[] = [
+  {
+    key: 'tracker_overspent',
+    label: 'Tracker over budget',
+    desc: 'When a tracker exceeds 100% of its budget',
+  },
+  {
+    key: 'tracker_pace',
+    label: 'Tracker pace warning',
+    desc: 'When spending is >10% ahead of pace with >20% of the period left',
+  },
+  {
+    key: 'spendable_low',
+    label: 'Spendable balance low',
+    desc: 'When spendable drops below your alert threshold',
+  },
+  {
+    key: 'payday',
+    label: 'Payday landed',
+    desc: 'When a salary-sized credit appears on your account',
+  },
+  {
+    key: 'large_tx',
+    label: 'Large transaction',
+    desc: 'Unexpected debits above the threshold you set',
+  },
+  {
+    key: 'bills',
+    label: 'Bill reminders',
+    desc: 'Upcoming charges within their reminder window',
+  },
+  {
+    key: 'saver_milestone',
+    label: 'Saver goal milestones',
+    desc: 'When a saver reaches 50%, 75%, or 100% of its goal',
+  },
+  {
+    key: 'sync_stale',
+    label: 'Data out of date',
+    desc: "When Vantura hasn't synced in over 24 hours",
+  },
+]
+
+const NOTIF_GROUPS: { label: string; icon: string; keys: NotifType[] }[] = [
+  {
+    label: 'Spending alerts',
+    icon: 'mdi-alert-circle-outline',
+    keys: [
+      'tracker_overspent',
+      'tracker_pace',
+      'spendable_low',
+      'payday',
+      'large_tx',
+    ],
+  },
+  {
+    label: 'Reminders & system',
+    icon: 'mdi-bell-ring-outline',
+    keys: ['bills', 'saver_milestone', 'sync_stale'],
+  },
+]
 
 function formatLastSync(iso: string | null): string {
   if (!iso) return 'Never'
@@ -179,6 +251,7 @@ function DashboardSectionOrderForm() {
   const resetToDefault = () => {
     setOrder([...DEFAULT_DASHBOARD_SECTION_ORDER])
     setDashboardSectionOrder([...DEFAULT_DASHBOARD_SECTION_ORDER])
+    toast.success('Section order reset to default.')
   }
 
   return (
@@ -213,14 +286,20 @@ function DashboardSectionOrderForm() {
           </li>
         ))}
       </ul>
-      <Button
-        variant="outline-secondary"
-        size="sm"
-        onClick={resetToDefault}
-        aria-label="Reset dashboard section order to default"
-      >
-        Reset to default order
-      </Button>
+      <div className="d-flex align-items-center gap-3 flex-wrap">
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={resetToDefault}
+          aria-label="Reset dashboard section order to default"
+        >
+          Reset to default order
+        </Button>
+        <span className="small text-muted">
+          <i className="mdi mdi-check-circle-outline me-1" aria-hidden />
+          Changes save automatically
+        </span>
+      </div>
     </div>
   )
 }
@@ -287,48 +366,8 @@ export function Settings() {
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
   )
-  const NOTIF_TYPES: { key: NotifType; label: string; desc: string }[] = [
-    {
-      key: 'bills',
-      label: 'Bill reminders',
-      desc: 'Upcoming charges within their reminder window',
-    },
-    {
-      key: 'tracker_overspent',
-      label: 'Tracker over budget',
-      desc: 'When a tracker exceeds 100% of its budget',
-    },
-    {
-      key: 'tracker_pace',
-      label: 'Tracker pace warning',
-      desc: 'When spending is >10% ahead of pace with >20% of the period left',
-    },
-    {
-      key: 'spendable_low',
-      label: 'Spendable balance low',
-      desc: 'When spendable drops below your alert threshold',
-    },
-    {
-      key: 'payday',
-      label: 'Payday landed',
-      desc: 'When a salary-sized credit appears on your account',
-    },
-    {
-      key: 'large_tx',
-      label: 'Large transaction',
-      desc: 'Unexpected debits above the threshold you set',
-    },
-    {
-      key: 'saver_milestone',
-      label: 'Saver goal milestones',
-      desc: 'When a saver reaches 50%, 75%, or 100% of its goal',
-    },
-    {
-      key: 'sync_stale',
-      label: 'Data out of date',
-      desc: "When Vantura hasn't synced in over 24 hours",
-    },
-  ]
+  const [notifPermission, setNotifPermission] =
+    useState<NotificationPermission | null>(() => getNotificationPermission())
   const [notifTypes, setNotifTypes] = useState<Record<NotifType, boolean>>(
     () =>
       Object.fromEntries(
@@ -362,10 +401,13 @@ export function Settings() {
   const sectionKeys = getSettingsSectionKeys()
   const { activeSection, selectSection } = useSplitNavSection({
     storageKey: SETTINGS_ACTIVE_SECTION_KEY,
-    defaultSection: 'help',
+    defaultSection: 'about',
     sectionKeys,
     legacyMigrate: (keys) => {
       try {
+        // Migrate users who previously landed on the old 'help' section
+        const currentRaw = localStorage.getItem(SETTINGS_ACTIVE_SECTION_KEY)
+        if (currentRaw === 'help') return 'about'
         const oldRaw = localStorage.getItem(LEGACY_SETTINGS_ACCORDION_KEY)
         if (oldRaw) {
           const parsed = JSON.parse(oldRaw) as unknown
@@ -561,6 +603,14 @@ export function Settings() {
       setPaydayError('Please select your next payday.')
       return
     }
+    const d = new Date()
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (nextPayday.trim() < todayStr) {
+      setPaydayError(
+        'Next payday cannot be in the past. Please select a future date.'
+      )
+      return
+    }
     setAppSetting('payday_frequency', paydayFrequency)
     setAppSetting('payday_day', String(effectivePaydayDay))
     setAppSetting('next_payday', nextPayday.trim())
@@ -752,12 +802,17 @@ export function Settings() {
                 <button
                   key={key}
                   type="button"
-                  className={`list-group-item list-group-item-action border-0 rounded-0 ${
+                  className={`list-group-item list-group-item-action border-0 rounded-0 d-flex align-items-center gap-2 ${
                     activeSection === key ? 'active' : ''
                   }`}
                   onClick={() => selectSection(key)}
                   aria-current={activeSection === key ? 'page' : undefined}
                 >
+                  <i
+                    className={`mdi ${SETTINGS_SECTION_ICONS[key] ?? 'mdi-circle-small'}`}
+                    style={{ fontSize: '1rem', opacity: 0.75, flexShrink: 0 }}
+                    aria-hidden
+                  />
                   {SETTINGS_SECTION_LABELS[key] ?? key}
                 </button>
               ))}
@@ -792,31 +847,187 @@ export function Settings() {
               <h2 className="h5 mb-3 fw-medium">
                 {SETTINGS_SECTION_LABELS[activeSection] ?? activeSection}
               </h2>
-              {activeSection === 'help' && (
+              {activeSection === 'about' && (
                 <>
-                  <p className="small text-muted mb-2">
-                    New to Vantura? Read the user guide or run the dashboard
-                    tour to see how everything works.
-                  </p>
-                  <div className="d-flex flex-wrap gap-2 mb-3">
+                  {/* Version + URL */}
+                  <div className="mb-4">
+                    <div
+                      className="d-flex align-items-center gap-2 mb-1"
+                      style={{ fontSize: '0.9rem' }}
+                    >
+                      <i
+                        className="mdi mdi-information-outline"
+                        style={{
+                          color: 'var(--vantura-primary)',
+                          fontSize: '1.1rem',
+                        }}
+                        aria-hidden
+                      />
+                      <span className="text-muted">
+                        Vantura{' '}
+                        <span className="fw-semibold text-body">
+                          v{APP_VERSION}
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      className="d-flex align-items-center gap-2 mb-3"
+                      style={{ fontSize: '0.9rem' }}
+                    >
+                      <i
+                        className="mdi mdi-earth"
+                        style={{
+                          color: 'var(--vantura-primary)',
+                          fontSize: '1.1rem',
+                        }}
+                        aria-hidden
+                      />
+                      <span className="text-muted">
+                        Live at{' '}
+                        <a
+                          href="https://myvantura.xyz"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-body fw-semibold"
+                        >
+                          myvantura.xyz
+                        </a>
+                      </span>
+                    </div>
+                    {updateReady ? (
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={applyUpdate}
+                        aria-label="Install the available app update"
+                      >
+                        <i
+                          className="mdi mdi-arrow-down-circle-outline me-1"
+                          aria-hidden
+                        />
+                        Update available — Install now
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={checkForUpdate}
+                        disabled={checking}
+                        aria-label="Check for app updates"
+                        aria-busy={checking}
+                      >
+                        {checking ? (
+                          <>
+                            <Spinner
+                              animation="border"
+                              size="sm"
+                              className="me-1"
+                              role="status"
+                              aria-hidden="true"
+                            />
+                            Checking…
+                          </>
+                        ) : (
+                          <>
+                            <i className="mdi mdi-refresh me-1" aria-hidden />
+                            Check for updates
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+
+                  <hr className="mb-4" />
+
+                  {/* Resource cards */}
+                  <div className="d-flex flex-column gap-3 mb-4">
                     <Link
                       to="/help"
-                      className="btn btn-gradient-primary btn-sm"
+                      className="d-flex align-items-center gap-3 p-3 rounded text-decoration-none"
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.09)',
+                        transition: 'border-color 0.15s',
+                      }}
                       aria-label="Open user guide"
                     >
-                      User guide
+                      <i
+                        className="mdi mdi-book-open-page-variant flex-shrink-0"
+                        style={{
+                          color: 'var(--vantura-primary)',
+                          fontSize: '1.4rem',
+                        }}
+                        aria-hidden
+                      />
+                      <div>
+                        <div className="fw-semibold small text-body">
+                          User guide
+                        </div>
+                        <div
+                          className="text-muted"
+                          style={{ fontSize: '0.78rem' }}
+                        >
+                          How everything works — features, calculations, tips
+                        </div>
+                      </div>
+                      <i
+                        className="mdi mdi-chevron-right ms-auto flex-shrink-0"
+                        style={{
+                          color: 'var(--vantura-text-secondary)',
+                          fontSize: '1.1rem',
+                        }}
+                        aria-hidden
+                      />
                     </Link>
+
                     <Link
                       to="/changelog"
-                      className="btn btn-outline-primary btn-sm"
+                      className="d-flex align-items-center gap-3 p-3 rounded text-decoration-none"
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.09)',
+                        transition: 'border-color 0.15s',
+                      }}
                       aria-label="See what's new"
                     >
                       <i
-                        className="mdi mdi-rocket-launch-outline me-1"
+                        className="mdi mdi-rocket-launch-outline flex-shrink-0"
+                        style={{
+                          color: 'var(--vantura-primary)',
+                          fontSize: '1.4rem',
+                        }}
                         aria-hidden
                       />
-                      What&apos;s new
+                      <div>
+                        <div className="fw-semibold small text-body">
+                          What&apos;s new
+                        </div>
+                        <div
+                          className="text-muted"
+                          style={{ fontSize: '0.78rem' }}
+                        >
+                          Changelog and release milestones
+                        </div>
+                      </div>
+                      <i
+                        className="mdi mdi-chevron-right ms-auto flex-shrink-0"
+                        style={{
+                          color: 'var(--vantura-text-secondary)',
+                          fontSize: '1.1rem',
+                        }}
+                        aria-hidden
+                      />
                     </Link>
+                  </div>
+
+                  <hr className="mb-4" />
+
+                  {/* Dashboard tour */}
+                  <div>
+                    <p className="small text-muted mb-2">
+                      New to Vantura? Run the dashboard tour to see how
+                      everything works.
+                    </p>
                     <Button
                       variant="outline-primary"
                       size="sm"
@@ -826,73 +1037,13 @@ export function Settings() {
                       }}
                       aria-label="Show dashboard tour again"
                     >
-                      Show dashboard tour again
-                    </Button>
-                  </div>
-                  <p className="small text-muted mb-1">
-                    <i
-                      className="mdi mdi-information-outline me-1"
-                      aria-hidden
-                    />
-                    Vantura{' '}
-                    <span className="fw-semibold text-body">
-                      v{APP_VERSION}
-                    </span>
-                  </p>
-                  <p className="small text-muted mb-3">
-                    <i className="mdi mdi-earth me-1" aria-hidden />
-                    Live at{' '}
-                    <a
-                      href="https://myvantura.xyz"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-body fw-semibold"
-                    >
-                      myvantura.xyz
-                    </a>{' '}
-                    — permanent address
-                  </p>
-                  {updateReady ? (
-                    <Button
-                      variant="outline-success"
-                      size="sm"
-                      onClick={applyUpdate}
-                      aria-label="Install the available app update"
-                    >
                       <i
-                        className="mdi mdi-arrow-down-circle-outline me-1"
+                        className="mdi mdi-play-circle-outline me-1"
                         aria-hidden
                       />
-                      Update available — Install now
+                      Show dashboard tour
                     </Button>
-                  ) : (
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={checkForUpdate}
-                      disabled={checking}
-                      aria-label="Check for app updates"
-                      aria-busy={checking}
-                    >
-                      {checking ? (
-                        <>
-                          <Spinner
-                            animation="border"
-                            size="sm"
-                            className="me-1"
-                            role="status"
-                            aria-hidden="true"
-                          />
-                          Checking…
-                        </>
-                      ) : (
-                        <>
-                          <i className="mdi mdi-refresh me-1" aria-hidden />
-                          Check for updates
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  </div>
                 </>
               )}
               {activeSection === 'appearance' && (
@@ -942,61 +1093,28 @@ export function Settings() {
                       )
                     })}
                   </div>
+                  <p className="small text-muted mt-2 mb-0">
+                    Selected:{' '}
+                    <span className="fw-semibold text-body">
+                      {ACCENT_PALETTES[accent]?.label ?? accent}
+                    </span>
+                  </p>
 
                   <hr className="my-4" />
-                  <h6 className="text-muted mb-2">Category colours</h6>
+                  <h6 className="text-muted mb-1">Category colours</h6>
+                  <p className="small text-muted mb-3">
+                    Customise the colours used for spending categories in charts
+                    and reports.
+                  </p>
                   <CategoryColorsSection />
                 </>
               )}
               {activeSection === 'payday' && (
                 <>
-                  <p className="small text-muted mb-2">
+                  <p className="small text-muted mb-3">
                     Used for your spendable balance, PAYDAY trackers, and budget
                     planning. Update when your pay cycle changes.
                   </p>
-                  <div className="changelog-upcoming-grid mb-3">
-                    <div className="changelog-upcoming-item">
-                      <i
-                        className="mdi mdi-calendar-today changelog-upcoming-icon"
-                        style={{ color: '#90caf9' }}
-                        aria-hidden
-                      />
-                      <span>
-                        <strong className="text-body">
-                          Fixed date (1st–28th)
-                        </strong>{' '}
-                        — same date every month. Days 29–31 are excluded because
-                        February doesn't always have them, which would cause a
-                        skipped pay.
-                      </span>
-                    </div>
-                    <div className="changelog-upcoming-item">
-                      <i
-                        className="mdi mdi-calendar-check changelog-upcoming-icon"
-                        style={{ color: '#80cbc4' }}
-                        aria-hidden
-                      />
-                      <span>
-                        <strong className="text-body">Last weekday</strong> —
-                        the last Mon–Fri of the month, whatever the date. Ideal
-                        if your pay always falls at the end of the month (e.g.
-                        30 Apr, 29 May, 30 Jun).
-                      </span>
-                    </div>
-                    <div className="changelog-upcoming-item">
-                      <i
-                        className="mdi mdi-calendar-week changelog-upcoming-icon"
-                        style={{ color: '#ce93d8' }}
-                        aria-hidden
-                      />
-                      <span>
-                        <strong className="text-body">
-                          Last Monday / Last Friday / etc.
-                        </strong>{' '}
-                        — the last occurrence of a specific weekday each month.
-                      </span>
-                    </div>
-                  </div>
                   <Form onSubmit={handlePaydaySubmit}>
                     <div
                       className="mb-3 p-2 rounded"
@@ -1149,7 +1267,7 @@ export function Settings() {
                         </p>
                       )}
                     </div>
-                    <Form.Group className="mb-2">
+                    <Form.Group className="mb-3">
                       <Form.Label htmlFor="settings-payday-frequency">
                         Frequency
                       </Form.Label>
@@ -1165,7 +1283,7 @@ export function Settings() {
                         <option value="MONTHLY">Monthly</option>
                       </Form.Select>
                     </Form.Group>
-                    <Form.Group className="mb-2">
+                    <Form.Group className="mb-3">
                       <Form.Label htmlFor="settings-payday-day">Day</Form.Label>
                       <Form.Select
                         id="settings-payday-day"
@@ -1179,7 +1297,7 @@ export function Settings() {
                         ))}
                       </Form.Select>
                     </Form.Group>
-                    <Form.Group className="mb-2">
+                    <Form.Group className="mb-3">
                       <Form.Label htmlFor="settings-payday-pay-amount">
                         Pay amount ($)
                       </Form.Label>
@@ -1251,6 +1369,32 @@ export function Settings() {
                       any time. Requires browser permission.
                     </p>
 
+                    {/* Browser permission denied warning */}
+                    {notificationsEnabled && notifPermission === 'denied' && (
+                      <div
+                        className="d-flex align-items-start gap-2 p-2 rounded mb-3 small"
+                        style={{
+                          background: 'rgba(220,53,69,0.10)',
+                          border: '1px solid rgba(220,53,69,0.28)',
+                        }}
+                        role="alert"
+                      >
+                        <i
+                          className="mdi mdi-alert-circle-outline flex-shrink-0 mt-1"
+                          style={{
+                            color: 'var(--bs-danger)',
+                            fontSize: '1rem',
+                          }}
+                          aria-hidden
+                        />
+                        <span>
+                          Browser permission is <strong>denied</strong>. Enable
+                          notifications in your browser settings, then reload
+                          the page.
+                        </span>
+                      </div>
+                    )}
+
                     {/* Master toggle */}
                     <Form.Check
                       type="switch"
@@ -1265,6 +1409,7 @@ export function Settings() {
                           if (perm !== 'granted') {
                             const granted =
                               await requestNotificationPermission()
+                            setNotifPermission(getNotificationPermission())
                             if (!granted) {
                               toast.error(
                                 'Notification permission denied. Enable in browser settings.'
@@ -1291,77 +1436,108 @@ export function Settings() {
                           paddingLeft: '1rem',
                         }}
                       >
-                        <p
-                          className="small text-muted mb-3"
-                          style={{ fontWeight: 600 }}
-                        >
-                          What to notify you about
-                        </p>
-                        {NOTIF_TYPES.map(({ key, label, desc }) => (
-                          <div key={key} className="mb-3">
-                            <Form.Check
-                              type="switch"
-                              id={`settings-notif-${key}`}
-                              label={label}
-                              checked={notifTypes[key]}
-                              onChange={(e) => {
-                                const next = e.target.checked
-                                setNotifTypeEnabled(key, next)
-                                setNotifTypes((prev) => ({
-                                  ...prev,
-                                  [key]: next,
-                                }))
+                        {NOTIF_GROUPS.map((group) => (
+                          <div key={group.label} className="mb-4">
+                            <p
+                              className="text-muted mb-3"
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '0.72rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
                               }}
-                            />
-                            <div
-                              className="small text-muted"
-                              style={{ marginTop: 2, marginLeft: 48 }}
                             >
-                              {desc}
-                            </div>
-                            {key === 'large_tx' && notifTypes['large_tx'] && (
-                              <Form.Group
-                                className="mt-2"
-                                style={{ marginLeft: 48, maxWidth: 200 }}
-                              >
-                                <Form.Label
-                                  htmlFor="settings-large-tx-threshold"
-                                  className="small text-muted mb-1"
-                                >
-                                  Notify me when a single debit exceeds ($)
-                                </Form.Label>
-                                <Form.Control
-                                  id="settings-large-tx-threshold"
-                                  type="number"
-                                  min={1}
-                                  size="sm"
-                                  value={largeTxThreshold}
-                                  onChange={(e) =>
-                                    setLargeTxThresholdState(e.target.value)
-                                  }
-                                  onBlur={() => {
-                                    const dollars = parseInt(
-                                      largeTxThreshold,
-                                      10
-                                    )
-                                    if (!Number.isNaN(dollars) && dollars > 0) {
-                                      setLargeTxThresholdCents(dollars * 100)
-                                      toast.success(
-                                        `Large transaction threshold set to $${dollars}.`
-                                      )
-                                    } else {
-                                      setLargeTxThresholdState(
-                                        String(
-                                          Math.round(
-                                            getLargeTxThresholdCents() / 100
-                                          )
-                                        )
-                                      )
-                                    }
-                                  }}
-                                />
-                              </Form.Group>
-                            )}
+                              <i
+                                className={`mdi ${group.icon} me-1`}
+                                aria-hidden
+                              />
+                              {group.label}
+                            </p>
+                            {group.keys.map((k) => {
+                              const notifType = NOTIF_TYPES.find(
+                                (t) => t.key === k
+                              )!
+                              return (
+                                <div key={k} className="mb-3">
+                                  <Form.Check
+                                    type="switch"
+                                    id={`settings-notif-${k}`}
+                                    label={notifType.label}
+                                    checked={notifTypes[k]}
+                                    onChange={(e) => {
+                                      const next = e.target.checked
+                                      setNotifTypeEnabled(k, next)
+                                      setNotifTypes((prev) => ({
+                                        ...prev,
+                                        [k]: next,
+                                      }))
+                                    }}
+                                  />
+                                  <div
+                                    className="small text-muted"
+                                    style={{ marginTop: 2, marginLeft: 48 }}
+                                  >
+                                    {notifType.desc}
+                                  </div>
+                                  {k === 'large_tx' &&
+                                    notifTypes['large_tx'] && (
+                                      <Form.Group
+                                        className="mt-2"
+                                        style={{
+                                          marginLeft: 48,
+                                          maxWidth: 200,
+                                        }}
+                                      >
+                                        <Form.Label
+                                          htmlFor="settings-large-tx-threshold"
+                                          className="small text-muted mb-1"
+                                        >
+                                          Notify me when a single debit exceeds
+                                          ($)
+                                        </Form.Label>
+                                        <Form.Control
+                                          id="settings-large-tx-threshold"
+                                          type="number"
+                                          min={1}
+                                          size="sm"
+                                          value={largeTxThreshold}
+                                          onChange={(e) =>
+                                            setLargeTxThresholdState(
+                                              e.target.value
+                                            )
+                                          }
+                                          onBlur={() => {
+                                            const dollars = parseInt(
+                                              largeTxThreshold,
+                                              10
+                                            )
+                                            if (
+                                              !Number.isNaN(dollars) &&
+                                              dollars > 0
+                                            ) {
+                                              setLargeTxThresholdCents(
+                                                dollars * 100
+                                              )
+                                              toast.success(
+                                                `Large transaction threshold set to $${dollars}.`
+                                              )
+                                            } else {
+                                              setLargeTxThresholdState(
+                                                String(
+                                                  Math.round(
+                                                    getLargeTxThresholdCents() /
+                                                      100
+                                                  )
+                                                )
+                                              )
+                                            }
+                                          }}
+                                        />
+                                      </Form.Group>
+                                    )}
+                                </div>
+                              )
+                            })}
                           </div>
                         ))}
                       </div>
@@ -1372,8 +1548,8 @@ export function Settings() {
                 <>
                   <p className="small text-muted mb-3">
                     Vantura locks automatically after a period of inactivity.
-                    With biometrics enabled, Touch ID or Face ID can unlock the
-                    app instead of your passphrase.
+                    With biometrics enabled, your device&apos;s biometric can
+                    unlock the app instead of your passphrase.
                   </p>
                   <Form.Group className="mb-4">
                     <Form.Label htmlFor="settings-lock-timeout">
@@ -1399,6 +1575,20 @@ export function Settings() {
                     </Form.Select>
                   </Form.Group>
                   <hr className="mb-4" />
+                  {bioAvailable === null && (
+                    <div
+                      className="d-flex align-items-center gap-2 text-muted small"
+                      role="status"
+                    >
+                      <Spinner
+                        animation="border"
+                        size="sm"
+                        role="status"
+                        aria-hidden="true"
+                      />
+                      Checking biometric availability…
+                    </div>
+                  )}
                   {bioAvailable === false && (
                     <div
                       className="alert alert-secondary small mb-3"
@@ -1413,14 +1603,21 @@ export function Settings() {
                       <Form.Check
                         type="switch"
                         id="settings-bio-toggle"
-                        label="Biometric unlock (Touch ID / Face ID)"
+                        label="Biometric unlock"
                         checked={bioEnabled}
                         disabled={bioRegistering}
                         onChange={(e) =>
                           handleBiometricToggle(e.target.checked)
                         }
-                        className="mb-3"
+                        className="mb-1"
                       />
+                      <p
+                        className="small text-muted mb-3"
+                        style={{ marginLeft: 48 }}
+                      >
+                        Touch ID, Face ID, Windows Hello, or your device&apos;s
+                        biometric
+                      </p>
                       {bioEnabled && (
                         <Button
                           variant="outline-secondary"
@@ -1478,32 +1675,34 @@ export function Settings() {
                       Re-syncs all transactions, including category changes made
                       in the Up Bank app.
                     </p>
-                    <p className="small text-muted mb-2">
-                      Last synced: {formatLastSync(lastSync)}
-                    </p>
-                    <Button
-                      className="btn-gradient-primary"
-                      size="sm"
-                      onClick={handleReSync}
-                      disabled={syncing || isDemoMode}
-                      aria-label="Re-sync with Up Bank"
-                      aria-busy={syncing}
-                    >
-                      {syncing ? (
-                        <>
-                          <Spinner
-                            animation="border"
-                            size="sm"
-                            className="me-1"
-                            role="status"
-                            aria-hidden="true"
-                          />
-                          Syncing…
-                        </>
-                      ) : (
-                        'Re-sync now'
-                      )}
-                    </Button>
+                    <div className="d-flex align-items-center gap-3 flex-wrap mb-2">
+                      <Button
+                        className="btn-gradient-primary"
+                        size="sm"
+                        onClick={handleReSync}
+                        disabled={syncing || isDemoMode}
+                        aria-label="Re-sync with Up Bank"
+                        aria-busy={syncing}
+                      >
+                        {syncing ? (
+                          <>
+                            <Spinner
+                              animation="border"
+                              size="sm"
+                              className="me-1"
+                              role="status"
+                              aria-hidden="true"
+                            />
+                            Syncing…
+                          </>
+                        ) : (
+                          'Re-sync now'
+                        )}
+                      </Button>
+                      <span className="small text-muted">
+                        Last synced: {formatLastSync(lastSync)}
+                      </span>
+                    </div>
                     {syncing && syncProgress && (
                       <p
                         className="small text-muted mt-2 mb-0"
@@ -1523,7 +1722,7 @@ export function Settings() {
                     )}
                   </div>
 
-                  <hr />
+                  <hr className="my-4" />
 
                   {!isDemoMode && (
                     <div className="mb-4">
@@ -1555,10 +1754,14 @@ export function Settings() {
                     </div>
                   )}
 
-                  {!isDemoMode && <hr />}
+                  {!isDemoMode && <hr className="my-4" />}
+
+                  <h6 className="text-muted mb-3">Transfer settings</h6>
 
                   <div className="mb-4">
-                    <h6 className="text-muted mb-2">Export profile settings</h6>
+                    <p className="small fw-semibold text-body mb-1">
+                      Export profile
+                    </p>
                     <p className="small text-muted mb-2">
                       Exports appearance and configuration (colors, payday
                       setup, notification preferences, trackers, upcoming
@@ -1580,7 +1783,9 @@ export function Settings() {
                   </div>
 
                   <div className="mb-4">
-                    <h6 className="text-muted mb-2">Import profile settings</h6>
+                    <p className="small fw-semibold text-body mb-1">
+                      Import profile
+                    </p>
                     <p className="small text-muted mb-2">
                       Imports appearance and configuration into this browser.
                       Does not import transactions or API tokens. Use to restore
@@ -1599,14 +1804,35 @@ export function Settings() {
                     </Button>
                   </div>
 
-                  <hr />
+                  <hr className="my-4" />
 
-                  <div>
-                    <h6 className="text-muted mb-2">Clear all data</h6>
-                    <p className="small text-muted mb-2">
+                  {/* Danger zone */}
+                  <div
+                    className="p-3 rounded"
+                    style={{
+                      background: 'rgba(220,53,69,0.06)',
+                      border: '1px solid rgba(220,53,69,0.2)',
+                    }}
+                  >
+                    <p
+                      className="small fw-semibold mb-3"
+                      style={{
+                        color: 'var(--bs-danger)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      <i className="mdi mdi-alert-outline me-1" aria-hidden />
+                      Danger zone
+                    </p>
+                    <p className="small fw-semibold text-body mb-1">
+                      Clear all data
+                    </p>
+                    <p className="small text-muted mb-3">
                       Permanently delete all local data. You will need to
                       re-enter your passphrase and Personal Access Token
-                      (re-onboard).
+                      (re-onboard). This cannot be undone.
                     </p>
                     <Button
                       variant="outline-danger"

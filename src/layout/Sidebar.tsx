@@ -33,8 +33,6 @@ const PRIMARY_NAV: NavItem[] = [
 
 const UTILITY_NAV: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: 'mdi-cog' },
-  { to: '/help', label: 'Help', icon: 'mdi-book-open-page-variant' },
-  { to: '/changelog', label: "What's new", icon: 'mdi-rocket-launch-outline' },
 ]
 
 export function Sidebar({
