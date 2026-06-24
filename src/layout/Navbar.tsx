@@ -103,7 +103,7 @@ export function Navbar({
           className="navbar-collapsed-brand"
           aria-label="Go to dashboard"
         >
-          <VanturaLogo variant="text" height={28} />
+          <VanturaLogo variant="text" height={36} />
           {isDemoMode && <span className="navbar-demo-badge">DEMO</span>}
         </Link>
       )}

@@ -1105,15 +1105,20 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   white-space: nowrap;
 }
 .sidebar .sidebar-brand {
+  height: calc(70px + env(safe-area-inset-top, 0px));
   min-height: calc(70px + env(safe-area-inset-top, 0px));
   padding: 0.25rem 0;
   padding-top: calc(0.25rem + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-left: 2.25rem;
-  padding-right: 1rem;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
   border-bottom: 1px solid var(--vantura-border);
+}
+.sidebar:not(.collapsed) .sidebar-collapse-btn {
+  position: absolute;
+  right: 1rem;
 }
 .sidebar-collapse-btn {
   background: none;
@@ -1154,6 +1159,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.1rem;
+}
+.sidebar.collapsed .sidebar-brand .sidebar-brand-block {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px;
+  transition: background 0.2s;
+}
+.sidebar.collapsed .sidebar-brand .sidebar-brand-block:hover {
+  background: var(--vantura-sidebar-hover-bg);
 }
 .sidebar .sidebar-brand .sidebar-demo-badge {
   font-size: 0.6rem;

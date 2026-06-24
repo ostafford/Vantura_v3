@@ -94,27 +94,43 @@ export function Sidebar({
         </div>
       ) : (
         <div className="sidebar-brand">
-          {!collapsed && (
-            <div className="sidebar-brand-block">
-              <VanturaLogo variant="icon" height={44} />
-              {isDemoMode && (
-                <span className="sidebar-demo-badge" aria-hidden>
-                  DEMO
-                </span>
-              )}
-            </div>
-          )}
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={() => uiStore.getState().toggleSidebar()}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          <div
+            className="sidebar-brand-block"
+            onClick={
+              collapsed ? () => uiStore.getState().toggleSidebar() : undefined
+            }
+            role={collapsed ? 'button' : undefined}
+            tabIndex={collapsed ? 0 : undefined}
+            onKeyDown={
+              collapsed
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ')
+                      uiStore.getState().toggleSidebar()
+                  }
+                : undefined
+            }
+            aria-label={collapsed ? 'Expand sidebar' : undefined}
           >
-            <i
-              className={`mdi ${collapsed ? 'mdi-chevron-right' : 'mdi-chevron-left'}`}
-              aria-hidden
+            <VanturaLogo
+              variant={collapsed ? 'icon' : 'wordmark'}
+              height={collapsed ? 44 : 38}
             />
-          </button>
+            {!collapsed && isDemoMode && (
+              <span className="sidebar-demo-badge" aria-hidden>
+                DEMO
+              </span>
+            )}
+          </div>
+          {!collapsed && (
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={() => uiStore.getState().toggleSidebar()}
+              aria-label="Collapse sidebar"
+            >
+              <i className="mdi mdi-chevron-left" aria-hidden />
+            </button>
+          )}
         </div>
       )}
 
