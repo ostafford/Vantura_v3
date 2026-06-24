@@ -6,20 +6,53 @@ export interface MilestoneItem {
 export interface Milestone {
   date: string
   heading: string
+  icon: string
   primaryMonth: string
   color: string
   version: string // app version this milestone shipped in
   items: MilestoneItem[]
 }
 
-export interface UpcomingItem extends MilestoneItem {
+export interface UpcomingItem {
+  icon: string
   color: string
+  name: string
+  tagline: string
+  verdict: 'New' | 'Extension' | 'Revival' | 'Partial'
+  detail: string
 }
 
 export const MILESTONES: Milestone[] = [
   {
     date: '24 Jun 2026',
+    heading: 'Changelog & Roadmap Redesign',
+    icon: 'mdi-telescope',
+    primaryMonth: '2026-06',
+    version: '0.6.0',
+    color: '#ce93d8',
+    items: [
+      {
+        icon: 'mdi-lightbulb-on-outline',
+        text: 'Exploring Next expanded to 11 upcoming features — each with a verdict badge (Extension, Revival, Partial, New) and an expandable explanation so you know exactly what is being considered and why',
+      },
+      {
+        icon: 'mdi-layers-outline',
+        text: 'Features grouped by type — Extensions, Revivals, Partially there, and Brand new — so you can see what is close to done vs. net new at a glance',
+      },
+      {
+        icon: 'mdi-chevron-down-circle-outline',
+        text: 'Groups and release history cards now collapse — the page starts compact on every visit and you expand only what you want to read',
+      },
+      {
+        icon: 'mdi-tag-outline',
+        text: 'Every milestone in the release history now has a themed icon — making the timeline scannable without opening a single card',
+      },
+    ],
+  },
+  {
+    date: '24 Jun 2026',
     heading: 'Navigation Refinements',
+    icon: 'mdi-compass-outline',
     primaryMonth: '2026-06',
     version: '0.5.6',
     color: '#ffcc80',
@@ -45,6 +78,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '23 Jun 2026',
     heading: 'Now Live at myvantura.xyz',
+    icon: 'mdi-earth',
     primaryMonth: '2026-06',
     version: '0.5.5',
     color: '#a5d6a7',
@@ -66,6 +100,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Stability Fix',
+    icon: 'mdi-shield-bug-outline',
     primaryMonth: '2026-06',
     version: '0.5.4',
     color: '#80cbc4',
@@ -79,6 +114,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Export & Import v2',
+    icon: 'mdi-swap-horizontal',
     primaryMonth: '2026-06',
     version: '0.5.3',
     color: '#90caf9',
@@ -108,6 +144,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Reliability & Hosting',
+    icon: 'mdi-server-network',
     primaryMonth: '2026-06',
     version: '0.5.2',
     color: '#80deea',
@@ -129,6 +166,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Smarter App Updates',
+    icon: 'mdi-update',
     primaryMonth: '2026-06',
     version: '0.5.1',
     color: '#80cbc4',
@@ -150,6 +188,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Update & Release UX',
+    icon: 'mdi-flag-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#ffe082',
@@ -171,6 +210,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Notification Centre',
+    icon: 'mdi-bell-ring-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#ce93d8',
@@ -212,6 +252,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Lock Screen UX',
+    icon: 'mdi-lock-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#90caf9',
@@ -237,6 +278,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Documentation & UX Polish',
+    icon: 'mdi-book-open-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#ce93d8',
@@ -262,6 +304,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'PWA & App Icons',
+    icon: 'mdi-cellphone-arrow-down',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#80cbc4',
@@ -283,6 +326,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Security & Theming',
+    icon: 'mdi-shield-lock-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#80cbc4',
@@ -308,6 +352,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: '21 Jun 2026',
     heading: 'Budget Plan',
+    icon: 'mdi-wallet-outline',
     primaryMonth: '2026-06',
     version: '0.5.0',
     color: '#ffab91',
@@ -333,6 +378,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'May–Jun 2026',
     heading: 'Analytics Overhaul',
+    icon: 'mdi-chart-box-outline',
     primaryMonth: '2026-05',
     version: '0.0.2',
     color: '#90caf9',
@@ -362,6 +408,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'Apr–May 2026',
     heading: 'Dashboard & Tracker Refinements',
+    icon: 'mdi-view-dashboard-outline',
     primaryMonth: '2026-05',
     version: '0.0.2',
     color: '#ffe082',
@@ -383,6 +430,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'Apr 2026',
     heading: 'Maybuys',
+    icon: 'mdi-cart-heart',
     primaryMonth: '2026-04',
     version: '0.0.2',
     color: '#f48fb1',
@@ -408,6 +456,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'Mar–Apr 2026',
     heading: 'Analytics & Navigation',
+    icon: 'mdi-chart-timeline-variant',
     primaryMonth: '2026-04',
     version: '0.0.2',
     color: '#80deea',
@@ -433,6 +482,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'Feb 2026',
     heading: 'Polish & Tooling',
+    icon: 'mdi-wrench-outline',
     primaryMonth: '2026-02',
     version: '0.0.2',
     color: '#a5d6a7',
@@ -470,6 +520,7 @@ export const MILESTONES: Milestone[] = [
   {
     date: 'Feb 2026',
     heading: 'Foundation',
+    icon: 'mdi-cube-outline',
     primaryMonth: '2026-02',
     version: '0.0.1',
     color: '#ffcc80',
@@ -512,18 +563,111 @@ export const MILESTONES: Milestone[] = [
 
 export const UPCOMING: UpcomingItem[] = [
   {
-    icon: 'mdi-auto-fix',
+    icon: 'mdi-tag-multiple-outline',
     color: '#80cbc4',
-    text: 'Recurring transaction detection — auto-suggest upcoming charges from your transaction history',
+    name: 'Smart Categorisation',
+    tagline:
+      'Auto-apply your past category corrections to future matching transactions',
+    verdict: 'Extension',
+    detail:
+      'When you manually re-categorise a transaction, Vantura will remember that merchant and apply the same correction automatically to future matching transactions. Built on top of the existing override infrastructure — fully local, no cloud needed.',
   },
   {
-    icon: 'mdi-currency-usd',
+    icon: 'mdi-pencil-outline',
     color: '#ffe082',
-    text: 'Multi-currency display — show foreign amounts alongside AUD equivalents',
+    name: 'Merchant Nicknames',
+    tagline:
+      "Give readable names to raw processor strings like 'AMZN MKTP AU*AB1234'",
+    verdict: 'New',
+    detail:
+      'Up Bank returns raw payment processor names that can be cryptic. Set a display name once per merchant and Vantura will show the clean name everywhere — in your transaction feed, trackers, analytics charts, and budget view.',
   },
   {
-    icon: 'mdi-tag-outline',
+    icon: 'mdi-call-split',
     color: '#f48fb1',
-    text: 'Tags — user-defined transaction labels for finer categorisation',
+    name: 'Split Transactions',
+    tagline: 'Divide a single charge across multiple trackers or categories',
+    verdict: 'New',
+    detail:
+      "Sometimes one purchase serves multiple purposes — a Kmart run that's half groceries, half a gift. Split lets you allocate portions of a transaction to different trackers or categories while keeping the original transaction intact.",
+  },
+  {
+    icon: 'mdi-scale-balance',
+    color: '#ce93d8',
+    name: 'Net Worth Snapshot',
+    tagline:
+      'A single view of your total assets and liabilities with a trend over time',
+    verdict: 'Revival',
+    detail:
+      'Pulls together all your Up account balances (spending + savers) into one number, with an optional liabilities input for loans or credit cards. A previous version existed — bringing it back leaner as a Dashboard card or Analytics section. All the underlying data is already being fetched.',
+  },
+  {
+    icon: 'mdi-file-export-outline',
+    color: '#a5d6a7',
+    name: 'Tax Report Export',
+    tagline:
+      'Tag transactions as tax deductible and export a clean summary at tax time',
+    verdict: 'New',
+    detail:
+      'Mark work-related transactions as deductible — tools, subscriptions, travel, home office — then export a clean CSV with merchant, date, amount, and category. Especially useful for freelancers and anyone with work expenses.',
+  },
+  {
+    icon: 'mdi-bank-outline',
+    color: '#ffab91',
+    name: 'Debt Tracker',
+    tagline:
+      'Track loan or credit card payoff with a progress bar and projected payoff date',
+    verdict: 'Extension',
+    detail:
+      'Up Bank already fetches HOME_LOAN account data but nothing surfaces it in the UI. A new Analytics section (similar to Savers) would show current balance, interest rate, minimum repayment, and projected payoff date — plus how extra repayments change the outcome.',
+  },
+  {
+    icon: 'mdi-piggy-bank-outline',
+    color: '#90caf9',
+    name: 'Custom Savings Goals',
+    tagline:
+      'Virtual goals with a target amount and date, independent of your Up Savers',
+    verdict: 'Partial',
+    detail:
+      "Up Bank Savers already support target amounts and goal dates in Vantura. This extends the idea to virtual goals not tied to a real account — 'save $3,000 for a holiday by December'. Vantura calculates how much to set aside each pay cycle and tracks your progress.",
+  },
+  {
+    icon: 'mdi-calendar-outline',
+    color: '#80cbc4',
+    name: 'Bill Calendar',
+    tagline:
+      'A timeline view of your upcoming charges — week by week, not just a flat list',
+    verdict: 'Extension',
+    detail:
+      "All the data already exists — upcoming charges have a date and frequency. The Dashboard groups them as before next payday and later, but a proper calendar or timeline view would show exactly what's hitting your account this week, next week, and beyond at a glance.",
+  },
+  {
+    icon: 'mdi-download-outline',
+    color: '#ffe082',
+    name: 'Data Export',
+    tagline: 'Download your transaction history as a readable CSV or JSON file',
+    verdict: 'Extension',
+    detail:
+      "A profile backup already exists but it's an encrypted blob — not something you'd open in a spreadsheet. This adds a plain CSV export of your transaction history with categories, notes, and tags. Useful for your own records or importing into another tool.",
+  },
+  {
+    icon: 'mdi-view-grid-outline',
+    color: '#ce93d8',
+    name: 'Home Screen Widgets',
+    tagline:
+      'A glanceable spend summary on your home screen without opening the app',
+    verdict: 'New',
+    detail:
+      'Since Vantura is a PWA, a home screen widget could show your current pay cycle spend vs budget at a glance. Functionality is platform-constrained — Android PWAs support richer widget surfaces than iOS — but worth exploring as capabilities improve.',
+  },
+  {
+    icon: 'mdi-account-multiple-outline',
+    color: '#90caf9',
+    name: 'Joint Account Support',
+    tagline:
+      'See your 2Up joint account transactions alongside your personal accounts',
+    verdict: 'Partial',
+    detail:
+      'Up Bank supports joint accounts (2Up) and the ownership type field already distinguishes personal from joint. If your API token has access to a 2Up account, those transactions may already be syncing — the main addition is clearer labelling and filtering by account ownership throughout the UI.',
   },
 ]

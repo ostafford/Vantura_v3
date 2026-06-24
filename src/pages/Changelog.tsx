@@ -31,9 +31,71 @@ const INITIAL_MONTH = AVAILABLE_MONTHS.includes(NOW_MONTH)
   ? NOW_MONTH
   : AVAILABLE_MONTHS[AVAILABLE_MONTHS.length - 1]
 
+// ── Exploring next groups ─────────────────────────────────────────────
+const UPCOMING_GROUP_CONFIG = [
+  {
+    verdict: 'Extension' as const,
+    label: 'Extensions',
+    description: 'Building further on features already in Vantura',
+    icon: 'mdi-layers-outline',
+    color: '#80cbc4',
+  },
+  {
+    verdict: 'Revival' as const,
+    label: 'Revivals',
+    description: 'Features that previously existed, coming back leaner',
+    icon: 'mdi-restore',
+    color: '#ce93d8',
+  },
+  {
+    verdict: 'Partial' as const,
+    label: 'Partially there',
+    description: 'The infrastructure exists — UI is the next step',
+    icon: 'mdi-dots-horizontal-circle-outline',
+    color: '#ffe082',
+  },
+  {
+    verdict: 'New' as const,
+    label: 'Brand new',
+    description: 'Net new features being designed from scratch',
+    icon: 'mdi-star-outline',
+    color: '#f48fb1',
+  },
+]
+
+const GROUPED_UPCOMING = UPCOMING_GROUP_CONFIG.map((group) => ({
+  ...group,
+  items: UPCOMING.filter((item) => item.verdict === group.verdict),
+})).filter((g) => g.items.length > 0)
+
 // ── Component ────────────────────────────────────────────────────────
 export function Changelog() {
   const [selectedMonth, setSelectedMonth] = useState(INITIAL_MONTH)
+  const [expandedUpcoming, setExpandedUpcoming] = useState<string | null>(null)
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(
+    new Set()
+  )
+
+  const toggleMilestone = (heading: string) => {
+    setExpandedMilestones((prev) => {
+      const next = new Set(prev)
+      if (next.has(heading)) next.delete(heading)
+      else next.add(heading)
+      return next
+    })
+  }
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(GROUPED_UPCOMING.map((g) => g.verdict))
+  )
+
+  const toggleGroup = (verdict: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(verdict)) next.delete(verdict)
+      else next.add(verdict)
+      return next
+    })
+  }
 
   const idx = AVAILABLE_MONTHS.indexOf(selectedMonth)
   const canGoBack = idx > 0
@@ -147,17 +209,88 @@ export function Changelog() {
           Ideas being considered for future updates — nothing here is committed
           or guaranteed.
         </p>
-        <div className="changelog-upcoming-grid">
-          {UPCOMING.map((item, i) => (
-            <div key={i} className="changelog-upcoming-item">
-              <i
-                className={`mdi ${item.icon} changelog-upcoming-icon`}
-                style={{ color: item.color }}
-                aria-hidden
-              />
-              <span>{item.text}</span>
-            </div>
-          ))}
+        <div className="changelog-upcoming-groups">
+          {GROUPED_UPCOMING.map((group) => {
+            const isCollapsed = collapsedGroups.has(group.verdict)
+            return (
+              <div key={group.verdict} className="changelog-upcoming-group">
+                <div
+                  className="changelog-upcoming-group-header"
+                  onClick={() => toggleGroup(group.verdict)}
+                  role="button"
+                  aria-expanded={!isCollapsed}
+                >
+                  <i
+                    className={`mdi ${group.icon} changelog-upcoming-group-icon`}
+                    style={{ color: group.color }}
+                    aria-hidden
+                  />
+                  <div className="changelog-upcoming-group-meta">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="changelog-upcoming-group-label">
+                        {group.label}
+                      </span>
+                      <span
+                        className={`changelog-upcoming-verdict changelog-upcoming-verdict--${group.verdict.toLowerCase()}`}
+                      >
+                        {group.items.length}
+                      </span>
+                    </div>
+                    <p className="changelog-upcoming-group-description mb-0">
+                      {group.description}
+                    </p>
+                  </div>
+                  <i
+                    className={`mdi mdi-chevron-down changelog-upcoming-group-chevron${isCollapsed ? ' changelog-upcoming-group-chevron--closed' : ''}`}
+                    aria-hidden
+                  />
+                </div>
+                {!isCollapsed && (
+                  <div className="changelog-upcoming-grid">
+                    {group.items.map((item) => {
+                      const isOpen = expandedUpcoming === item.name
+                      return (
+                        <div
+                          key={item.name}
+                          className="changelog-upcoming-item"
+                          onClick={() =>
+                            setExpandedUpcoming(isOpen ? null : item.name)
+                          }
+                          role="button"
+                          aria-expanded={isOpen}
+                        >
+                          <i
+                            className={`mdi ${item.icon} changelog-upcoming-icon`}
+                            style={{ color: item.color }}
+                            aria-hidden
+                          />
+                          <div className="changelog-upcoming-body">
+                            <div className="changelog-upcoming-header">
+                              <span className="changelog-upcoming-name">
+                                {item.name}
+                              </span>
+                              <i
+                                className={`mdi mdi-chevron-down changelog-upcoming-chevron${isOpen ? ' changelog-upcoming-chevron--open' : ''}`}
+                                aria-hidden
+                              />
+                            </div>
+                            <p className="changelog-upcoming-tagline mb-0">
+                              {item.tagline}
+                            </p>
+                            {isOpen && (
+                              <p className="changelog-upcoming-detail mb-0">
+                                {item.detail}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -205,75 +338,94 @@ export function Changelog() {
 
       {/* ── Timeline ────────────────────────────────────────────────── */}
       <div className="changelog-timeline">
-        {filteredMilestones.map((milestone: Milestone, i: number) => (
-          <div
-            key={milestone.heading}
-            className="changelog-milestone"
-            style={
-              { '--milestone-color': milestone.color } as React.CSSProperties
-            }
-          >
-            <div className="changelog-milestone-date">
-              <div className="d-flex flex-column align-items-center gap-1">
-                <span
-                  className="changelog-date-pill"
-                  style={{
-                    background: milestone.color,
-                    color: 'var(--vantura-text-on-pastel)',
-                  }}
-                >
-                  {milestone.date}
-                </span>
-                <span className="changelog-feature-count">
-                  {milestone.items.length}{' '}
-                  {milestone.items.length === 1 ? 'feature' : 'features'}
-                </span>
-              </div>
-            </div>
-            <Card
-              className="changelog-milestone-card"
+        {filteredMilestones.map((milestone: Milestone, i: number) => {
+          const isExpanded = expandedMilestones.has(milestone.heading)
+          return (
+            <div
+              key={milestone.heading}
+              className="changelog-milestone"
               style={
-                {
-                  '--milestone-color-bg': `${milestone.color}14`,
-                } as React.CSSProperties
+                { '--milestone-color': milestone.color } as React.CSSProperties
               }
             >
-              <Card.Body>
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <h6
-                    className="fw-semibold mb-0"
-                    style={{ color: milestone.color }}
+              <div className="changelog-milestone-date">
+                <div className="d-flex flex-column align-items-center gap-1">
+                  <span
+                    className="changelog-date-pill"
+                    style={{
+                      background: milestone.color,
+                      color: 'var(--vantura-text-on-pastel)',
+                    }}
                   >
-                    {milestone.heading}
-                  </h6>
-                  {isLatestMonth && i === 0 && (
-                    <span
-                      className="changelog-latest-badge"
-                      style={{
-                        background: milestone.color,
-                        color: 'var(--vantura-text-on-pastel)',
-                      }}
-                    >
-                      Latest
-                    </span>
-                  )}
+                    {milestone.date}
+                  </span>
+                  <span className="changelog-feature-count">
+                    {milestone.items.length}{' '}
+                    {milestone.items.length === 1 ? 'feature' : 'features'}
+                  </span>
                 </div>
-                <ul className="changelog-item-list">
-                  {milestone.items.map((item, j) => (
-                    <li key={j} className="changelog-item">
-                      <i
-                        className={`mdi ${item.icon} changelog-item-icon`}
-                        style={{ color: milestone.color }}
-                        aria-hidden
-                      />
-                      <span>{item.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card.Body>
-            </Card>
-          </div>
-        ))}
+              </div>
+              <Card
+                className="changelog-milestone-card"
+                style={
+                  {
+                    '--milestone-color-bg': `${milestone.color}14`,
+                  } as React.CSSProperties
+                }
+              >
+                <Card.Body>
+                  <div
+                    className={`d-flex align-items-center gap-2 changelog-milestone-toggle${isExpanded ? ' mb-3' : ''}`}
+                    onClick={() => toggleMilestone(milestone.heading)}
+                    role="button"
+                    aria-expanded={isExpanded}
+                  >
+                    <i
+                      className={`mdi ${milestone.icon} changelog-milestone-heading-icon`}
+                      style={{ color: milestone.color }}
+                      aria-hidden
+                    />
+                    <h6
+                      className="fw-semibold mb-0 flex-grow-1"
+                      style={{ color: milestone.color }}
+                    >
+                      {milestone.heading}
+                    </h6>
+                    {isLatestMonth && i === 0 && (
+                      <span
+                        className="changelog-latest-badge"
+                        style={{
+                          background: milestone.color,
+                          color: 'var(--vantura-text-on-pastel)',
+                        }}
+                      >
+                        Latest
+                      </span>
+                    )}
+                    <i
+                      className={`mdi mdi-chevron-down changelog-milestone-chevron${isExpanded ? '' : ' changelog-milestone-chevron--closed'}`}
+                      aria-hidden
+                    />
+                  </div>
+                  {isExpanded && (
+                    <ul className="changelog-item-list">
+                      {milestone.items.map((item, j) => (
+                        <li key={j} className="changelog-item">
+                          <i
+                            className={`mdi ${item.icon} changelog-item-icon`}
+                            style={{ color: milestone.color }}
+                            aria-hidden
+                          />
+                          <span>{item.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card.Body>
+              </Card>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
