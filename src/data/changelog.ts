@@ -24,6 +24,40 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '25 Jun 2026',
+    heading: 'Settings Redesign',
+    icon: 'mdi-cog-outline',
+    primaryMonth: '2026-06',
+    version: '0.6.1',
+    color: '#90caf9',
+    items: [
+      {
+        icon: 'mdi-dock-bottom',
+        text: "Help and What's New consolidated into Settings → About — the sidebar footer is now just Settings and Lock, keeping navigation focused",
+      },
+      {
+        icon: 'mdi-view-list-outline',
+        text: 'Settings section nav now has icons — each section is instantly recognisable at a glance without reading the label',
+      },
+      {
+        icon: 'mdi-bell-ring-outline',
+        text: 'Notification types now grouped into Spending alerts and Reminders & system — easier to find and configure the alerts you care about',
+      },
+      {
+        icon: 'mdi-bell-cancel-outline',
+        text: 'Browser permission status shown in Notifications — a clear warning appears when notification permission is blocked at the OS level',
+      },
+      {
+        icon: 'mdi-alert-outline',
+        text: 'Danger zone card in Data settings separates the destructive Clear all data action from safe data operations like export and import',
+      },
+      {
+        icon: 'mdi-calendar-check-outline',
+        text: 'Next payday field now validates that the date is not in the past — prevents a misconfigured payday from silently breaking Spendable',
+      },
+    ],
+  },
+  {
     date: '24 Jun 2026',
     heading: 'Changelog & Roadmap Redesign',
     icon: 'mdi-telescope',
@@ -177,7 +211,7 @@ export const MILESTONES: Milestone[] = [
       },
       {
         icon: 'mdi-refresh',
-        text: 'New "Check for updates" button in Settings → Help lets you manually check at any time',
+        text: 'New "Check for updates" button in Settings → About lets you manually check at any time',
       },
       {
         icon: 'mdi-clock-outline',
@@ -195,7 +229,7 @@ export const MILESTONES: Milestone[] = [
     items: [
       {
         icon: 'mdi-information-outline',
-        text: "App version now visible in Settings → Help and on the What's new page — always know what you're running",
+        text: "App version now visible in Settings → About and on the What's new page — always know what you're running",
       },
       {
         icon: 'mdi-filter-outline',
