@@ -31,6 +31,10 @@ import {
   getUpcomingBucketId,
   assignUpcomingToBucket,
 } from '@/services/budgetBuckets'
+import {
+  getManualAccounts,
+  type ManualAccountRow,
+} from '@/services/manualAccounts'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
@@ -224,6 +228,12 @@ export function UpcomingSection({
   const [cancelByDate, setCancelByDate] = useState('')
   const [upcomingBucketId, setUpcomingBucketId] = useState<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [chargeType, setChargeType] = useState<
+    'EXPENSE' | 'LIABILITY_REPAYMENT'
+  >('EXPENSE')
+  const [linkedManualAccountId, setLinkedManualAccountId] = useState<
+    number | null
+  >(null)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
   const [txSearch, setTxSearch] = useState('')
@@ -261,6 +271,11 @@ export function UpcomingSection({
   const categories = useMemo(() => getCategories(), [refresh])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allBuckets = useMemo(() => getBuckets(), [refresh])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allManualAccounts = useMemo(() => getManualAccounts(), [refresh])
+  const manualLiabilities = allManualAccounts.filter(
+    (a: ManualAccountRow) => a.kind === 'liability'
+  )
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   function openCreate() {
@@ -281,6 +296,8 @@ export function UpcomingSection({
     setTxSearch('')
     setMoreOptionsOpen(false)
     setImportedFromTx(null)
+    setChargeType('EXPENSE')
+    setLinkedManualAccountId(null)
     setShowModal(true)
   }
 
@@ -299,12 +316,15 @@ export function UpcomingSection({
     const bucketId = getUpcomingBucketId(c.id)
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
+    setChargeType(c.charge_type ?? 'EXPENSE')
+    setLinkedManualAccountId(c.linked_manual_account_id ?? null)
     setMoreOptionsOpen(
       !!(
         c.category_id ||
         c.reminder_days_before != null ||
         c.cancel_by_date ||
-        bucketId != null
+        bucketId != null ||
+        c.charge_type === 'LIABILITY_REPAYMENT'
       )
     )
     setShowModal(true)
@@ -338,7 +358,9 @@ export function UpcomingSection({
         isReserved,
         reminderDays,
         false,
-        cancelBy
+        cancelBy,
+        chargeType,
+        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
       toast.success('Upcoming charge updated.')
@@ -352,7 +374,9 @@ export function UpcomingSection({
         isReserved,
         reminderDays,
         false,
-        cancelBy
+        cancelBy,
+        chargeType,
+        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
       toast.success('Upcoming charge added.')
@@ -1011,6 +1035,66 @@ export function UpcomingSection({
                     Reminder shows &quot;Due in N days&quot; when within the set
                     days. Stop date removes the charge after that date.
                   </Form.Text>
+
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small">Charge type</Form.Label>
+                    <Form.Select
+                      size="sm"
+                      value={chargeType}
+                      onChange={(e) => {
+                        setChargeType(
+                          e.target.value as 'EXPENSE' | 'LIABILITY_REPAYMENT'
+                        )
+                        if (e.target.value !== 'LIABILITY_REPAYMENT')
+                          setLinkedManualAccountId(null)
+                      }}
+                    >
+                      <option value="EXPENSE">
+                        Expense (reduces net worth)
+                      </option>
+                      <option value="LIABILITY_REPAYMENT">
+                        Liability repayment (e.g. credit card payment)
+                      </option>
+                    </Form.Select>
+                    <Form.Text className="text-muted">
+                      Liability repayments are excluded from projected net worth
+                      — paying a debt doesn&apos;t change your total wealth.
+                    </Form.Text>
+                  </Form.Group>
+
+                  {chargeType === 'LIABILITY_REPAYMENT' &&
+                    manualLiabilities.length > 0 && (
+                      <Form.Group className="mb-2">
+                        <Form.Label className="small">
+                          Link to account
+                        </Form.Label>
+                        <Form.Select
+                          size="sm"
+                          value={
+                            linkedManualAccountId != null
+                              ? String(linkedManualAccountId)
+                              : ''
+                          }
+                          onChange={(e) =>
+                            setLinkedManualAccountId(
+                              e.target.value ? Number(e.target.value) : null
+                            )
+                          }
+                        >
+                          <option value="">None</option>
+                          {manualLiabilities.map((a: ManualAccountRow) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                              {a.institution ? ` (${a.institution})` : ''}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Form.Text className="text-muted">
+                          When linked, Vantura will prompt you to update the
+                          account balance after this charge fires.
+                        </Form.Text>
+                      </Form.Group>
+                    )}
                 </>
               )}
             </Form>

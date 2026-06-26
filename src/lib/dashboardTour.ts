@@ -28,6 +28,7 @@ const SECTION_TOUR_ATTRS: Record<DashboardSectionId, string> = {
   insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
+  net_worth: 'net-worth',
 }
 
 type SideType = 'top' | 'bottom' | 'left' | 'right'
@@ -74,6 +75,15 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
       'Add <strong>bills and subscriptions</strong> you know are coming — rent, Netflix, insurance, etc.<br><br>' +
       'Each charge reduces <strong>Spendable</strong> until its due date. Toggle <strong>Include in Spendable</strong> per charge to control this.<br><br>' +
       'Grouped into <strong>Next pay</strong> and <strong>Later</strong>.',
+    side: 'top',
+    align: 'center',
+  },
+  net_worth: {
+    title: 'Net Worth',
+    description:
+      'Your total <strong>assets minus liabilities</strong> at a glance.<br><br>' +
+      '<strong>Up Bank</strong> balances sync automatically. External accounts (credit cards, super, property, HECS) are entered manually.<br><br>' +
+      'Tap <strong>View details</strong> to manage accounts and see the full breakdown.',
     side: 'top',
     align: 'center',
   },

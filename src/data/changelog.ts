@@ -24,6 +24,40 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '27 Jun 2026',
+    heading: 'Net Worth',
+    icon: 'mdi-chart-timeline-variant',
+    primaryMonth: '2026-06',
+    version: '0.7.0',
+    color: '#a5d6a7',
+    items: [
+      {
+        icon: 'mdi-card-account-details-outline',
+        text: 'Net Worth dashboard card — total assets minus liabilities at a glance, with a delta arrow versus the previous snapshot and a stale-account warning',
+      },
+      {
+        icon: 'mdi-scale-balance',
+        text: 'Analytics → Net Worth page — full breakdown of Up Bank balances alongside manually entered external accounts, with live and manual sections clearly separated',
+      },
+      {
+        icon: 'mdi-bank-plus',
+        text: '10 external account types — Credit Card, Mortgage, Personal/Car Loan, HECS/HELP, Superannuation, Investment Portfolio, Property, Savings (other bank), and more — each with optional interest rate and notes fields',
+      },
+      {
+        icon: 'mdi-clock-alert-outline',
+        text: 'Stale balance warnings — per-type freshness thresholds (Credit Card: 7 days, Loans/Super/Investments: 30–90 days, Property: 1 year) flag accounts that may need a balance update',
+      },
+      {
+        icon: 'mdi-swap-horizontal',
+        text: 'Liability repayment charge type — credit card payments in Upcoming charges can be marked as repayments so they are excluded from projected net worth (transferring money between asset and liability is not an expense)',
+      },
+      {
+        icon: 'mdi-chart-line',
+        text: '12-month trend chart — a daily snapshot is written on every sync, building a historical net worth curve over time',
+      },
+    ],
+  },
+  {
     date: '25 Jun 2026',
     heading: 'Settings Redesign',
     icon: 'mdi-cog-outline',
@@ -624,16 +658,6 @@ export const UPCOMING: UpcomingItem[] = [
     verdict: 'New',
     detail:
       "Sometimes one purchase serves multiple purposes — a Kmart run that's half groceries, half a gift. Split lets you allocate portions of a transaction to different trackers or categories while keeping the original transaction intact.",
-  },
-  {
-    icon: 'mdi-scale-balance',
-    color: '#ce93d8',
-    name: 'Net Worth Snapshot',
-    tagline:
-      'A single view of your total assets and liabilities with a trend over time',
-    verdict: 'Revival',
-    detail:
-      'Pulls together all your Up account balances (spending + savers) into one number, with an optional liabilities input for loans or credit cards. A previous version existed — bringing it back leaner as a Dashboard card or Analytics section. All the underlying data is already being fetched.',
   },
   {
     icon: 'mdi-file-export-outline',

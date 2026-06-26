@@ -15,6 +15,7 @@ import {
   type UpTag,
 } from '@/api/upBank'
 import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
+import { writeNetWorthSnapshot } from '@/services/netWorth'
 /** Return today as YYYY-MM-DD in local time. */
 function todayDateString(): string {
   const d = new Date()
@@ -357,6 +358,7 @@ export async function performInitialSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
     progressCallback({
@@ -391,6 +393,7 @@ export async function performSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  writeNetWorthSnapshot()
   const sinceDate = getAppSetting('last_sync')
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, sinceDate, (p) => {
@@ -428,6 +431,7 @@ export async function performFullSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
     progressCallback({

@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 29
+const SCHEMA_VERSION = 30
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -113,6 +113,8 @@ const DDL_STATEMENTS = [
     cancel_by_date TEXT,
     created_at TEXT NOT NULL,
     bucket_id INTEGER,
+    charge_type TEXT NOT NULL DEFAULT 'EXPENSE',
+    linked_manual_account_id INTEGER,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
@@ -191,6 +193,28 @@ const DDL_STATEMENTS = [
     read_at TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS idx_notification_history_created_at ON notification_history(created_at)`,
+  `CREATE TABLE IF NOT EXISTS manual_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    institution TEXT,
+    account_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    balance_cents INTEGER NOT NULL DEFAULT 0,
+    credit_limit_cents INTEGER,
+    interest_rate_bps INTEGER,
+    rate_type TEXT,
+    fixed_rate_expiry_date TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    last_updated_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+    snapshot_date TEXT PRIMARY KEY,
+    up_bank_cents INTEGER NOT NULL,
+    manual_assets_cents INTEGER NOT NULL DEFAULT 0,
+    manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
+  )`,
 ]
 
 export function runSchema(database: Database): void {
@@ -671,6 +695,52 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['29']
+    )
+  }
+  if (version < 30) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS manual_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        institution TEXT,
+        account_type TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        balance_cents INTEGER NOT NULL DEFAULT 0,
+        credit_limit_cents INTEGER,
+        interest_rate_bps INTEGER,
+        rate_type TEXT,
+        fixed_rate_expiry_date TEXT,
+        notes TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        last_updated_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `)
+    database.run(`
+      CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+        snapshot_date TEXT PRIMARY KEY,
+        up_bank_cents INTEGER NOT NULL,
+        manual_assets_cents INTEGER NOT NULL DEFAULT 0,
+        manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
+      )
+    `)
+    const upcomingCols = database.exec(`PRAGMA table_info(upcoming_charges)`)
+    const upcomingExisting = new Set(
+      (upcomingCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!upcomingExisting.has('charge_type')) {
+      database.run(
+        `ALTER TABLE upcoming_charges ADD COLUMN charge_type TEXT NOT NULL DEFAULT 'EXPENSE'`
+      )
+    }
+    if (!upcomingExisting.has('linked_manual_account_id')) {
+      database.run(
+        `ALTER TABLE upcoming_charges ADD COLUMN linked_manual_account_id INTEGER`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['30']
     )
   }
 }
