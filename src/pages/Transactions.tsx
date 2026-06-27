@@ -585,6 +585,24 @@ export function Transactions() {
                   ))}
                 </Form.Select>
               </div>
+              {(filters.saverActivity || filters.linkedAccountId) && (
+                <div className="d-flex align-items-center gap-2 mb-2 small">
+                  <span className="text-muted">
+                    {filters.saverActivity && 'Saver filter active'}
+                    {filters.saverActivity && filters.linkedAccountId && ' · '}
+                    {filters.linkedAccountId &&
+                      `Account scope: ${filters.linkedAccountId.slice(0, 8)}…`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="p-0 small"
+                    onClick={clearSaverFilters}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
               <Modal
                 show={filtersDrawerOpen}
                 onHide={() => setFiltersDrawerOpen(false)}
@@ -739,7 +757,7 @@ export function Transactions() {
                     <Form.Check
                       type="checkbox"
                       id="transactions-filter-saver-mobile"
-                      label="Saver-related only"
+                      label="Saver activity only (transfers to/from savers, saver account transactions)"
                       checked={!!filters.saverActivity}
                       onChange={(e) =>
                         updateFilter(
@@ -921,7 +939,7 @@ export function Transactions() {
           {!isMobile && (filters.saverActivity || filters.linkedAccountId) ? (
             <div className="d-flex flex-wrap align-items-center gap-2 mb-2 small">
               <span className="text-muted">
-                {filters.saverActivity && 'Saver-related filter active'}
+                {filters.saverActivity && 'Saver filter active'}
                 {filters.saverActivity && filters.linkedAccountId && ' · '}
                 {filters.linkedAccountId &&
                   `Account scope: ${filters.linkedAccountId.slice(0, 8)}…`}
@@ -941,7 +959,7 @@ export function Transactions() {
               <Form.Check
                 type="checkbox"
                 id="transactions-filter-saver-desktop"
-                label="Saver-related only (transfers to/from savers, activity on saver accounts, round-ups)"
+                label="Saver activity only (transfers to/from savers, saver account transactions)"
                 checked={!!filters.saverActivity}
                 onChange={(e) =>
                   updateFilter(

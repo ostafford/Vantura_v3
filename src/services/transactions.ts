@@ -73,7 +73,7 @@ export interface TransactionFilters {
   amountMax?: number
   search?: string
   /**
-   * When true: transfers to/from SAVER accounts, activity on saver accounts, or round-up lines.
+   * When true: transfers to/from SAVER accounts and all activity on saver accounts.
    */
   saverActivity?: boolean
   /** Either leg matches this Up account id (spending account or saver counterparty). */
@@ -131,7 +131,6 @@ function buildWhereClause(filters: TransactionFilters): {
     conditions.push(`(
       t.transfer_account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
       OR t.account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
-      OR t.is_round_up = 1
     )`)
   }
   const linked = filters.linkedAccountId?.trim()
