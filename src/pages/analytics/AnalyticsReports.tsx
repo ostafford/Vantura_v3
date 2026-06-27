@@ -30,9 +30,7 @@ import {
   getInsightsCategoryColors,
   normalizeCategoryIdForColor,
 } from '@/lib/chartColors'
-import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import { useStore } from 'zustand'
-import { accentStore } from '@/stores/accentStore'
 import { syncStore } from '@/stores/syncStore'
 import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
@@ -403,9 +401,8 @@ export function AnalyticsReports() {
   )
 
   // --- Store ---
-  const accent = useStore(accentStore, (s) => s.accent)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
-  const chartPalette = ACCENT_PALETTES[accent].chartPalette
+  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
   const categoryColors = getInsightsCategoryColors()
 
   // --- Data ---

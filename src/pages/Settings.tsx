@@ -6,8 +6,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button, Modal, Spinner, Form } from 'react-bootstrap'
 import { getAppSetting, setAppSetting, deleteDatabase } from '@/db'
 import { toast } from '@/stores/toastStore'
-import { ACCENT_PALETTES, type AccentId } from '@/lib/accentPalettes'
-import { accentStore } from '@/stores/accentStore'
+import { themeStore, type ThemeMode } from '@/stores/themeStore'
 import { sessionStore } from '@/stores/sessionStore'
 import {
   deriveKeyFromPassphrase,
@@ -180,10 +179,6 @@ function formatLastSync(iso: string | null): string {
 function formatSettingsSummary(settings: Record<string, string>): string {
   if (!settings || Object.keys(settings).length === 0) return 'None'
   const parts: string[] = []
-  const accent = settings.accent_color
-  if (accent && ACCENT_PALETTES[accent as AccentId]) {
-    parts.push(ACCENT_PALETTES[accent as AccentId].label + ' accent')
-  }
   const freq = settings.payday_frequency
   if (freq) {
     const label =
@@ -361,7 +356,7 @@ export function Settings() {
     upcomingCharges: true,
     budgetPlan: true,
   })
-  const accent = useStore(accentStore, (s) => s.accent)
+  const themeMode = useStore(themeStore, (s) => s.mode)
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
     getNotificationsEnabled()
@@ -1048,57 +1043,45 @@ export function Settings() {
               )}
               {activeSection === 'appearance' && (
                 <>
-                  <h6 className="text-muted mb-2">Accent colour</h6>
+                  <h6 className="text-muted mb-2">Theme</h6>
                   <p className="small text-muted mb-3">
-                    Applies to buttons, highlights, and active states throughout
-                    the app.
+                    Choose how Vantura looks. System follows your device's light
+                    or dark setting automatically.
                   </p>
                   <div
-                    className="d-flex flex-wrap gap-2"
+                    className="d-flex gap-2"
                     role="group"
-                    aria-label="Choose accent colour"
+                    aria-label="Choose theme mode"
                   >
-                    {(Object.keys(ACCENT_PALETTES) as AccentId[]).map((id) => {
-                      const { primary, label } = ACCENT_PALETTES[id]
-                      const isSelected = accent === id
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          className="border rounded-circle p-0 d-flex align-items-center justify-content-center"
-                          style={{
-                            width: 36,
-                            height: 36,
-                            background: primary,
-                            borderWidth: isSelected ? 3 : 1,
-                            borderColor: isSelected
-                              ? 'var(--vantura-text)'
-                              : 'var(--vantura-border)',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                          }}
-                          onClick={() => accentStore.getState().setAccent(id)}
-                          aria-label={`${label} accent`}
-                          aria-pressed={isSelected}
-                          title={label}
-                        >
-                          {isSelected && (
-                            <i
-                              className="mdi mdi-check"
-                              style={{ fontSize: '1rem', color: '#1a1a2e' }}
-                              aria-hidden
-                            />
-                          )}
-                        </button>
-                      )
-                    })}
+                    {[
+                      {
+                        id: 'light' as ThemeMode,
+                        icon: 'mdi-white-balance-sunny',
+                        label: 'Light',
+                      },
+                      {
+                        id: 'dark' as ThemeMode,
+                        icon: 'mdi-moon-waning-crescent',
+                        label: 'Dark',
+                      },
+                      {
+                        id: 'system' as ThemeMode,
+                        icon: 'mdi-laptop',
+                        label: 'System',
+                      },
+                    ].map(({ id, icon, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`btn btn-sm ${themeMode === id ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        onClick={() => themeStore.getState().setMode(id)}
+                        aria-pressed={themeMode === id}
+                      >
+                        <i className={`mdi ${icon} me-1`} aria-hidden />
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                  <p className="small text-muted mt-2 mb-0">
-                    Selected:{' '}
-                    <span className="fw-semibold text-body">
-                      {ACCENT_PALETTES[accent]?.label ?? accent}
-                    </span>
-                  </p>
 
                   <hr className="my-4" />
                   <h6 className="text-muted mb-1">Category colours</h6>

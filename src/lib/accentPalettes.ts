@@ -11,50 +11,50 @@ export const ACCENT_PALETTES: Record<
   }
 > = {
   sky: {
-    primary: '#7EB8D8',
-    gradientStart: '#a8d8f0',
-    gradientEnd: '#5090b8',
-    chartPalette: ['#a8d8f0', '#7EB8D8', '#5090b8'],
+    primary: '#90caf9',
+    gradientStart: '#c2def8',
+    gradientEnd: '#5b9fd4',
+    chartPalette: ['#c2def8', '#90caf9', '#5b9fd4'],
     label: 'Sky',
   },
   mint: {
-    primary: '#7EC8C0',
-    gradientStart: '#a8e0d8',
-    gradientEnd: '#50a098',
-    chartPalette: ['#a8e0d8', '#7EC8C0', '#50a098'],
+    primary: '#80cbc4',
+    gradientStart: '#b2e0db',
+    gradientEnd: '#4da89e',
+    chartPalette: ['#b2e0db', '#80cbc4', '#4da89e'],
     label: 'Mint',
   },
   lavender: {
-    primary: '#B0A8D8',
-    gradientStart: '#ccc8ee',
-    gradientEnd: '#9088b8',
-    chartPalette: ['#ccc8ee', '#B0A8D8', '#9088b8'],
+    primary: '#ce93d8',
+    gradientStart: '#e2bce8',
+    gradientEnd: '#a85db8',
+    chartPalette: ['#e2bce8', '#ce93d8', '#a85db8'],
     label: 'Lavender',
   },
   peach: {
-    primary: '#E8B888',
-    gradientStart: '#f8d0a8',
-    gradientEnd: '#c89858',
-    chartPalette: ['#f8d0a8', '#E8B888', '#c89858'],
+    primary: '#ffcc80',
+    gradientStart: '#ffe2b2',
+    gradientEnd: '#e89e40',
+    chartPalette: ['#ffe2b2', '#ffcc80', '#e89e40'],
     label: 'Peach',
   },
   blush: {
-    primary: '#E8A8C0',
-    gradientStart: '#f8c8d8',
-    gradientEnd: '#c888a0',
-    chartPalette: ['#f8c8d8', '#E8A8C0', '#c888a0'],
+    primary: '#f48fb1',
+    gradientStart: '#f9bdd0',
+    gradientEnd: '#d5628a',
+    chartPalette: ['#f9bdd0', '#f48fb1', '#d5628a'],
     label: 'Blush',
   },
   lemon: {
-    primary: '#D8D088',
-    gradientStart: '#ece888',
-    gradientEnd: '#b8b060',
-    chartPalette: ['#ece888', '#D8D088', '#b8b060'],
+    primary: '#ffe082',
+    gradientStart: '#fff3b2',
+    gradientEnd: '#e8c040',
+    chartPalette: ['#fff3b2', '#ffe082', '#e8c040'],
     label: 'Lemon',
   },
 }
 
-/** The 6 user-selectable pastel swatches (excludes reserved Sage/Rose semantic colours). */
+/** The 6 user-selectable accent swatches (excludes reserved Sage/Rose semantic colours). */
 export const PASTEL_SWATCHES = (Object.keys(ACCENT_PALETTES) as AccentId[]).map(
   (id) => ({
     id,
@@ -65,8 +65,8 @@ export const PASTEL_SWATCHES = (Object.keys(ACCENT_PALETTES) as AccentId[]).map(
 
 /** Fixed semantic colours — not user-selectable. */
 export const SEMANTIC_COLORS = {
-  success: '#8EC5A0',
-  danger: '#E89898',
-  warning: '#E8B888',
-  info: '#7EB8D8',
+  success: '#a5d6a7',
+  danger: '#ef9a9a',
+  warning: '#ffcc80',
+  info: '#90caf9',
 } as const

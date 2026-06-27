@@ -5,21 +5,41 @@
     <link rel="icon" type="image/svg+xml" href="./images/logo-icon-bg.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="./images/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#b66dff" />
+    <meta name="theme-color" content="#13131c" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Vantura</title>
+    <!-- Apply stored theme before first paint to prevent flash -->
+    <script>
+      (function () {
+        var m = localStorage.getItem('vantura_theme_mode') || 'dark'
+        var r =
+          m === 'system'
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+            : m
+        document.documentElement.setAttribute('data-theme', r)
+        document.documentElement.setAttribute('data-bs-theme', r)
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', r === 'light' ? '#f5f4f0' : '#13131c')
+      })()
+    </script>
     <style>
       html {
-        color-scheme: dark;
+        color-scheme: dark light;
       }
       html,
       body {
         margin: 0;
         min-height: 100%;
-        background-color: #1a142d;
-        color: #eae6f5;
+        background-color: #13131c;
+        color: #e4e4f0;
+      }
+      [data-theme='light'] body {
+        background-color: #f5f4f0;
+        color: #1a1a2e;
       }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" crossorigin="anonymous" />

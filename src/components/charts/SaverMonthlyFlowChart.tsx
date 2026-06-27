@@ -16,7 +16,7 @@ import {
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const SAVE_COLOR = 'var(--vantura-success, #8EC5A0)'
+const SAVE_COLOR = 'var(--vantura-success, #a5d6a7)'
 const WITHDRAW_COLOR = 'var(--vantura-danger)'
 const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 8

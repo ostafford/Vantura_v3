@@ -16,8 +16,8 @@ function getSentiment(
 }
 
 const SENTIMENT_COLOR: Record<Sentiment, string> = {
-  positive: 'var(--vantura-success, #8EC5A0)',
-  negative: 'var(--vantura-danger, #E89898)',
+  positive: 'var(--vantura-success, #a5d6a7)',
+  negative: 'var(--vantura-danger, #ef9a9a)',
   neutral: 'var(--vantura-text-secondary, #8888a0)',
 }
 

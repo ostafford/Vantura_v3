@@ -828,7 +828,7 @@ export function AnalyticsNetWorth() {
               <span
                 className="badge rounded-pill"
                 style={{
-                  background: 'var(--vantura-success, #8EC5A0)',
+                  background: 'var(--vantura-success, #a5d6a7)',
                   color: '#1a2e1a',
                   fontSize: '0.7rem',
                 }}

@@ -25,7 +25,7 @@ const EXPORT_FILE_VERSION = 1
  * Any key not in this list is NEVER exported (except saver_goal_date_* prefix).
  */
 export const SETTINGS_WHITELIST: readonly string[] = [
-  'accent_color',
+  'theme_mode',
   'payday_frequency',
   'payday_day',
   'next_payday',

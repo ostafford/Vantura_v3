@@ -26,7 +26,7 @@ const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 12
 const MARGIN_BOTTOM = 24
 const MARGIN_RIGHT = 24
-const SUCCESS_COLOR = 'var(--vantura-success, #8EC5A0)'
+const SUCCESS_COLOR = 'var(--vantura-success, #a5d6a7)'
 const SUCCESS_FILL =
   'color-mix(in srgb, var(--vantura-success) 18%, transparent)'
 const DANGER_FILL = 'color-mix(in srgb, var(--vantura-danger) 18%, transparent)'
@@ -175,7 +175,7 @@ export function MonthSpendingComparisonChart({
     const { points, yDomain, avg } = prepared
     const semanticStrokes = getMonthComparisonSemanticStrokes(points, metric)
     const currentStroke =
-      semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
+      semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #ffcc80)'
     const previousStroke =
       semanticStrokes?.previousStroke ??
       'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'

@@ -1,7 +1,6 @@
 import { useId } from 'react'
 import { useStore } from 'zustand'
-import { accentStore } from '@/stores/accentStore'
-import { ACCENT_PALETTES } from '@/lib/accentPalettes'
+import { themeStore, resolveTheme } from '@/stores/themeStore'
 
 interface VanturaLogoProps {
   variant?: 'icon' | 'wordmark' | 'text'
@@ -13,12 +12,14 @@ export function VanturaLogo({
   height = 64,
 }: VanturaLogoProps) {
   const uid = useId()
-  const accent = useStore(accentStore, (s) => s.accent)
-  const palette = ACCENT_PALETTES[accent]
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const isDark = resolveTheme(themeMode) === 'dark'
 
-  const c0 = '#ffffff'
-  const c1 = palette.gradientStart
-  const c2 = palette.gradientEnd
+  // Dark mode: white → light sky → deep sky  (visible on dark bg)
+  // Light mode: deep sky → mid sky → light sky (visible on light bg — no white)
+  const c0 = isDark ? '#ffffff' : '#5b9fd4'
+  const c1 = isDark ? '#c2def8' : '#90caf9'
+  const c2 = isDark ? '#5b9fd4' : '#c2def8'
 
   if (variant === 'icon') {
     return (

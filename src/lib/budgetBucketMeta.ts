@@ -8,7 +8,7 @@ export { PASTEL_SWATCHES }
 
 /** Resolve the CSS hex colour for a bucket colour id. */
 export function bucketColourHex(colour: string): string {
-  return ACCENT_PALETTES[colour as AccentId]?.primary ?? '#B0A8D8'
+  return ACCENT_PALETTES[colour as AccentId]?.primary ?? '#ce93d8'
 }
 
 export interface BucketIconOption {

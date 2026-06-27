@@ -9,9 +9,6 @@ import type { CategoryBreakdownRow } from '@/services/insights'
 import { getInsightsCategoryColors } from '@/lib/chartColors'
 import { normalizeCategoryIdForColor } from '@/lib/chartColors'
 import { UNCATEGORISED_COLOR_KEY } from '@/lib/chartColors'
-import { ACCENT_PALETTES } from '@/lib/accentPalettes'
-import { useStore } from 'zustand'
-import { accentStore } from '@/stores/accentStore'
 const NODE_WIDTH = 12
 const COLUMN_GAP = 80
 const MIN_LINK_WIDTH = 2
@@ -33,8 +30,7 @@ export function SankeyFlowChart({
   ariaLabel = 'Income to spending flow',
 }: SankeyFlowChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const accent = useStore(accentStore, (s) => s.accent)
-  const chartPalette = ACCENT_PALETTES[accent].chartPalette
+  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
   const categoryColors = getInsightsCategoryColors()
 
   useEffect(() => {
@@ -141,15 +137,7 @@ export function SankeyFlowChart({
             : cat.category_name
         )
     })
-  }, [
-    moneyInCents,
-    categories,
-    width,
-    height,
-    accent,
-    categoryColors,
-    chartPalette,
-  ])
+  }, [moneyInCents, categories, width, height, categoryColors, chartPalette])
 
   return (
     <svg

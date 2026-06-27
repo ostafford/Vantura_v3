@@ -1,23 +1,23 @@
-/* Design tokens — dark theme only. data-theme="dark" set statically in index.html. */
+/* Design tokens — dark default. Light theme overrides via [data-theme="light"]. */
 @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
 
 :root {
-  /* Pastel accent — Sky is the default; overridden by [data-accent] rules below */
-  --vantura-primary: #7eb8d8;
-  --vantura-primary-gradient: linear-gradient(to right, #a8d8f0, #5090b8);
-  /* Dark text for use ON pastel-coloured surfaces (badges, filled buttons, etc.) */
+  /* Accent — locked to Sky; no user-selectable override */
+  --vantura-primary: #90caf9;
+  --vantura-primary-gradient: linear-gradient(to right, #c2def8, #5b9fd4);
+  /* Dark text for use ON accent-coloured surfaces (badges, filled buttons, etc.) */
   --vantura-text-on-pastel: #1a1a2e;
   /* Softened white for text ON deep gradient backgrounds — removes harshness of pure white */
   --vantura-text-on-gradient: rgba(255, 255, 255, 0.88);
   /* Sidebar gradient — subtly lighter at top, darker at bottom */
   --vantura-sidebar-gradient: linear-gradient(135deg, #1a1a26 0%, #0f0f18 100%);
   --vantura-secondary: #d8d8d8;
-  /* Fixed semantic pastels — not user-selectable */
-  --vantura-success: #8ec5a0;
-  --vantura-info: #7eb8d8;
-  --vantura-warning: #e8b888;
-  --vantura-danger: #e89898;
-  /* Neutral dark backgrounds — purple tint removed */
+  /* Fixed semantic colours — not user-selectable */
+  --vantura-success: #a5d6a7;
+  --vantura-info: #90caf9;
+  --vantura-warning: #ffcc80;
+  --vantura-danger: #ef9a9a;
+  /* Neutral dark backgrounds */
   --vantura-content-bg: #13131c;
   --vantura-background: #13131c;
   --vantura-surface: #1c1c28;
@@ -39,8 +39,7 @@
   --vantura-table-striped-bg: rgba(255, 255, 255, 0.04);
   /* Table hover */
   --vantura-table-hover-bg: rgba(255, 255, 255, 0.1);
-  /* Stat card semantic backgrounds — deep tones, white text on these */
-  /* Statement gradient cards — floors raised, no longer bottoming out near-black */
+  /* Statement gradient cards — deep tones, white text */
   --vantura-gradient-success: linear-gradient(to right, #226038, #183825);
   --vantura-gradient-danger: linear-gradient(to right, #6a2430, #481820);
   --vantura-gradient-info: linear-gradient(to right, #224570, #183050);
@@ -59,26 +58,26 @@
   );
   /* Progress bar warning gradient — dark, white text safe */
   --vantura-gradient-warning: linear-gradient(to right, #7a5010, #584008);
-  /* Chart colours — full pastel palette */
-  --vantura-chart-money-in: #8ec5a0;
-  --vantura-chart-money-out: #e89898;
-  --vantura-chart-category-1: #7eb8d8;
-  --vantura-chart-category-2: #8ec5a0;
-  --vantura-chart-category-3: #e89898;
-  --vantura-chart-category-4: #e8b888;
-  --vantura-chart-category-5: #b0a8d8;
-  --vantura-chart-category-6: #7ec8c0;
-  --vantura-chart-series-1: #7eb8d8;
-  --vantura-chart-series-2: #8ec5a0;
-  --vantura-chart-series-3: #e89898;
-  --vantura-chart-series-4: #e8b888;
-  --vantura-chart-series-5: #b0a8d8;
-  --vantura-chart-series-6: #7ec8c0;
+  /* Chart colours */
+  --vantura-chart-money-in: #a5d6a7;
+  --vantura-chart-money-out: #ef9a9a;
+  --vantura-chart-category-1: #90caf9;
+  --vantura-chart-category-2: #a5d6a7;
+  --vantura-chart-category-3: #ef9a9a;
+  --vantura-chart-category-4: #ffcc80;
+  --vantura-chart-category-5: #ce93d8;
+  --vantura-chart-category-6: #80cbc4;
+  --vantura-chart-series-1: #90caf9;
+  --vantura-chart-series-2: #a5d6a7;
+  --vantura-chart-series-3: #ef9a9a;
+  --vantura-chart-series-4: #ffcc80;
+  --vantura-chart-series-5: #ce93d8;
+  --vantura-chart-series-6: #80cbc4;
   /* Month comparison / time-series */
-  --vantura-chart-accent: #e8b888;
-  --vantura-chart-accent-soft: rgba(232, 184, 136, 0.18);
+  --vantura-chart-accent: #ffcc80;
+  --vantura-chart-accent-soft: rgba(255, 204, 128, 0.18);
   --vantura-chart-previous: #a0a0b8;
-  --vantura-chart-average: #7eb8d8;
+  --vantura-chart-average: #90caf9;
   /* Chart bar gradient stops — deep tones */
   --vantura-chart-bar-success-from: #1a5530;
   --vantura-chart-bar-success-to: #0a3018;
@@ -87,10 +86,10 @@
   --vantura-chart-bar-danger-from: #5a1c22;
   --vantura-chart-bar-danger-to: #380f14;
   /* Tracker / meta badges — semi-transparent tints */
-  --vantura-badge-frequency-bg: rgba(232, 184, 136, 0.22);
-  --vantura-badge-frequency-fg: #e8b888;
-  --vantura-badge-meta-bg: rgba(126, 184, 216, 0.22);
-  --vantura-badge-meta-fg: #7eb8d8;
+  --vantura-badge-frequency-bg: rgba(255, 204, 128, 0.22);
+  --vantura-badge-frequency-fg: #ffcc80;
+  --vantura-badge-meta-bg: rgba(144, 202, 249, 0.22);
+  --vantura-badge-meta-fg: #90caf9;
   --vantura-badge-frequency-text: color-mix(
     in srgb,
     #ffffff 80%,
@@ -103,16 +102,14 @@
   );
   /* Elevated surface — modals, banners, drawers; one step above --vantura-surface */
   --vantura-surface-elevated: #242438;
-  /* Bootstrap semantic vars — bridged to Vantura's pastel palette so Bootstrap
-     utility classes (.text-success, .bg-danger, .progress-bar variants, etc.)
-     all render in Vantura colours instead of Bootstrap's default blue/green/red */
-  --bs-primary-rgb: 126, 184, 216;
-  --bs-success-rgb: 142, 197, 160;
-  --bs-danger-rgb: 232, 152, 152;
-  --bs-warning-rgb: 232, 184, 136;
-  --bs-info-rgb: 126, 184, 216;
-  /* Bootstrap body / border / secondary vars — mapped to Vantura tokens so any
-     component using --bs-* inherits the correct dark-theme values automatically */
+  /* Bootstrap semantic vars — bridged to Vantura's palette so Bootstrap
+     utility classes (.text-success, .bg-danger, etc.) all render in Vantura colours */
+  --bs-primary-rgb: 144, 202, 249;
+  --bs-success-rgb: 165, 214, 167;
+  --bs-danger-rgb: 239, 154, 154;
+  --bs-warning-rgb: 255, 204, 128;
+  --bs-info-rgb: 144, 202, 249;
+  /* Bootstrap body / border / secondary vars */
   --bs-body-bg: var(--vantura-background);
   --bs-body-color: var(--vantura-text);
   --bs-secondary-color: var(--vantura-text-secondary);
@@ -120,8 +117,201 @@
   /* Progress bar — consistent track and label across all instances */
   --bs-progress-bg: var(--vantura-border);
   --bs-progress-bar-color: var(--vantura-text-on-pastel);
-  /* Softer dark for text inside pastel progress bars — avoids both jarring white and stamped-on black */
   --vantura-progress-label: rgba(26, 26, 46, 0.75);
+}
+
+/* ── Light theme overrides ─────────────────────────────────────────────────── */
+[data-theme='light'] {
+  color-scheme: light;
+  --vantura-content-bg: #f5f4f0;
+  --vantura-background: #f5f4f0;
+  --vantura-surface: #ffffff;
+  --vantura-border: #e0ddd6;
+  --vantura-text: #1a1a2e;
+  --vantura-text-secondary: #6a6a82;
+  --vantura-sidebar-bg: #eceae2;
+  --vantura-sidebar-gradient: linear-gradient(135deg, #f0ede6 0%, #e8e5de 100%);
+  --vantura-sidebar-menu-color: #1a1a2e;
+  --vantura-sidebar-icon-color: rgba(50, 50, 70, 0.6);
+  --vantura-sidebar-active-bg: #e0ddd6;
+  --vantura-sidebar-hover-bg: rgba(0, 0, 0, 0.05);
+  --vantura-navbar-bg: #eceae2;
+  --vantura-bg-elevated: #ffffff;
+  --vantura-surface-elevated: #fafaf5;
+  --vantura-table-striped-bg: rgba(0, 0, 0, 0.02);
+  --vantura-table-hover-bg: rgba(0, 0, 0, 0.05);
+  --vantura-chart-opacity: 0.65;
+  --vantura-chart-bar-opacity: 0.88;
+  --vantura-chart-previous: #9090a8;
+  --vantura-card-bg: linear-gradient(135deg, #ffffff 0%, #faf9f5 100%);
+  --vantura-appearance-card-bg: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f5f4f0 100%
+  );
+  /* Badge text — darkened accent tint instead of near-white for readability on light bg */
+  --vantura-badge-frequency-text: color-mix(
+    in srgb,
+    var(--vantura-badge-frequency-fg) 85%,
+    #1a1a2e
+  );
+  --vantura-badge-meta-text: color-mix(
+    in srgb,
+    var(--vantura-badge-meta-fg) 85%,
+    #1a1a2e
+  );
+}
+
+/* Light mode: swap rgba(white) overlays → rgba(black) equivalents */
+[data-theme='light'] .btn-icon {
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+[data-theme='light'] .btn-icon:hover,
+[data-theme='light'] .btn-icon:focus-visible {
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  color: var(--vantura-text);
+}
+[data-theme='light'] .period-toggle {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme='light'] .period-toggle .segment-btn:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--vantura-text);
+}
+[data-theme='light'] .breadcrumb {
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+[data-theme='light'] .modal-backdrop.show {
+  opacity: 0.45;
+}
+[data-theme='light'] .modal-content {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.1);
+}
+[data-theme='light'] .modal-header {
+  background: rgba(0, 0, 0, 0.03);
+}
+[data-theme='light'] .modal-footer {
+  background: rgba(0, 0, 0, 0.02);
+}
+[data-theme='light'] .dropdown-menu {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .sidebar-backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+[data-theme='light'] .notif-drawer__backdrop {
+  background: rgba(0, 0, 0, 0.3);
+}
+[data-theme='light'] .notif-drawer {
+  box-shadow: -6px 0 32px rgba(0, 0, 0, 0.18);
+}
+[data-theme='light'] .notif-bell:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme='light'] .notif-drawer__clear:hover,
+[data-theme='light'] .notif-drawer__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme='light'] .notif-drawer__item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+[data-theme='light'] .notif-drawer__item-dismiss:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme='light'] .settings-accordion .accordion-button::after {
+  filter: none;
+}
+[data-theme='light'] .app-boot-shell {
+  background: linear-gradient(135deg, #f5f4f0 0%, #ffffff 50%, #eceae2 100%);
+}
+[data-theme='light'] .changelog-upcoming-group-header:hover,
+[data-theme='light'] .changelog-upcoming-item:hover,
+[data-theme='light'] .changelog-milestone-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+[data-theme='light'] .changelog-upcoming-grid {
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .changelog-upcoming-detail {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .pwa-update-banner {
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+}
+/* Pastel fill backgrounds: dark-tinted → white-tinted in light mode */
+[data-theme='light'] .bg-pastel-success,
+[data-theme='light'] .stat-card-flat--success {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-success) 48%, white) 0%,
+    color-mix(in srgb, var(--vantura-success) 38%, white) 100%
+  );
+}
+[data-theme='light'] .bg-pastel-danger,
+[data-theme='light'] .stat-card-flat--danger {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-danger) 48%, white) 0%,
+    color-mix(in srgb, var(--vantura-danger) 38%, white) 100%
+  );
+}
+[data-theme='light'] .bg-pastel-info,
+[data-theme='light'] .stat-card-flat--info {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-info) 48%, white) 0%,
+    color-mix(in srgb, var(--vantura-info) 38%, white) 100%
+  );
+}
+[data-theme='light'] .bg-pastel-primary,
+[data-theme='light'] .stat-card-flat--primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-primary) 48%, white) 0%,
+    color-mix(in srgb, var(--vantura-primary) 38%, white) 100%
+  );
+}
+/* Stat card border-left: dark-mix → white-mix in light mode */
+[data-theme='light'] .stat-card-flat--success {
+  border-left-color: color-mix(in srgb, var(--vantura-success) 60%, white);
+}
+[data-theme='light'] .stat-card-flat--danger {
+  border-left-color: color-mix(in srgb, var(--vantura-danger) 60%, white);
+}
+[data-theme='light'] .stat-card-flat--info {
+  border-left-color: color-mix(in srgb, var(--vantura-info) 60%, white);
+}
+[data-theme='light'] .stat-card-flat--primary {
+  border-left-color: color-mix(in srgb, var(--vantura-primary) 60%, white);
+}
+/* Auth screen gradient — light bg tinted by accent */
+[data-theme='light'] .auth-full-bg {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vantura-primary) 10%, #f5f4f0) 0%,
+    color-mix(in srgb, var(--vantura-primary) 6%, #ffffff) 50%,
+    color-mix(in srgb, var(--vantura-primary) 10%, #eceae2) 100%
+  );
+}
+[data-theme='light'] .auth-full-bg .card,
+[data-theme='light'] .auth-full-bg .auth-card {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+[data-theme='light'] .auth-full-bg .form-control,
+[data-theme='light'] .auth-full-bg .form-select {
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .auth-full-bg .btn {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
 }
 
 /* Form check / switch */
@@ -140,38 +330,6 @@
 }
 .form-check-label {
   color: var(--vantura-text);
-}
-
-/* Pastel accent overrides — user choice from Settings */
-[data-accent='sky'] {
-  --vantura-primary: #7eb8d8;
-  --vantura-primary-gradient: linear-gradient(to right, #a8d8f0, #5090b8);
-  --vantura-sidebar-active-color: #7eb8d8;
-}
-[data-accent='mint'] {
-  --vantura-primary: #7ec8c0;
-  --vantura-primary-gradient: linear-gradient(to right, #a8e0d8, #50a098);
-  --vantura-sidebar-active-color: #7ec8c0;
-}
-[data-accent='lavender'] {
-  --vantura-primary: #b0a8d8;
-  --vantura-primary-gradient: linear-gradient(to right, #ccc8ee, #9088b8);
-  --vantura-sidebar-active-color: #b0a8d8;
-}
-[data-accent='peach'] {
-  --vantura-primary: #e8b888;
-  --vantura-primary-gradient: linear-gradient(to right, #f8d0a8, #c89858);
-  --vantura-sidebar-active-color: #e8b888;
-}
-[data-accent='blush'] {
-  --vantura-primary: #e8a8c0;
-  --vantura-primary-gradient: linear-gradient(to right, #f8c8d8, #c888a0);
-  --vantura-sidebar-active-color: #e8a8c0;
-}
-[data-accent='lemon'] {
-  --vantura-primary: #d8d088;
-  --vantura-primary-gradient: linear-gradient(to right, #ece888, #b8b060);
-  --vantura-sidebar-active-color: #d8d088;
 }
 
 :root {
@@ -725,8 +883,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 4px;
   text-align: center;
   line-height: 36px;
-  background: var(--vantura-gradient-primary);
-  color: var(--vantura-text-on-gradient);
+  background: var(--vantura-primary-gradient);
+  color: var(--vantura-text-on-pastel);
   margin-right: 0.5rem;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
 }
@@ -1400,14 +1558,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 
 .btn-icon.btn-icon-primary {
   color: var(--vantura-primary);
-  background: rgba(126, 184, 216, 0.08);
+  background: color-mix(in srgb, var(--vantura-primary) 8%, transparent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 
 .btn-icon.btn-icon-primary:hover,
 .btn-icon.btn-icon-primary:focus-visible {
-  background: rgba(126, 184, 216, 0.16);
-  box-shadow: 0 2px 6px rgba(126, 184, 216, 0.18);
+  background: color-mix(in srgb, var(--vantura-primary) 16%, transparent);
+  box-shadow: 0 2px 6px
+    color-mix(in srgb, var(--vantura-primary) 18%, transparent);
   color: var(--vantura-primary);
 }
 
@@ -2863,7 +3022,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 10px;
-  background: rgba(126, 184, 216, 0.18);
+  background: color-mix(in srgb, var(--vantura-primary) 18%, transparent);
   color: var(--vantura-primary);
   line-height: 1.4;
 }
@@ -2888,10 +3047,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   background: rgba(255, 255, 255, 0.04);
 }
 .notif-drawer__item--unread {
-  background: rgba(126, 184, 216, 0.05);
+  background: color-mix(in srgb, var(--vantura-primary) 5%, transparent);
 }
 .notif-drawer__item--unread:hover {
-  background: rgba(126, 184, 216, 0.09);
+  background: color-mix(in srgb, var(--vantura-primary) 9%, transparent);
 }
 
 .notif-drawer__item-icon {
@@ -2959,7 +3118,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   letter-spacing: 0.05em;
   padding: 2px 5px;
   border-radius: 4px;
-  background: rgba(126, 184, 216, 0.15);
+  background: color-mix(in srgb, var(--vantura-primary) 15%, transparent);
   color: var(--vantura-primary);
   white-space: nowrap;
 }
@@ -2980,13 +3139,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 
 @keyframes dashboard-scroll-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(126, 184, 216, 0.45);
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--vantura-primary) 45%, transparent);
   }
   40% {
-    box-shadow: 0 0 0 10px rgba(126, 184, 216, 0.15);
+    box-shadow: 0 0 0 10px
+      color-mix(in srgb, var(--vantura-primary) 15%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(126, 184, 216, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 

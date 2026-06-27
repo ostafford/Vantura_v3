@@ -15,7 +15,7 @@ import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
 
-const LINE_COLOR = 'var(--vantura-success, #8EC5A0)'
+const LINE_COLOR = 'var(--vantura-success, #a5d6a7)'
 const AREA_COLOR = 'rgba(142, 197, 160, 0.18)'
 const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 8

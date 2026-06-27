@@ -3,8 +3,8 @@ import type {
   MonthSpendingSeriesPoint,
 } from '@/lib/monthSpendingSeries'
 
-const SUCCESS_COLOR = 'var(--vantura-success, #8EC5A0)'
-const DANGER_COLOR = 'var(--vantura-danger, #E89898)'
+const SUCCESS_COLOR = 'var(--vantura-success, #a5d6a7)'
+const DANGER_COLOR = 'var(--vantura-danger, #ef9a9a)'
 
 function computeMtd(points: MonthSpendingSeriesPoint[], metric: MonthMetric) {
   const currentKey =

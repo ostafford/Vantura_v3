@@ -288,10 +288,10 @@ describe('profileExport', () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)
       applySettings({
-        accent_color: 'teal',
+        theme_mode: 'light',
         api_token_encrypted: 'evil',
       } as Record<string, string>)
-      expect(setAppSettingMock).toHaveBeenCalledWith('accent_color', 'teal')
+      expect(setAppSettingMock).toHaveBeenCalledWith('theme_mode', 'light')
       expect(setAppSettingMock).not.toHaveBeenCalledWith(
         'api_token_encrypted',
         expect.anything()

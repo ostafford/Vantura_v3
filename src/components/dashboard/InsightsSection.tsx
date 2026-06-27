@@ -22,9 +22,7 @@ import {
   formatShortDateFromDate,
   formatDollars,
 } from '@/lib/format'
-import { accentStore } from '@/stores/accentStore'
 import { syncStore } from '@/stores/syncStore'
-import { ACCENT_PALETTES } from '@/lib/accentPalettes'
 import {
   getInsightsCategoryColors,
   setInsightsCategoryColor,
@@ -63,7 +61,6 @@ export function InsightsSection({
   const [categoryBarColor, setCategoryBarColor] = useState<string | null>(null)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
-  const accent = useStore(accentStore, (s) => s.accent)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
   const { startStr, endIso } = weekRange
@@ -86,7 +83,7 @@ export function InsightsSection({
       import.meta.env.DEV ? getWeeklyInsightsDebugCounts(weekRange) : null,
     [weekRange]
   )
-  const chartPalette = ACCENT_PALETTES[accent].chartPalette
+  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const categoryColors = useMemo(() => getInsightsCategoryColors(), [refresh])
 

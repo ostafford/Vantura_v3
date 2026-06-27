@@ -18,7 +18,7 @@ import { useChartDimensions } from '@/hooks/useChartDimensions'
 const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const MARGIN_TOP = 8
 const MARGIN_RIGHT = 24
-const DEFAULT_LINE_COLOR = 'var(--vantura-primary, #7EB8D8)'
+const DEFAULT_LINE_COLOR = 'var(--vantura-primary, #90caf9)'
 const GOAL_LINE_COLOR = 'var(--vantura-text-secondary, #8888a0)'
 
 export interface ProgressDataPoint {

@@ -150,7 +150,7 @@ export function AnalyticsAtAGlanceSection() {
   }, [pointsCurrent, pointsPrevious, yearCurrentThroughMonth, metric])
 
   const yearCurrentStroke =
-    yearLegendStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
+    yearLegendStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #ffcc80)'
   const yearPreviousStroke =
     yearLegendStrokes?.previousStroke ??
     'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'
@@ -180,7 +180,7 @@ export function AnalyticsAtAGlanceSection() {
   }, [activeLineSeries, metric])
 
   const thisPeriodStroke =
-    semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #E8B888)'
+    semanticStrokes?.currentStroke ?? 'var(--vantura-chart-accent, #ffcc80)'
   const lastPeriodStroke =
     semanticStrokes?.previousStroke ??
     'var(--vantura-chart-previous, var(--bs-gray-600, #6c757d))'

@@ -3,7 +3,11 @@ import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
-import { accentStore } from '@/stores/accentStore'
+import {
+  themeStore,
+  resolveTheme,
+  THEME_LOCALSTORAGE_KEY,
+} from '@/stores/themeStore'
 import { sessionStore } from '@/stores/sessionStore'
 import { ToastProvider } from '@/components/ToastProvider'
 import { VanturaLogo } from '@/components/VanturaLogo'
@@ -49,17 +53,34 @@ function AppContent() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null
   )
-  const accent = useStore(accentStore, (s) => s.accent)
-  const accentHydrated = useStore(accentStore, (s) => s.hydrated)
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const themeHydrated = useStore(themeStore, (s) => s.hydrated)
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
   useInactivityLock(unlocked)
   const { updateReady, applyUpdate } = usePwaUpdate()
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
-    if (!accentHydrated) return
-    document.documentElement.setAttribute('data-accent', accent)
-  }, [accent, accentHydrated])
+    if (!themeHydrated) return
+    const apply = () => {
+      const resolved = resolveTheme(themeMode)
+      document.documentElement.setAttribute('data-theme', resolved)
+      document.documentElement.setAttribute('data-bs-theme', resolved)
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta)
+        meta.setAttribute(
+          'content',
+          resolved === 'light' ? '#f5f4f0' : '#13131c'
+        )
+      localStorage.setItem(THEME_LOCALSTORAGE_KEY, themeMode)
+    }
+    apply()
+    if (themeMode === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      mq.addEventListener('change', apply)
+      return () => mq.removeEventListener('change', apply)
+    }
+  }, [themeMode, themeHydrated])
 
   useEffect(() => {
     let cancelled = false
@@ -76,15 +97,11 @@ function AppContent() {
         return
       }
       if (cancelled) return
-      accentStore.getState().hydrateFromDb()
-      if (cancelled) return
+      themeStore.getState().hydrateFromDb()
       if (cancelled) return
       advanceNextPaydayIfNeeded()
       if (cancelled) return
       recalculateTrackers()
-      if (cancelled) return
-      const accent = accentStore.getState().accent
-      document.documentElement.setAttribute('data-accent', accent)
       if (!cancelled) setReady(true)
     }
     boot()
