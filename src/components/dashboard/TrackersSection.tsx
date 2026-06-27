@@ -370,10 +370,7 @@ export function TrackersSection({
 
   const titleBlock = (
     <div className="d-flex align-items-center">
-      <span
-        className="page-title-icon bg-gradient-primary text-white mr-2"
-        {...dragHandleProps}
-      >
+      <span className="page-title-icon" {...dragHandleProps}>
         <i className="mdi mdi-chart-line" aria-hidden />
       </span>
       <div className="d-flex align-items-center">

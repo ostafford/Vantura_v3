@@ -16,7 +16,7 @@ export function AnalyticsIndex() {
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
                   style={{ width: 36, height: 36, minWidth: 36 }}
                 >
                   <i
@@ -52,7 +52,7 @@ export function AnalyticsIndex() {
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
                   style={{ width: 36, height: 36, minWidth: 36 }}
                 >
                   <i
@@ -88,7 +88,7 @@ export function AnalyticsIndex() {
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
                   style={{ width: 36, height: 36, minWidth: 36 }}
                 >
                   <i
@@ -124,7 +124,7 @@ export function AnalyticsIndex() {
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
                   style={{ width: 36, height: 36, minWidth: 36 }}
                 >
                   <i
@@ -160,7 +160,7 @@ export function AnalyticsIndex() {
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
                 <span
-                  className="page-title-icon bg-gradient-primary text-white rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
                   style={{ width: 36, height: 36, minWidth: 36 }}
                 >
                   <i

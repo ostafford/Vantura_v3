@@ -232,7 +232,7 @@ export function AnalyticsAtAGlanceSection() {
     <Card className="mb-4">
       <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2 section-header">
         <div className="d-flex align-items-center flex-wrap gap-2">
-          <span className="page-title-icon bg-gradient-primary text-white mr-2">
+          <span className="page-title-icon">
             <i className={`mdi ${headerIcon}`} aria-hidden />
           </span>
           <div className="d-flex flex-column">

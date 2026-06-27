@@ -61,10 +61,7 @@ export function MonthSummarySection({
     <Card>
       <Card.Header className="d-flex justify-content-between align-items-center section-header">
         <div className="d-flex align-items-center">
-          <span
-            className="page-title-icon bg-gradient-primary text-white mr-2"
-            {...dragHandleProps}
-          >
+          <span className="page-title-icon" {...dragHandleProps}>
             <i className="mdi mdi-calendar-month" aria-hidden />
           </span>
           <div className="d-flex flex-column">

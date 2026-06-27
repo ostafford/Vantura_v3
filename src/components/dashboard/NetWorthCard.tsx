@@ -45,10 +45,7 @@ export function NetWorthCard({ dragHandleProps }: NetWorthCardProps) {
     <Card>
       <Card.Header className="d-flex justify-content-between align-items-center section-header">
         <div className="d-flex align-items-center gap-2">
-          <span
-            className="page-title-icon bg-gradient-primary text-white mr-2"
-            {...dragHandleProps}
-          >
+          <span className="page-title-icon" {...dragHandleProps}>
             <i className="mdi mdi-chart-timeline-variant" aria-hidden />
           </span>
           <span>Net Worth</span>

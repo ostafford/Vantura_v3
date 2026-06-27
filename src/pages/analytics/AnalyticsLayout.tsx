@@ -115,7 +115,7 @@ export function AnalyticsLayout() {
         <div className="sticky-toolbar">
           <div className="page-header" style={{ margin: 0 }}>
             <h3 className="page-title">
-              <span className="page-title-icon bg-gradient-primary text-white mr-2">
+              <span className="page-title-icon">
                 <i className={`mdi ${pageTitleIcon}`} aria-hidden />
               </span>
               {pageTitle}

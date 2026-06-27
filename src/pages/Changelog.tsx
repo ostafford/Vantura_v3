@@ -144,7 +144,7 @@ export function Changelog() {
       <div className="sticky-toolbar">
         <div className="page-header" style={{ margin: 0 }}>
           <h3 className="page-title">
-            <span className="page-title-icon bg-gradient-primary text-white mr-2">
+            <span className="page-title-icon">
               <i className="mdi mdi-rocket-launch-outline" aria-hidden />
             </span>
             What&apos;s new

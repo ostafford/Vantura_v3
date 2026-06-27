@@ -638,7 +638,7 @@ export function AnalyticsReports() {
           style={{ margin: 0, paddingBottom: '0.5rem' }}
         >
           <h3 className="page-title">
-            <span className="page-title-icon bg-gradient-primary text-white mr-2">
+            <span className="page-title-icon">
               <i className="mdi mdi-file-chart" aria-hidden />
             </span>
             Reports

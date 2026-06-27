@@ -883,10 +883,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 4px;
   text-align: center;
   line-height: 36px;
-  background: var(--vantura-primary-gradient);
+  background: var(--vantura-primary);
   color: var(--vantura-text-on-pastel);
   margin-right: 0.5rem;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
 }
 .page-title-icon[draggable='true'] {
   cursor: grab;
