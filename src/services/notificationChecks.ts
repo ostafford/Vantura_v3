@@ -4,7 +4,7 @@
  * re-firing the same alert within the same day or budget period.
  */
 
-import { getDb, getAppSetting, setAppSetting } from '@/db'
+import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
 import { formatMoney } from '@/lib/format'
 import {
   getNotificationsEnabled,
@@ -25,6 +25,66 @@ import { getAccountsByTypes } from '@/services/accounts'
 function todayDateString(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ─── 0. Auto-clear settled bill notifications ────────────────────────────────
+
+/**
+ * For each upcoming charge that has a linked match_raw_text, detect whether a
+ * matching settled debit has appeared in the transaction log since the charge
+ * window opened. If settled, delete the corresponding bills_due notification
+ * from history so the banner disappears automatically.
+ *
+ * Runs on every app open — queries are cheap and idempotent per charge cycle.
+ */
+function checkBillsSettled(): void {
+  if (!getNotifTypeEnabled('bills')) return
+
+  const db = getDb()
+  if (!db) return
+
+  const stmt = db.prepare(
+    `SELECT id, name, next_charge_date, match_raw_text
+     FROM upcoming_charges
+     WHERE match_raw_text IS NOT NULL AND match_raw_text != ''`
+  )
+
+  while (stmt.step()) {
+    const row = stmt.get() as [number, string, string, string]
+    const [chargeId, chargeName, nextChargeDate, matchRawText] = row
+
+    // Per-cycle guard — skip if we already auto-cleared for this charge date
+    const guardKey = `notif_bill_settled_${chargeId}_${nextChargeDate}`
+    if (getAppSetting(guardKey)) continue
+
+    // Accept payment up to 5 days before the nominal charge date (early payments)
+    const windowStart = new Date(nextChargeDate.slice(0, 10) + 'T12:00:00Z')
+    windowStart.setUTCDate(windowStart.getUTCDate() - 5)
+    const windowStartStr = windowStart.toISOString().slice(0, 10)
+
+    const txRes = db.exec(
+      `SELECT id FROM transactions
+       WHERE raw_text = ?
+         AND amount < 0
+         AND transfer_account_id IS NULL
+         AND substr(COALESCE(settled_at, created_at), 1, 10) >= ?
+       LIMIT 1`,
+      [matchRawText, windowStartStr]
+    )
+
+    if (!txRes[0]?.values?.length) continue
+
+    // Payment found — remove matching bills_due notifications for this charge
+    const escapedName = chargeName.replace(/%/g, '\\%').replace(/_/g, '\\_')
+    db.run(
+      `DELETE FROM notification_history
+       WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
+      [`%${escapedName}%`]
+    )
+    schedulePersist()
+    setAppSetting(guardKey, '1')
+  }
+  stmt.free()
 }
 
 // ─── 1. Bills due soon ───────────────────────────────────────────────────────
@@ -521,6 +581,7 @@ function checkPossiblePayday(): void {
 export function runNotificationChecks(): void {
   if (!getNotificationsEnabled()) return
 
+  checkBillsSettled()
   checkBillsDue()
   checkSpendableLow()
   checkTrackerOverspent()
