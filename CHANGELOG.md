@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-27
+
+### Fixed
+
+- **Spendable double-count corrected:** Up Bank's API returns the *net available* balance (held/pending transactions already deducted at source). Vantura was subtracting them a second time, causing Spendable to read significantly lower than Up Bank. Formula is now `Spendable = Available − Reserved` and matches Up Bank exactly. See `src/services/balance.ts`.
+- **Stale architecture doc and Help page updated:** `Arch_Docs/05_Calculation_logic.md` Section 5.2 and the in-app Help → Spendable balance section both previously documented the incorrect `Available − Held − Reserved` formula; both now reflect the corrected formula.
+
+### Changed
+
+- **Tooltip upgrade:** Available and Spendable dashboard cards now render structured, tap-friendly tooltips (bullet points, post-payday projection, contextual state headers). Tooltips respond to tap on mobile via `rootClose`. See `src/components/StatCard.tsx`, `src/index.css`.
+- **Reserved calculation refactored:** `calcChargeReserved` extracted as a shared core used by both `calculateReservedAmount` and `calculateReservedBreakdown`, eliminating duplicated switch logic. See `src/services/balance.ts`.
+
+### Added
+
+- **`calculateReservedBreakdown`** — pure function returning a per-charge breakdown of reserved amounts, including occurrence count and prorated/multi-occurrence labels. 8 new unit tests added. See `src/services/balance.ts`, `src/services/balance.test.ts`.
+
 ## [0.5.5] - 2026-06-23
 
 ### Added

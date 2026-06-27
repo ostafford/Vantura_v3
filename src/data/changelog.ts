@@ -25,6 +25,28 @@ export interface UpcomingItem {
 export const MILESTONES: Milestone[] = [
   {
     date: '27 Jun 2026',
+    heading: 'Spendable Fix',
+    icon: 'mdi-calculator-variant-outline',
+    primaryMonth: '2026-06',
+    version: '0.7.1',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-check-circle-outline',
+        text: "Spendable formula corrected — Up Bank's balance already nets out held/pending transactions, so Vantura no longer double-deducts them. Spendable now matches Up Bank exactly.",
+      },
+      {
+        icon: 'mdi-information-outline',
+        text: 'Tooltip redesign — Available and Spendable cards now show structured, tap-friendly tooltips with bullet-point breakdowns and a post-payday projection.',
+      },
+      {
+        icon: 'mdi-test-tube',
+        text: 'Calculation coverage expanded — 8 new unit tests for the reserved breakdown function; shared core logic extracted to eliminate duplicate calculation paths.',
+      },
+    ],
+  },
+  {
+    date: '27 Jun 2026',
     heading: 'Net Worth',
     icon: 'mdi-chart-timeline-variant',
     primaryMonth: '2026-06',

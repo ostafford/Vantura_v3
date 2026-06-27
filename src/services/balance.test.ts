@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calculateReservedAmount } from './balance'
+import { calculateReservedAmount, calculateReservedBreakdown } from './balance'
 
 describe('calculateReservedAmount', () => {
   beforeEach(() => {
@@ -398,5 +398,185 @@ describe('calculateReservedAmount', () => {
     )
     // $20 + $40 + $150 = $210 = 21000 cents
     expect(reserved).toBe(21000)
+  })
+})
+
+describe('calculateReservedBreakdown', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2025-02-23T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns empty array when nextPayday is null', () => {
+    expect(
+      calculateReservedBreakdown(
+        [
+          {
+            name: 'Spotify',
+            next_charge_date: '2025-02-25',
+            frequency: 'ONCE',
+            amount: 1300,
+            is_reserved: 1,
+          },
+        ],
+        null,
+        'MONTHLY'
+      )
+    ).toEqual([])
+  })
+
+  it('returns empty array when no reserved charges qualify', () => {
+    expect(
+      calculateReservedBreakdown(
+        [
+          {
+            name: 'Netflix',
+            next_charge_date: '2025-03-10',
+            frequency: 'ONCE',
+            amount: 2000,
+            is_reserved: 0,
+          },
+        ],
+        '2025-03-01',
+        'MONTHLY'
+      )
+    ).toEqual([])
+  })
+
+  it('returns one item per charge with correct name, amount, and occurrenceCount=1 for ONCE', () => {
+    const result = calculateReservedBreakdown(
+      [
+        {
+          name: 'Spotify',
+          next_charge_date: '2025-02-25',
+          frequency: 'ONCE',
+          amount: 1300,
+          is_reserved: 1,
+        },
+      ],
+      '2025-03-01',
+      'MONTHLY'
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe('Spotify')
+    expect(result[0].reservedAmount).toBe(1300)
+    expect(result[0].fullAmount).toBe(1300)
+    expect(result[0].occurrenceCount).toBe(1)
+    expect(result[0].projectedDate).toBe('2025-02-25')
+  })
+
+  it('totals match calculateReservedAmount for the same inputs', () => {
+    const charges = [
+      {
+        name: 'Spotify',
+        next_charge_date: '2025-02-25',
+        frequency: 'ONCE',
+        amount: 1300,
+        is_reserved: 1,
+      },
+      {
+        name: 'Aldi Mobile',
+        next_charge_date: '2025-02-24',
+        frequency: 'MONTHLY',
+        amount: 4000,
+        is_reserved: 1,
+      },
+      {
+        name: 'Ignored',
+        next_charge_date: '2025-02-26',
+        frequency: 'ONCE',
+        amount: 9999,
+        is_reserved: 0,
+      },
+    ]
+    const breakdown = calculateReservedBreakdown(
+      charges,
+      '2025-03-01',
+      'MONTHLY'
+    )
+    const total = breakdown.reduce((s, r) => s + r.reservedAmount, 0)
+    expect(total).toBe(
+      calculateReservedAmount(charges, '2025-03-01', 'MONTHLY')
+    )
+  })
+
+  it('sets occurrenceCount=2 for fortnightly charge hitting twice before payday', () => {
+    // Today Feb 23. Payday Mar 23. Fortnightly from Feb 25 → Feb 25, Mar 11 both ≤ Mar 23.
+    const result = calculateReservedBreakdown(
+      [
+        {
+          name: 'Rent',
+          next_charge_date: '2025-02-25',
+          frequency: 'FORTNIGHTLY',
+          amount: 15900,
+          is_reserved: 1,
+        },
+      ],
+      '2025-03-23',
+      'FORTNIGHTLY'
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].occurrenceCount).toBe(2)
+    expect(result[0].reservedAmount).toBe(31800)
+    expect(result[0].fullAmount).toBe(15900)
+  })
+
+  it('sets occurrenceCount=4 for weekly charge hitting four times before payday', () => {
+    const result = calculateReservedBreakdown(
+      [
+        {
+          name: 'Gym',
+          next_charge_date: '2025-02-24',
+          frequency: 'WEEKLY',
+          amount: 1000,
+          is_reserved: 1,
+        },
+      ],
+      '2025-03-23',
+      'FORTNIGHTLY'
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].occurrenceCount).toBe(4)
+    expect(result[0].reservedAmount).toBe(4000)
+  })
+
+  it('sets occurrenceCount=1 and reservedAmount < fullAmount for prorated MONTHLY', () => {
+    // Charge of $300 due Mar 10 (15 days away), fortnightly pay: prorated to $150
+    const result = calculateReservedBreakdown(
+      [
+        {
+          name: 'Insurance',
+          next_charge_date: '2025-03-10',
+          frequency: 'MONTHLY',
+          amount: 30000,
+          is_reserved: 1,
+        },
+      ],
+      '2025-03-23',
+      'FORTNIGHTLY'
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].occurrenceCount).toBe(1)
+    expect(result[0].reservedAmount).toBeLessThan(result[0].fullAmount)
+  })
+
+  it('excludes charges after nextPayday', () => {
+    const result = calculateReservedBreakdown(
+      [
+        {
+          name: 'Future',
+          next_charge_date: '2025-04-01',
+          frequency: 'ONCE',
+          amount: 5000,
+          is_reserved: 1,
+        },
+      ],
+      '2025-03-01',
+      'MONTHLY'
+    )
+    expect(result).toHaveLength(0)
   })
 })

@@ -2990,3 +2990,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     overflow: hidden;
   }
 }
+
+/* Rich tooltip — wider, left-aligned, for formatted multi-line content */
+.tooltip-rich .tooltip-inner {
+  max-width: 300px;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .tooltip-rich .tooltip-inner {
+    max-width: min(280px, 90vw);
+  }
+}

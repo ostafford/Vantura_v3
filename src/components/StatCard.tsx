@@ -16,7 +16,8 @@ export interface StatCardProps {
   compact?: boolean
   gradient: ColorVariant
   imgAlt?: string
-  tooltip?: string
+  /** Accepts plain strings or formatted JSX for richer multi-line tooltips. */
+  tooltip?: ReactNode
 }
 
 export function StatCard({
@@ -39,7 +40,13 @@ export function StatCard({
         {tooltip && (
           <OverlayTrigger
             placement="top"
-            overlay={<Tooltip id={`stat-${title}-tooltip`}>{tooltip}</Tooltip>}
+            trigger={['hover', 'focus', 'click']}
+            rootClose
+            overlay={
+              <Tooltip id={`stat-${title}-tooltip`} className="tooltip-rich">
+                {tooltip}
+              </Tooltip>
+            }
           >
             <span
               className="ms-1"
@@ -90,8 +97,15 @@ export function StatCard({
               {tooltip && (
                 <OverlayTrigger
                   placement="top"
+                  trigger={['hover', 'focus', 'click']}
+                  rootClose
                   overlay={
-                    <Tooltip id={`stat-${title}-tooltip`}>{tooltip}</Tooltip>
+                    <Tooltip
+                      id={`stat-${title}-tooltip`}
+                      className="tooltip-rich"
+                    >
+                      {tooltip}
+                    </Tooltip>
                   }
                 >
                   <span

@@ -352,16 +352,18 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-2">
                     <strong>
-                      Spendable = Available − held transactions − upcoming
-                      charges reserved before your next payday.
+                      Spendable = Available − upcoming charges reserved before
+                      your next payday.
                     </strong>
                   </p>
                   <p className="mb-2">
-                    Only charges due before the next payday are reserved.
-                    Recurring charges (monthly, quarterly, yearly) are prorated
-                    so the reserved amount reflects only the portion of the
-                    cycle left before you get paid — giving you a fair
-                    &quot;safe to spend&quot; figure.
+                    Your Available balance from Up Bank already reflects any
+                    pending or held transactions, so Vantura does not deduct
+                    them a second time. Only charges due before the next payday
+                    are reserved. Recurring charges (monthly, quarterly, yearly)
+                    are prorated so the reserved amount reflects only the
+                    portion of the cycle left before you get paid — giving you a
+                    fair &quot;safe to spend&quot; figure.
                   </p>
 
                   <SectionHeading icon="mdi-bell-outline">

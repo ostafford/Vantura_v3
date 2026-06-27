@@ -7,7 +7,6 @@ import {
   getReservedAmount,
   getSpendableBalance,
   getPayAmountCents,
-  getHeldTransactionTotal,
 } from '@/services/balance'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
@@ -66,7 +65,6 @@ export function Dashboard() {
     pctPayRaw,
     nextPayday,
     reservedCents,
-    heldCents,
     lastSyncAgeMs,
   } = useMemo(
     () => ({
@@ -77,7 +75,6 @@ export function Dashboard() {
       pctPayRaw: getAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY),
       nextPayday: getAppSetting('next_payday'),
       reservedCents: getReservedAmount(),
-      heldCents: getHeldTransactionTotal(),
       lastSyncAgeMs: (() => {
         const ls = getAppSetting('last_sync')
         return ls ? Date.now() - new Date(ls).getTime() : null
@@ -120,35 +117,75 @@ export function Dashboard() {
       : 0
 
   const spendableSubtitle =
-    (nextPayday && nextPayday.trim() !== ''
+    nextPayday && nextPayday.trim() !== ''
       ? `$${formatMoney(reservedCents)} reserved until ${formatShortDate(nextPayday)}`
-      : `$${formatMoney(reservedCents)} reserved for upcoming`) +
-    (heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : '')
+      : `$${formatMoney(reservedCents)} reserved for upcoming`
   const availableProjectedSubtitle =
     payAmountCents != null
-      ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}${heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : ''}`
-      : `Gross balance before holds${heldCents > 0 ? ` · $${formatMoney(heldCents)} held` : ''}`
+      ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}`
+      : 'Balance as reported by Up Bank'
 
-  const heldNote =
-    heldCents > 0
-      ? ` Held/pending: $${formatMoney(heldCents)} (authorised but not yet settled — deducted to match Up Bank's Spendable).`
-      : ''
+  const spendableTooltip = (() => {
+    const fmtSigned = (c: number) =>
+      c < 0 ? `−$${formatMoney(Math.abs(c))}` : `$${formatMoney(c)}`
+    const projected =
+      payAmountCents != null ? spendableCents + payAmountCents : null
 
-  const spendableTooltip =
-    (spendableCents < 0
-      ? 'Spendable is negative — reserved charges and held transactions exceed your available balance.'
-      : isSpendableLow
-        ? 'Below your alert threshold — check your upcoming charges or adjust the threshold by clicking this card.'
-        : 'Spendable = Available minus held transactions minus reserved upcoming charges. Click to set alert threshold.') +
-    heldNote +
-    (payAmountCents != null
-      ? (() => {
-          const projected = spendableCents + payAmountCents
-          const fmtSigned = (c: number) =>
-            c < 0 ? `−$${formatMoney(Math.abs(c))}` : `$${formatMoney(c)}`
-          return ` After payday (before new spending): about ${fmtSigned(spendableCents)} + $${formatMoney(payAmountCents)} = ${fmtSigned(projected)}.`
-        })()
-      : '')
+    return (
+      <div style={{ fontSize: '0.82rem' }}>
+        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
+          {spendableCents < 0
+            ? 'Spendable is negative'
+            : isSpendableLow
+              ? 'Below your alert threshold'
+              : 'How Spendable is calculated'}
+        </div>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
+        >
+          <div>
+            • <strong>Available</strong> — your Up Bank balance
+          </div>
+          <div>
+            • minus <strong>Reserved</strong> — upcoming charges set aside
+            before payday
+          </div>
+          {spendableCents < 0 && (
+            <div
+              style={{ marginTop: '0.3rem', color: 'var(--vantura-danger)' }}
+            >
+              Reserved charges exceed your available balance.
+            </div>
+          )}
+          {isSpendableLow && spendableCents >= 0 && (
+            <div
+              style={{ marginTop: '0.3rem', color: 'var(--vantura-warning)' }}
+            >
+              Check your upcoming charges or tap to adjust the threshold.
+            </div>
+          )}
+          {projected != null && (
+            <div
+              style={{
+                marginTop: '0.3rem',
+                borderTop: '1px solid rgba(255,255,255,0.12)',
+                paddingTop: '0.3rem',
+              }}
+            >
+              After payday: {fmtSigned(spendableCents)} + $
+              {formatMoney(payAmountCents!)} ={' '}
+              <strong>{fmtSigned(projected)}</strong>
+            </div>
+          )}
+        </div>
+        <div
+          style={{ marginTop: '0.45rem', opacity: 0.55, fontSize: '0.78rem' }}
+        >
+          Tap this card to set a low-balance alert.
+        </div>
+      </div>
+    )
+  })()
 
   const now = new Date()
   const headerDate = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
@@ -427,7 +464,39 @@ export function Dashboard() {
             value={availableCents}
             subtitle={availableProjectedSubtitle}
             gradient="success"
-            tooltip="Sum of your transactional account balances — excludes saver accounts. This is your Up Bank balance as reported, before any Spendable adjustments."
+            tooltip={
+              <div style={{ fontSize: '0.82rem' }}>
+                <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
+                  Your Up Bank balance
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem',
+                  }}
+                >
+                  <div>• Sum of all transactional account balances</div>
+                  <div>• Excludes saver accounts</div>
+                  <div>• Pending/held transactions already reflected</div>
+                </div>
+                {payAmountCents != null && (
+                  <div
+                    style={{
+                      marginTop: '0.45rem',
+                      borderTop: '1px solid rgba(255,255,255,0.12)',
+                      paddingTop: '0.3rem',
+                    }}
+                  >
+                    Post-payday: ${formatMoney(availableCents)} + $
+                    {formatMoney(payAmountCents)} ={' '}
+                    <strong>
+                      ${formatMoney(availableCents + payAmountCents)}
+                    </strong>
+                  </div>
+                )}
+              </div>
+            }
           />
         </Col>
         <Col md={6} className="stretch-card">
