@@ -2836,6 +2836,40 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 
+/* ─── Section headers ─────────────────────────────────────────── */
+
+.notif-drawer__section:not(:first-child) .notif-drawer__section-header {
+  border-top: 1px solid var(--vantura-border);
+  margin-top: 4px;
+}
+
+.notif-drawer__section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 6px;
+}
+
+.notif-drawer__section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vantura-text-secondary);
+}
+
+.notif-drawer__section-count {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(126, 184, 216, 0.18);
+  color: var(--vantura-primary);
+  line-height: 1.4;
+}
+
+/* ─── Notification rows ───────────────────────────────────────── */
+
 .notif-drawer__item {
   display: flex;
   align-items: flex-start;
@@ -2940,6 +2974,55 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 50%;
   background: var(--vantura-primary);
   flex-shrink: 0;
+}
+
+/* ─── Notification scroll-to highlight ───────────────────────────────────── */
+
+@keyframes dashboard-scroll-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(126, 184, 216, 0.45);
+  }
+  40% {
+    box-shadow: 0 0 0 10px rgba(126, 184, 216, 0.15);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(126, 184, 216, 0);
+  }
+}
+
+.dashboard-scroll-highlight {
+  animation: dashboard-scroll-pulse 1.8s ease-out;
+  border-radius: 10px;
+}
+
+.notif-drawer__item-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--vantura-text-secondary);
+  font-size: 0.9rem;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.notif-drawer__item:hover .notif-drawer__item-dismiss,
+.notif-drawer__item:focus-within .notif-drawer__item-dismiss {
+  opacity: 1;
+}
+.notif-drawer__item-dismiss:hover {
+  color: var(--vantura-text);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .notif-drawer__empty {

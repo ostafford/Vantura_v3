@@ -218,6 +218,14 @@ export function markAllNotificationsRead(): void {
   schedulePersist()
 }
 
+/** Delete a single notification history entry by id. */
+export function dismissNotification(id: number): void {
+  const db = getDb()
+  if (!db) return
+  db.run(`DELETE FROM notification_history WHERE id = ?`, [id])
+  schedulePersist()
+}
+
 /** Delete all notification history entries. */
 export function clearAllNotifications(): void {
   const db = getDb()

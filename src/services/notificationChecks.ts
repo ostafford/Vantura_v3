@@ -52,7 +52,13 @@ function checkBillsDue(): void {
       tomorrow.length === 1
         ? 'Bill due tomorrow'
         : `${tomorrow.length} bills due tomorrow`
-    addNotificationToHistory('bills_due', title, names, '/', 'View Upcoming')
+    addNotificationToHistory(
+      'bills_due',
+      title,
+      names,
+      '/?scroll=upcoming',
+      'View Upcoming'
+    )
     showNotification(title, names)
   }
 
@@ -67,7 +73,13 @@ function checkBillsDue(): void {
       soon.length === 1
         ? 'Upcoming bill reminder'
         : `${soon.length} upcoming bills`
-    addNotificationToHistory('bills_due', title, names, '/', 'View Upcoming')
+    addNotificationToHistory(
+      'bills_due',
+      title,
+      names,
+      '/?scroll=upcoming',
+      'View Upcoming'
+    )
     showNotification(title, names)
   }
 }
@@ -109,8 +121,8 @@ function checkSpendableLow(): void {
     'spendable_low',
     'Spendable balance low',
     body,
-    '/',
-    'View Dashboard'
+    '/?scroll=spendable',
+    'View Spendable'
   )
   showNotification('Spendable balance low', body)
 }
@@ -387,8 +399,8 @@ function checkSaverMilestones(): void {
         'saver_milestone',
         `${saver.display_name}: ${milestoneLabel}`,
         body,
-        '/',
-        'View Dashboard'
+        `/analytics/savers/${saver.id}`,
+        'View Saver'
       )
       showNotification(`${saver.display_name}: ${milestoneLabel}`, body)
       break // only fire the highest new milestone per run

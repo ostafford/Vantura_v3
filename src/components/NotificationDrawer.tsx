@@ -6,6 +6,7 @@ import {
   getNotificationHistory,
   markNotificationsRead,
   clearAllNotifications,
+  dismissNotification,
   type NotificationHistoryItem,
 } from '@/lib/notifications'
 
@@ -59,16 +60,47 @@ function getMeta(type: string) {
   )
 }
 
+// ─── Sections config ──────────────────────────────────────────────────────────
+
+const SECTIONS = [
+  {
+    key: 'alerts',
+    label: 'Alerts',
+    types: new Set([
+      'bills_due',
+      'tracker_overspent',
+      'tracker_pace',
+      'spendable_low',
+    ]),
+  },
+  {
+    key: 'activity',
+    label: 'Activity',
+    types: new Set([
+      'payday',
+      'possible_payday',
+      'large_tx',
+      'saver_milestone',
+    ]),
+  },
+  {
+    key: 'system',
+    label: 'System',
+    types: new Set(['sync_stale', 'whats_new']),
+  },
+]
+
 // ─── Single notification row ──────────────────────────────────────────────────
 
 interface NotifRowProps {
   item: NotificationHistoryItem
   onRead: (id: number) => void
   onClick: (item: NotificationHistoryItem) => void
+  onDismiss: (id: number) => void
 }
 
-function NotifRow({ item, onRead, onClick }: NotifRowProps) {
-  const rowRef = useRef<HTMLButtonElement>(null)
+function NotifRow({ item, onRead, onClick, onDismiss }: NotifRowProps) {
+  const rowRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { icon, color } = getMeta(item.type)
   const isUnread = item.read_at === null
@@ -95,11 +127,15 @@ function NotifRow({ item, onRead, onClick }: NotifRowProps) {
   }, [isUnread, item.id, onRead])
 
   return (
-    <button
+    <div
       ref={rowRef}
-      type="button"
+      role="button"
+      tabIndex={0}
       className={`notif-drawer__item${isUnread ? ' notif-drawer__item--unread' : ''}`}
       onClick={() => onClick(item)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick(item)
+      }}
       aria-label={item.title}
     >
       <div className="notif-drawer__item-icon" style={{ color }} aria-hidden>
@@ -122,8 +158,38 @@ function NotifRow({ item, onRead, onClick }: NotifRowProps) {
           <span className="notif-drawer__item-link">{item.link_label} →</span>
         )}
       </div>
+      <button
+        type="button"
+        className="notif-drawer__item-dismiss"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDismiss(item.id)
+        }}
+        aria-label="Dismiss notification"
+      >
+        <i className="mdi mdi-close" aria-hidden />
+      </button>
       {isUnread && <div className="notif-drawer__item-dot" aria-hidden />}
-    </button>
+    </div>
+  )
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHeader({
+  label,
+  unreadCount,
+}: {
+  label: string
+  unreadCount: number
+}) {
+  return (
+    <div className="notif-drawer__section-header">
+      <span className="notif-drawer__section-label">{label}</span>
+      {unreadCount > 0 && (
+        <span className="notif-drawer__section-count">{unreadCount}</span>
+      )}
+    </div>
   )
 }
 
@@ -181,6 +247,15 @@ export function NotificationDrawer() {
     [refreshUnreadCount]
   )
 
+  const handleDismiss = useCallback(
+    (id: number) => {
+      dismissNotification(id)
+      setItems((prev) => prev.filter((i) => i.id !== id))
+      refreshUnreadCount()
+    },
+    [refreshUnreadCount]
+  )
+
   const handleItemClick = useCallback(
     (item: NotificationHistoryItem) => {
       closeDrawer()
@@ -198,6 +273,15 @@ export function NotificationDrawer() {
   }, [refreshUnreadCount])
 
   if (!drawerOpen) return null
+
+  const sections = SECTIONS.map((s) => ({
+    ...s,
+    items: items.filter((i) => s.types.has(i.type)),
+  })).filter((s) => s.items.length > 0)
+
+  // Items that don't belong to any defined section (future-proofing)
+  const categorisedIds = new Set(SECTIONS.flatMap((s) => [...s.types]))
+  const uncategorised = items.filter((i) => !categorisedIds.has(i.type))
 
   return (
     <>
@@ -245,14 +329,36 @@ export function NotificationDrawer() {
               <p>You&apos;re all caught up</p>
             </div>
           ) : (
-            items.map((item) => (
-              <NotifRow
-                key={item.id}
-                item={item}
-                onRead={handleRead}
-                onClick={handleItemClick}
-              />
-            ))
+            <>
+              {sections.map((section) => (
+                <div key={section.key} className="notif-drawer__section">
+                  <SectionHeader
+                    label={section.label}
+                    unreadCount={
+                      section.items.filter((i) => i.read_at === null).length
+                    }
+                  />
+                  {section.items.map((item) => (
+                    <NotifRow
+                      key={item.id}
+                      item={item}
+                      onRead={handleRead}
+                      onClick={handleItemClick}
+                      onDismiss={handleDismiss}
+                    />
+                  ))}
+                </div>
+              ))}
+              {uncategorised.map((item) => (
+                <NotifRow
+                  key={item.id}
+                  item={item}
+                  onRead={handleRead}
+                  onClick={handleItemClick}
+                  onDismiss={handleDismiss}
+                />
+              ))}
+            </>
           )}
         </div>
       </aside>

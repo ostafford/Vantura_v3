@@ -53,6 +53,11 @@ export function Dashboard() {
     getDashboardSectionOrder()
   )
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [bannerDismissedToday, setBannerDismissedToday] = useState(() => {
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return getAppSetting('dismissed_due_soon_date') === today
+  })
   const [showThresholdModal, setShowThresholdModal] = useState(false)
   const [thresholdDollars, setThresholdDollars] = useState('')
   const [thresholdPctPay, setThresholdPctPay] = useState('')
@@ -195,28 +200,45 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, dataVersion]
   )
+  const handleDismissBanner = useCallback(() => {
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    setAppSetting('dismissed_due_soon_date', today)
+    setBannerDismissedToday(true)
+  }, [])
+
   const dueSoonAlert = useMemo(() => {
-    const nextDue = dueSoon[0]
-    if (!nextDue) return null
-    const days = daysUntilCharge(nextDue.next_charge_date)
-    const dayText =
-      days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`
+    if (bannerDismissedToday || dueSoon.length === 0) return null
     return (
       <div
         className="alert alert-warning d-flex align-items-center gap-2 py-2 mb-4"
         role="alert"
       >
         <i className="mdi mdi-bell-ring flex-shrink-0" aria-hidden />
-        <span>
-          <strong>Due soon:</strong> {nextDue.name} ($
-          {formatMoney(nextDue.amount)}) — {dayText}
-          {dueSoon.length > 1 && (
-            <span className="text-muted ms-2">+{dueSoon.length - 1} more</span>
-          )}
+        <span className="flex-grow-1">
+          <strong>Due soon: </strong>
+          {dueSoon.map((c, i) => {
+            const days = daysUntilCharge(c.next_charge_date)
+            const dayText = days === 0 ? 'today' : `in ${days}d`
+            return (
+              <span key={c.id}>
+                {i > 0 && <span className="text-muted mx-2">·</span>}
+                {c.name} (${formatMoney(c.amount)}) — {dayText}
+              </span>
+            )
+          })}
         </span>
+        <button
+          type="button"
+          className="btn-close btn-close-white ms-2 flex-shrink-0"
+          style={{ fontSize: '0.65rem' }}
+          onClick={handleDismissBanner}
+          aria-label="Dismiss for today"
+          title="Dismiss for today"
+        />
       </div>
     )
-  }, [dueSoon])
+  }, [dueSoon, bannerDismissedToday, handleDismissBanner])
 
   const handleManualSync = useCallback(async () => {
     const token = sessionStore.getState().getToken()
@@ -311,6 +333,29 @@ export function Dashboard() {
   useEffect(() => {
     setSectionOrder(getDashboardSectionOrder())
   }, [dataVersion])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const scroll = params.get('scroll')
+    if (!scroll) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('scroll')
+    window.history.replaceState(null, '', url.toString())
+    const idMap: Record<string, string> = {
+      upcoming: 'dashboard-section-upcoming',
+      spendable: 'dashboard-spendable-card',
+    }
+    const elId = idMap[scroll]
+    if (!elId) return
+    const t = setTimeout(() => {
+      const el = document.getElementById(elId)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('dashboard-scroll-highlight')
+      setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
+    }, 150)
+    return () => clearTimeout(t)
+  }, [])
 
   const handleSectionDragStart = useCallback(
     (e: React.DragEvent, id: DashboardSectionId) => {
@@ -499,7 +544,7 @@ export function Dashboard() {
             }
           />
         </Col>
-        <Col md={6} className="stretch-card">
+        <Col id="dashboard-spendable-card" md={6} className="stretch-card">
           <div
             role="button"
             tabIndex={0}
