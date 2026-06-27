@@ -729,7 +729,7 @@ export const UPCOMING: UpcomingItem[] = [
       'Track loan or credit card payoff with a progress bar and projected payoff date',
     verdict: 'Extension',
     detail:
-      'Up Bank already fetches HOME_LOAN account data but nothing surfaces it in the UI. A new Analytics section (similar to Savers) would show current balance, interest rate, minimum repayment, and projected payoff date — plus how extra repayments change the outcome.',
+      'Up Bank HOME_LOAN accounts already appear in the Net Worth page as a liability line item. A dedicated Debt Tracker section (similar to Savers) would go further — payoff progress bar, minimum repayment tracking, projected payoff date, and a tool to model how extra repayments change the timeline.',
   },
   {
     icon: 'mdi-piggy-bank-outline',
