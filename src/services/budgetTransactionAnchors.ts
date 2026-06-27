@@ -15,6 +15,7 @@ export interface BucketAnchorItem {
 export interface AnchorDebitRow {
   id: string
   description: string
+  raw_text: string | null
   amount: number
   date: string
   category_id: string | null
@@ -147,7 +148,7 @@ export function searchRecentDebits(
   if (!db) return []
   const pattern = search.trim() ? `%${search.trim()}%` : '%'
   const stmt = db.prepare(
-    `SELECT id, description, ABS(amount), COALESCE(settled_at, created_at), category_id
+    `SELECT id, description, raw_text, ABS(amount), COALESCE(settled_at, created_at), category_id
      FROM transactions
      WHERE amount < 0
        AND transfer_account_id IS NULL
@@ -160,13 +161,21 @@ export function searchRecentDebits(
   stmt.bind([pattern, pattern, limit])
   const list: AnchorDebitRow[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [string, string, number, string, string | null]
+    const r = stmt.get() as [
+      string,
+      string,
+      string | null,
+      number,
+      string,
+      string | null,
+    ]
     list.push({
       id: r[0],
       description: r[1],
-      amount: r[2],
-      date: r[3],
-      category_id: r[4] ?? null,
+      raw_text: r[2] ?? null,
+      amount: r[3],
+      date: r[4],
+      category_id: r[5] ?? null,
     })
   }
   stmt.free()

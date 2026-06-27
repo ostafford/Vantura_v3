@@ -241,6 +241,10 @@ export function UpcomingSection({
   const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
     null
   )
+  const [matchRawText, setMatchRawText] = useState<string | null>(null)
+  const [matchDescription, setMatchDescription] = useState<string>('')
+  const [showSettlementPicker, setShowSettlementPicker] = useState(false)
+  const [settlementSearch, setSettlementSearch] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date()
     return { year: d.getFullYear(), month: d.getMonth() + 1 }
@@ -296,6 +300,10 @@ export function UpcomingSection({
     setTxSearch('')
     setMoreOptionsOpen(false)
     setImportedFromTx(null)
+    setMatchRawText(null)
+    setMatchDescription('')
+    setShowSettlementPicker(false)
+    setSettlementSearch('')
     setChargeType('EXPENSE')
     setLinkedManualAccountId(null)
     setShowModal(true)
@@ -316,6 +324,10 @@ export function UpcomingSection({
     const bucketId = getUpcomingBucketId(c.id)
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
+    setMatchRawText(c.match_raw_text ?? null)
+    setMatchDescription(c.match_raw_text ? c.name : '')
+    setShowSettlementPicker(false)
+    setSettlementSearch('')
     setChargeType(c.charge_type ?? 'EXPENSE')
     setLinkedManualAccountId(c.linked_manual_account_id ?? null)
     setMoreOptionsOpen(
@@ -360,7 +372,8 @@ export function UpcomingSection({
         false,
         cancelBy,
         chargeType,
-        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null
+        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
+        matchRawText
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
       toast.success('Upcoming charge updated.')
@@ -376,7 +389,8 @@ export function UpcomingSection({
         false,
         cancelBy,
         chargeType,
-        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null
+        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
+        matchRawText
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
       toast.success('Upcoming charge added.')
@@ -728,6 +742,10 @@ export function UpcomingSection({
                               calcNextChargeDate(tx.date, frequency)
                             )
                             setImportedFromTx(tx)
+                            if (tx.raw_text) {
+                              setMatchRawText(tx.raw_text)
+                              setMatchDescription(tx.description)
+                            }
                             setCreateStep('form')
                             setTxSearch('')
                           }}
@@ -741,6 +759,10 @@ export function UpcomingSection({
                                 calcNextChargeDate(tx.date, frequency)
                               )
                               setImportedFromTx(tx)
+                              if (tx.raw_text) {
+                                setMatchRawText(tx.raw_text)
+                                setMatchDescription(tx.description)
+                              }
                               setCreateStep('form')
                               setTxSearch('')
                             }
@@ -1095,6 +1117,137 @@ export function UpcomingSection({
                         </Form.Text>
                       </Form.Group>
                     )}
+
+                  {/* ── Settlement tracking ─────────────────────────────────── */}
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small">
+                      Settlement tracking
+                    </Form.Label>
+                    {matchRawText ? (
+                      <div
+                        className="d-flex align-items-center gap-2 px-2 py-2 rounded"
+                        style={{
+                          background: 'var(--bs-tertiary-bg)',
+                          border: '1px solid var(--bs-border-color)',
+                        }}
+                      >
+                        <i
+                          className="mdi mdi-link-variant flex-shrink-0"
+                          style={{ color: 'var(--vantura-success)' }}
+                          aria-hidden
+                        />
+                        <span
+                          className="small flex-grow-1 text-truncate"
+                          title={matchRawText}
+                        >
+                          {matchDescription || matchRawText}
+                        </span>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted flex-shrink-0"
+                          onClick={() => {
+                            setMatchRawText(null)
+                            setMatchDescription('')
+                            setShowSettlementPicker(false)
+                          }}
+                          aria-label="Remove settlement link"
+                        >
+                          <i className="mdi mdi-close" aria-hidden />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          onClick={() => setShowSettlementPicker((v) => !v)}
+                        >
+                          <i
+                            className="mdi mdi-link-variant me-1"
+                            aria-hidden
+                          />
+                          Link a transaction
+                        </Button>
+                        {showSettlementPicker && (
+                          <div className="mt-2">
+                            <Form.Control
+                              size="sm"
+                              type="text"
+                              placeholder="Search transactions…"
+                              value={settlementSearch}
+                              onChange={(e) =>
+                                setSettlementSearch(e.target.value)
+                              }
+                              autoFocus
+                              className="mb-1"
+                            />
+                            <div
+                              style={{
+                                maxHeight: 180,
+                                overflowY: 'auto',
+                                border: '1px solid var(--bs-border-color)',
+                                borderRadius: 6,
+                              }}
+                            >
+                              {searchRecentDebits(settlementSearch, 20).map(
+                                (tx) => (
+                                  <div
+                                    key={tx.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    className="d-flex justify-content-between align-items-center px-2 py-1"
+                                    style={{
+                                      cursor: 'pointer',
+                                      borderBottom:
+                                        '1px solid var(--bs-border-color)',
+                                      fontSize: '0.8rem',
+                                    }}
+                                    onClick={() => {
+                                      setMatchRawText(
+                                        tx.raw_text ?? tx.description
+                                      )
+                                      setMatchDescription(tx.description)
+                                      setShowSettlementPicker(false)
+                                      setSettlementSearch('')
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        setMatchRawText(
+                                          tx.raw_text ?? tx.description
+                                        )
+                                        setMatchDescription(tx.description)
+                                        setShowSettlementPicker(false)
+                                        setSettlementSearch('')
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background =
+                                        'var(--bs-tertiary-bg)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = ''
+                                    }}
+                                  >
+                                    <span className="text-truncate me-2">
+                                      {tx.description}
+                                    </span>
+                                    <span className="text-muted flex-shrink-0">
+                                      ${formatMoney(tx.amount)}
+                                    </span>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <Form.Text className="text-muted d-block mt-1">
+                      When linked, your bill notification stays pinned until
+                      this transaction settles.
+                    </Form.Text>
+                  </Form.Group>
                 </>
               )}
             </Form>
