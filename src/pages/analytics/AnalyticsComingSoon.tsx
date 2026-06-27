@@ -18,10 +18,7 @@ export function AnalyticsComingSoon() {
         <Col xs={12} md={6}>
           <Card className="h-100 border">
             <Card.Body className="d-flex align-items-start">
-              <span
-                className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                style={{ width: 36, height: 36, minWidth: 36 }}
-              >
+              <span className="page-title-icon">
                 <i
                   className="mdi mdi-chart-line"
                   style={{ fontSize: '1.25rem' }}
@@ -41,10 +38,7 @@ export function AnalyticsComingSoon() {
         <Col xs={12} md={6}>
           <Card className="h-100 border">
             <Card.Body className="d-flex align-items-start">
-              <span
-                className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                style={{ width: 36, height: 36, minWidth: 36 }}
-              >
+              <span className="page-title-icon">
                 <i
                   className="mdi mdi-chart-bar"
                   style={{ fontSize: '1.25rem' }}

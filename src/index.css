@@ -877,12 +877,13 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin-bottom: 0;
 }
 .page-title-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   width: 36px;
   height: 36px;
   border-radius: 4px;
-  text-align: center;
-  line-height: 36px;
   background: var(--vantura-primary);
   color: var(--vantura-text-on-pastel);
   margin-right: 0.5rem;

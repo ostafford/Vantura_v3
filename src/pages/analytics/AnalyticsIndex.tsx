@@ -15,10 +15,7 @@ export function AnalyticsIndex() {
           >
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
+                <span className="page-title-icon">
                   <i
                     className="mdi mdi-chart-line"
                     style={{ fontSize: '1.25rem' }}
@@ -51,10 +48,7 @@ export function AnalyticsIndex() {
           >
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
+                <span className="page-title-icon">
                   <i
                     className="mdi mdi-file-chart"
                     style={{ fontSize: '1.25rem' }}
@@ -87,10 +81,7 @@ export function AnalyticsIndex() {
           >
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
+                <span className="page-title-icon">
                   <i
                     className="mdi mdi-piggy-bank"
                     style={{ fontSize: '1.25rem' }}
@@ -123,10 +114,7 @@ export function AnalyticsIndex() {
           >
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
+                <span className="page-title-icon">
                   <i
                     className="mdi mdi-wallet-outline"
                     style={{ fontSize: '1.25rem' }}
@@ -159,10 +147,7 @@ export function AnalyticsIndex() {
           >
             <Card className="h-100">
               <Card.Body className="d-flex align-items-start">
-                <span
-                  className="page-title-icon rounded d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0"
-                  style={{ width: 36, height: 36, minWidth: 36 }}
-                >
+                <span className="page-title-icon">
                   <i
                     className="mdi mdi-chart-timeline-variant"
                     style={{ fontSize: '1.25rem' }}
