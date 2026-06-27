@@ -234,6 +234,14 @@ export function clearAllNotifications(): void {
   schedulePersist()
 }
 
+/** Delete all notification history entries except sticky bills_due items. */
+export function clearNonStickyNotifications(): void {
+  const db = getDb()
+  if (!db) return
+  db.run(`DELETE FROM notification_history WHERE type != 'bills_due'`)
+  schedulePersist()
+}
+
 /** Delete entries older than HISTORY_RETENTION_DAYS. Called after every insert. */
 export function pruneOldNotifications(): void {
   const db = getDb()

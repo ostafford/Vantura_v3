@@ -2995,6 +2995,29 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 10px;
 }
 
+.notif-drawer__item--bills {
+  border-left: 3px solid var(--vantura-warning);
+  padding-left: 13px;
+}
+
+.notif-drawer__bills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 3px 0 5px;
+}
+
+.notif-drawer__bills-row {
+  font-size: 0.75rem;
+  color: var(--vantura-text-secondary);
+  line-height: 1.35;
+}
+
+.notif-drawer__bills-row::before {
+  content: '· ';
+  opacity: 0.45;
+}
+
 .notif-drawer__item-dismiss {
   flex-shrink: 0;
   background: none;

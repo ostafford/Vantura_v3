@@ -16,7 +16,11 @@ import {
   markCheckedToday,
 } from '@/lib/notifications'
 import { getSpendableBalance } from '@/services/balance'
-import { getDueSoonCharges, daysUntilCharge } from '@/services/upcoming'
+import {
+  getDueSoonCharges,
+  daysUntilCharge,
+  type UpcomingChargeRow,
+} from '@/services/upcoming'
 import { getTrackersWithProgress } from '@/services/trackers'
 import { getAccountsByTypes } from '@/services/accounts'
 
@@ -102,49 +106,25 @@ function checkBillsDue(): void {
 
   markCheckedToday('notif_last_bills_date')
 
-  // Separate tomorrow-due from general window
-  const tomorrow = charges.filter(
-    (c) => daysUntilCharge(c.next_charge_date) <= 1
-  )
-  const soon = charges.filter((c) => daysUntilCharge(c.next_charge_date) > 1)
-
-  if (tomorrow.length > 0) {
-    const names = tomorrow
-      .map((c) => `${c.name} ($${formatMoney(c.amount)})`)
-      .join(', ')
+  for (const c of charges) {
+    const days = daysUntilCharge(c.next_charge_date)
+    const dayText =
+      days <= 0 ? 'due today' : days === 1 ? 'due tomorrow' : `due in ${days}d`
     const title =
-      tomorrow.length === 1
-        ? 'Bill due tomorrow'
-        : `${tomorrow.length} bills due tomorrow`
+      days <= 0
+        ? 'Bill due today'
+        : days === 1
+          ? 'Bill due tomorrow'
+          : 'Upcoming bill reminder'
+    const body = `${c.name} ($${formatMoney(c.amount)}) — ${dayText}`
     addNotificationToHistory(
       'bills_due',
       title,
-      names,
+      body,
       '/?scroll=upcoming',
       'View Upcoming'
     )
-    showNotification(title, names)
-  }
-
-  if (soon.length > 0) {
-    const names = soon
-      .map((c) => {
-        const days = daysUntilCharge(c.next_charge_date)
-        return `${c.name} ($${formatMoney(c.amount)}) in ${days}d`
-      })
-      .join(', ')
-    const title =
-      soon.length === 1
-        ? 'Upcoming bill reminder'
-        : `${soon.length} upcoming bills`
-    addNotificationToHistory(
-      'bills_due',
-      title,
-      names,
-      '/?scroll=upcoming',
-      'View Upcoming'
-    )
-    showNotification(title, names)
+    showNotification(title, body)
   }
 }
 
@@ -574,6 +554,57 @@ function checkPossiblePayday(): void {
     'Set up payday'
   )
   showNotification('Possible payday detected', body)
+}
+
+// ─── On-demand: ensure bills_due sidebar entries exist ───────────────────────
+
+/**
+ * Guarantee a bills_due notification exists in history for each supplied charge.
+ * Called when the user dismisses the dashboard banner so the charges remain
+ * visible in the sidebar even though the banner is hidden for the day.
+ *
+ * Deduplicates: skips any charge whose name already appears in a bills_due
+ * entry created today (whether by this function or by checkBillsDue earlier).
+ */
+export function ensureBillsDueNotifications(
+  charges: UpcomingChargeRow[]
+): void {
+  const db = getDb()
+  if (!db) return
+  if (charges.length === 0) return
+
+  const today = todayDateString()
+
+  for (const c of charges) {
+    const escapedName = c.name.replace(/%/g, '\\%').replace(/_/g, '\\_')
+    const existing = db.exec(
+      `SELECT 1 FROM notification_history
+       WHERE type = 'bills_due'
+         AND body LIKE ? ESCAPE '\\'
+         AND substr(created_at, 1, 10) = ?
+       LIMIT 1`,
+      [`%${escapedName}%`, today]
+    )
+    if (existing[0]?.values?.length) continue
+
+    const days = daysUntilCharge(c.next_charge_date)
+    const dayText =
+      days <= 0 ? 'due today' : days === 1 ? 'due tomorrow' : `due in ${days}d`
+    const title =
+      days <= 0
+        ? 'Bill due today'
+        : days === 1
+          ? 'Bill due tomorrow'
+          : 'Upcoming bill reminder'
+    const body = `${c.name} ($${formatMoney(c.amount)}) — ${dayText}`
+    addNotificationToHistory(
+      'bills_due',
+      title,
+      body,
+      '/?scroll=upcoming',
+      'View Upcoming'
+    )
+  }
 }
 
 // ─── Main entry point ─────────────────────────────────────────────────────────

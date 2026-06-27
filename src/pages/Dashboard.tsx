@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { Row, Col, Modal, Button, Form } from 'react-bootstrap'
+import { useLocation } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
   getAvailableBalance,
@@ -30,7 +31,10 @@ import {
   type DashboardSectionId,
 } from '@/lib/dashboardSections'
 import { daysUntilCharge, getDueSoonCharges } from '@/services/upcoming'
-import { runNotificationChecks } from '@/services/notificationChecks'
+import {
+  runNotificationChecks,
+  ensureBillsDueNotifications,
+} from '@/services/notificationChecks'
 import { notificationStore } from '@/stores/notificationStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { toast } from '@/stores/toastStore'
@@ -46,6 +50,7 @@ const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
 }
 
 export function Dashboard() {
+  const location = useLocation()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const isSyncing = useStore(syncStore, (s) => s.syncing)
   const [dataVersion, setDataVersion] = useState(0)
@@ -205,7 +210,9 @@ export function Dashboard() {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     setAppSetting('dismissed_due_soon_date', today)
     setBannerDismissedToday(true)
-  }, [])
+    ensureBillsDueNotifications(dueSoon)
+    notificationStore.getState().refreshUnreadCount()
+  }, [dueSoon])
 
   const dueSoonAlert = useMemo(() => {
     if (bannerDismissedToday || dueSoon.length === 0) return null
@@ -327,6 +334,7 @@ export function Dashboard() {
 
   useEffect(() => {
     runNotificationChecks()
+    ensureBillsDueNotifications(getDueSoonCharges())
     notificationStore.getState().refreshUnreadCount()
   }, [])
 
@@ -335,7 +343,7 @@ export function Dashboard() {
   }, [dataVersion])
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(location.search)
     const scroll = params.get('scroll')
     if (!scroll) return
     const url = new URL(window.location.href)
@@ -355,7 +363,7 @@ export function Dashboard() {
       setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
     }, 150)
     return () => clearTimeout(t)
-  }, [])
+  }, [location.search])
 
   const handleSectionDragStart = useCallback(
     (e: React.DragEvent, id: DashboardSectionId) => {

@@ -5,7 +5,7 @@ import { notificationStore } from '@/stores/notificationStore'
 import {
   getNotificationHistory,
   markNotificationsRead,
-  clearAllNotifications,
+  clearNonStickyNotifications,
   dismissNotification,
   type NotificationHistoryItem,
 } from '@/lib/notifications'
@@ -97,9 +97,16 @@ interface NotifRowProps {
   onRead: (id: number) => void
   onClick: (item: NotificationHistoryItem) => void
   onDismiss: (id: number) => void
+  canDismiss: boolean
 }
 
-function NotifRow({ item, onRead, onClick, onDismiss }: NotifRowProps) {
+function NotifRow({
+  item,
+  onRead,
+  onClick,
+  onDismiss,
+  canDismiss,
+}: NotifRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { icon, color } = getMeta(item.type)
@@ -158,18 +165,138 @@ function NotifRow({ item, onRead, onClick, onDismiss }: NotifRowProps) {
           <span className="notif-drawer__item-link">{item.link_label} →</span>
         )}
       </div>
-      <button
-        type="button"
-        className="notif-drawer__item-dismiss"
-        onClick={(e) => {
-          e.stopPropagation()
-          onDismiss(item.id)
-        }}
-        aria-label="Dismiss notification"
-      >
-        <i className="mdi mdi-close" aria-hidden />
-      </button>
+      {canDismiss && (
+        <button
+          type="button"
+          className="notif-drawer__item-dismiss"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDismiss(item.id)
+          }}
+          aria-label="Dismiss notification"
+        >
+          <i className="mdi mdi-close" aria-hidden />
+        </button>
+      )}
       {isUnread && <div className="notif-drawer__item-dot" aria-hidden />}
+    </div>
+  )
+}
+
+// ─── Bills-due helpers ────────────────────────────────────────────────────────
+
+function parseBillBody(body: string): {
+  info: string
+  dayLabel: string | null
+} {
+  const idx = body.indexOf(' — ')
+  if (idx === -1) return { info: body, dayLabel: null }
+  return { info: body.slice(0, idx), dayLabel: body.slice(idx + 3) }
+}
+
+function dayLabelColor(label: string): string {
+  if (label === 'due today') return 'var(--vantura-danger)'
+  if (label === 'due tomorrow') return 'var(--vantura-warning)'
+  return 'var(--vantura-text-secondary)'
+}
+
+function urgencyOrder(body: string): number {
+  const { dayLabel } = parseBillBody(body)
+  if (!dayLabel) return 999
+  if (dayLabel === 'due today') return 0
+  if (dayLabel === 'due tomorrow') return 1
+  const match = dayLabel.match(/due in (\d+)d/)
+  return match ? parseInt(match[1], 10) : 999
+}
+
+// ─── Grouped bills-due card ───────────────────────────────────────────────────
+
+function BillsDueGroup({
+  items,
+  onRead,
+  onClick,
+}: {
+  items: NotificationHistoryItem[]
+  onRead: (ids: number[]) => void
+  onClick: (item: NotificationHistoryItem) => void
+}) {
+  const groupRef = useRef<HTMLDivElement>(null)
+  const itemsRef = useRef(items)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  itemsRef.current = items
+  const { icon, color } = getMeta('bills_due')
+  const sorted = [...items].sort(
+    (a, b) => urgencyOrder(a.body) - urgencyOrder(b.body)
+  )
+  const latest = items[0]
+  const hasUnread = items.some((i) => i.read_at === null)
+
+  useEffect(() => {
+    if (!hasUnread) return
+    const el = groupRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          const ids = itemsRef.current
+            .filter((i) => i.read_at === null)
+            .map((i) => i.id)
+          timerRef.current = setTimeout(() => onRead(ids), 400)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.8 }
+    )
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [hasUnread, onRead])
+
+  return (
+    <div
+      ref={groupRef}
+      role="button"
+      tabIndex={0}
+      className={`notif-drawer__item notif-drawer__item--bills${hasUnread ? ' notif-drawer__item--unread' : ''}`}
+      onClick={() => onClick(latest)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick(latest)
+      }}
+      aria-label="Bills due soon"
+    >
+      <div className="notif-drawer__item-icon" style={{ color }} aria-hidden>
+        <i className={`mdi ${icon}`} />
+      </div>
+      <div className="notif-drawer__item-content">
+        <div className="notif-drawer__item-header">
+          <span className="notif-drawer__item-title">Bills due soon</span>
+          <span className="notif-drawer__item-time">
+            {relativeTime(latest.created_at)}
+          </span>
+        </div>
+        <div className="notif-drawer__bills-list">
+          {sorted.map((item) => {
+            const { info, dayLabel } = parseBillBody(item.body)
+            return (
+              <span key={item.id} className="notif-drawer__bills-row">
+                {info}
+                {dayLabel && (
+                  <>
+                    {' — '}
+                    <span style={{ color: dayLabelColor(dayLabel) }}>
+                      {dayLabel}
+                    </span>
+                  </>
+                )}
+              </span>
+            )
+          })}
+        </div>
+        <span className="notif-drawer__item-link">View Upcoming →</span>
+      </div>
+      {hasUnread && <div className="notif-drawer__item-dot" aria-hidden />}
     </div>
   )
 }
@@ -247,6 +374,18 @@ export function NotificationDrawer() {
     [refreshUnreadCount]
   )
 
+  const handleReadMany = useCallback(
+    (ids: number[]) => {
+      markNotificationsRead(ids)
+      const now = new Date().toISOString()
+      setItems((prev) =>
+        prev.map((i) => (ids.includes(i.id) ? { ...i, read_at: now } : i))
+      )
+      refreshUnreadCount()
+    },
+    [refreshUnreadCount]
+  )
+
   const handleDismiss = useCallback(
     (id: number) => {
       dismissNotification(id)
@@ -267,8 +406,8 @@ export function NotificationDrawer() {
   )
 
   const handleClearAll = useCallback(() => {
-    clearAllNotifications()
-    setItems([])
+    clearNonStickyNotifications()
+    setItems((prev) => prev.filter((i) => i.type === 'bills_due'))
     refreshUnreadCount()
   }, [refreshUnreadCount])
 
@@ -299,7 +438,7 @@ export function NotificationDrawer() {
         <div className="notif-drawer__header">
           <span className="notif-drawer__title">Notifications</span>
           <div className="notif-drawer__header-actions">
-            {items.length > 0 && (
+            {items.some((i) => i.type !== 'bills_due') && (
               <button
                 type="button"
                 className="notif-drawer__clear"
@@ -330,25 +469,41 @@ export function NotificationDrawer() {
             </div>
           ) : (
             <>
-              {sections.map((section) => (
-                <div key={section.key} className="notif-drawer__section">
-                  <SectionHeader
-                    label={section.label}
-                    unreadCount={
-                      section.items.filter((i) => i.read_at === null).length
-                    }
-                  />
-                  {section.items.map((item) => (
-                    <NotifRow
-                      key={item.id}
-                      item={item}
-                      onRead={handleRead}
-                      onClick={handleItemClick}
-                      onDismiss={handleDismiss}
+              {sections.map((section) => {
+                const billsItems = section.items.filter(
+                  (i) => i.type === 'bills_due'
+                )
+                const otherItems = section.items.filter(
+                  (i) => i.type !== 'bills_due'
+                )
+                return (
+                  <div key={section.key} className="notif-drawer__section">
+                    <SectionHeader
+                      label={section.label}
+                      unreadCount={
+                        section.items.filter((i) => i.read_at === null).length
+                      }
                     />
-                  ))}
-                </div>
-              ))}
+                    {billsItems.length > 0 && (
+                      <BillsDueGroup
+                        items={billsItems}
+                        onRead={handleReadMany}
+                        onClick={handleItemClick}
+                      />
+                    )}
+                    {otherItems.map((item) => (
+                      <NotifRow
+                        key={item.id}
+                        item={item}
+                        onRead={handleRead}
+                        onClick={handleItemClick}
+                        onDismiss={handleDismiss}
+                        canDismiss={true}
+                      />
+                    ))}
+                  </div>
+                )
+              })}
               {uncategorised.map((item) => (
                 <NotifRow
                   key={item.id}
@@ -356,6 +511,7 @@ export function NotificationDrawer() {
                   onRead={handleRead}
                   onClick={handleItemClick}
                   onDismiss={handleDismiss}
+                  canDismiss={item.type !== 'bills_due'}
                 />
               ))}
             </>
