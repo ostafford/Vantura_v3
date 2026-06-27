@@ -25,6 +25,36 @@ export interface UpcomingItem {
 export const MILESTONES: Milestone[] = [
   {
     date: '27 Jun 2026',
+    heading: 'Light Mode & Colour System',
+    icon: 'mdi-palette-outline',
+    primaryMonth: '2026-06',
+    version: '0.8.0',
+    color: '#f48fb1',
+    items: [
+      {
+        icon: 'mdi-white-balance-sunny',
+        text: 'Light / Dark / System theme — choose between light mode, dark mode, or let your device switch automatically. System mode follows your OS in real time — dark at night to reduce eye strain, light during the day.',
+      },
+      {
+        icon: 'mdi-palette-swatch-outline',
+        text: 'Vibrant colour palette — all 6 accent swatches updated to richer Material Design 300-level values. Every colour now pops consistently across charts, badges, and trackers.',
+      },
+      {
+        icon: 'mdi-water-outline',
+        text: 'Sky locked as the single app accent — one consistent #90caf9 Sky blue across every button, icon, and highlight. Nothing looks out of place depending on which colour you had selected.',
+      },
+      {
+        icon: 'mdi-view-grid-outline',
+        text: 'Page icons unified — all 19 section header icons now share one solid Sky style. Previously 17 were overriding individually with a dark navy gradient, causing visible inconsistency between pages.',
+      },
+      {
+        icon: 'mdi-text-recognition',
+        text: 'Logo simplified — the Vantura cipher monogram and wordmark now use a single solid Sky colour in both light and dark mode, with no gradient and no store dependency.',
+      },
+    ],
+  },
+  {
+    date: '27 Jun 2026',
     heading: 'Spendable Fix',
     icon: 'mdi-calculator-variant-outline',
     primaryMonth: '2026-06',
