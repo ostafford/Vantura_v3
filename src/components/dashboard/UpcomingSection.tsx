@@ -325,7 +325,7 @@ export function UpcomingSection({
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
     setMatchRawText(c.match_raw_text ?? null)
-    setMatchDescription(c.match_raw_text ? c.name : '')
+    setMatchDescription('')
     setShowSettlementPicker(false)
     setSettlementSearch('')
     setChargeType(c.charge_type ?? 'EXPENSE')
@@ -1190,8 +1190,21 @@ export function UpcomingSection({
                                 borderRadius: 6,
                               }}
                             >
-                              {searchRecentDebits(settlementSearch, 20).map(
-                                (tx) => (
+                              {(() => {
+                                const trackable = searchRecentDebits(
+                                  settlementSearch,
+                                  20
+                                ).filter((tx) => tx.raw_text != null)
+                                if (trackable.length === 0) {
+                                  return (
+                                    <p className="text-muted small text-center py-2 mb-0 px-2">
+                                      No trackable transactions found. Only
+                                      transactions with a bank fingerprint can
+                                      be linked.
+                                    </p>
+                                  )
+                                }
+                                return trackable.map((tx) => (
                                   <div
                                     key={tx.id}
                                     role="button"
@@ -1204,18 +1217,14 @@ export function UpcomingSection({
                                       fontSize: '0.8rem',
                                     }}
                                     onClick={() => {
-                                      setMatchRawText(
-                                        tx.raw_text ?? tx.description
-                                      )
+                                      setMatchRawText(tx.raw_text!)
                                       setMatchDescription(tx.description)
                                       setShowSettlementPicker(false)
                                       setSettlementSearch('')
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        setMatchRawText(
-                                          tx.raw_text ?? tx.description
-                                        )
+                                        setMatchRawText(tx.raw_text!)
                                         setMatchDescription(tx.description)
                                         setShowSettlementPicker(false)
                                         setSettlementSearch('')
@@ -1236,8 +1245,8 @@ export function UpcomingSection({
                                       ${formatMoney(tx.amount)}
                                     </span>
                                   </div>
-                                )
-                              )}
+                                ))
+                              })()}
                             </div>
                           </div>
                         )}

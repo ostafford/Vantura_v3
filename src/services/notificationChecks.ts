@@ -43,21 +43,26 @@ function checkBillsSettled(): void {
   const db = getDb()
   if (!db) return
 
-  const stmt = db.prepare(
-    `SELECT id, name, next_charge_date, match_raw_text
-     FROM upcoming_charges
-     WHERE match_raw_text IS NOT NULL AND match_raw_text != ''`
+  // getDueSoonCharges() already applies firstOccurrenceOnOrAfter, so
+  // next_charge_date on each item is the real upcoming occurrence date —
+  // not the potentially stale stored value in the DB.
+  const dueSoon = getDueSoonCharges().filter(
+    (c) => c.match_raw_text != null && c.match_raw_text !== ''
   )
 
-  while (stmt.step()) {
-    const row = stmt.get() as [number, string, string, string]
-    const [chargeId, chargeName, nextChargeDate, matchRawText] = row
+  for (const charge of dueSoon) {
+    const {
+      id: chargeId,
+      name: chargeName,
+      next_charge_date: nextChargeDate,
+      match_raw_text: matchRawText,
+    } = charge
 
-    // Per-cycle guard — skip if we already auto-cleared for this charge date
+    // Per-cycle guard keyed on projected date — advances each month automatically
     const guardKey = `notif_bill_settled_${chargeId}_${nextChargeDate}`
     if (getAppSetting(guardKey)) continue
 
-    // Accept payment up to 5 days before the nominal charge date (early payments)
+    // Accept payment up to 5 days before the projected charge date (early payments)
     const windowStart = new Date(nextChargeDate.slice(0, 10) + 'T12:00:00Z')
     windowStart.setUTCDate(windowStart.getUTCDate() - 5)
     const windowStartStr = windowStart.toISOString().slice(0, 10)
@@ -84,7 +89,6 @@ function checkBillsSettled(): void {
     schedulePersist()
     setAppSetting(guardKey, '1')
   }
-  stmt.free()
 }
 
 // ─── 1. Bills due soon ───────────────────────────────────────────────────────
