@@ -75,3 +75,87 @@ export const DASHBOARD_SECTION_LABELS: Record<DashboardSectionId, string> = {
   upcoming: 'Upcoming transactions',
   net_worth: 'Net Worth',
 }
+
+// --- Section sizing ---
+
+export type DashboardSectionSize = 'small' | 'medium' | 'large'
+
+export const DASHBOARD_SECTION_SIZES_KEY = 'dashboard_section_sizes'
+
+export const DEFAULT_SECTION_SIZES: Record<
+  DashboardSectionId,
+  DashboardSectionSize
+> = {
+  month_summary: 'large',
+  insights: 'large',
+  trackers: 'medium',
+  upcoming: 'small',
+  net_worth: 'small',
+}
+
+export function getDashboardSectionSizes(): Record<
+  DashboardSectionId,
+  DashboardSectionSize
+> {
+  try {
+    const raw = getAppSetting(DASHBOARD_SECTION_SIZES_KEY)
+    if (!raw) return { ...DEFAULT_SECTION_SIZES }
+    const parsed = JSON.parse(raw) as unknown
+    if (typeof parsed !== 'object' || parsed === null)
+      return { ...DEFAULT_SECTION_SIZES }
+    const result = { ...DEFAULT_SECTION_SIZES }
+    for (const id of DASHBOARD_SECTION_IDS) {
+      const val = (parsed as Record<string, unknown>)[id]
+      if (val === 'small' || val === 'medium' || val === 'large')
+        result[id] = val
+    }
+    return result
+  } catch {
+    return { ...DEFAULT_SECTION_SIZES }
+  }
+}
+
+export function setDashboardSectionSizes(
+  sizes: Record<DashboardSectionId, DashboardSectionSize>
+): void {
+  setAppSetting(DASHBOARD_SECTION_SIZES_KEY, JSON.stringify(sizes))
+}
+
+// --- Section visibility ---
+
+export const DASHBOARD_SECTION_VISIBILITY_KEY = 'dashboard_section_visibility'
+
+export const DEFAULT_SECTION_VISIBILITY: Record<DashboardSectionId, boolean> = {
+  month_summary: true,
+  insights: true,
+  trackers: true,
+  upcoming: true,
+  net_worth: true,
+}
+
+export function getDashboardSectionVisibility(): Record<
+  DashboardSectionId,
+  boolean
+> {
+  try {
+    const raw = getAppSetting(DASHBOARD_SECTION_VISIBILITY_KEY)
+    if (!raw) return { ...DEFAULT_SECTION_VISIBILITY }
+    const parsed = JSON.parse(raw) as unknown
+    if (typeof parsed !== 'object' || parsed === null)
+      return { ...DEFAULT_SECTION_VISIBILITY }
+    const result = { ...DEFAULT_SECTION_VISIBILITY }
+    for (const id of DASHBOARD_SECTION_IDS) {
+      const val = (parsed as Record<string, unknown>)[id]
+      if (typeof val === 'boolean') result[id] = val
+    }
+    return result
+  } catch {
+    return { ...DEFAULT_SECTION_VISIBILITY }
+  }
+}
+
+export function setDashboardSectionVisibility(
+  visibility: Record<DashboardSectionId, boolean>
+): void {
+  setAppSetting(DASHBOARD_SECTION_VISIBILITY_KEY, JSON.stringify(visibility))
+}

@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useStore } from 'zustand'
 import { sessionStore } from '@/stores/sessionStore'
 import { uiStore } from '@/stores/uiStore'
+import { sidebarPinsStore } from '@/stores/sidebarPinsStore'
 import { getAppSetting } from '@/db'
 import { VanturaLogo } from '@/components/VanturaLogo'
 
@@ -42,6 +44,7 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation()
   const isDemoMode = getAppSetting('demo_mode') === '1'
+  const pins = useStore(sidebarPinsStore, (s) => s.pins)
 
   const width = overlay
     ? SIDEBAR_WIDTH
@@ -151,6 +154,46 @@ export function Sidebar({
             </li>
           ))}
         </ul>
+
+        {pins.length > 0 && (
+          <ul className="nav" style={{ marginTop: '0.5rem' }}>
+            {showLabels && (
+              <li className="nav-item">
+                <span
+                  className="menu-title"
+                  style={{
+                    opacity: 0.45,
+                    fontSize: '0.7rem',
+                    letterSpacing: '0.08em',
+                    paddingLeft: '1rem',
+                    paddingTop: '0.5rem',
+                    display: 'block',
+                  }}
+                >
+                  FAVOURITES
+                </span>
+              </li>
+            )}
+            {pins.map((item) => (
+              <li
+                key={item.path}
+                className={`nav-item${isActive(item.path) ? ' active' : ''}`}
+              >
+                <Link
+                  className="nav-link"
+                  to={item.path}
+                  aria-label={!showLabels ? item.label : undefined}
+                  style={{ color: 'inherit' }}
+                >
+                  <i className={`mdi ${item.icon} menu-icon`} aria-hidden />
+                  {showLabels && (
+                    <span className="menu-title">{item.label}</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="sidebar-footer">
           {UTILITY_NAV.map((item) => (

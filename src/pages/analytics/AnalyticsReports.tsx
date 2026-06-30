@@ -32,6 +32,10 @@ import {
 } from '@/lib/chartColors'
 import { useStore } from 'zustand'
 import { syncStore } from '@/stores/syncStore'
+import {
+  sidebarPinsStore,
+  PINNABLE_ANALYTICS_PAGES,
+} from '@/stores/sidebarPinsStore'
 import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
 import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
@@ -371,6 +375,14 @@ export function AnalyticsReports() {
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() + 1
 
+  const pins = useStore(sidebarPinsStore, (s) => s.pins)
+  const reportsPinnablePage = PINNABLE_ANALYTICS_PAGES.find(
+    (p) => p.path === '/analytics/reports'
+  )
+  const isReportsPinned =
+    reportsPinnablePage != null &&
+    pins.some((p) => p.path === reportsPinnablePage.path)
+
   // --- Period state ---
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState(currentMonth)
@@ -643,13 +655,35 @@ export function AnalyticsReports() {
             </span>
             Reports
           </h3>
-          <PageBreadcrumb
-            items={[
-              { label: 'Dashboard', to: '/' },
-              { label: 'Analytics', to: '/analytics' },
-              { label: 'Reports' },
-            ]}
-          />
+          <div className="d-flex align-items-center gap-2">
+            {reportsPinnablePage && (
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() =>
+                  sidebarPinsStore.getState().toggle(reportsPinnablePage)
+                }
+                aria-label={
+                  isReportsPinned ? 'Unpin from sidebar' : 'Pin to sidebar'
+                }
+                title={
+                  isReportsPinned ? 'Unpin from sidebar' : 'Pin to sidebar'
+                }
+              >
+                <i
+                  className={`mdi ${isReportsPinned ? 'mdi-pin' : 'mdi-pin-outline'}`}
+                  aria-hidden
+                />
+              </button>
+            )}
+            <PageBreadcrumb
+              items={[
+                { label: 'Dashboard', to: '/' },
+                { label: 'Analytics', to: '/analytics' },
+                { label: 'Reports' },
+              ]}
+            />
+          </div>
         </div>
         <div className="d-flex flex-wrap align-items-center gap-3 justify-content-center">
           {!isCustomRange ? (

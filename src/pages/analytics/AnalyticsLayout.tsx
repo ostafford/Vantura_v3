@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Outlet, useMatches } from 'react-router-dom'
+import { Outlet, useMatches, useLocation } from 'react-router-dom'
+import { useStore } from 'zustand'
 import {
   PageBreadcrumb,
   type PageBreadcrumbItem,
@@ -7,6 +8,10 @@ import {
 import type { AppRouteHandle } from '@/types/appRouteHandle'
 import { getTracker } from '@/services/trackers'
 import { getBucket } from '@/services/budgetBuckets'
+import {
+  sidebarPinsStore,
+  PINNABLE_ANALYTICS_PAGES,
+} from '@/stores/sidebarPinsStore'
 
 function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
   const items: PageBreadcrumbItem[] = [{ label: 'Dashboard', to: '/' }]
@@ -96,6 +101,9 @@ function resolveAnalyticsPageTitle(matches: ReturnType<typeof useMatches>) {
 
 export function AnalyticsLayout() {
   const matches = useMatches()
+  const location = useLocation()
+  const pins = useStore(sidebarPinsStore, (s) => s.pins)
+
   const breadcrumbItems = useMemo(
     () => buildAnalyticsBreadcrumbItems(matches),
     [matches]
@@ -109,6 +117,12 @@ export function AnalyticsLayout() {
     (m) => (m.handle as AppRouteHandle | undefined)?.noLayoutHeader === true
   )
 
+  const pinnablePage = PINNABLE_ANALYTICS_PAGES.find(
+    (p) => p.path === location.pathname
+  )
+  const isPinned =
+    pinnablePage != null && pins.some((p) => p.path === pinnablePage.path)
+
   return (
     <div>
       {!suppressHeader && (
@@ -120,7 +134,27 @@ export function AnalyticsLayout() {
               </span>
               {pageTitle}
             </h3>
-            <PageBreadcrumb items={breadcrumbItems} />
+            <div className="d-flex align-items-center gap-2">
+              {pinnablePage && (
+                <button
+                  type="button"
+                  className="btn-icon"
+                  onClick={() =>
+                    sidebarPinsStore.getState().toggle(pinnablePage)
+                  }
+                  aria-label={
+                    isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'
+                  }
+                  title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+                >
+                  <i
+                    className={`mdi ${isPinned ? 'mdi-pin' : 'mdi-pin-outline'}`}
+                    aria-hidden
+                  />
+                </button>
+              )}
+              <PageBreadcrumb items={breadcrumbItems} />
+            </div>
           </div>
         </div>
       )}

@@ -350,7 +350,7 @@
   box-sizing: border-box;
 }
 
-/* Phase 5: Viewport targets 13"-27" (~1280px–2560px). Layout max-width 1400px in Layout.tsx. */
+/* Phase 5: Viewport targets 13"-27" (~1280px–2560px). Full-width layout, no max-width cap. */
 body {
   margin: 0;
   min-height: 100dvh;
@@ -405,9 +405,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 1.25rem 2.25rem 2.75rem;
   width: 100%;
   flex-grow: 1;
-  max-width: 1400px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* Phase 8: Purple React card overrides */
@@ -727,8 +724,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .dashboard-grid {
   --dashboard-gap: 1.5rem;
   display: grid;
-  /* Auto-reflow to 1 column before content gets clipped on resize */
-  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
+  /* 3-col on desktop (sidebar collapsed), 2-col when sidebar expanded, 1-col on mobile */
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   gap: var(--dashboard-gap);
 }
 .dashboard-grid-cell {
@@ -760,9 +757,20 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .dashboard-title {
   font-weight: 600;
 }
+/* Card column spans — large always fills the row, medium spans 2 */
+.dashboard-grid-cell[data-size='medium'] {
+  grid-column: span 2;
+}
+.dashboard-grid-cell[data-size='large'] {
+  grid-column: 1 / -1;
+}
 @media (max-width: 767px) {
   .dashboard-grid {
     --dashboard-gap: 1rem;
+  }
+  .dashboard-grid-cell[data-size='medium'],
+  .dashboard-grid-cell[data-size='large'] {
+    grid-column: span 1;
   }
 }
 

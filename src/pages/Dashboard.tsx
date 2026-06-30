@@ -28,7 +28,15 @@ import {
 import {
   getDashboardSectionOrder,
   setDashboardSectionOrder,
+  getDashboardSectionSizes,
+  setDashboardSectionSizes,
+  getDashboardSectionVisibility,
+  setDashboardSectionVisibility,
+  DEFAULT_SECTION_SIZES,
+  DEFAULT_SECTION_VISIBILITY,
+  DASHBOARD_SECTION_LABELS,
   type DashboardSectionId,
+  type DashboardSectionSize,
 } from '@/lib/dashboardSections'
 import { daysUntilCharge, getDueSoonCharges } from '@/services/upcoming'
 import {
@@ -57,6 +65,19 @@ export function Dashboard() {
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>(() =>
     getDashboardSectionOrder()
   )
+  const [sectionSizes, setSectionSizes] = useState<
+    Record<DashboardSectionId, DashboardSectionSize>
+  >(() => getDashboardSectionSizes())
+  const [sectionVisibility, setSectionVisibility] = useState<
+    Record<DashboardSectionId, boolean>
+  >(() => getDashboardSectionVisibility())
+  const [showCustomiseModal, setShowCustomiseModal] = useState(false)
+  const [draftSizes, setDraftSizes] = useState<
+    Record<DashboardSectionId, DashboardSectionSize>
+  >(DEFAULT_SECTION_SIZES)
+  const [draftVisibility, setDraftVisibility] = useState<
+    Record<DashboardSectionId, boolean>
+  >(DEFAULT_SECTION_VISIBILITY)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [bannerDismissedToday, setBannerDismissedToday] = useState(() => {
     const d = new Date()
@@ -247,6 +268,20 @@ export function Dashboard() {
     )
   }, [dueSoon, bannerDismissedToday, handleDismissBanner])
 
+  const openCustomiseModal = useCallback(() => {
+    setDraftSizes(getDashboardSectionSizes())
+    setDraftVisibility(getDashboardSectionVisibility())
+    setShowCustomiseModal(true)
+  }, [])
+
+  const saveCustomise = useCallback(() => {
+    setDashboardSectionSizes(draftSizes)
+    setDashboardSectionVisibility(draftVisibility)
+    setSectionSizes(draftSizes)
+    setSectionVisibility(draftVisibility)
+    setShowCustomiseModal(false)
+  }, [draftSizes, draftVisibility])
+
   const handleManualSync = useCallback(async () => {
     const token = sessionStore.getState().getToken()
     if (!token || syncStore.getState().syncing) return
@@ -340,6 +375,8 @@ export function Dashboard() {
 
   useEffect(() => {
     setSectionOrder(getDashboardSectionOrder())
+    setSectionSizes(getDashboardSectionSizes())
+    setSectionVisibility(getDashboardSectionVisibility())
   }, [dataVersion])
 
   useEffect(() => {
@@ -438,6 +475,7 @@ export function Dashboard() {
   function renderSectionCell(id: DashboardSectionId) {
     const isDragOver = dragOverId === id
     const tourAttr = TOUR_DATA_ATTRS[id]
+    const size = sectionSizes[id] ?? 'small'
     const dragHandleProps: React.HTMLAttributes<HTMLSpanElement> = {
       draggable: true,
       onDragStart: (e: React.DragEvent<HTMLSpanElement>) =>
@@ -452,6 +490,7 @@ export function Dashboard() {
         id={`dashboard-section-${id}`}
         className="dashboard-grid-cell"
         data-section-id={id}
+        data-size={size}
         {...(tourAttr ? { 'data-tour': tourAttr } : {})}
         onDragOver={(e: React.DragEvent) => handleSectionDragOver(e, id)}
         onDragLeave={handleSectionDragLeave}
@@ -485,6 +524,15 @@ export function Dashboard() {
               {staleHours}h old
             </span>
           )}
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={openCustomiseModal}
+            aria-label="Customise dashboard"
+            title="Customise dashboard"
+          >
+            <i className="mdi mdi-tune-variant" aria-hidden />
+          </button>
           <button
             type="button"
             className="btn-icon"
@@ -635,8 +683,78 @@ export function Dashboard() {
         </Modal.Footer>
       </Modal>
 
+      <Modal
+        show={showCustomiseModal}
+        onHide={() => setShowCustomiseModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Customise Dashboard</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {sectionOrder.map((id) => (
+            <div
+              key={id}
+              className="d-flex align-items-center justify-content-between py-2"
+              style={{ borderBottom: '1px solid var(--vantura-border)' }}
+            >
+              <Form.Check
+                type="switch"
+                id={`customise-toggle-${id}`}
+                checked={draftVisibility[id] ?? true}
+                onChange={(e) =>
+                  setDraftVisibility((prev) => ({
+                    ...prev,
+                    [id]: e.target.checked,
+                  }))
+                }
+                label={DASHBOARD_SECTION_LABELS[id]}
+              />
+              <div className="btn-group btn-group-sm ms-3">
+                {(['small', 'medium', 'large'] as DashboardSectionSize[]).map(
+                  (size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className={`btn btn-sm ${
+                        draftSizes[id] === size
+                          ? 'btn-outline-primary'
+                          : 'btn-outline-secondary'
+                      }`}
+                      disabled={!(draftVisibility[id] ?? true)}
+                      onClick={() =>
+                        setDraftSizes((prev) => ({ ...prev, [id]: size }))
+                      }
+                    >
+                      {size.charAt(0).toUpperCase() + size.slice(1)}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          ))}
+          <p className="text-muted small mt-3 mb-0">
+            <i className="mdi mdi-drag me-1" aria-hidden />
+            Drag cards on the dashboard to reorder them.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowCustomiseModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={saveCustomise}>
+            Save
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       <div className="dashboard-grid">
-        {sectionOrder.map((id) => renderSectionCell(id))}
+        {sectionOrder
+          .filter((id) => sectionVisibility[id] !== false)
+          .map((id) => renderSectionCell(id))}
       </div>
     </div>
   )
