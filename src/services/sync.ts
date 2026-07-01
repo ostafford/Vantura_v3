@@ -9,6 +9,7 @@ import {
   fetchAllTransactions,
   fetchCategories,
   fetchTags,
+  fetchTransactionById,
   type UpAccount,
   type UpTransaction,
   type UpCategory,
@@ -68,7 +69,7 @@ export function advanceNextPaydayIfNeeded(): void {
 }
 
 export type SyncProgress = {
-  phase: 'accounts' | 'transactions' | 'categories' | 'tags' | 'done'
+  phase: 'accounts' | 'transactions' | 'held' | 'categories' | 'tags' | 'done'
   fetched?: number
   hasMore?: boolean
 }
@@ -79,13 +80,49 @@ export function formatSyncProgressMessage(p: SyncProgress): string {
   if (p.phase === 'transactions' && p.fetched != null) {
     return `Fetched ${p.fetched} transactions…`
   }
+  if (p.phase === 'held') return 'Checking pending transactions…'
   return `Syncing ${p.phase}…`
 }
+
+/** True while inside withTransaction(); suppresses the per-row schedulePersist(). */
+let suppressPersist = false
 
 function run(sql: string, params: (string | number | null)[] = []): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   db.run(sql, params)
+  if (!suppressPersist) schedulePersist()
+}
+
+/**
+ * Run fn inside a single SQLite transaction and persist once at the end, instead of
+ * once per row. Used for bulk upserts (e.g. full re-sync's transaction list) where the
+ * per-call schedulePersist() and per-statement autocommit overhead add up across
+ * thousands of rows. Rolls back on error so a failure partway through a full re-sync
+ * doesn't leave a half-written batch.
+ *
+ * `suppressPersist` doubles as an in-transaction flag: if withTransaction is called
+ * while one is already open (e.g. nested from within another withTransaction's fn),
+ * it runs fn() inline instead of issuing a nested BEGIN, which SQLite rejects.
+ */
+function withTransaction(fn: () => void): void {
+  if (suppressPersist) {
+    fn()
+    return
+  }
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run('BEGIN')
+  suppressPersist = true
+  try {
+    fn()
+  } catch (e) {
+    suppressPersist = false
+    db.run('ROLLBACK')
+    throw e
+  }
+  suppressPersist = false
+  db.run('COMMIT')
   schedulePersist()
 }
 
@@ -208,6 +245,62 @@ function upsertTransaction(tx: UpTransaction): void {
   )
   const tagIds = (rel?.tags?.data ?? []).map((t) => t.id)
   upsertTransactionTags(tx.id, tagIds)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** ids of locally stored transactions still marked HELD (i.e. not yet settled). */
+function getLocallyHeldTransactionIds(): string[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(`SELECT id FROM transactions WHERE status = 'HELD'`)
+  const ids: string[] = []
+  while (stmt.step()) ids.push(stmt.get()[0] as string)
+  stmt.free()
+  return ids
+}
+
+const HELD_LOOKUP_BATCH_SIZE = 5
+
+/**
+ * Re-fetch locally-HELD transactions individually to pick up settlement (status/
+ * settledAt) or category changes that an incremental sync's filter[since] — which
+ * matches on createdAt, not last-modified — would otherwise miss. HELD transactions
+ * are normally a handful, so this stays fast enough for the regular "Sync" button and
+ * doesn't require a full history re-sync just to notice a hold has settled.
+ *
+ * `justFetchedIds` are ids already upserted by this run's incremental transaction
+ * fetch — skipped here since their data is already current, whether they're still
+ * HELD or have since settled. Lookups run in small paced batches (not one big burst)
+ * to stay within Up's rate limit, and a single failed lookup is skipped rather than
+ * aborting the whole sync (via Promise.allSettled, not Promise.all).
+ */
+async function resolveHeldTransactions(
+  apiToken: string,
+  justFetchedIds: ReadonlySet<string>
+): Promise<void> {
+  const heldIds = getLocallyHeldTransactionIds().filter(
+    (id) => !justFetchedIds.has(id)
+  )
+  if (heldIds.length === 0) return
+
+  const resolved: UpTransaction[] = []
+  for (let i = 0; i < heldIds.length; i += HELD_LOOKUP_BATCH_SIZE) {
+    const batch = heldIds.slice(i, i + HELD_LOOKUP_BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map((id) => fetchTransactionById(apiToken, id))
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value) resolved.push(r.value)
+    }
+    if (i + HELD_LOOKUP_BATCH_SIZE < heldIds.length) await sleep(1000)
+  }
+  if (resolved.length === 0) return
+  withTransaction(() => {
+    for (const tx of resolved) upsertTransaction(tx)
+  })
 }
 
 function upsertTag(tag: UpTag): void {
@@ -367,7 +460,9 @@ export async function performInitialSync(
       hasMore: p.hasMore,
     })
   }).then((txs) => {
-    for (const tx of txs) upsertTransaction(tx)
+    withTransaction(() => {
+      for (const tx of txs) upsertTransaction(tx)
+    })
   })
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)
@@ -396,15 +491,18 @@ export async function performSync(
   writeNetWorthSnapshot()
   const sinceDate = getAppSetting('last_sync')
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
-  await fetchAllTransactions(apiToken, sinceDate, (p) => {
+  const txs = await fetchAllTransactions(apiToken, sinceDate, (p) => {
     progressCallback({
       phase: 'transactions',
       fetched: p.fetched,
       hasMore: p.hasMore,
     })
-  }).then((txs) => {
+  })
+  withTransaction(() => {
     for (const tx of txs) upsertTransaction(tx)
   })
+  progressCallback({ phase: 'held' })
+  await resolveHeldTransactions(apiToken, new Set(txs.map((tx) => tx.id)))
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)
   for (const c of categories) upsertCategory(c)
@@ -440,7 +538,9 @@ export async function performFullSync(
       hasMore: p.hasMore,
     })
   }).then((txs) => {
-    for (const tx of txs) upsertTransaction(tx)
+    withTransaction(() => {
+      for (const tx of txs) upsertTransaction(tx)
+    })
   })
   progressCallback({ phase: 'categories' })
   const categories = await fetchCategories(apiToken)

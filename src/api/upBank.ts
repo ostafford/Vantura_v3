@@ -108,10 +108,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const MAX_429_RETRIES = 3
+const MAX_RETRY_WAIT_MS = 30_000
+
+/**
+ * Fetch with auth. On 429, retries with backoff (honouring Retry-After if present,
+ * capped at MAX_RETRY_WAIT_MS so a large server-supplied value can't stall the caller
+ * indefinitely) instead of failing immediately — needed since HELD/SETTLED transaction
+ * pages, and locally-HELD transaction lookups, are now fetched concurrently, which can
+ * occasionally trip the rate limit. `attempt` counts retries used so far (0 on the
+ * first call), independent of MAX_429_RETRIES, so the backoff sequence (2s, 4s, 6s...)
+ * stays correct regardless of the configured retry limit.
+ */
 async function fetchWithAuth(
   url: string,
   token: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  attempt = 0
 ): Promise<Response> {
   const res = await fetch(url, {
     ...options,
@@ -122,7 +135,19 @@ async function fetchWithAuth(
     },
   })
   if (res.status === 429) {
-    throw new Error('Too many requests. Please wait a minute and try again.')
+    if (attempt >= MAX_429_RETRIES) {
+      throw new Error('Too many requests. Please wait a minute and try again.')
+    }
+    const retryAfterHeader = res.headers.get('Retry-After')
+    const retryAfterSecs = retryAfterHeader ? Number(retryAfterHeader) : NaN
+    const waitMs = Math.min(
+      Number.isFinite(retryAfterSecs) && retryAfterSecs > 0
+        ? retryAfterSecs * 1000
+        : 2000 * (attempt + 1), // 2s, 4s, 6s
+      MAX_RETRY_WAIT_MS
+    )
+    await sleep(waitMs)
+    return fetchWithAuth(url, token, options, attempt + 1)
   }
   if (res.status === 401) {
     throw new UpBankUnauthorizedError()
@@ -238,8 +263,12 @@ async function fetchTransactionsByStatus(
 }
 
 /**
- * Fetch all transactions in batches (HELD + SETTLED). Fetches both statuses and merges by id;
- * when the same id appears in both, the SETTLED version is kept. 1s delay between pages.
+ * Fetch all transactions in batches (HELD + SETTLED). The two statuses are fetched
+ * concurrently (each still paced 1s/page to stay within the rate limit) rather than
+ * one after the other — HELD is normally a handful of pages, so running it alongside
+ * SETTLED means it no longer adds its own serial wait on top of the (much larger)
+ * SETTLED history. Results are merged by id; when the same id appears in both, the
+ * SETTLED version is kept (settled is applied to the map after held, same as before).
  */
 export async function fetchAllTransactions(
   token: string,
@@ -247,24 +276,57 @@ export async function fetchAllTransactions(
   progressCallback: (progress: { fetched: number; hasMore: boolean }) => void
 ): Promise<UpTransaction[]> {
   const byId = new Map<string, UpTransaction>()
-  const report = (fetched: number, hasMore: boolean) =>
-    progressCallback({ fetched, hasMore })
+  let heldFetched = 0
+  let settledFetched = 0
+  let heldHasMore = true
+  let settledHasMore = true
+  const report = () =>
+    progressCallback({
+      fetched: heldFetched + settledFetched,
+      hasMore: heldHasMore || settledHasMore,
+    })
 
-  const held = await fetchTransactionsByStatus(token, sinceDate, 'HELD', (p) =>
-    report(p.fetched, p.hasMore)
-  )
+  const [held, settled] = await Promise.all([
+    fetchTransactionsByStatus(token, sinceDate, 'HELD', (p) => {
+      heldFetched = p.fetched
+      heldHasMore = p.hasMore
+      report()
+    }),
+    fetchTransactionsByStatus(token, sinceDate, 'SETTLED', (p) => {
+      settledFetched = p.fetched
+      settledHasMore = p.hasMore
+      report()
+    }),
+  ])
+
   for (const tx of held) byId.set(tx.id, tx)
-  const heldCount = byId.size
-
-  const settled = await fetchTransactionsByStatus(
-    token,
-    sinceDate,
-    'SETTLED',
-    (p) => report(heldCount + p.fetched, p.hasMore)
-  )
   for (const tx of settled) byId.set(tx.id, tx)
 
   return Array.from(byId.values())
+}
+
+interface UpSingleResponse<T> {
+  data: T
+}
+
+/**
+ * Fetch a single transaction by id. Used to resolve locally-HELD transactions (check
+ * whether they've settled, or picked up a category change) without a full history
+ * re-sync. Returns null on 404 (e.g. an authorization hold that was later voided and
+ * no longer exists on Up's side) rather than throwing, so callers can skip it.
+ */
+export async function fetchTransactionById(
+  token: string,
+  id: string
+): Promise<UpTransaction | null> {
+  const res = await fetchWithAuth(
+    `${BASE_URL}/api/v1/transactions/${id}`,
+    token
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Up Bank API error: ${res.status}`)
+  const json = (await res.json()) as UpSingleResponse<UpTransaction>
+  return json.data
 }
 
 /**
