@@ -8,6 +8,7 @@ import {
   resolveTheme,
   THEME_LOCALSTORAGE_KEY,
 } from '@/stores/themeStore'
+import { sidebarPinsStore } from '@/stores/sidebarPinsStore'
 import { sessionStore } from '@/stores/sessionStore'
 import { ToastProvider } from '@/components/ToastProvider'
 import { VanturaLogo } from '@/components/VanturaLogo'
@@ -98,6 +99,8 @@ function AppContent() {
       }
       if (cancelled) return
       themeStore.getState().hydrateFromDb()
+      if (cancelled) return
+      sidebarPinsStore.getState().hydrateFromDb()
       if (cancelled) return
       advanceNextPaydayIfNeeded()
       if (cancelled) return

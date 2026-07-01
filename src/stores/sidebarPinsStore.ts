@@ -26,7 +26,9 @@ export const PINNABLE_ANALYTICS_PAGES: PinnedNavItem[] = [
 
 interface SidebarPinsState {
   pins: PinnedNavItem[]
+  hydrated: boolean
   toggle: (item: PinnedNavItem) => void
+  hydrateFromDb: () => void
 }
 
 const PINS_KEY = 'sidebar_pins'
@@ -55,7 +57,8 @@ function savePins(pins: PinnedNavItem[]): void {
 }
 
 export const sidebarPinsStore = createStore<SidebarPinsState>((set, get) => ({
-  pins: loadPins(),
+  pins: [],
+  hydrated: false,
   toggle(item) {
     const current = get().pins
     const exists = current.some((p) => p.path === item.path)
@@ -64,5 +67,8 @@ export const sidebarPinsStore = createStore<SidebarPinsState>((set, get) => ({
       : [...current, item]
     savePins(next)
     set({ pins: next })
+  },
+  hydrateFromDb() {
+    set({ pins: loadPins(), hydrated: true })
   },
 }))

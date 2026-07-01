@@ -77,6 +77,7 @@ export function InsightsBarChart({
 
     const innerWidth = dimensions.width - left - right
     const innerHeight = dimensions.height - MARGIN_TOP - bottom
+    if (innerWidth <= 0 || innerHeight <= 0) return
 
     const svg = select(container)
       .append('svg')
