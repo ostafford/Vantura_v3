@@ -105,7 +105,8 @@ function buildWhereClause(filters: TransactionFilters): {
     const parts: string[] = []
     if (hasUncategorised)
       parts.push(
-        '(t.category_id IS NULL AND t.transfer_account_id IS NULL AND t.is_categorizable = 1)'
+        `(t.category_id IS NULL AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
+          AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL))`
       )
     if (realIds.length) {
       const placeholders = realIds.map(() => '?').join(',')
@@ -135,8 +136,11 @@ function buildWhereClause(filters: TransactionFilters): {
   }
   const linked = filters.linkedAccountId?.trim()
   if (linked) {
-    conditions.push('(t.account_id = ? OR t.transfer_account_id = ?)')
-    params.push(linked, linked)
+    conditions.push(
+      `(t.account_id = ? OR t.transfer_account_id = ?
+        OR t.id IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override = ?))`
+    )
+    params.push(linked, linked, linked)
   }
 
   return {

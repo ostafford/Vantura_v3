@@ -15,6 +15,45 @@ export interface AccountRow {
   monthly_deposit_target_cents: number | null
 }
 
+/** Manually-created credit card account backed by an imported transaction ledger
+ *  (distinct from the balance-only `manual_accounts` CREDIT_CARD type). */
+export const CREDIT_CARD_IMPORT_TYPE = 'CREDIT_CARD_IMPORT'
+
+/**
+ * Creates a manual credit-card account seeded with an opening balance anchor.
+ * The running balance is opening_balance_cents + net of imported transactions
+ * on this account, minus any Up transactions linked to it as payoffs
+ * (see getCreditCardBalance in creditCardImport.ts).
+ */
+export function createCreditCardAccount(
+  displayName: string,
+  openingBalanceCents: number,
+  openingBalanceDate: string
+): string {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  const id = `cc-${crypto.randomUUID()}`
+  const now = new Date().toISOString()
+  db.run(
+    `INSERT INTO accounts
+       (id, display_name, account_type, balance, created_at, updated_at,
+        ownership_type, synced_at, is_closed, opening_balance_cents, opening_balance_date)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?)`,
+    [
+      id,
+      displayName,
+      CREDIT_CARD_IMPORT_TYPE,
+      -openingBalanceCents,
+      now,
+      now,
+      openingBalanceCents,
+      openingBalanceDate,
+    ]
+  )
+  schedulePersist()
+  return id
+}
+
 /**
  * Returns accounts matching the given types. Excludes closed accounts by default.
  * Pass includeClosed=true only for historical lookups (e.g. transaction filters).
@@ -63,6 +102,42 @@ export function getAccountsByTypes(
 
 export function sumAccountBalancesCents(rows: AccountRow[]): number {
   return rows.reduce((s, r) => s + r.balance, 0)
+}
+
+export function getAccountById(id: string): AccountRow | null {
+  const db = getDb()
+  if (!db) return null
+  const stmt = db.prepare(
+    `SELECT id, display_name, account_type, balance, ownership_type, is_closed,
+            target_amount_cents, monthly_deposit_target_cents
+     FROM accounts WHERE id = ?`
+  )
+  stmt.bind([id])
+  if (!stmt.step()) {
+    stmt.free()
+    return null
+  }
+  const r = stmt.get() as [
+    string,
+    string,
+    string,
+    number,
+    string | null,
+    number,
+    number | null,
+    number | null,
+  ]
+  stmt.free()
+  return {
+    id: r[0],
+    display_name: r[1],
+    account_type: r[2],
+    balance: r[3],
+    ownership_type: r[4],
+    is_closed: r[5],
+    target_amount_cents: r[6] ?? null,
+    monthly_deposit_target_cents: r[7] ?? null,
+  }
 }
 
 export interface SaverBalanceSnapshot {

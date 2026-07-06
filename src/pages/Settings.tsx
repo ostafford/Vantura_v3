@@ -22,6 +22,7 @@ import {
 import { usePwaUpdate } from '@/hooks/usePwaUpdate'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
 import { CategoryColorsSection } from '@/components/CategoryColorsSection'
+import { MerchantRulesSection } from '@/components/MerchantRulesSection'
 import {
   getDashboardSectionOrder,
   setDashboardSectionOrder,
@@ -75,6 +76,7 @@ function getSettingsSectionKeys(): string[] {
     'appearance',
     'payday',
     'dashboard-sections',
+    'merchant-rules',
     ...(isNotificationSupported() ? (['notifications'] as const) : []),
     'security',
     'data',
@@ -86,6 +88,7 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   appearance: 'Appearance',
   payday: 'Payday',
   'dashboard-sections': 'Dashboard sections',
+  'merchant-rules': 'Merchant rules',
   notifications: 'Notifications',
   security: 'Security',
   data: 'Data',
@@ -96,6 +99,7 @@ const SETTINGS_SECTION_ICONS: Record<string, string> = {
   appearance: 'mdi-palette-outline',
   payday: 'mdi-calendar-today',
   'dashboard-sections': 'mdi-view-dashboard-outline',
+  'merchant-rules': 'mdi-tag-multiple-outline',
   notifications: 'mdi-bell-outline',
   security: 'mdi-shield-lock-outline',
   data: 'mdi-database-outline',
@@ -1342,6 +1346,7 @@ export function Settings() {
                   <DashboardSectionOrderForm />
                 </>
               )}
+              {activeSection === 'merchant-rules' && <MerchantRulesSection />}
               {activeSection === 'notifications' &&
                 isNotificationSupported() && (
                   <>

@@ -87,7 +87,7 @@ export function getTrackerSpent(trackerId: number): number {
      WHERE tc.tracker_id = ?
        AND COALESCE(t.created_at, t.settled_at) >= (SELECT last_reset_date FROM trackers WHERE id = ?)
        AND COALESCE(t.created_at, t.settled_at) < (SELECT next_reset_date FROM trackers WHERE id = ?)
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+       AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)`
   )
   stmt.bind([trackerId, trackerId, trackerId])
   stmt.step()
@@ -116,7 +116,7 @@ export function getTrackerSpentInPeriod(
      WHERE tc.tracker_id = ?
        AND COALESCE(t.created_at, t.settled_at) >= ?
        AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+       AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)`
   )
   stmt.bind([trackerId, startNorm, endNorm])
   stmt.step()
@@ -350,7 +350,7 @@ export function getTrackerTransactionsInPeriod(
      WHERE tc.tracker_id = ?
        AND COALESCE(t.created_at, t.settled_at) >= ?
        AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL
+       AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT 21`
   )
   stmt.bind([trackerId, startNorm, endNorm])
@@ -822,7 +822,7 @@ export function getTrackerTransactionTimeline(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
      INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
      ${dateFilter}
      ORDER BY COALESCE(t.created_at, t.settled_at) ASC LIMIT ?`
   )
@@ -908,7 +908,7 @@ export function getTrackerTransactionsForTable(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
      INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
      ${dateFilter}
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ? OFFSET ?`
   )
@@ -965,7 +965,7 @@ export function getTrackerTransactionsCount(
   const stmt = db.prepare(
     `SELECT COUNT(*) as n FROM transactions t
      INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
      ${dateFilter}`
   )
   stmt.bind(params)

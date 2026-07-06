@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 31
+const SCHEMA_VERSION = 33
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -29,7 +29,9 @@ const DDL_STATEMENTS = [
     synced_at TEXT,
     is_closed INTEGER NOT NULL DEFAULT 0,
     target_amount_cents INTEGER,
-    monthly_deposit_target_cents INTEGER
+    monthly_deposit_target_cents INTEGER,
+    opening_balance_cents INTEGER,
+    opening_balance_date TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -68,6 +70,7 @@ const DDL_STATEMENTS = [
     transaction_type TEXT,
     deep_link_url TEXT,
     synced_at TEXT,
+    source TEXT NOT NULL DEFAULT 'up',
     FOREIGN KEY (account_id) REFERENCES accounts(id),
     FOREIGN KEY (round_up_parent_id) REFERENCES transactions(id),
     FOREIGN KEY (transfer_account_id) REFERENCES accounts(id),
@@ -127,7 +130,9 @@ const DDL_STATEMENTS = [
     user_notes TEXT,
     user_category_override TEXT,
     is_income INTEGER DEFAULT 0,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+    user_transfer_account_override TEXT,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id),
+    FOREIGN KEY (user_transfer_account_override) REFERENCES accounts(id)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,6 +220,37 @@ const DDL_STATEMENTS = [
     up_bank_cents INTEGER NOT NULL,
     manual_assets_cents INTEGER NOT NULL DEFAULT 0,
     manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS merchant_category_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_text TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_matched_at TEXT,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS credit_card_statement_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    opening_balance_cents INTEGER NOT NULL,
+    closing_balance_cents INTEGER,
+    computed_closing_balance_cents INTEGER NOT NULL,
+    row_count INTEGER NOT NULL,
+    imported_at TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES accounts(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS statement_import_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_name_pattern TEXT NOT NULL,
+    format TEXT NOT NULL,
+    date_field_preference TEXT NOT NULL DEFAULT 'transaction',
+    credit_marker TEXT NOT NULL DEFAULT 'CR',
+    opening_balance_label TEXT NOT NULL DEFAULT 'Opening Balance',
+    closing_balance_label TEXT NOT NULL DEFAULT 'Closing Balance',
+    date_format TEXT NOT NULL DEFAULT 'DD/MM/YYYY',
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
   )`,
 ]
 
@@ -750,6 +786,91 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['31']
+    )
+  }
+
+  if (version < 32) {
+    const acctCols = database.exec(`PRAGMA table_info(accounts)`)
+    const acctExisting = new Set(
+      (acctCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!acctExisting.has('opening_balance_cents')) {
+      database.run(
+        `ALTER TABLE accounts ADD COLUMN opening_balance_cents INTEGER`
+      )
+    }
+    if (!acctExisting.has('opening_balance_date')) {
+      database.run(`ALTER TABLE accounts ADD COLUMN opening_balance_date TEXT`)
+    }
+
+    const txCols = database.exec(`PRAGMA table_info(transactions)`)
+    const txExisting = new Set(
+      (txCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!txExisting.has('source')) {
+      database.run(
+        `ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'up'`
+      )
+    }
+
+    const udCols = database.exec(`PRAGMA table_info(transaction_user_data)`)
+    const udExisting = new Set(
+      (udCols[0]?.values ?? []).map((r) => String(r[1]))
+    )
+    if (!udExisting.has('user_transfer_account_override')) {
+      database.run(
+        `ALTER TABLE transaction_user_data ADD COLUMN user_transfer_account_override TEXT`
+      )
+    }
+
+    database.run(`
+      CREATE TABLE IF NOT EXISTS merchant_category_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match_text TEXT NOT NULL,
+        category_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_matched_at TEXT,
+        FOREIGN KEY (category_id) REFERENCES categories(id)
+      )
+    `)
+    database.run(`
+      CREATE TABLE IF NOT EXISTS credit_card_statement_imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        opening_balance_cents INTEGER NOT NULL,
+        closing_balance_cents INTEGER,
+        computed_closing_balance_cents INTEGER NOT NULL,
+        row_count INTEGER NOT NULL,
+        imported_at TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      )
+    `)
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['32']
+    )
+  }
+
+  if (version < 33) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS statement_import_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bank_name_pattern TEXT NOT NULL,
+        format TEXT NOT NULL,
+        date_field_preference TEXT NOT NULL DEFAULT 'transaction',
+        credit_marker TEXT NOT NULL DEFAULT 'CR',
+        opening_balance_label TEXT NOT NULL DEFAULT 'Opening Balance',
+        closing_balance_label TEXT NOT NULL DEFAULT 'Closing Balance',
+        date_format TEXT NOT NULL DEFAULT 'DD/MM/YYYY',
+        created_at TEXT NOT NULL,
+        last_used_at TEXT
+      )
+    `)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['33']
     )
   }
 }

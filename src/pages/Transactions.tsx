@@ -23,8 +23,15 @@ import {
   type TransactionRow,
 } from '@/services/transactions'
 import { getCategories } from '@/services/categories'
-import { getTransactionUserDataMap } from '@/services/transactionUserData'
+import {
+  getTransactionUserDataMap,
+  setTransactionTransferOverride,
+} from '@/services/transactionUserData'
 import { updateTransactionCategoryLocal } from '@/services/transactions'
+import {
+  getAccountsByTypes,
+  CREDIT_CARD_IMPORT_TYPE,
+} from '@/services/accounts'
 import {
   getAllTags,
   getTagsForTransaction,
@@ -345,6 +352,22 @@ export function Transactions() {
 
   const [categoryUpdating, setCategoryUpdating] = useState(false)
   const [categoryError, setCategoryError] = useState<string | null>(null)
+
+  const ccAccounts = useMemo(
+    () => getAccountsByTypes([CREDIT_CARD_IMPORT_TYPE]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [localDbVersion]
+  )
+
+  const editTransferOverrideAccountId = editTxRow
+    ? (userDataMap[editTxRow.id]?.user_transfer_account_override ?? '')
+    : ''
+
+  function handleTransferOverrideChange(accountId: string) {
+    if (!editTxRow) return
+    setTransactionTransferOverride(editTxRow.id, accountId || null)
+    bumpLocal()
+  }
 
   const handleCategoryChange = async (newCategoryId: string) => {
     const token = sessionStore.getState().getToken()
@@ -1427,6 +1450,36 @@ export function Transactions() {
                     </dd>
                   </>
                 )}
+
+                {ccAccounts.length > 0 &&
+                  editTxRow.amount < 0 &&
+                  !ccAccounts.some((a) => a.id === editTxRow.account_id) && (
+                    <>
+                      <dt className="col-sm-4 text-muted">Card payment</dt>
+                      <dd className="col-sm-8">
+                        <Form.Select
+                          size="sm"
+                          value={editTransferOverrideAccountId}
+                          onChange={(e) =>
+                            handleTransferOverrideChange(e.target.value)
+                          }
+                        >
+                          <option value="">Not a card payment</option>
+                          {ccAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              Payment to {a.display_name}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <small className="text-muted d-block mt-1">
+                          Link this if it's a lump-sum payoff of an imported
+                          credit card — it'll be excluded from spending totals
+                          so it doesn't double-count with the card's own
+                          transactions.
+                        </small>
+                      </dd>
+                    </>
+                  )}
 
                 <dt className="col-sm-4 text-muted pt-1">Tags</dt>
                 <dd className="col-sm-8">

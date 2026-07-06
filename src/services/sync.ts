@@ -17,6 +17,7 @@ import {
 } from '@/api/upBank'
 import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
+import { CREDIT_CARD_IMPORT_TYPE } from '@/services/accounts'
 /** Return today as YYYY-MM-DD in local time. */
 function todayDateString(): string {
   const d = new Date()
@@ -159,11 +160,17 @@ function upsertAccount(acc: UpAccount): void {
  * Mark any accounts in the local DB that were NOT returned by the API as closed.
  * Re-opens accounts that reappear (is_closed = 0 is set in upsertAccount).
  * Called after all accounts from a sync pass have been upserted.
+ *
+ * Excludes CREDIT_CARD_IMPORT accounts: those are manually created (statement
+ * import feature) and can never appear in an Up Bank API response, so this
+ * sweep must not be allowed to touch them or every one would be marked closed
+ * on the very next sync.
  */
 function reconcileClosedAccounts(fetchedIds: Set<string>): void {
   const db = getDb()
   if (!db) return
-  const stmt = db.prepare(`SELECT id FROM accounts`)
+  const stmt = db.prepare(`SELECT id FROM accounts WHERE account_type != ?`)
+  stmt.bind([CREDIT_CARD_IMPORT_TYPE])
   const storedIds: string[] = []
   while (stmt.step()) {
     storedIds.push(stmt.get()[0] as string)

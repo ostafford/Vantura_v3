@@ -104,7 +104,8 @@ export function detectPaySchedule(
      FROM transactions
      WHERE raw_text = ?
        AND amount > 0
-       AND transfer_account_id IS NULL
+       AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND source = 'up'
      ORDER BY pay_date ASC
      LIMIT 24`
   )
@@ -214,7 +215,8 @@ export function searchCreditTransactions(
        COUNT(*) AS occurrences
      FROM transactions
      WHERE amount > 0
-       AND transfer_account_id IS NULL
+       AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND source = 'up'
        AND (description LIKE ? OR raw_text LIKE ?)
      GROUP BY COALESCE(raw_text, description)
      ORDER BY occurrences DESC, latest_date DESC
