@@ -10,11 +10,7 @@
  * bank — not a bespoke parser. See getDocument usage below for the PDF path.
  */
 
-import * as pdfjsLib from 'pdfjs-dist'
-import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { getDb, schedulePersist } from '@/db'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
 
 export type StatementFormat = 'PDF' | 'CSV' | 'OFX'
 
@@ -32,6 +28,12 @@ export interface ParsedStatement {
   detectedBankName: string | null
   openingBalanceCents: number | null
   closingBalanceCents: number | null
+  /** Set when the CSV guardrail (see parseCsvStatement) determines this file
+   * isn't a single credit-card statement — e.g. Vantura's own multi-account
+   * export was uploaded by mistake. Undefined for PDF/OFX and for CSVs that
+   * pass the check; when set, `rows` is always empty and the caller should
+   * surface this message instead of attempting a preview. */
+  rejectionReason?: string
 }
 
 export interface StatementImportProfileRow {
@@ -68,6 +70,32 @@ function parseDateToIso(raw: string, dateFormat: string): string {
 
 // ─── PDF ──────────────────────────────────────────────────────────────────
 
+let pdfjsLibPromise: Promise<typeof import('pdfjs-dist')> | null = null
+
+/** Loaded on first use rather than imported statically, so parsing a CSV or
+ * OFX file (and unit tests that only exercise those paths) never pulls in
+ * pdfjs-dist or its worker — only an actual PDF import pays that cost. On
+ * failure the cached promise is cleared so a later retry (e.g. after a flaky
+ * chunk load) issues a fresh import instead of permanently replaying the
+ * same rejection. */
+function loadPdfjs(): Promise<typeof import('pdfjs-dist')> {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = (async () => {
+      try {
+        const lib = await import('pdfjs-dist')
+        const workerUrl = (await import('pdfjs-dist/build/pdf.worker.mjs?url'))
+          .default
+        lib.GlobalWorkerOptions.workerSrc = workerUrl
+        return lib
+      } catch (err) {
+        pdfjsLibPromise = null
+        throw err
+      }
+    })()
+  }
+  return pdfjsLibPromise
+}
+
 /**
  * Reconstructs readable lines from a PDF's absolutely-positioned text items by
  * grouping items sharing a y-coordinate, then ordering by x. Validated against
@@ -75,6 +103,7 @@ function parseDateToIso(raw: string, dateFormat: string): string {
  * multi-column tables.
  */
 async function extractPdfLines(file: File): Promise<string[]> {
+  const pdfjsLib = await loadPdfjs()
   const data = new Uint8Array(await file.arrayBuffer())
   const doc = await pdfjsLib.getDocument({ data }).promise
   const lines: string[] = []
@@ -209,6 +238,15 @@ const AMOUNT_HEADER_RE = /^(amount|value)/i
 const DEBIT_HEADER_RE = /^debit/i
 const CREDIT_HEADER_RE = /^credit/i
 const BALANCE_HEADER_RE = /^balance/i
+const CATEGORY_HEADER_RE = /^category/i
+const TAGS_HEADER_RE = /^tags/i
+// Exact match only ("Account" / "Account Name") — deliberately NOT a prefix
+// match. Some real bank exports have an "Account Number" or "Account Type"
+// column (e.g. Purchase/Cash Advance/Interest per row); those are a
+// different account-holding-account or transaction property, not "which
+// account" this row belongs to, and would false-positive the multi-account
+// guardrail below if matched as a prefix.
+const ACCOUNT_HEADER_RE = /^account(\s*name)?$/i
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = []
@@ -246,6 +284,25 @@ export function parseCsvStatement(text: string): ParsedStatement {
   const debitIdx = header.findIndex((h) => DEBIT_HEADER_RE.test(h))
   const creditIdx = header.findIndex((h) => CREDIT_HEADER_RE.test(h))
   const balanceIdx = header.findIndex((h) => BALANCE_HEADER_RE.test(h))
+  const accountIdx = header.findIndex((h) => ACCOUNT_HEADER_RE.test(h))
+
+  // Guardrail: Vantura's own transaction export always carries both a
+  // Category and a Tags column together — no AU bank CSV export does. This
+  // catches the file-mix-up case (re-uploading Vantura's own export instead
+  // of a bank statement) before a single row is parsed.
+  const looksLikeOwnExport =
+    header.some((h) => CATEGORY_HEADER_RE.test(h)) &&
+    header.some((h) => TAGS_HEADER_RE.test(h))
+  if (looksLikeOwnExport) {
+    return {
+      rows: [],
+      detectedBankName: null,
+      openingBalanceCents: null,
+      closingBalanceCents: null,
+      rejectionReason:
+        'This looks like a Vantura transaction export, not a bank statement — upload the CSV your bank provides for this card instead.',
+    }
+  }
 
   const rows: ParsedStatementRow[] = []
   const hasAmountColumn = amountIdx !== -1
@@ -263,10 +320,21 @@ export function parseCsvStatement(text: string): ParsedStatement {
     }
   }
 
+  // Keyed by lowercase so "Chase Sapphire" and "chase sapphire" (a casing
+  // quirk, not a different account) don't falsely count as two accounts;
+  // the displayed message uses whichever casing appeared first.
+  const accountValues = new Map<string, string>()
   for (const line of lines.slice(1)) {
     const cols = splitCsvLine(line)
     const dateRaw = cols[dateIdx]
     if (!dateRaw) continue
+
+    if (accountIdx !== -1) {
+      const accountRaw = cols[accountIdx]?.trim()
+      if (accountRaw && !accountValues.has(accountRaw.toLowerCase())) {
+        accountValues.set(accountRaw.toLowerCase(), accountRaw)
+      }
+    }
 
     let amountCents: number | null = null
     if (hasAmountColumn) {
@@ -296,6 +364,19 @@ export function parseCsvStatement(text: string): ParsedStatement {
           ? parseMoneyToCents(cols[balanceIdx])
           : null,
     })
+  }
+
+  // Guardrail: a genuine single-card statement has no reason to carry more
+  // than one account name. Two-plus distinct values means this file mixes
+  // transactions from multiple accounts (e.g. a full multi-account export).
+  if (accountValues.size > 1) {
+    return {
+      rows: [],
+      detectedBankName: null,
+      openingBalanceCents: null,
+      closingBalanceCents: null,
+      rejectionReason: `This file contains transactions from multiple accounts (${[...accountValues.values()].join(', ')}) — a credit card statement should only contain one account's transactions.`,
+    }
   }
 
   return {

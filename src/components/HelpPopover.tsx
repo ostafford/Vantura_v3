@@ -1,11 +1,15 @@
 import { useState } from 'react'
+import type React from 'react'
 import { OverlayTrigger, Popover, Button } from 'react-bootstrap'
 
 export interface HelpPopoverProps {
   id: string
   title: string
-  content: string
+  content: React.ReactNode
   ariaLabel?: string
+  /** Overrides Bootstrap's default ~276px popover width — use for content
+   * that needs more room, e.g. a numbered step list. */
+  maxWidth?: number
 }
 
 export function HelpPopover({
@@ -13,11 +17,12 @@ export function HelpPopover({
   title,
   content,
   ariaLabel = 'Help',
+  maxWidth,
 }: HelpPopoverProps) {
   const [show, setShow] = useState(false)
 
   const popover = (
-    <Popover id={id}>
+    <Popover id={id} style={maxWidth ? { maxWidth } : undefined}>
       <Popover.Header as="h3">{title}</Popover.Header>
       <Popover.Body>{content}</Popover.Body>
     </Popover>

@@ -1055,9 +1055,43 @@ export function AnalyticsNetWorth() {
       {/* ── Liabilities ──────────────────────────────────────────────────── */}
       <Card className="grid-margin">
         <Card.Header className="d-flex justify-content-between align-items-center">
-          <span className="fw-semibold">
+          <span className="fw-semibold d-flex align-items-center">
             <i className="mdi mdi-trending-down text-danger me-2" aria-hidden />
             Liabilities
+            <HelpPopover
+              id="liabilities-credit-card-import-help"
+              title="Importing a credit card statement"
+              ariaLabel="How do I import a credit card statement?"
+              maxWidth={340}
+              content={
+                <ol className="ps-3 mb-0">
+                  <li className="mb-2">
+                    <strong>Add credit card (statement import)</strong> below —
+                    name the card and enter the opening balance and date printed
+                    on the first statement you&apos;ll import. This just creates
+                    the account; it doesn&apos;t import anything yet.
+                  </li>
+                  <li className="mb-2">
+                    The card then appears here under an{' '}
+                    <strong>IMPORTED</strong> badge. Click{' '}
+                    <strong>Import statement</strong> next to it.
+                  </li>
+                  <li className="mb-2">
+                    Upload the <strong>PDF, CSV, or OFX/QFX</strong> file your
+                    bank sent you for that card — not anything exported from
+                    Vantura itself.
+                  </li>
+                  <li className="mb-2">
+                    Review the parsed rows, tick which to include, assign
+                    categories, then <strong>Import</strong>.
+                  </li>
+                  <li>
+                    Repeat step 2 each time a new statement lands — there's no
+                    live bank connection for cards besides Up.
+                  </li>
+                </ol>
+              }
+            />
           </span>
           <span className="fw-semibold text-danger">
             ${formatMoney(summary.manualLiabilitiesCents)}

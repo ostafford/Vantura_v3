@@ -99,6 +99,12 @@ export function StatementImportModal({
         parsed = parseOfxStatement(await file.text())
       }
 
+      if (parsed.rejectionReason) {
+        setError(parsed.rejectionReason)
+        setParsing(false)
+        return
+      }
+
       if (parsed.rows.length === 0) {
         setError(
           'No transactions could be read from this file. It may use a layout Vantura doesn’t recognize yet.'
