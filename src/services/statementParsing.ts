@@ -34,6 +34,28 @@ export interface ParsedStatement {
    * pass the check; when set, `rows` is always empty and the caller should
    * surface this message instead of attempting a preview. */
   rejectionReason?: string
+  /** True only for the CSV auto-sniff path (no profile/manual mapping given)
+   * when every parsed date's day and month components are both ≤12 — i.e.
+   * the DD/MM default is a genuine, unverifiable guess rather than a
+   * provably-correct parse (which would be the case if any row's first
+   * component were 13-31). Undefined once a date format has been explicitly
+   * confirmed via a profile or manual mapping. */
+  dateFormatAmbiguous?: boolean
+}
+
+/** Column-role mapping for a CSV layout that the automatic header-sniff
+ * couldn't recognize (e.g. headerless exports) — confirmed once by the user
+ * and reused on future imports from the same bank via a saved profile. */
+export interface CsvColumnMap {
+  dateCol: number
+  descriptionCol: number
+  amountCol: number | null
+  debitCol: number | null
+  creditCol: number | null
+  balanceCol: number | null
+  /** Optional — lets the multi-account guardrail run on manually-mapped
+   * layouts that do carry an account-name column. */
+  accountCol: number | null
 }
 
 export interface StatementImportProfileRow {
@@ -47,6 +69,17 @@ export interface StatementImportProfileRow {
   date_format: string
   created_at: string
   last_used_at: string | null
+  /** CSV-only; null for PDF profiles. */
+  csv_column_map: CsvColumnMap | null
+  /** CSV-only; null for PDF profiles. */
+  csv_has_header: boolean | null
+  /** CSV-only; null for PDF profiles. A structural fingerprint of the file
+   * this profile was learned from (the header line's text, or the column
+   * count for a headerless layout) — required to match before a saved CSV
+   * profile is reused, so an unrelated bank's file can't silently borrow
+   * another bank's column mapping or date-format correction just because it
+   * happens to parse into some nonzero row count. See tryKnownCsvProfiles. */
+  csv_match_signature: string | null
 }
 
 function parseMoneyToCents(raw: string): number {
@@ -248,7 +281,9 @@ const TAGS_HEADER_RE = /^tags/i
 // guardrail below if matched as a prefix.
 const ACCOUNT_HEADER_RE = /^account(\s*name)?$/i
 
-function splitCsvLine(line: string): string[] {
+/** Exported so the manual column-mapping UI can render real column values
+ * from the uploaded file without duplicating this quoting logic. */
+export function splitCsvLine(line: string): string[] {
   const out: string[] = []
   let cur = ''
   let inQuotes = false
@@ -267,7 +302,142 @@ function splitCsvLine(line: string): string[] {
   return out.map((s) => s.trim().replace(/^"|"$/g, ''))
 }
 
-export function parseCsvStatement(text: string): ParsedStatement {
+/** Shared by both CSV paths: resolves a row's signed amount from either a
+ * single signed column or an unsigned debit(-)/credit(+) pair. */
+function resolveAmountCents(
+  cols: string[],
+  amountIdx: number,
+  debitIdx: number,
+  creditIdx: number
+): number | null {
+  if (amountIdx !== -1) {
+    const amountRaw = cols[amountIdx]?.replace(/[$,]/g, '')
+    const amount = amountRaw ? parseFloat(amountRaw) : NaN
+    if (!Number.isNaN(amount)) return Math.round(amount * 100)
+  }
+  if (debitIdx !== -1 || creditIdx !== -1) {
+    const debitRaw = debitIdx !== -1 ? cols[debitIdx]?.trim() : ''
+    const creditRaw = creditIdx !== -1 ? cols[creditIdx]?.trim() : ''
+    if (debitRaw) return -parseMoneyToCents(debitRaw)
+    if (creditRaw) return parseMoneyToCents(creditRaw)
+  }
+  return null
+}
+
+/** Rejection message shared by both CSV paths' multi-account guardrail. */
+function multiAccountRejection(accountValues: Map<string, string>): string {
+  return `This file contains transactions from multiple accounts (${[...accountValues.values()].join(', ')}) — a credit card statement should only contain one account's transactions.`
+}
+
+const OWN_EXPORT_REJECTION =
+  'This looks like a Vantura transaction export, not a bank statement — upload the CSV your bank provides for this card instead.'
+
+/**
+ * Parses a CSV using an explicit, user-confirmed column mapping instead of
+ * header-name sniffing — the fallback for layouts the auto-sniff couldn't
+ * recognize (e.g. headerless CBA/NAB-style exports). Runs the same
+ * own-export and multi-account guardrails as the auto-sniff path: the file
+ * reaching this function means auto-sniff couldn't read its *headers*, not
+ * that the file itself is safe to skip these checks on.
+ */
+function parseCsvWithColumnMap(
+  text: string,
+  map: CsvColumnMap,
+  hasHeader: boolean,
+  dateFormat: string
+): ParsedStatement {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+
+  if (hasHeader && lines.length > 0) {
+    const header = splitCsvLine(lines[0])
+    const looksLikeOwnExport =
+      header.some((h) => CATEGORY_HEADER_RE.test(h)) &&
+      header.some((h) => TAGS_HEADER_RE.test(h))
+    if (looksLikeOwnExport) {
+      return {
+        rows: [],
+        detectedBankName: null,
+        openingBalanceCents: null,
+        closingBalanceCents: null,
+        rejectionReason: OWN_EXPORT_REJECTION,
+      }
+    }
+  }
+
+  const dataLines = hasHeader ? lines.slice(1) : lines
+  const rows: ParsedStatementRow[] = []
+  const accountValues = new Map<string, string>()
+  for (const line of dataLines) {
+    const cols = splitCsvLine(line)
+    const dateRaw = cols[map.dateCol]
+    if (!dateRaw) continue
+
+    if (map.accountCol != null) {
+      const accountRaw = cols[map.accountCol]?.trim()
+      if (accountRaw && !accountValues.has(accountRaw.toLowerCase())) {
+        accountValues.set(accountRaw.toLowerCase(), accountRaw)
+      }
+    }
+
+    const amountCents = resolveAmountCents(
+      cols,
+      map.amountCol ?? -1,
+      map.debitCol ?? -1,
+      map.creditCol ?? -1
+    )
+    if (amountCents === null) continue
+
+    rows.push({
+      date: parseDateToIso(dateRaw, dateFormat),
+      description: (cols[map.descriptionCol] ?? '').trim(),
+      amountCents,
+      balanceCents:
+        map.balanceCol != null && cols[map.balanceCol]
+          ? parseMoneyToCents(cols[map.balanceCol])
+          : null,
+    })
+  }
+
+  if (accountValues.size > 1) {
+    return {
+      rows: [],
+      detectedBankName: null,
+      openingBalanceCents: null,
+      closingBalanceCents: null,
+      rejectionReason: multiAccountRejection(accountValues),
+    }
+  }
+
+  return {
+    rows,
+    detectedBankName: null,
+    openingBalanceCents: rows[0]?.balanceCents ?? null,
+    closingBalanceCents: rows[rows.length - 1]?.balanceCents ?? null,
+  }
+}
+
+/** The subset of a profile CSV parsing actually needs — lets callers (e.g.
+ * a live column-mapping preview) pass a lightweight options object instead
+ * of fabricating a full StatementImportProfileRow. */
+export type CsvParseOptions = Pick<
+  StatementImportProfileRow,
+  'csv_column_map' | 'csv_has_header' | 'date_format'
+>
+
+export function parseCsvStatement(
+  text: string,
+  profile?: CsvParseOptions | null
+): ParsedStatement {
+  if (profile?.csv_column_map) {
+    return parseCsvWithColumnMap(
+      text,
+      profile.csv_column_map,
+      profile.csv_has_header ?? true,
+      profile.date_format
+    )
+  }
+  const dateFormat = profile?.date_format ?? 'DD/MM/YYYY'
+
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
   if (lines.length === 0) {
     return {
@@ -299,8 +469,7 @@ export function parseCsvStatement(text: string): ParsedStatement {
       detectedBankName: null,
       openingBalanceCents: null,
       closingBalanceCents: null,
-      rejectionReason:
-        'This looks like a Vantura transaction export, not a bank statement — upload the CSV your bank provides for this card instead.',
+      rejectionReason: OWN_EXPORT_REJECTION,
     }
   }
 
@@ -324,10 +493,20 @@ export function parseCsvStatement(text: string): ParsedStatement {
   // quirk, not a different account) don't falsely count as two accounts;
   // the displayed message uses whichever casing appeared first.
   const accountValues = new Map<string, string>()
+  // If any row's first date component is 13-31, DD/MM is the only valid
+  // reading and the default isn't a guess — only flag ambiguity when every
+  // row's first/second components are both <=12 and genuinely could go
+  // either way.
+  let sawUnambiguousDate = false
   for (const line of lines.slice(1)) {
     const cols = splitCsvLine(line)
     const dateRaw = cols[dateIdx]
     if (!dateRaw) continue
+
+    const dateParts = dateRaw.split('/')
+    if (dateParts.length === 3 && parseInt(dateParts[0], 10) > 12) {
+      sawUnambiguousDate = true
+    }
 
     if (accountIdx !== -1) {
       const accountRaw = cols[accountIdx]?.trim()
@@ -336,27 +515,13 @@ export function parseCsvStatement(text: string): ParsedStatement {
       }
     }
 
-    let amountCents: number | null = null
-    if (hasAmountColumn) {
-      const amountRaw = cols[amountIdx]?.replace(/[$,]/g, '')
-      const amount = amountRaw ? parseFloat(amountRaw) : NaN
-      if (!Number.isNaN(amount)) amountCents = Math.round(amount * 100)
-    }
     // Split Debit/Credit layout: unsigned columns, at most one populated per
     // row. Debit = spend (negative); Credit = payment/refund (positive).
-    if (amountCents === null && hasSplitColumns) {
-      const debitRaw = debitIdx !== -1 ? cols[debitIdx]?.trim() : ''
-      const creditRaw = creditIdx !== -1 ? cols[creditIdx]?.trim() : ''
-      if (debitRaw) {
-        amountCents = -parseMoneyToCents(debitRaw)
-      } else if (creditRaw) {
-        amountCents = parseMoneyToCents(creditRaw)
-      }
-    }
+    const amountCents = resolveAmountCents(cols, amountIdx, debitIdx, creditIdx)
     if (amountCents === null) continue
 
     rows.push({
-      date: parseDateToIso(dateRaw, 'DD/MM/YYYY'),
+      date: parseDateToIso(dateRaw, dateFormat),
       description: (cols[descIdx] ?? '').trim(),
       amountCents,
       balanceCents:
@@ -375,7 +540,7 @@ export function parseCsvStatement(text: string): ParsedStatement {
       detectedBankName: null,
       openingBalanceCents: null,
       closingBalanceCents: null,
-      rejectionReason: `This file contains transactions from multiple accounts (${[...accountValues.values()].join(', ')}) — a credit card statement should only contain one account's transactions.`,
+      rejectionReason: multiAccountRejection(accountValues),
     }
   }
 
@@ -384,6 +549,11 @@ export function parseCsvStatement(text: string): ParsedStatement {
     detectedBankName: null,
     openingBalanceCents: rows[0]?.balanceCents ?? null,
     closingBalanceCents: rows[rows.length - 1]?.balanceCents ?? null,
+    // Once a date format has been explicitly chosen (profile override or a
+    // manual mapping, handled above), it's a confirmed choice, not a guess —
+    // don't keep flagging it as ambiguous.
+    dateFormatAmbiguous:
+      profile?.date_format == null && rows.length > 0 && !sawUnambiguousDate,
   }
 }
 
@@ -435,6 +605,15 @@ export function parseOfxStatement(text: string): ParsedStatement {
 
 // ─── Profiles ─────────────────────────────────────────────────────────────
 
+function parseCsvColumnMap(raw: unknown): CsvColumnMap | null {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    return JSON.parse(raw) as CsvColumnMap
+  } catch {
+    return null
+  }
+}
+
 function parseProfileRow(row: unknown[]): StatementImportProfileRow {
   return {
     id: row[0] as number,
@@ -447,13 +626,38 @@ function parseProfileRow(row: unknown[]): StatementImportProfileRow {
     date_format: row[7] as string,
     created_at: row[8] as string,
     last_used_at: (row[9] as string | null) ?? null,
+    csv_column_map: parseCsvColumnMap(row[10]),
+    csv_has_header: row[11] == null ? null : Boolean(row[11] as number),
+    csv_match_signature: (row[12] as string | null) ?? null,
   }
 }
 
 const PROFILE_COLS = `
   id, bank_name_pattern, format, date_field_preference, credit_marker,
-  opening_balance_label, closing_balance_label, date_format, created_at, last_used_at
+  opening_balance_label, closing_balance_label, date_format, created_at, last_used_at,
+  csv_column_map, csv_has_header, csv_match_signature
 `
+
+/**
+ * A structural fingerprint of a CSV layout — the header line's text (when
+ * the file has one) or the raw column count (when it doesn't) — computed
+ * identically at profile-save time and at match time. Used to gate which
+ * saved CSV profiles are even candidates for a given file, so a profile
+ * only ever matches files that actually resemble the one it was learned
+ * from, rather than any file that happens to parse into some rows under it.
+ */
+export function computeCsvMatchSignature(
+  text: string,
+  hasHeader: boolean
+): string | null {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+  if (lines.length === 0) return null
+  const cols = splitCsvLine(lines[0])
+  if (hasHeader) {
+    return `header:${cols.map((c) => c.trim().toLowerCase()).join('|')}`
+  }
+  return `cols:${cols.length}`
+}
 
 /**
  * Matches by substring in JS rather than a SQL LIKE clause, for two reasons:
@@ -503,8 +707,9 @@ export function saveStatementImportProfile(
   db.run(
     `INSERT INTO statement_import_profiles
        (bank_name_pattern, format, date_field_preference, credit_marker,
-        opening_balance_label, closing_balance_label, date_format, created_at, last_used_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        opening_balance_label, closing_balance_label, date_format, created_at, last_used_at,
+        csv_column_map, csv_has_header, csv_match_signature)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.bank_name_pattern,
       input.format,
@@ -515,12 +720,79 @@ export function saveStatementImportProfile(
       input.date_format,
       now,
       now,
+      input.csv_column_map ? JSON.stringify(input.csv_column_map) : null,
+      input.csv_has_header == null ? null : input.csv_has_header ? 1 : 0,
+      input.csv_match_signature,
     ]
   )
   const id =
     (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ?? 0
   schedulePersist()
   return id
+}
+
+/** A saved profile must explain at least this fraction of a file's data
+ * rows to be accepted — a genuine match accounts for nearly the whole file;
+ * a profile that only happens to parse a handful of rows is a sign it's the
+ * wrong bank's mapping, not a confirmed one. */
+const MIN_PROFILE_MATCH_RATIO = 0.9
+
+/**
+ * Tries every saved CSV profile against a file the plain default couldn't
+ * parse (or hasn't been tried against yet), newest-used first, and returns
+ * the first one that both (a) structurally matches — same header text, or
+ * same column count for a headerless layout, per computeCsvMatchSignature —
+ * and (b) explains at least MIN_PROFILE_MATCH_RATIO of the file's rows.
+ * CSV files don't reliably carry an in-file bank name the way PDF statements
+ * do (see detectBankName), so a repeat import is matched structurally rather
+ * than by name — but "produces some rows" alone isn't enough evidence a
+ * profile belongs to this file, since two different banks' exports can
+ * share a column count/order. The signature check is required and cheap, so
+ * it runs before the (comparatively expensive) full-file parse.
+ */
+export function tryKnownCsvProfiles(
+  text: string
+): { parsed: ParsedStatement; profile: StatementImportProfileRow } | null {
+  const db = getDb()
+  if (!db) return null
+  const stmt = db.prepare(
+    `SELECT ${PROFILE_COLS} FROM statement_import_profiles
+     WHERE format = 'CSV' ORDER BY last_used_at DESC`
+  )
+  const profiles: StatementImportProfileRow[] = []
+  while (stmt.step()) {
+    profiles.push(parseProfileRow(stmt.get()))
+  }
+  stmt.free()
+
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+  if (lines.length === 0) return null
+
+  for (const profile of profiles) {
+    if (!profile.csv_match_signature) continue
+    // A date-format-only profile (no column map) only ever comes from the
+    // auto-sniff path, which always treats the first line as a header —
+    // regardless of the profile's own csv_has_header value, which is a
+    // meaningless placeholder for this profile kind (see
+    // StatementImportModal.tsx's handleRedoDateFormat).
+    const hasHeaderForMatch = profile.csv_column_map
+      ? (profile.csv_has_header ?? true)
+      : true
+    const signature = computeCsvMatchSignature(text, hasHeaderForMatch)
+    if (signature == null || signature !== profile.csv_match_signature) {
+      continue
+    }
+
+    const parsed = parseCsvStatement(text, profile)
+    if (parsed.rows.length === 0) continue
+
+    const dataLineCount = hasHeaderForMatch ? lines.length - 1 : lines.length
+    if (dataLineCount <= 0) continue
+    if (parsed.rows.length / dataLineCount < MIN_PROFILE_MATCH_RATIO) continue
+
+    return { parsed, profile }
+  }
+  return null
 }
 
 export function touchStatementImportProfile(id: number): void {

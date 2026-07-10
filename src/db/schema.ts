@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 33
+const SCHEMA_VERSION = 35
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -250,7 +250,10 @@ const DDL_STATEMENTS = [
     closing_balance_label TEXT NOT NULL DEFAULT 'Closing Balance',
     date_format TEXT NOT NULL DEFAULT 'DD/MM/YYYY',
     created_at TEXT NOT NULL,
-    last_used_at TEXT
+    last_used_at TEXT,
+    csv_column_map TEXT,
+    csv_has_header INTEGER,
+    csv_match_signature TEXT
   )`,
 ]
 
@@ -871,6 +874,39 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['33']
+    )
+  }
+
+  if (version < 34) {
+    const cols = database.exec(`PRAGMA table_info(statement_import_profiles)`)
+    const existing = new Set((cols[0]?.values ?? []).map((r) => String(r[1])))
+    if (!existing.has('csv_column_map')) {
+      database.run(
+        `ALTER TABLE statement_import_profiles ADD COLUMN csv_column_map TEXT`
+      )
+    }
+    if (!existing.has('csv_has_header')) {
+      database.run(
+        `ALTER TABLE statement_import_profiles ADD COLUMN csv_has_header INTEGER`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['34']
+    )
+  }
+
+  if (version < 35) {
+    const cols = database.exec(`PRAGMA table_info(statement_import_profiles)`)
+    const existing = new Set((cols[0]?.values ?? []).map((r) => String(r[1])))
+    if (!existing.has('csv_match_signature')) {
+      database.run(
+        `ALTER TABLE statement_import_profiles ADD COLUMN csv_match_signature TEXT`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['35']
     )
   }
 }
