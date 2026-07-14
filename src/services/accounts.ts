@@ -15,45 +15,6 @@ export interface AccountRow {
   monthly_deposit_target_cents: number | null
 }
 
-/** Manually-created credit card account backed by an imported transaction ledger
- *  (distinct from the balance-only `manual_accounts` CREDIT_CARD type). */
-export const CREDIT_CARD_IMPORT_TYPE = 'CREDIT_CARD_IMPORT'
-
-/**
- * Creates a manual credit-card account seeded with an opening balance anchor.
- * The running balance is opening_balance_cents + net of imported transactions
- * on this account, minus any Up transactions linked to it as payoffs
- * (see getCreditCardBalance in creditCardImport.ts).
- */
-export function createCreditCardAccount(
-  displayName: string,
-  openingBalanceCents: number,
-  openingBalanceDate: string
-): string {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  const id = `cc-${crypto.randomUUID()}`
-  const now = new Date().toISOString()
-  db.run(
-    `INSERT INTO accounts
-       (id, display_name, account_type, balance, created_at, updated_at,
-        ownership_type, synced_at, is_closed, opening_balance_cents, opening_balance_date)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?)`,
-    [
-      id,
-      displayName,
-      CREDIT_CARD_IMPORT_TYPE,
-      -openingBalanceCents,
-      now,
-      now,
-      openingBalanceCents,
-      openingBalanceDate,
-    ]
-  )
-  schedulePersist()
-  return id
-}
-
 /**
  * Returns accounts matching the given types. Excludes closed accounts by default.
  * Pass includeClosed=true only for historical lookups (e.g. transaction filters).

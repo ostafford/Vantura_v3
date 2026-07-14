@@ -1,6 +1,5 @@
 import { getDb, schedulePersist, getAppSetting } from '@/db'
 import { firstOccurrenceOnOrAfter } from '@/services/upcoming'
-import { CREDIT_CARD_IMPORT_TYPE } from '@/services/accounts'
 
 export interface NetWorthSummary {
   upBankCents: number
@@ -33,8 +32,7 @@ export function getNetWorthSummary(): NetWorthSummary {
     }
 
   const upResult = db.exec(
-    `SELECT COALESCE(SUM(balance), 0) FROM accounts
-     WHERE is_closed = 0 AND account_type != '${CREDIT_CARD_IMPORT_TYPE}'`
+    `SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE is_closed = 0`
   )
   const upBankCents = (upResult[0]?.values?.[0]?.[0] as number) ?? 0
 
@@ -49,25 +47,12 @@ export function getNetWorthSummary(): NetWorthSummary {
   const manualLiabilitiesCents =
     (liabResult[0]?.values?.[0]?.[0] as number) ?? 0
 
-  // Credit-card-import accounts store their debt as a negative `balance` (Up
-  // sign convention) — negate to fold it into the liabilities bucket.
-  const ccLiabResult = db.exec(
-    `SELECT COALESCE(SUM(-balance), 0) FROM accounts
-     WHERE is_closed = 0 AND account_type = '${CREDIT_CARD_IMPORT_TYPE}'`
-  )
-  const importedLiabilitiesCents =
-    (ccLiabResult[0]?.values?.[0]?.[0] as number) ?? 0
-
-  const totalManualLiabilitiesCents =
-    manualLiabilitiesCents + importedLiabilitiesCents
-
-  const totalCents =
-    upBankCents + manualAssetsCents - totalManualLiabilitiesCents
+  const totalCents = upBankCents + manualAssetsCents - manualLiabilitiesCents
 
   return {
     upBankCents,
     manualAssetsCents,
-    manualLiabilitiesCents: totalManualLiabilitiesCents,
+    manualLiabilitiesCents,
     totalCents,
   }
 }

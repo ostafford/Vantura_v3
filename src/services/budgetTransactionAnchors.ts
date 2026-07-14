@@ -33,7 +33,7 @@ function resolveLatestAmount(
      FROM transactions
      WHERE LOWER(description) = LOWER(?)
        AND amount < 0
-       AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND transfer_account_id IS NULL
        AND is_round_up = 0
      ORDER BY substr(COALESCE(settled_at, created_at), 1, 10) DESC,
               COALESCE(settled_at, created_at) DESC
@@ -151,7 +151,7 @@ export function searchRecentDebits(
     `SELECT id, description, raw_text, ABS(amount), COALESCE(settled_at, created_at), category_id
      FROM transactions
      WHERE amount < 0
-       AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND transfer_account_id IS NULL
        AND round_up_parent_id IS NULL
        AND (description LIKE ? ESCAPE '\\' OR raw_text LIKE ? ESCAPE '\\')
      ORDER BY substr(COALESCE(settled_at, created_at), 1, 10) DESC,

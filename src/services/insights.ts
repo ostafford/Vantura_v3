@@ -4,15 +4,11 @@
  * Term definitions (aligned with Up Bank app and product intent):
  *
  * - Money In: Real income only (salary, refunds, etc.). Excludes internal transfers
- *   (e.g. from a saver back to spending, or a linked credit-card payoff), and
- *   excludes credit-card-import rows entirely (source != 'up') — a payment or
- *   refund credited onto an imported card is never real income, it's debt
- *   reduction or a spend offset. Filter: amount > 0 AND not a transfer
- *   (transfer_account_id IS NULL and no
- *   transaction_user_data.user_transfer_account_override) AND source = 'up'.
+ *   (e.g. from a saver back to spending). Filter: amount > 0 AND not a transfer
+ *   (transfer_account_id IS NULL) AND source = 'up'.
  *
  * - Money Out: Spending only (purchases, charges). Excludes internal transfers out
- *   (e.g. to a saver, or a linked credit-card payoff). Filter: amount < 0 AND not a transfer.
+ *   (e.g. to a saver). Filter: amount < 0 AND not a transfer.
  *
  * - Savers: Net movement to/from any saver account (Loose Change, Investing, etc.).
  *   Computed from the SAVER account side: negated SUM(amount) for transactions whose
@@ -136,9 +132,7 @@ export function getWeeklyInsightsDebugCounts(
     return row ? Number(row[0]) : 0
   }
   return {
-    charges: run(
-      `amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND ${bounds}`
-    ),
+    charges: run(`amount < 0 AND transfer_account_id IS NULL AND ${bounds}`),
     roundUps: run(`is_round_up = 1 AND ${bounds}`),
     transfers: run(`transfer_account_id IS NOT NULL AND ${bounds}`),
   }
@@ -179,13 +173,13 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
   // Money In: real income; exclude internal transfers
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up' AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startIso, endIso]
   )
   // Money Out + Charges share the same filter — one query returns both
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([startIso, endIso])
@@ -284,14 +278,14 @@ export function getMonthlyInsights(
 
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up'
+     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up'
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [startIso, endIso]
   )
 
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([startIso, endIso])
@@ -366,7 +360,7 @@ export function getWeeklyCategoryBreakdown(
     `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
      FROM transactions t
      LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND t.is_categorizable = 1
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
      AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
      GROUP BY t.category_id ORDER BY total DESC LIMIT 15`
   )
@@ -399,7 +393,7 @@ export function getCategoryBreakdownForDateRange(
     `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
      FROM transactions t
      LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND t.is_categorizable = 1
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
      AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
      GROUP BY t.category_id ORDER BY total DESC LIMIT 20`
   )
@@ -429,7 +423,7 @@ export function getMoneyInForDateRange(
   const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
   const stmt = db.prepare(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up'
+     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up'
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   stmt.bind([dateFrom, endStr])
@@ -479,13 +473,13 @@ export function getInsightsForDateRange(
 
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up' AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
+     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
     [dateFrom, endStr]
   )
   // Money Out + Charges share the same filter — one query returns both
   const spendingStmt = db.prepare(
     `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1
+     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
   spendingStmt.bind([dateFrom, endStr])
@@ -919,8 +913,8 @@ function getDailyMoneyInOutForRange(
 
   const stmt = db.prepare(
     `SELECT CAST(substr(COALESCE(created_at, settled_at), 9, 2) AS INTEGER) AS day,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY day
@@ -977,8 +971,8 @@ function getDailyMoneyInOutByDateInRange(
 
   const stmt = db.prepare(
     `SELECT date(COALESCE(created_at, settled_at)) AS d,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY d
@@ -1193,8 +1187,8 @@ export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
 
   const stmt = db.prepare(
     `SELECT CAST(strftime('%m', COALESCE(created_at, settled_at)) AS INTEGER) AS m,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL) AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?
      GROUP BY m

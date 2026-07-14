@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 35
+const SCHEMA_VERSION = 36
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -130,9 +130,7 @@ const DDL_STATEMENTS = [
     user_notes TEXT,
     user_category_override TEXT,
     is_income INTEGER DEFAULT 0,
-    user_transfer_account_override TEXT,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id),
-    FOREIGN KEY (user_transfer_account_override) REFERENCES accounts(id)
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -220,40 +218,6 @@ const DDL_STATEMENTS = [
     up_bank_cents INTEGER NOT NULL,
     manual_assets_cents INTEGER NOT NULL DEFAULT 0,
     manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
-  )`,
-  `CREATE TABLE IF NOT EXISTS merchant_category_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    match_text TEXT NOT NULL,
-    category_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    last_matched_at TEXT,
-    FOREIGN KEY (category_id) REFERENCES categories(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS credit_card_statement_imports (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    account_id TEXT NOT NULL,
-    file_name TEXT NOT NULL,
-    opening_balance_cents INTEGER NOT NULL,
-    closing_balance_cents INTEGER,
-    computed_closing_balance_cents INTEGER NOT NULL,
-    row_count INTEGER NOT NULL,
-    imported_at TEXT NOT NULL,
-    FOREIGN KEY (account_id) REFERENCES accounts(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS statement_import_profiles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bank_name_pattern TEXT NOT NULL,
-    format TEXT NOT NULL,
-    date_field_preference TEXT NOT NULL DEFAULT 'transaction',
-    credit_marker TEXT NOT NULL DEFAULT 'CR',
-    opening_balance_label TEXT NOT NULL DEFAULT 'Opening Balance',
-    closing_balance_label TEXT NOT NULL DEFAULT 'Closing Balance',
-    date_format TEXT NOT NULL DEFAULT 'DD/MM/YYYY',
-    created_at TEXT NOT NULL,
-    last_used_at TEXT,
-    csv_column_map TEXT,
-    csv_has_header INTEGER,
-    csv_match_signature TEXT
   )`,
 ]
 
@@ -907,6 +871,71 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['35']
+    )
+  }
+
+  // Bank-statement-import feature removed entirely (2026-07-14 decision,
+  // after a same-day audit). Deletes any CREDIT_CARD_IMPORT account, its
+  // imported transactions, and their local user-data rows, then drops the
+  // three tables that only ever served this feature. One-time and
+  // destructive by design — there is no export/backup path for this data.
+  if (version < 36) {
+    const idsResult = database.exec(
+      `SELECT id FROM accounts WHERE account_type = 'CREDIT_CARD_IMPORT'`
+    )
+    const accountIds = (idsResult[0]?.values ?? []).map((r) => String(r[0]))
+    if (accountIds.length > 0) {
+      const acctPlaceholders = accountIds.map(() => '?').join(',')
+      const txIdsResult = database.exec(
+        `SELECT id FROM transactions WHERE account_id IN (${acctPlaceholders})`,
+        accountIds
+      )
+      const txIds = (txIdsResult[0]?.values ?? []).map((r) => String(r[0]))
+      if (txIds.length > 0) {
+        const txPlaceholders = txIds.map(() => '?').join(',')
+        database.run(
+          `DELETE FROM transaction_user_data WHERE transaction_id IN (${txPlaceholders})`,
+          txIds
+        )
+      }
+      database.run(
+        `DELETE FROM transactions WHERE account_id IN (${acctPlaceholders})`,
+        accountIds
+      )
+      database.run(
+        `DELETE FROM accounts WHERE account_type = 'CREDIT_CARD_IMPORT'`
+      )
+    }
+
+    database.run(`DROP TABLE IF EXISTS credit_card_statement_imports`)
+    database.run(`DROP TABLE IF EXISTS statement_import_profiles`)
+    database.run(`DROP TABLE IF EXISTS merchant_category_rules`)
+
+    const udCols = database.exec(`PRAGMA table_info(transaction_user_data)`)
+    const udHasOverride = (udCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'user_transfer_account_override'
+    )
+    if (udHasOverride) {
+      // A payoff-link row on the Up side of the link (e.g. the transaction
+      // that paid off the card) may carry no other data of its own — it only
+      // exists because setTransactionTransferOverride created it. Delete
+      // those outright rather than leaving an empty husk once the column
+      // below is dropped; a row with a real note/category override alongside
+      // a stale link is left alone; DROP COLUMN clears just the link value.
+      database.run(
+        `DELETE FROM transaction_user_data
+         WHERE user_transfer_account_override IS NOT NULL
+           AND user_notes IS NULL
+           AND user_category_override IS NULL`
+      )
+      database.run(
+        `ALTER TABLE transaction_user_data DROP COLUMN user_transfer_account_override`
+      )
+    }
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['36']
     )
   }
 }

@@ -1,17 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { Card, Row, Col, Modal, Button, Form, Badge } from 'react-bootstrap'
 import { syncStore } from '@/stores/syncStore'
 import { formatMoney } from '@/lib/format'
-import {
-  getAccountsByTypes,
-  createCreditCardAccount,
-  CREDIT_CARD_IMPORT_TYPE,
-  type AccountRow,
-} from '@/services/accounts'
-import { StatementImportModal } from '@/components/StatementImportModal'
-import { getLatestStatementImport } from '@/services/creditCardImport'
+import { getAccountsByTypes } from '@/services/accounts'
 import {
   getNetWorthSummary,
   getProjectedNetWorth,
@@ -637,150 +629,11 @@ function AccountRow({
   )
 }
 
-// ─── Credit card import status line ─────────────────────────────────────────
-
-function CreditCardImportStatus({
-  accountId,
-  refresh,
-}: {
-  accountId: string
-  refresh: number
-}) {
-  const record = useMemo(
-    () => getLatestStatementImport(accountId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accountId, refresh]
-  )
-  if (!record) return null
-
-  const dateLabel = new Date(record.importedAt).toLocaleDateString()
-  if (record.checksumMismatchCents != null) {
-    return (
-      <div className="small text-warning mt-1">
-        <i className="mdi mdi-alert-outline me-1" aria-hidden />
-        Last import ({dateLabel}, {record.rowCount} txns) is off by $
-        {formatMoney(Math.abs(record.checksumMismatchCents))} from the
-        statement's stated closing balance.
-      </div>
-    )
-  }
-  if (record.statedClosingBalanceCents != null) {
-    return (
-      <div className="small text-success mt-1">
-        <i className="mdi mdi-check-circle-outline me-1" aria-hidden />
-        Last import ({dateLabel}, {record.rowCount} txns) matches the
-        statement's closing balance.
-      </div>
-    )
-  }
-  return (
-    <div className="small text-muted mt-1">
-      Last import: {dateLabel}, {record.rowCount} txns (no stated closing
-      balance to verify against).
-    </div>
-  )
-}
-
-// ─── Add credit card (statement import) modal ───────────────────────────────
-
-function AddCreditCardModal({
-  onSave,
-  onClose,
-}: {
-  onSave: () => void
-  onClose: () => void
-}) {
-  const [name, setName] = useState('')
-  const [openingBalance, setOpeningBalance] = useState('')
-  const [openingDate, setOpeningDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  )
-  const [error, setError] = useState<string | null>(null)
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const cents = Math.round(parseFloat(openingBalance || '0') * 100)
-    if (!name.trim()) {
-      setError('Give this card a name.')
-      return
-    }
-    if (!Number.isFinite(cents) || cents < 0) {
-      setError('Opening balance must be a non-negative amount.')
-      return
-    }
-    createCreditCardAccount(name.trim(), cents, openingDate)
-    onSave()
-  }
-
-  return (
-    <Modal show onHide={onClose} centered>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add Credit Card (Statement Import)</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted small">
-            This is different from a plain manual "Credit Card" liability — this
-            account holds real transactions imported from your bank's statement,
-            so it can be categorized and budgeted like any Up Bank account.
-          </p>
-          <Form.Group className="mb-3">
-            <Form.Label>Card name</Form.Label>
-            <Form.Control
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Chase Sapphire"
-              autoFocus
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Opening balance</Form.Label>
-            <Form.Control
-              type="number"
-              step="0.01"
-              min="0"
-              value={openingBalance}
-              onChange={(e) => setOpeningBalance(e.target.value)}
-              placeholder="0.00"
-            />
-            <Form.Text className="text-muted">
-              Use the "Previous Balance" / "Opening Balance" printed on the
-              first statement you'll import.
-            </Form.Text>
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Label>Opening balance date</Form.Label>
-            <Form.Control
-              type="date"
-              value={openingDate}
-              onChange={(e) => setOpeningDate(e.target.value)}
-            />
-            <Form.Text className="text-muted">
-              The statement period's start date — the anchor future imports are
-              calculated from.
-            </Form.Text>
-          </Form.Group>
-          {error && <div className="text-danger small mt-2">{error}</div>}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit">
-            Add Card
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
-  )
-}
-
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export function AnalyticsNetWorth() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [refresh, setRefresh] = useState(0)
-  const navigate = useNavigate()
 
   // State for modals
   const [quickUpdateAccount, setQuickUpdateAccount] =
@@ -789,19 +642,11 @@ export function AnalyticsNetWorth() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addInitialType, setAddInitialType] =
     useState<ManualAccountType | null>(null)
-  const [showAddCreditCard, setShowAddCreditCard] = useState(false)
-  const [importAccount, setImportAccount] = useState<AccountRow | null>(null)
 
   const bump = useCallback(() => setRefresh((r) => r + 1), [])
 
   const upAccounts = useMemo(
     () => getAccountsByTypes(['TRANSACTIONAL', 'SAVER', 'HOME_LOAN']),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt, refresh]
-  )
-
-  const ccAccounts = useMemo(
-    () => getAccountsByTypes([CREDIT_CARD_IMPORT_TYPE]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, refresh]
   )
@@ -1058,47 +903,13 @@ export function AnalyticsNetWorth() {
           <span className="fw-semibold d-flex align-items-center">
             <i className="mdi mdi-trending-down text-danger me-2" aria-hidden />
             Liabilities
-            <HelpPopover
-              id="liabilities-credit-card-import-help"
-              title="Importing a credit card statement"
-              ariaLabel="How do I import a credit card statement?"
-              maxWidth={340}
-              content={
-                <ol className="ps-3 mb-0">
-                  <li className="mb-2">
-                    <strong>Add credit card (statement import)</strong> below —
-                    name the card and enter the opening balance and date printed
-                    on the first statement you&apos;ll import. This just creates
-                    the account; it doesn&apos;t import anything yet.
-                  </li>
-                  <li className="mb-2">
-                    The card then appears here under an{' '}
-                    <strong>IMPORTED</strong> badge. Click{' '}
-                    <strong>Import statement</strong> next to it.
-                  </li>
-                  <li className="mb-2">
-                    Upload the <strong>PDF, CSV, or OFX/QFX</strong> file your
-                    bank sent you for that card — not anything exported from
-                    Vantura itself.
-                  </li>
-                  <li className="mb-2">
-                    Review the parsed rows, tick which to include, assign
-                    categories, then <strong>Import</strong>.
-                  </li>
-                  <li>
-                    Repeat step 2 each time a new statement lands — there's no
-                    live bank connection for cards besides Up.
-                  </li>
-                </ol>
-              }
-            />
           </span>
           <span className="fw-semibold text-danger">
             ${formatMoney(summary.manualLiabilitiesCents)}
           </span>
         </Card.Header>
         <Card.Body className="p-0">
-          {manualLiabilities.length === 0 && ccAccounts.length === 0 ? (
+          {manualLiabilities.length === 0 ? (
             <p className="text-muted small px-3 py-3 mb-0">
               No liabilities added yet.
             </p>
@@ -1114,57 +925,6 @@ export function AnalyticsNetWorth() {
             </div>
           )}
 
-          {ccAccounts.length > 0 && (
-            <>
-              <hr className="my-2 mx-3" />
-              <div className="px-3 pb-1">
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <span
-                    className="badge rounded-pill bg-info-subtle text-info-emphasis"
-                    style={{ fontSize: '0.7rem' }}
-                  >
-                    IMPORTED
-                  </span>
-                </div>
-                {ccAccounts.map((a) => (
-                  <div key={a.id} className="py-1 px-1">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span
-                        role="button"
-                        className="d-flex align-items-center gap-2 min-w-0"
-                        onClick={() =>
-                          navigate(`/transactions?linkedAccountId=${a.id}`)
-                        }
-                      >
-                        <i
-                          className="mdi mdi-credit-card-outline text-muted flex-shrink-0"
-                          aria-hidden
-                        />
-                        <span className="fw-medium">{a.display_name}</span>
-                      </span>
-                      <span className="d-flex align-items-center gap-2 flex-shrink-0">
-                        <button
-                          type="button"
-                          className="btn btn-link btn-sm p-0"
-                          onClick={() => setImportAccount(a)}
-                        >
-                          Import statement
-                        </button>
-                        <span className="small text-danger">
-                          ${formatMoney(Math.abs(a.balance))}
-                        </span>
-                      </span>
-                    </div>
-                    <CreditCardImportStatus
-                      accountId={a.id}
-                      refresh={refresh}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
           <div className="px-3 pb-3 pt-1 d-flex gap-3">
             <button
               type="button"
@@ -1176,14 +936,6 @@ export function AnalyticsNetWorth() {
             >
               <i className="mdi mdi-plus me-1" aria-hidden />
               Add liability account
-            </button>
-            <button
-              type="button"
-              className="btn btn-link btn-sm p-0 text-muted"
-              onClick={() => setShowAddCreditCard(true)}
-            >
-              <i className="mdi mdi-plus me-1" aria-hidden />
-              Add credit card (statement import)
             </button>
           </div>
         </Card.Body>
@@ -1243,29 +995,6 @@ export function AnalyticsNetWorth() {
             setShowAddModal(false)
             setEditAccount(null)
             setAddInitialType(null)
-          }}
-        />
-      )}
-
-      {showAddCreditCard && (
-        <AddCreditCardModal
-          onSave={() => {
-            setShowAddCreditCard(false)
-            toast.success('Credit card added.')
-            bump()
-          }}
-          onClose={() => setShowAddCreditCard(false)}
-        />
-      )}
-
-      {importAccount && (
-        <StatementImportModal
-          accountId={importAccount.id}
-          accountName={importAccount.display_name}
-          onClose={() => setImportAccount(null)}
-          onImported={() => {
-            setImportAccount(null)
-            bump()
           }}
         />
       )}

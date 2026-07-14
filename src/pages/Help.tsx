@@ -15,7 +15,6 @@ const HELP_SECTION_KEYS = [
   'analytics',
   'budget-plan',
   'savers',
-  'credit-cards',
   'transactions',
   'settings',
   'security-privacy',
@@ -32,7 +31,6 @@ const HELP_SECTION_LABELS: Record<string, string> = {
   analytics: 'Analytics',
   'budget-plan': 'Budget Plan',
   savers: 'Savers',
-  'credit-cards': 'Credit cards',
   transactions: 'Transactions',
   settings: 'Settings',
   'security-privacy': 'Security and privacy',
@@ -516,21 +514,11 @@ export function Help() {
                   <SectionHeading icon="mdi-wallet-outline">
                     Budget Plan
                   </SectionHeading>
-                  <p className="mb-2">
+                  <p className="mb-0">
                     Group your expenses into buckets, see Income vs Committed vs
                     Free Spending, and test affordability with hypothetical
                     expenses. See <strong>Help → Budget Plan</strong> for full
                     details.
-                  </p>
-
-                  <SectionHeading icon="mdi-credit-card-outline">
-                    Credit cards (statement import)
-                  </SectionHeading>
-                  <p className="mb-0">
-                    Import a non-Up credit card&apos;s bank statement so its
-                    transactions show up alongside your Up Bank data. See{' '}
-                    <strong>Help → Credit cards</strong> for the step-by-step
-                    walkthrough.
                   </p>
                 </>
               )}
@@ -651,84 +639,6 @@ export function Help() {
                   <p className="mb-0">
                     Drag saver cards by their name to reorder them — the order
                     is saved automatically.
-                  </p>
-                </>
-              )}
-
-              {/* ── Credit cards (statement import) ──────────────────── */}
-              {activeSection === 'credit-cards' && (
-                <>
-                  <SectionHeading icon="mdi-information-outline" first>
-                    What it is
-                  </SectionHeading>
-                  <p className="mb-2">
-                    Up Bank accounts sync automatically, but most other banks
-                    have no open API. Statement import (Analytics → Net Worth →
-                    Liabilities) lets you upload a credit card&apos;s bank
-                    statement so its transactions show up alongside your Up Bank
-                    data — categorized, tracked, and budgeted the same way.
-                  </p>
-
-                  <SectionHeading icon="mdi-numeric-1-circle-outline">
-                    Step 1 — Add the card
-                  </SectionHeading>
-                  <p className="mb-2">
-                    On the Net Worth page, under <strong>Liabilities</strong>,
-                    click <strong>Add credit card (statement import)</strong>.
-                    Give it a name, then enter the{' '}
-                    <strong>opening balance</strong> and{' '}
-                    <strong>opening balance date</strong> printed on the first
-                    statement you&apos;re about to import — this is just the
-                    anchor point; it doesn&apos;t import any transactions yet.
-                  </p>
-
-                  <SectionHeading icon="mdi-numeric-2-circle-outline">
-                    Step 2 — Import a statement
-                  </SectionHeading>
-                  <p className="mb-2">
-                    The card now appears under an <strong>IMPORTED</strong>{' '}
-                    badge. Click <strong>Import statement</strong> next to it
-                    and upload the <strong>PDF, CSV, or OFX/QFX</strong> file
-                    your bank provided for that card.
-                  </p>
-
-                  <SectionHeading icon="mdi-numeric-3-circle-outline">
-                    Step 3 — Review and commit
-                  </SectionHeading>
-                  <p className="mb-2">
-                    Vantura parses the file and shows every transaction it
-                    found. Untick anything you don&apos;t want imported, assign
-                    a category to each row (tick <strong>Remember</strong> to
-                    auto-categorize that merchant next time), optionally enter
-                    the statement&apos;s stated closing balance to sanity-check
-                    the import, then click <strong>Import</strong>.
-                  </p>
-                  <Tip>
-                    If the computed balance doesn&apos;t match what you entered,
-                    Vantura flags the mismatch on the card afterwards — double
-                    check the rows you unticked or the amounts on any edited
-                    row.
-                  </Tip>
-
-                  <SectionHeading icon="mdi-link-variant">
-                    Paying off the card from Up
-                  </SectionHeading>
-                  <p className="mb-2">
-                    When you pay the card off from an Up Bank account, open that
-                    payment transaction and set <strong>Card payment</strong> to
-                    the imported card. This links it as a payoff — it updates
-                    the card&apos;s balance immediately and is excluded from
-                    your spending totals so it doesn&apos;t double-count against
-                    the card&apos;s own transactions.
-                  </p>
-
-                  <SectionHeading icon="mdi-repeat">Ongoing use</SectionHeading>
-                  <p className="mb-0">
-                    This is a manual, per-statement workflow — repeat Step 2
-                    each time a new statement lands. Upload the file{' '}
-                    <strong>your bank</strong> sent you, not anything exported
-                    from Vantura itself — Vantura recognizes and rejects its own
-                    exports if uploaded here by mistake.
                   </p>
                 </>
               )}

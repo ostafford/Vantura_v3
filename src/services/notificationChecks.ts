@@ -75,7 +75,7 @@ function checkBillsSettled(): void {
       `SELECT id FROM transactions
        WHERE raw_text = ?
          AND amount < 0
-         AND transfer_account_id IS NULL AND id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+         AND transfer_account_id IS NULL
          AND substr(COALESCE(settled_at, created_at), 1, 10) >= ?
        LIMIT 1`,
       [matchRawText, windowStartStr]
@@ -307,7 +307,7 @@ function checkPaydayLanded(): void {
        JOIN accounts a ON t.account_id = a.id
        WHERE a.account_type = 'TRANSACTIONAL'
          AND t.amount >= ?
-         AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+         AND t.transfer_account_id IS NULL
          AND COALESCE(t.settled_at, t.created_at) >= ?
        ORDER BY COALESCE(t.settled_at, t.created_at) DESC
        LIMIT 5`
@@ -372,7 +372,7 @@ function checkLargeTransaction(): void {
      JOIN accounts a ON t.account_id = a.id
      WHERE a.account_type = 'TRANSACTIONAL'
        AND t.amount <= ?
-       AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND t.transfer_account_id IS NULL
        AND t.is_round_up = 0
        ${dateSql}
      ORDER BY COALESCE(t.settled_at, t.created_at) DESC`
@@ -511,7 +511,7 @@ function checkPossiblePayday(): void {
      JOIN accounts a ON t.account_id = a.id
      WHERE a.account_type = 'TRANSACTIONAL'
        AND t.amount >= ?
-       AND t.transfer_account_id IS NULL AND t.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+       AND t.transfer_account_id IS NULL
        AND t.is_round_up = 0
        AND COALESCE(t.settled_at, t.created_at) >= ?
        AND (
@@ -519,7 +519,7 @@ function checkPossiblePayday(): void {
          FROM transactions t2
          WHERE COALESCE(t2.raw_text, t2.description) = COALESCE(t.raw_text, t.description)
            AND t2.amount > 0
-           AND t2.transfer_account_id IS NULL AND t2.id NOT IN (SELECT transaction_id FROM transaction_user_data WHERE user_transfer_account_override IS NOT NULL)
+           AND t2.transfer_account_id IS NULL
        ) >= 2
      ORDER BY t.amount DESC
      LIMIT 1`
