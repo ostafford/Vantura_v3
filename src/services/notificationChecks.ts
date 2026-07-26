@@ -106,6 +106,8 @@ function checkBillsDue(): void {
 
   markCheckedToday('notif_last_bills_date')
 
+  const db = getDb()
+
   for (const c of charges) {
     const days = daysUntilCharge(c.next_charge_date)
     const dayText =
@@ -117,6 +119,18 @@ function checkBillsDue(): void {
           ? 'Bill due tomorrow'
           : 'Upcoming bill reminder'
     const body = `${c.name} ($${formatMoney(c.amount)}) — ${dayText}`
+
+    // Replace any stale countdown row for this bill (e.g. yesterday's
+    // "due in 2d") so it doesn't keep piling up alongside today's.
+    if (db) {
+      const escapedName = c.name.replace(/%/g, '\\%').replace(/_/g, '\\_')
+      db.run(
+        `DELETE FROM notification_history
+         WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
+        [`%${escapedName}%`]
+      )
+    }
+
     addNotificationToHistory(
       'bills_due',
       title,
@@ -563,8 +577,9 @@ function checkPossiblePayday(): void {
  * Called when the user dismisses the dashboard banner so the charges remain
  * visible in the sidebar even though the banner is hidden for the day.
  *
- * Deduplicates: skips any charge whose name already appears in a bills_due
- * entry created today (whether by this function or by checkBillsDue earlier).
+ * Deduplicates: replaces any existing bills_due entry for the same charge
+ * (whether created today by checkBillsDue or on a prior day) so only one
+ * countdown row per bill ever exists in history.
  */
 export function ensureBillsDueNotifications(
   charges: UpcomingChargeRow[]
@@ -572,8 +587,6 @@ export function ensureBillsDueNotifications(
   const db = getDb()
   if (!db) return
   if (charges.length === 0) return
-
-  const today = todayDateString()
 
   for (const c of charges) {
     const escapedName = c.name.replace(/%/g, '\\%').replace(/_/g, '\\_')
@@ -583,9 +596,15 @@ export function ensureBillsDueNotifications(
          AND body LIKE ? ESCAPE '\\'
          AND substr(created_at, 1, 10) = ?
        LIMIT 1`,
-      [`%${escapedName}%`, today]
+      [`%${escapedName}%`, todayDateString()]
     )
     if (existing[0]?.values?.length) continue
+
+    db.run(
+      `DELETE FROM notification_history
+       WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
+      [`%${escapedName}%`]
+    )
 
     const days = daysUntilCharge(c.next_charge_date)
     const dayText =
