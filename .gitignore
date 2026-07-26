@@ -8,6 +8,9 @@ dist-ssr
 vite.config.ts.timestamp-*.mjs
 .vite
 
+# Test coverage
+coverage
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
