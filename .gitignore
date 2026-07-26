@@ -11,6 +11,12 @@ vite.config.ts.timestamp-*.mjs
 # Test coverage
 coverage
 
+# Playwright
+playwright-report
+test-results
+blob-report
+playwright/.cache
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

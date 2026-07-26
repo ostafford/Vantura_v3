@@ -1067,6 +1067,14 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
   return list
 }
 
+export const __test__ = {
+  daysBetween,
+  stepBackOnePeriod,
+  getPreviousPaydayDate,
+  getLastResetDate,
+  getNextResetDate,
+}
+
 /**
  * Category IDs linked to a tracker (for edit form).
  */
