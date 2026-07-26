@@ -25,5 +25,12 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
-      - run: npm audit --omit=dev --audit-level=critical
+      - name: npm audit
+        run: |
+          for i in 1 2 3; do
+            npm audit --omit=dev --audit-level=critical && exit 0
+            echo "npm audit attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit 1
       - run: npm run build
