@@ -1,4 +1,10 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  Navigate,
+  Link,
+  useRouteError,
+  isRouteErrorResponse,
+} from 'react-router-dom'
 import { Layout } from '@/layout/Layout'
 import { Dashboard } from '@/pages/Dashboard'
 import { Transactions } from '@/pages/Transactions'
@@ -17,11 +23,61 @@ import { Changelog } from '@/pages/Changelog'
 import { SaverAccountTransactionsRedirect } from '@/routing/SaverAccountTransactionsRedirect'
 import type { AppRouteHandle } from '@/types/appRouteHandle'
 
+function RouteError() {
+  const error = useRouteError()
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : 'An unexpected error occurred.'
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: 24,
+        backgroundColor: 'var(--vantura-background, #13131c)',
+        color: 'var(--vantura-text, #e4e4f0)',
+      }}
+    >
+      <h2 className="mb-3">Something went wrong</h2>
+      <p className="text-muted mb-3 text-center">{message}</p>
+      <div className="d-flex gap-2">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => window.location.assign('/')}
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function NotFound() {
+  return (
+    <div className="text-center py-5">
+      <h2 className="mb-3">Page not found</h2>
+      <p className="text-muted mb-3">
+        The page you're looking for doesn't exist.
+      </p>
+      <Link to="/" className="btn btn-primary">
+        Go to Dashboard
+      </Link>
+    </div>
+  )
+}
+
 export const appRouter = createBrowserRouter(
   [
     {
       path: '/',
       element: <Layout />,
+      errorElement: <RouteError />,
       children: [
         { index: true, element: <Dashboard /> },
         { path: 'plan', element: <Navigate to="/analytics" replace /> },
@@ -152,6 +208,7 @@ export const appRouter = createBrowserRouter(
         { path: 'settings', element: <Settings /> },
         { path: 'help', element: <Help /> },
         { path: 'changelog', element: <Changelog /> },
+        { path: '*', element: <NotFound /> },
       ],
     },
   ],

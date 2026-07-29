@@ -1,6 +1,22 @@
 import { Form } from 'react-bootstrap'
 import { Link } from 'react-router-dom'
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
+import { MILESTONES } from '@/data/changelog'
+
+const MILESTONE_COUNT = MILESTONES.length
+const TOTAL_FEATURE_COUNT = MILESTONES.reduce(
+  (sum, m) => sum + m.items.length,
+  0
+)
+const EARLIEST_MONTH = [...new Set(MILESTONES.map((m) => m.primaryMonth))]
+  .sort()
+  .at(0)
+const SINCE_LABEL = EARLIEST_MONTH
+  ? new Date(EARLIEST_MONTH + '-01').toLocaleString('default', {
+      month: 'short',
+      year: 'numeric',
+    })
+  : ''
 
 const HELP_ACTIVE_SECTION_KEY = 'vantura_help_active_section'
 
@@ -196,7 +212,8 @@ export function Help() {
                         See what&apos;s been built
                       </div>
                       <div className="text-muted small">
-                        9 milestones · 43+ features shipped since Feb 2026
+                        {MILESTONE_COUNT} milestones · {TOTAL_FEATURE_COUNT}{' '}
+                        features shipped since {SINCE_LABEL}
                       </div>
                     </div>
                     <i

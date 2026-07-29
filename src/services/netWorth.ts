@@ -2,7 +2,12 @@ import { getDb, schedulePersist, getAppSetting } from '@/db'
 import { firstOccurrenceOnOrAfter } from '@/services/upcoming'
 
 export interface NetWorthSummary {
+  /** Sum of all synced Up Bank account balances (TRANSACTIONAL + SAVER + HOME_LOAN). HOME_LOAN balances are negative, so this is a net figure — use upBankAssetsCents/upBankLiabilitiesCents for an assets/liabilities breakdown. */
   upBankCents: number
+  /** Synced Up Bank TRANSACTIONAL + SAVER balances only. */
+  upBankAssetsCents: number
+  /** Synced Up Bank HOME_LOAN debt, as a positive amount. */
+  upBankLiabilitiesCents: number
   manualAssetsCents: number
   manualLiabilitiesCents: number
   totalCents: number
@@ -26,6 +31,8 @@ export function getNetWorthSummary(): NetWorthSummary {
   if (!db)
     return {
       upBankCents: 0,
+      upBankAssetsCents: 0,
+      upBankLiabilitiesCents: 0,
       manualAssetsCents: 0,
       manualLiabilitiesCents: 0,
       totalCents: 0,
@@ -35,6 +42,16 @@ export function getNetWorthSummary(): NetWorthSummary {
     `SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE is_closed = 0`
   )
   const upBankCents = (upResult[0]?.values?.[0]?.[0] as number) ?? 0
+
+  const upAssetResult = db.exec(
+    `SELECT COALESCE(SUM(balance), 0) FROM accounts
+     WHERE is_closed = 0 AND account_type != 'HOME_LOAN'`
+  )
+  const upBankAssetsCents = (upAssetResult[0]?.values?.[0]?.[0] as number) ?? 0
+
+  // Up Bank represents home loan debt as a negative balance; flip to a
+  // positive liability amount for the assets/liabilities breakdown.
+  const upBankLiabilitiesCents = upBankAssetsCents - upBankCents
 
   const assetResult = db.exec(
     `SELECT COALESCE(SUM(balance_cents), 0) FROM manual_accounts WHERE kind = 'asset'`
@@ -51,6 +68,8 @@ export function getNetWorthSummary(): NetWorthSummary {
 
   return {
     upBankCents,
+    upBankAssetsCents,
+    upBankLiabilitiesCents,
     manualAssetsCents,
     manualLiabilitiesCents,
     totalCents,

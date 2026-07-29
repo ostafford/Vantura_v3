@@ -57,7 +57,11 @@ import {
 } from '@/lib/notifications'
 import { useFullReSync } from '@/hooks/useFullReSync'
 import { isBiometricAvailable, registerBiometric } from '@/lib/webauthn'
-import { clearBiometricSession } from '@/lib/biometricSession'
+import {
+  clearBiometricSession,
+  storeBiometricSession,
+  hasBiometricSession,
+} from '@/lib/biometricSession'
 import {
   detectPaySchedule,
   searchCreditTransactions,
@@ -466,6 +470,8 @@ export function Settings() {
       const credentialId = await registerBiometric()
       setAppSetting('biometric_credential_id', credentialId)
       setAppSetting('biometrics_enabled', '1')
+      const token = sessionStore.getState().getToken()
+      if (token) await storeBiometricSession(token)
       setBioEnabled(true)
       toast.success('Biometric unlock enabled.')
     } catch (err) {
@@ -485,7 +491,12 @@ export function Settings() {
       const credentialId = await registerBiometric()
       setAppSetting('biometric_credential_id', credentialId)
       setAppSetting('biometrics_enabled', '1')
-      clearBiometricSession()
+      const token = sessionStore.getState().getToken()
+      if (token) {
+        await storeBiometricSession(token)
+      } else {
+        clearBiometricSession()
+      }
       setBioEnabled(true)
       toast.success('Biometric re-registered.')
     } catch (err) {
@@ -502,6 +513,7 @@ export function Settings() {
     setClearing(true)
     try {
       localStorage.removeItem('vantura_sidebar_collapsed')
+      clearBiometricSession()
       await deleteDatabase()
       toast.success('All data cleared.')
       sessionStore.getState().lock()
@@ -556,6 +568,9 @@ export function Settings() {
       const newEncrypted = await encryptToken(newToken, key)
       setAppSetting('api_token_encrypted', newEncrypted)
       sessionStore.getState().setUnlocked(newToken)
+      // Keep the cached biometric-unlock session in sync so a rotated-out
+      // token can't be restored via a fingerprint unlock later.
+      if (hasBiometricSession()) await storeBiometricSession(newToken)
       setUpdateTokenPassphrase('')
       setUpdateTokenNewToken('')
       setUpdateTokenError(null)
@@ -1545,6 +1560,7 @@ export function Settings() {
                         const val = e.target.value
                         setLockTimeout(val)
                         setAppSetting('lock_timeout_minutes', val)
+                        sessionStore.getState().bumpLockTimeoutVersion()
                         toast.success('Lock timeout updated.')
                       }}
                       style={{ maxWidth: 200 }}

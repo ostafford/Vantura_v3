@@ -49,6 +49,9 @@ const FREQUENCIES = [
   'ONCE',
 ]
 
+/** Default number of rows shown before the "Show all" toggle appears. */
+const DEFAULT_VISIBLE_COUNT = 5
+
 /** Given an anchor date (from a past transaction) and a frequency, returns the
  *  next future occurrence as a YYYY-MM-DD string. */
 function calcNextChargeDate(anchorDateStr: string, frequency: string): string {
@@ -235,6 +238,7 @@ export function UpcomingSection({
     number | null
   >(null)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [showAll, setShowAll] = useState(false)
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
   const [txSearch, setTxSearch] = useState('')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
@@ -273,6 +277,11 @@ export function UpcomingSection({
   const reserved = useMemo(() => getReservedAmount(), [refresh])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const categories = useMemo(() => getCategories(), [refresh])
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of categories) map.set(c.id, c.name)
+    return map
+  }, [categories])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allBuckets = useMemo(() => getBuckets(), [refresh])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -412,6 +421,17 @@ export function UpcomingSection({
   const nextPayTotal = nextPay.reduce((s, c) => s + c.amount, 0)
   const laterTotal = later.reduce((s, c) => s + c.amount, 0)
   const hasAny = nextPay.length > 0 || later.length > 0
+  const totalCount = nextPay.length + later.length
+  const isCapped = !showAll && totalCount > DEFAULT_VISIBLE_COUNT
+  // Next pay charges are more time-sensitive, so they claim the visible
+  // slots first; Later fills whatever's left of the default count.
+  const visibleNextPay = isCapped
+    ? nextPay.slice(0, DEFAULT_VISIBLE_COUNT)
+    : nextPay
+  const visibleLater = isCapped
+    ? later.slice(0, Math.max(0, DEFAULT_VISIBLE_COUNT - visibleNextPay.length))
+    : later
+  const hiddenCount = totalCount - visibleNextPay.length - visibleLater.length
 
   function reminderLabel(c: UpcomingChargeRow): string | null {
     if (c.reminder_days_before == null || c.reminder_days_before < 0)
@@ -426,6 +446,9 @@ export function UpcomingSection({
 
   function renderDataRow(c: UpcomingChargeRow) {
     const dueLabel = reminderLabel(c)
+    const categoryName = c.category_id
+      ? categoryNameById.get(c.category_id)
+      : null
     return (
       <tr
         key={c.id}
@@ -442,9 +465,21 @@ export function UpcomingSection({
       >
         <td>{formatShortDate(c.next_charge_date)}</td>
         <td>
-          {c.name}
-          {dueLabel && (
-            <span className="badge badge-reminder ms-1">{dueLabel}</span>
+          <div>
+            {c.name}
+            {dueLabel && (
+              <span className="badge badge-reminder ms-1">{dueLabel}</span>
+            )}
+          </div>
+          {(categoryName || c.is_reserved === 0) && (
+            <div className="small text-muted">
+              {[
+                categoryName,
+                c.is_reserved === 0 ? 'excluded from Spendable' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
           )}
         </td>
         <td>{c.frequency.charAt(0) + c.frequency.slice(1).toLowerCase()}</td>
@@ -487,7 +522,7 @@ export function UpcomingSection({
             <HelpPopover
               id="upcoming-help"
               title="Upcoming charges"
-              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Charges marked Include in Spendable reduce your Spendable balance until they are due. Grouped into Next pay (before your next payday) and Later."
+              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into Next pay (before your next payday) and Later, each showing the face-value total of what's listed. Charges marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for upcoming charges' total below is just that subset, prorated to your pay cycle, so it won't match the group totals above."
               ariaLabel="What are upcoming charges?"
             />
           </div>
@@ -538,7 +573,7 @@ export function UpcomingSection({
             </p>
           ) : isMobile ? (
             <div className="upcoming-list-vertical">
-              {nextPay.length > 0 && (
+              {visibleNextPay.length > 0 && (
                 <div className="mb-3">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <strong>Next pay</strong>
@@ -546,7 +581,7 @@ export function UpcomingSection({
                       ${formatMoney(nextPayTotal)} total
                     </span>
                   </div>
-                  {nextPay.map((c) => {
+                  {visibleNextPay.map((c) => {
                     const dueLabel = reminderLabel(c)
                     return (
                       <Card
@@ -575,9 +610,20 @@ export function UpcomingSection({
                                 )}
                               </div>
                               <div className="small text-muted">
-                                {formatShortDate(c.next_charge_date)} ·{' '}
-                                {c.frequency.charAt(0) +
-                                  c.frequency.slice(1).toLowerCase()}
+                                {[
+                                  `${formatShortDate(c.next_charge_date)} · ${
+                                    c.frequency.charAt(0) +
+                                    c.frequency.slice(1).toLowerCase()
+                                  }`,
+                                  c.category_id
+                                    ? categoryNameById.get(c.category_id)
+                                    : null,
+                                  c.is_reserved === 0
+                                    ? 'excluded from Spendable'
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
                               </div>
                             </div>
                             <div className="text-end">
@@ -590,7 +636,7 @@ export function UpcomingSection({
                   })}
                 </div>
               )}
-              {later.length > 0 && (
+              {visibleLater.length > 0 && (
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <strong>Later</strong>
@@ -598,7 +644,7 @@ export function UpcomingSection({
                       ${formatMoney(laterTotal)}
                     </span>
                   </div>
-                  {later.map((c) => {
+                  {visibleLater.map((c) => {
                     const dueLabel = reminderLabel(c)
                     return (
                       <Card
@@ -627,9 +673,20 @@ export function UpcomingSection({
                                 )}
                               </div>
                               <div className="small text-muted">
-                                {formatShortDate(c.next_charge_date)} ·{' '}
-                                {c.frequency.charAt(0) +
-                                  c.frequency.slice(1).toLowerCase()}
+                                {[
+                                  `${formatShortDate(c.next_charge_date)} · ${
+                                    c.frequency.charAt(0) +
+                                    c.frequency.slice(1).toLowerCase()
+                                  }`,
+                                  c.category_id
+                                    ? categoryNameById.get(c.category_id)
+                                    : null,
+                                  c.is_reserved === 0
+                                    ? 'excluded from Spendable'
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
                               </div>
                             </div>
                             <div className="text-end">
@@ -654,7 +711,7 @@ export function UpcomingSection({
                 </tr>
               </thead>
               <tbody>
-                {nextPay.length > 0 && (
+                {visibleNextPay.length > 0 && (
                   <>
                     <tr className="upcoming-section-header">
                       <td colSpan={4}>
@@ -667,10 +724,10 @@ export function UpcomingSection({
                         </div>
                       </td>
                     </tr>
-                    {nextPay.map(renderDataRow)}
+                    {visibleNextPay.map(renderDataRow)}
                   </>
                 )}
-                {later.length > 0 && (
+                {visibleLater.length > 0 && (
                   <>
                     <tr className="upcoming-section-header">
                       <td colSpan={4}>
@@ -680,14 +737,25 @@ export function UpcomingSection({
                         </div>
                       </td>
                     </tr>
-                    {later.map(renderDataRow)}
+                    {visibleLater.map(renderDataRow)}
                   </>
                 )}
               </tbody>
             </table>
           )}
+          {viewMode === 'list' && totalCount > DEFAULT_VISIBLE_COUNT && (
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 mt-2"
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll
+                ? 'Show less'
+                : `Show all ${totalCount} (${hiddenCount} more)`}
+            </button>
+          )}
           <div className="mt-2 small text-danger">
-            ${formatMoney(reserved)} reserved for upcoming
+            ${formatMoney(reserved)} reserved for upcoming charges
           </div>
         </Card.Body>
       </Card>

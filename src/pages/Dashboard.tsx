@@ -343,10 +343,13 @@ export function Dashboard() {
 
   useEffect(() => {
     if (shouldShowDashboardTour()) {
-      const t = setTimeout(() => startDashboardTour(sectionOrder), 400)
+      const visibleSections = sectionOrder.filter(
+        (id) => sectionVisibility[id] !== false
+      )
+      const t = setTimeout(() => startDashboardTour(visibleSections), 400)
       return () => clearTimeout(t)
     }
-  }, [sectionOrder])
+  }, [sectionOrder, sectionVisibility])
 
   useEffect(() => {
     const token = sessionStore.getState().getToken()

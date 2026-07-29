@@ -61,7 +61,9 @@ export function NetWorthCard({ dragHandleProps }: NetWorthCardProps) {
       <Card.Body>
         <div className="d-flex align-items-baseline gap-2 mb-1">
           <span className="fw-semibold fs-4">
-            {hasApproximate ? '≈ ' : ''}${formatMoney(summary.totalCents)}
+            {hasApproximate ? '≈ ' : ''}
+            {summary.totalCents < 0 ? '−' : ''}$
+            {formatMoney(Math.abs(summary.totalCents))}
           </span>
           {deltaVsPrev !== null && (
             <span
@@ -76,11 +78,18 @@ export function NetWorthCard({ dragHandleProps }: NetWorthCardProps) {
         </div>
         <div className="d-flex gap-3 small text-muted">
           <span className="text-success">
-            ▲ ${formatMoney(summary.upBankCents + summary.manualAssetsCents)}{' '}
+            ▲ $
+            {formatMoney(summary.upBankAssetsCents + summary.manualAssetsCents)}{' '}
             assets
           </span>
           <span className="text-danger">
-            ▼ ${formatMoney(summary.manualLiabilitiesCents)} liabilities
+            ▼ $
+            {formatMoney(
+              Math.abs(
+                summary.upBankLiabilitiesCents + summary.manualLiabilitiesCents
+              )
+            )}{' '}
+            liabilities
           </span>
         </div>
         {staleCount > 0 && (

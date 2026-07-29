@@ -641,7 +641,9 @@ export function replaceUpcomingCharges(
         ? uc.next_charge_date.slice(0, 10)
         : now.slice(0, 10)
     const categoryId =
-      uc.category_id != null && typeof uc.category_id === 'string'
+      uc.category_id != null &&
+      typeof uc.category_id === 'string' &&
+      categoryExists(db, uc.category_id)
         ? uc.category_id
         : null
     const isReserved = typeof uc.is_reserved === 'number' ? uc.is_reserved : 1

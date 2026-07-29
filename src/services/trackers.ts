@@ -172,17 +172,19 @@ function getPreviousPaydayDate(fromDate: string): string | null {
     prev = new Date(from)
     prev.setUTCDate(prev.getUTCDate() - 14)
   } else if (frequency === 'MONTHLY') {
-    prev = new Date(from)
-    prev.setUTCMonth(prev.getUTCMonth() - 1)
     if (isMonthlyLastWeekday(paydayDay)) {
-      return monthlyPaydayDate(
-        paydayDay,
-        prev.getUTCFullYear(),
-        prev.getUTCMonth()
-      )
+      let targetYear = from.getUTCFullYear()
+      let targetMonth = from.getUTCMonth() - 1
+      if (targetMonth < 0) {
+        targetMonth = 11
+        targetYear -= 1
+      }
+      return monthlyPaydayDate(paydayDay, targetYear, targetMonth)
         .toISOString()
         .slice(0, 10)
     }
+    prev = new Date(from)
+    prev.setUTCMonth(prev.getUTCMonth() - 1)
     if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
   } else {
     return null

@@ -62,11 +62,3 @@ export const PASTEL_SWATCHES = (Object.keys(ACCENT_PALETTES) as AccentId[]).map(
     label: ACCENT_PALETTES[id].label,
   })
 )
-
-/** Fixed semantic colours — not user-selectable. */
-export const SEMANTIC_COLORS = {
-  success: '#a5d6a7',
-  danger: '#ef9a9a',
-  warning: '#ffcc80',
-  info: '#90caf9',
-} as const

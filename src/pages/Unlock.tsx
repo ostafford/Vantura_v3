@@ -13,6 +13,7 @@ import {
   hasBiometricSession,
   retrieveBiometricSession,
   storeBiometricSession,
+  clearBiometricSession,
 } from '@/lib/biometricSession'
 import { VanturaLogo } from '@/components/VanturaLogo'
 
@@ -108,6 +109,7 @@ export function Unlock() {
     setResetError(null)
     try {
       localStorage.removeItem('vantura_sidebar_collapsed')
+      clearBiometricSession()
       await deleteDatabase()
       window.location.reload()
     } catch (err) {

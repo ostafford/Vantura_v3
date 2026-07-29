@@ -13,6 +13,7 @@ const NODE_WIDTH = 12
 const COLUMN_GAP = 80
 const MIN_LINK_WIDTH = 2
 const MAX_LINK_WIDTH = 24
+const CHART_PALETTE = ['#c2def8', '#90caf9', '#5b9fd4']
 
 export interface SankeyFlowChartProps {
   moneyInCents: number
@@ -30,7 +31,6 @@ export function SankeyFlowChart({
   ariaLabel = 'Income to spending flow',
 }: SankeyFlowChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
   const categoryColors = getInsightsCategoryColors()
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function SankeyFlowChart({
       const color =
         categoryColors[colorKey] ??
         categoryColors[UNCATEGORISED_COLOR_KEY] ??
-        chartPalette[i % chartPalette.length]
+        CHART_PALETTE[i % CHART_PALETTE.length]
       const path = line().curve(curveMonotoneX)([
         [leftX + NODE_WIDTH, centerY],
         [leftX + NODE_WIDTH + COLUMN_GAP * 0.3, centerY],
@@ -91,7 +91,7 @@ export function SankeyFlowChart({
       .attr('y', incomeNodeY)
       .attr('width', NODE_WIDTH)
       .attr('height', NODE_WIDTH)
-      .attr('fill', chartPalette[0])
+      .attr('fill', CHART_PALETTE[0])
       .attr('opacity', 0.9)
       .attr('rx', 2)
 
@@ -100,7 +100,7 @@ export function SankeyFlowChart({
       const color =
         categoryColors[colorKey] ??
         categoryColors[UNCATEGORISED_COLOR_KEY] ??
-        chartPalette[i % chartPalette.length]
+        CHART_PALETTE[i % CHART_PALETTE.length]
       container
         .append('rect')
         .attr('x', rightX)
@@ -137,7 +137,7 @@ export function SankeyFlowChart({
             : cat.category_name
         )
     })
-  }, [moneyInCents, categories, width, height, categoryColors, chartPalette])
+  }, [moneyInCents, categories, width, height, categoryColors])
 
   return (
     <svg

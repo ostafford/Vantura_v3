@@ -646,7 +646,13 @@ export function AnalyticsNetWorth() {
   const bump = useCallback(() => setRefresh((r) => r + 1), [])
 
   const upAccounts = useMemo(
-    () => getAccountsByTypes(['TRANSACTIONAL', 'SAVER', 'HOME_LOAN']),
+    () => getAccountsByTypes(['TRANSACTIONAL', 'SAVER']),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lastSyncCompletedAt, refresh]
+  )
+
+  const homeLoanAccounts = useMemo(
+    () => getAccountsByTypes(['HOME_LOAN']),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, refresh]
   )
@@ -745,7 +751,9 @@ export function AnalyticsNetWorth() {
             >
               <div className="small text-muted mb-1">Net Worth</div>
               <div className="fw-semibold fs-4">
-                {hasApproximate ? '≈ ' : ''}${formatMoney(summary.totalCents)}
+                {hasApproximate ? '≈ ' : ''}
+                {summary.totalCents < 0 ? '−' : ''}$
+                {formatMoney(Math.abs(summary.totalCents))}
               </div>
               {deltaVsPrev !== null && (
                 <div className="small mt-1">
@@ -783,7 +791,10 @@ export function AnalyticsNetWorth() {
             >
               <div className="small text-muted mb-1">Total Assets</div>
               <div className="fw-semibold fs-5 text-success">
-                ${formatMoney(summary.upBankCents + summary.manualAssetsCents)}
+                $
+                {formatMoney(
+                  summary.upBankAssetsCents + summary.manualAssetsCents
+                )}
               </div>
             </div>
             <div
@@ -795,7 +806,13 @@ export function AnalyticsNetWorth() {
             >
               <div className="small text-muted mb-1">Total Liabilities</div>
               <div className="fw-semibold fs-5 text-danger">
-                ${formatMoney(summary.manualLiabilitiesCents)}
+                $
+                {formatMoney(
+                  Math.abs(
+                    summary.upBankLiabilitiesCents +
+                      summary.manualLiabilitiesCents
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -818,7 +835,8 @@ export function AnalyticsNetWorth() {
             Assets
           </span>
           <span className="fw-semibold text-success">
-            ${formatMoney(summary.upBankCents + summary.manualAssetsCents)}
+            $
+            {formatMoney(summary.upBankAssetsCents + summary.manualAssetsCents)}
           </span>
         </Card.Header>
         <Card.Body className="p-0">
@@ -836,7 +854,7 @@ export function AnalyticsNetWorth() {
                 UP BANK · LIVE
               </span>
               <span className="fw-semibold">
-                ${formatMoney(summary.upBankCents)}
+                ${formatMoney(summary.upBankAssetsCents)}
               </span>
             </div>
             {upAccounts.length === 0 ? (
@@ -905,16 +923,53 @@ export function AnalyticsNetWorth() {
             Liabilities
           </span>
           <span className="fw-semibold text-danger">
-            ${formatMoney(summary.manualLiabilitiesCents)}
+            $
+            {formatMoney(
+              Math.abs(
+                summary.upBankLiabilitiesCents + summary.manualLiabilitiesCents
+              )
+            )}
           </span>
         </Card.Header>
         <Card.Body className="p-0">
+          {homeLoanAccounts.length > 0 && (
+            <div className="px-3 pt-3 pb-1">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <span
+                  className="badge rounded-pill"
+                  style={{
+                    background: 'var(--vantura-success, #a5d6a7)',
+                    color: '#1a2e1a',
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  UP BANK · LIVE
+                </span>
+                <span className="fw-semibold">
+                  ${formatMoney(Math.abs(summary.upBankLiabilitiesCents))}
+                </span>
+              </div>
+              {homeLoanAccounts.map((a) => (
+                <div
+                  key={a.id}
+                  className="d-flex justify-content-between align-items-center py-1 px-1"
+                >
+                  <span className="text-muted small">{a.display_name}</span>
+                  <span className="small">
+                    ${formatMoney(Math.abs(a.balance))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {manualLiabilities.length === 0 ? (
             <p className="text-muted small px-3 py-3 mb-0">
               No liabilities added yet.
             </p>
           ) : (
             <div className="px-3 pt-2 pb-1">
+              {homeLoanAccounts.length > 0 && <hr className="my-2 mx-0" />}
               {manualLiabilities.map((a) => (
                 <AccountRow
                   key={a.id}

@@ -169,6 +169,7 @@ function makeDelta(current: number, previous: number): MonthDelta {
 // ─── Spending Category List ───────────────────────────────────────────────────
 
 const SPENDING_LIST_DEFAULT_VISIBLE = 8
+const CHART_PALETTE = ['#c2def8', '#90caf9', '#5b9fd4']
 
 function SpendingCategoryList({
   chartData,
@@ -414,7 +415,6 @@ export function AnalyticsReports() {
 
   // --- Store ---
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
-  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
   const categoryColors = getInsightsCategoryColors()
 
   // --- Data ---
@@ -543,13 +543,13 @@ export function AnalyticsReports() {
           totalDollars: c.total / 100,
           fill:
             categoryColors[colorKey] ??
-            chartPalette[index % chartPalette.length],
+            CHART_PALETTE[index % CHART_PALETTE.length],
           stroke:
             categoryColors[colorKey] ??
-            chartPalette[index % chartPalette.length],
+            CHART_PALETTE[index % CHART_PALETTE.length],
         }
       }),
-    [categories, categoryColors, chartPalette]
+    [categories, categoryColors]
   )
   const totalSpent = categories.reduce((s, c) => s + c.total, 0)
   const top3Total = categories.slice(0, 3).reduce((s, c) => s + c.total, 0)

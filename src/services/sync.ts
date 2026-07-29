@@ -360,17 +360,19 @@ function prevPaydayDate(nextPayday: string): string | null {
     return prev.toISOString().slice(0, 10)
   }
   if (frequency === 'MONTHLY') {
-    const prev = new Date(from)
-    prev.setUTCMonth(prev.getUTCMonth() - 1)
     if (isMonthlyLastWeekday(paydayDay)) {
-      return monthlyPaydayDate(
-        paydayDay,
-        prev.getUTCFullYear(),
-        prev.getUTCMonth()
-      )
+      let targetYear = from.getUTCFullYear()
+      let targetMonth = from.getUTCMonth() - 1
+      if (targetMonth < 0) {
+        targetMonth = 11
+        targetYear -= 1
+      }
+      return monthlyPaydayDate(paydayDay, targetYear, targetMonth)
         .toISOString()
         .slice(0, 10)
     }
+    const prev = new Date(from)
+    prev.setUTCMonth(prev.getUTCMonth() - 1)
     if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
     return prev.toISOString().slice(0, 10)
   }
@@ -401,12 +403,21 @@ export function recalculateTrackers(): void {
       const freq = row[1]
       const nextReset = row[2] as string
       if (!nextReset || now < nextReset) continue
-      changed = true
       if (freq === 'PAYDAY') {
         if (!nextPayday) continue
         const nextPaydayNorm =
           nextPayday.length > 10 ? nextPayday.slice(0, 10) : nextPayday
+        // If next_payday itself is stuck in the past (e.g. a caller ran
+        // recalculateTrackers() without first calling
+        // advanceNextPaydayIfNeeded(), or payday settings were cleared),
+        // this would recompute the exact same target every outer pass —
+        // guard on an actual change so the loop can't spin forever on a
+        // no-op "update".
         const lastPaydayNorm = prevPaydayDate(nextPaydayNorm) ?? nextPaydayNorm
+        const nextResetNorm =
+          nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
+        if (nextPaydayNorm === nextResetNorm) continue
+        changed = true
         db.run(
           `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
           [lastPaydayNorm, nextPaydayNorm, id]
@@ -424,6 +435,7 @@ export function recalculateTrackers(): void {
         } else {
           continue
         }
+        changed = true
         const lastNorm =
           nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
         const nextNorm = next.toISOString().slice(0, 10)
@@ -552,4 +564,8 @@ export async function performFullSync(
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
   progressCallback({ phase: 'done' })
+}
+
+export const __test__ = {
+  prevPaydayDate,
 }

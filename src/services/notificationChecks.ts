@@ -31,6 +31,18 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * LIKE pattern matching a bills_due notification body for this exact charge
+ * name. Anchored to the " (" that always follows the name in the body
+ * (`"${name} ($${amount}) — ${dayText}"`), so a charge named "Gym" can't
+ * match a stored notification for "Anytime Gym Membership" — a bare
+ * `%name%` substring pattern would wrongly match both.
+ */
+function billNotificationPattern(chargeName: string): string {
+  const escaped = chargeName.replace(/%/g, '\\%').replace(/_/g, '\\_')
+  return `${escaped} ($%`
+}
+
 // ─── 0. Auto-clear settled bill notifications ────────────────────────────────
 
 /**
@@ -84,11 +96,10 @@ function checkBillsSettled(): void {
     if (!txRes[0]?.values?.length) continue
 
     // Payment found — remove matching bills_due notifications for this charge
-    const escapedName = chargeName.replace(/%/g, '\\%').replace(/_/g, '\\_')
     db.run(
       `DELETE FROM notification_history
        WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
-      [`%${escapedName}%`]
+      [billNotificationPattern(chargeName)]
     )
     schedulePersist()
     setAppSetting(guardKey, '1')
@@ -123,11 +134,10 @@ function checkBillsDue(): void {
     // Replace any stale countdown row for this bill (e.g. yesterday's
     // "due in 2d") so it doesn't keep piling up alongside today's.
     if (db) {
-      const escapedName = c.name.replace(/%/g, '\\%').replace(/_/g, '\\_')
       db.run(
         `DELETE FROM notification_history
          WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
-        [`%${escapedName}%`]
+        [billNotificationPattern(c.name)]
       )
     }
 
@@ -362,16 +372,26 @@ function checkLargeTransaction(): void {
 
   const thresholdCents = getLargeTxThresholdCents()
   const lastCheckIso = getAppSetting('notif_large_tx_last_check_iso')
-  const nowIso = new Date().toISOString()
-
-  // Update the check timestamp immediately so a crash doesn't cause a loop
-  setAppSetting('notif_large_tx_last_check_iso', nowIso)
+  // Transaction ids already notified at exactly lastCheckIso — settlement
+  // timestamps can collide (same second/millisecond) between two distinct
+  // transactions, so the date checkpoint alone can't disambiguate "already
+  // seen" from "new" when they share a timestamp.
+  const lastCheckIds = (getAppSetting('notif_large_tx_last_check_ids') ?? '')
+    .split(',')
+    .filter(Boolean)
 
   const params: (string | number)[] = [thresholdCents]
   let dateSql = ''
   if (lastCheckIso) {
-    dateSql = `AND COALESCE(t.settled_at, t.created_at) > ?`
-    params.push(lastCheckIso)
+    if (lastCheckIds.length > 0) {
+      const placeholders = lastCheckIds.map(() => '?').join(',')
+      dateSql = `AND (COALESCE(t.settled_at, t.created_at) > ?
+        OR (COALESCE(t.settled_at, t.created_at) = ? AND t.id NOT IN (${placeholders})))`
+      params.push(lastCheckIso, lastCheckIso, ...lastCheckIds)
+    } else {
+      dateSql = `AND COALESCE(t.settled_at, t.created_at) > ?`
+      params.push(lastCheckIso)
+    }
   } else {
     // First run: look back 24h only
     const yesterday = new Date()
@@ -381,7 +401,7 @@ function checkLargeTransaction(): void {
   }
 
   const stmt = db.prepare(
-    `SELECT t.description, t.amount, COALESCE(t.settled_at, t.created_at) as tx_date
+    `SELECT t.id, t.description, t.amount, COALESCE(t.settled_at, t.created_at) as tx_date
      FROM transactions t
      JOIN accounts a ON t.account_id = a.id
      WHERE a.account_type = 'TRANSACTIONAL'
@@ -395,14 +415,36 @@ function checkLargeTransaction(): void {
   params[0] = -thresholdCents
   stmt.bind(params)
 
-  const found: { description: string; amount: number }[] = []
+  const found: {
+    id: string
+    description: string
+    amount: number
+    date: string
+  }[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [string, number, string]
-    found.push({ description: r[0], amount: r[1] })
+    const r = stmt.get() as [string, string, number, string]
+    found.push({ id: r[0], description: r[1], amount: r[2], date: r[3] })
   }
   stmt.free()
 
   if (found.length === 0) return
+
+  // Advance the checkpoint to the latest transaction date actually seen, not to
+  // "now" — transactions can settle well after they occurred, so anchoring to
+  // wall-clock time would permanently skip any large transaction that syncs in
+  // after this point (its settled_at is always in the past relative to "now").
+  let maxDate = found[0].date
+  for (const t of found) if (t.date > maxDate) maxDate = t.date
+  // Accumulate ids at maxDate rather than overwrite: if maxDate hasn't moved
+  // (all new matches share the previous timestamp), previously-seen ids at
+  // that same instant must stay excluded too.
+  const idsAtMaxDate = new Set(maxDate === lastCheckIso ? lastCheckIds : [])
+  for (const t of found) if (t.date === maxDate) idsAtMaxDate.add(t.id)
+  setAppSetting('notif_large_tx_last_check_iso', maxDate)
+  setAppSetting(
+    'notif_large_tx_last_check_ids',
+    Array.from(idsAtMaxDate).join(',')
+  )
 
   if (found.length === 1) {
     const tx = found[0]
@@ -439,14 +481,24 @@ function checkSaverMilestones(): void {
     if (!saver.target_amount_cents || saver.target_amount_cents <= 0) continue
     const pct = (saver.balance / saver.target_amount_cents) * 100
 
-    for (const milestone of [50, 75, 100] as const) {
+    for (const milestone of [100, 75, 50] as const) {
       if (pct < milestone) continue
       const guardKey = `notif_sm_${saver.id}_${milestone}`
       // Store the target at time of firing so we re-fire if the goal changes
       const storedTarget = getAppSetting(guardKey)
       if (storedTarget === String(saver.target_amount_cents)) continue
 
-      setAppSetting(guardKey, String(saver.target_amount_cents))
+      // Mark this and every lower milestone as covered too, so a balance
+      // that jumps straight past 50%/75% to 100% only ever produces a
+      // single "highest milestone reached" notification, not one per tier.
+      for (const m of [50, 75, 100] as const) {
+        if (m <= milestone) {
+          setAppSetting(
+            `notif_sm_${saver.id}_${m}`,
+            String(saver.target_amount_cents)
+          )
+        }
+      }
       const milestoneLabel =
         milestone === 100 ? 'Goal reached' : `${milestone}% milestone`
       const body =
@@ -589,21 +641,21 @@ export function ensureBillsDueNotifications(
   if (charges.length === 0) return
 
   for (const c of charges) {
-    const escapedName = c.name.replace(/%/g, '\\%').replace(/_/g, '\\_')
+    const pattern = billNotificationPattern(c.name)
     const existing = db.exec(
       `SELECT 1 FROM notification_history
        WHERE type = 'bills_due'
          AND body LIKE ? ESCAPE '\\'
          AND substr(created_at, 1, 10) = ?
        LIMIT 1`,
-      [`%${escapedName}%`, todayDateString()]
+      [pattern, todayDateString()]
     )
     if (existing[0]?.values?.length) continue
 
     db.run(
       `DELETE FROM notification_history
        WHERE type = 'bills_due' AND body LIKE ? ESCAPE '\\'`,
-      [`%${escapedName}%`]
+      [pattern]
     )
 
     const days = daysUntilCharge(c.next_charge_date)

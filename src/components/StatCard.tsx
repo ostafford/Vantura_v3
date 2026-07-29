@@ -15,7 +15,6 @@ export interface StatCardProps {
   /** Smaller variant: less padding, smaller typography, gradient background. */
   compact?: boolean
   gradient: ColorVariant
-  imgAlt?: string
   /** Accepts plain strings or formatted JSX for richer multi-line tooltips. */
   tooltip?: ReactNode
 }

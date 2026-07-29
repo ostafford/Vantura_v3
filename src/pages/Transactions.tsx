@@ -30,12 +30,6 @@ import {
   getTagsForTransaction,
   setTransactionTagsLocal,
 } from '@/services/tags'
-import { getBuckets, type BudgetBucketRow } from '@/services/budgetBuckets'
-import {
-  pinTransactionToBucket,
-  getAnchorForTransaction,
-} from '@/services/budgetTransactionAnchors'
-import { BUDGET_FREQUENCIES } from '@/lib/budgetBucketMeta'
 import {
   updateTransactionCategory,
   addTransactionTags,
@@ -63,120 +57,6 @@ import {
 } from '@/lib/format'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
-
-// ─── Pin-to-bucket modal ─────────────────────────────────────────────────────
-
-interface PinToBucketModalProps {
-  tx: TransactionRow | null
-  onClose: () => void
-  onSaved: () => void
-}
-
-function PinToBucketModal({ tx, onClose, onSaved }: PinToBucketModalProps) {
-  const [bucketId, setBucketId] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-  const [buckets, setBuckets] = useState<BudgetBucketRow[]>([])
-
-  useMemo(() => {
-    if (tx) {
-      setBucketId('')
-      setFrequency('MONTHLY')
-      setBuckets(getBuckets())
-    }
-  }, [tx])
-
-  const existingAnchor = useMemo(
-    () => (tx ? getAnchorForTransaction(tx.id) : null),
-    [tx]
-  )
-
-  function handleConfirm() {
-    if (!tx || !bucketId) return
-    pinTransactionToBucket(tx.id, Number(bucketId), frequency)
-    toast.success(`"${tx.description}" pinned to budget bucket`)
-    onSaved()
-    onClose()
-  }
-
-  return (
-    <Modal show={!!tx} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title className="text-truncate" style={{ maxWidth: '90%' }}>
-          Add to budget bucket
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {tx && (
-          <>
-            <div
-              className="mb-3 p-2 rounded"
-              style={{ background: 'var(--bs-tertiary-bg)' }}
-            >
-              <div className="fw-medium">{tx.description || tx.raw_text}</div>
-              <div className="text-muted small">
-                ${formatMoney(Math.abs(tx.amount))} ·{' '}
-                {formatShortDate(
-                  (tx.created_at ?? tx.settled_at ?? '').slice(0, 10)
-                )}
-              </div>
-            </div>
-
-            {existingAnchor && (
-              <div className="alert alert-info py-2 small mb-3">
-                Already pinned to <strong>{existingAnchor.bucketName}</strong>.
-                Pinning again will create a second anchor in the chosen bucket.
-              </div>
-            )}
-
-            <Form.Group className="mb-3">
-              <Form.Label>Bucket</Form.Label>
-              <Form.Select
-                value={bucketId}
-                onChange={(e) => setBucketId(e.target.value)}
-              >
-                <option value="">Select a bucket…</option>
-                {buckets.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group>
-              <Form.Label>How often does this charge recur?</Form.Label>
-              <Form.Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {BUDGET_FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-
-            <p className="text-muted small mt-3 mb-0">
-              The bucket will use this amount and automatically update when a
-              newer charge with the same description appears.
-            </p>
-          </>
-        )}
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={handleConfirm} disabled={!bucketId}>
-          Pin to bucket
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 const SORT_OPTIONS: { value: TransactionSort; label: string }[] = [
   { value: 'date', label: 'Date' },
@@ -291,6 +171,16 @@ export function Transactions() {
     () => Object.keys(grouped).sort().reverse(),
     [grouped]
   )
+  // Show the year suffix on date labels only when the currently loaded
+  // transactions actually span more than one calendar year — data-driven
+  // so it works whether that's from an unfiltered view spanning years or
+  // an explicit date range that itself crosses a year boundary.
+  const showYear = useMemo(() => {
+    const years = new Set(
+      dateKeys.filter((d) => d !== 'Unknown').map((d) => d.slice(0, 4))
+    )
+    return years.size > 1
+  }, [dateKeys])
   const loadedCount = useMemo(
     () => dateKeys.reduce((n, k) => n + grouped[k].length, 0),
     [dateKeys, grouped]
@@ -314,8 +204,6 @@ export function Transactions() {
     () => getTransactionUserDataMap(parentIdsByDate),
     [parentIdsByDate]
   )
-
-  const [pinningTx, setPinningTx] = useState<TransactionRow | null>(null)
 
   const [editTxId, setEditTxId] = useState<string | null>(null)
   const editTxRow = useMemo(() => {
@@ -986,10 +874,6 @@ export function Transactions() {
       {dateKeys.length === 0 ? null : isMobile ? (
         <div className="transactions-list-vertical">
           {dateKeys.flatMap((dateStr) => {
-            const showYear =
-              !filters.dateFrom &&
-              !filters.dateTo &&
-              (filters.categoryIds?.length ?? 0) > 0
             const displayDate =
               dateStr === 'Unknown'
                 ? 'Unknown'
@@ -1044,26 +928,6 @@ export function Transactions() {
                         <div className={isDebit ? '' : 'text-success'}>
                           {isDebit ? '-' : '+'}${formatMoney(absCents)}
                         </div>
-                        {isDebit &&
-                          !row.transfer_account_id &&
-                          !row.is_round_up && (
-                            <button
-                              type="button"
-                              className="btn btn-link btn-sm p-0 text-muted"
-                              aria-label={`Add to budget bucket`}
-                              title="Add to budget bucket"
-                              style={{ fontSize: '0.85rem', lineHeight: 1 }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setPinningTx(row)
-                              }}
-                            >
-                              <i
-                                className="mdi mdi-wallet-plus-outline"
-                                aria-hidden
-                              />
-                            </button>
-                          )}
                       </div>
                     </div>
                     {roundUps.length > 0 && (
@@ -1113,15 +977,10 @@ export function Transactions() {
                     <th>Merchant</th>
                     <th>Category</th>
                     <th className="text-end">Amount</th>
-                    <th style={{ width: 40 }} />
                   </tr>
                 </thead>
                 <tbody>
                   {dateKeys.flatMap((dateStr, dateIndex) => {
-                    const showYear =
-                      !filters.dateFrom &&
-                      !filters.dateTo &&
-                      (filters.categoryIds?.length ?? 0) > 0
                     const displayDate =
                       dateStr === 'Unknown'
                         ? 'Unknown'
@@ -1170,27 +1029,6 @@ export function Transactions() {
                           >
                             {isDebit ? '-' : '+'}${formatMoney(absCents)}
                           </td>
-                          <td className="text-center" style={{ width: 40 }}>
-                            {isDebit &&
-                              !row.transfer_account_id &&
-                              !row.is_round_up && (
-                                <button
-                                  type="button"
-                                  className="btn btn-link btn-sm p-0 text-muted"
-                                  aria-label="Add to budget bucket"
-                                  title="Add to budget bucket"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setPinningTx(row)
-                                  }}
-                                >
-                                  <i
-                                    className="mdi mdi-wallet-plus-outline"
-                                    aria-hidden
-                                  />
-                                </button>
-                              )}
-                          </td>
                         </tr>
                       )
                       const roundUpRows = (
@@ -1207,7 +1045,6 @@ export function Transactions() {
                           <td className="text-end text-success">
                             +${formatMoney(Math.abs(ru.amount))}
                           </td>
-                          <td />
                         </tr>
                       ))
                       return [mainRow, ...roundUpRows]
@@ -1219,7 +1056,7 @@ export function Transactions() {
                           className="transactions-day-separator"
                           aria-hidden="true"
                         >
-                          <td colSpan={6} />
+                          <td colSpan={5} />
                         </tr>
                       ) : null
                     return [...dayRows, separator].filter(Boolean)
@@ -1240,12 +1077,6 @@ export function Transactions() {
           )}
         </>
       )}
-
-      <PinToBucketModal
-        tx={pinningTx}
-        onClose={() => setPinningTx(null)}
-        onSaved={() => {}}
-      />
 
       <Modal
         show={editTxId != null}

@@ -25,7 +25,7 @@
  */
 
 import { getDb } from '@/db'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import {
   buildMonthSpendingSeries,
   type MonthSpendingSeries,
@@ -388,7 +388,6 @@ export function getCategoryBreakdownForDateRange(
 ): CategoryBreakdownRow[] {
   const db = getDb()
   if (!db) return []
-  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
   const stmt = db.prepare(
     `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
      FROM transactions t
@@ -397,7 +396,7 @@ export function getCategoryBreakdownForDateRange(
      AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
      GROUP BY t.category_id ORDER BY total DESC LIMIT 20`
   )
-  stmt.bind([dateFrom, endStr])
+  stmt.bind([localDateStartUtc(dateFrom), localDateEndUtc(dateTo)])
   const list: CategoryBreakdownRow[] = []
   while (stmt.step()) {
     const row = stmt.get() as [string, string | null, number]
@@ -420,13 +419,12 @@ export function getMoneyInForDateRange(
 ): number {
   const db = getDb()
   if (!db) return 0
-  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
   const stmt = db.prepare(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
      WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up'
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
-  stmt.bind([dateFrom, endStr])
+  stmt.bind([localDateStartUtc(dateFrom), localDateEndUtc(dateTo)])
   stmt.step()
   const row = stmt.get()
   stmt.free()
@@ -460,7 +458,8 @@ export function getInsightsForDateRange(
 ): WeeklyInsightsData {
   const db = getDb()
   if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
-  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
+  const startStr = localDateStartUtc(dateFrom)
+  const endStr = localDateEndUtc(dateTo)
 
   const runOne = (sql: string, params: (string | number)[]): number => {
     const stmt = db.prepare(sql)
@@ -474,7 +473,7 @@ export function getInsightsForDateRange(
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
      WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
-    [dateFrom, endStr]
+    [startStr, endStr]
   )
   // Money Out + Charges share the same filter — one query returns both
   const spendingStmt = db.prepare(
@@ -482,7 +481,7 @@ export function getInsightsForDateRange(
      WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
   )
-  spendingStmt.bind([dateFrom, endStr])
+  spendingStmt.bind([startStr, endStr])
   spendingStmt.step()
   const spendingRow = spendingStmt.get()
   spendingStmt.free()
@@ -493,7 +492,7 @@ export function getInsightsForDateRange(
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
      AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
      AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`,
-    [dateFrom, endStr]
+    [startStr, endStr]
   )
   return { moneyIn, moneyOut, saverChanges, charges }
 }
@@ -909,8 +908,6 @@ function getDailyMoneyInOutForRange(
   const db = getDb()
   if (!db) return null
 
-  const endStr = dateTo.length <= 10 ? dateTo + 'T23:59:59.999Z' : dateTo
-
   const stmt = db.prepare(
     `SELECT CAST(substr(COALESCE(created_at, settled_at), 9, 2) AS INTEGER) AS day,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
@@ -920,7 +917,7 @@ function getDailyMoneyInOutForRange(
      GROUP BY day
      ORDER BY day`
   )
-  stmt.bind([dateFrom, endStr])
+  stmt.bind([localDateStartUtc(dateFrom), localDateEndUtc(dateTo)])
 
   const byDay: Record<number, { moneyInCents: number; moneyOutCents: number }> =
     {}
@@ -964,11 +961,6 @@ function getDailyMoneyInOutByDateInRange(
   const db = getDb()
   if (!db) return result
 
-  const endStr =
-    dateToInclusive.length <= 10
-      ? dateToInclusive + 'T23:59:59.999Z'
-      : dateToInclusive
-
   const stmt = db.prepare(
     `SELECT date(COALESCE(created_at, settled_at)) AS d,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
@@ -978,7 +970,7 @@ function getDailyMoneyInOutByDateInRange(
      GROUP BY d
      ORDER BY d`
   )
-  stmt.bind([dateFrom, endStr])
+  stmt.bind([localDateStartUtc(dateFrom), localDateEndUtc(dateToInclusive)])
 
   while (stmt.step()) {
     const row = stmt.get() as [string | null, number, number]
@@ -1182,8 +1174,8 @@ export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
   }))
   if (!db) return empty
 
-  const from = `${year}-01-01`
-  const to = `${year}-12-31T23:59:59.999Z`
+  const from = localDateStartUtc(`${year}-01-01`)
+  const to = localDateEndUtc(`${year}-12-31`)
 
   const stmt = db.prepare(
     `SELECT CAST(strftime('%m', COALESCE(created_at, settled_at)) AS INTEGER) AS m,

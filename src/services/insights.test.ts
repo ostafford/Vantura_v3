@@ -5,6 +5,7 @@ vi.mock('@/db', () => ({
 }))
 
 import { getYearMonthlyTotals, getYearComparisonPeriods } from './insights'
+import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
 
 describe('getYearMonthlyTotals', () => {
@@ -45,9 +46,12 @@ describe('getYearMonthlyTotals', () => {
     expect(result[0]).toEqual({ month: 1, moneyIn: 10_000, moneyOut: 5_000 })
     expect(result[1]).toEqual({ month: 2, moneyIn: 0, moneyOut: 0 })
     expect(result[2]).toEqual({ month: 3, moneyIn: 2_000, moneyOut: 8_000 })
+    // Bounds are converted from local calendar dates to UTC instants (see
+    // localDateStartUtc/localDateEndUtc) so the query matches the user's
+    // local Jan 1 – Dec 31, not UTC Jan 1 – Dec 31.
     expect(stmt.bind).toHaveBeenCalledWith([
-      '2024-01-01',
-      '2024-12-31T23:59:59.999Z',
+      localDateStartUtc('2024-01-01'),
+      localDateEndUtc('2024-12-31'),
     ])
   })
 })

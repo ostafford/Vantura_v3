@@ -25,6 +25,16 @@ export function ToastProvider() {
   }
 
   useEffect(() => {
+    // ToastProvider is unmounted while the app is locked, so its auto-hide
+    // timer can't run — a toast fired during that window (e.g. a
+    // background sync finishing after inactivity-lock) would otherwise sit
+    // as `show: true` and flash out of context on the next mount. Discard
+    // whatever was pending before this instance existed.
+    hide()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     if (!show) {
       setExiting(false)
       return

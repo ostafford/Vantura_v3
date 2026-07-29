@@ -8,14 +8,20 @@ import { createStore } from 'zustand/vanilla'
 type SessionStore = {
   unlocked: boolean
   apiToken: string | null
+  /** Bumped whenever lock_timeout_minutes changes, so useInactivityLock can
+   *  pick up the new value immediately instead of waiting for the next
+   *  lock/unlock cycle. */
+  lockTimeoutVersion: number
   setUnlocked: (token: string) => void
   lock: () => void
   getToken: () => string | null
+  bumpLockTimeoutVersion: () => void
 }
 
 export const sessionStore = createStore<SessionStore>((set, get) => ({
   unlocked: false,
   apiToken: null,
+  lockTimeoutVersion: 0,
 
   setUnlocked(token: string) {
     set({ unlocked: true, apiToken: token })
@@ -27,6 +33,10 @@ export const sessionStore = createStore<SessionStore>((set, get) => ({
 
   getToken() {
     return get().apiToken
+  },
+
+  bumpLockTimeoutVersion() {
+    set({ lockTimeoutVersion: get().lockTimeoutVersion + 1 })
   },
 }))
 
