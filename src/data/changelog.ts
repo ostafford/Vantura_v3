@@ -24,6 +24,44 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '30 Jul 2026',
+    heading: 'Stability & Accuracy Audit',
+    icon: 'mdi-shield-check-outline',
+    primaryMonth: '2026-07',
+    version: '0.8.1',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-sync-alert',
+        text: 'Sync reliability — fixed a bug where syncing could hang the app for certain PAYDAY tracker setups.',
+      },
+      {
+        icon: 'mdi-calendar-alert-outline',
+        text: "Payday date accuracy — corrected a calculation bug for 'last weekday of the month' payday schedules landing on the 29th–31st.",
+      },
+      {
+        icon: 'mdi-bell-alert-outline',
+        text: "Notification accuracy — large-transaction alerts, saver milestone alerts, and bill reminders now fire correctly and don't mix up similarly-named bills.",
+      },
+      {
+        icon: 'mdi-chart-timeline-variant',
+        text: 'Net Worth corrected — home loan accounts now display as a liability instead of an asset, and negative amounts render correctly everywhere.',
+      },
+      {
+        icon: 'mdi-calendar-range-outline',
+        text: 'Date filters fixed — Transactions and Analytics date ranges now use your local timezone instead of shifting by UTC offset.',
+      },
+      {
+        icon: 'mdi-fingerprint',
+        text: 'Biometric unlock hardened — fixed cases where enabling Touch ID / Face ID silently failed to activate, and all cached biometric credentials now clear properly when you delete your data.',
+      },
+      {
+        icon: 'mdi-wallet-outline',
+        text: "Removed the unfinished 'pin transaction to bucket' option in Budget Plan — it wasn't actually connected to anything.",
+      },
+    ],
+  },
+  {
     date: '27 Jun 2026',
     heading: 'Light Mode & Colour System',
     icon: 'mdi-palette-outline',

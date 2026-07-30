@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-30
+
+Full-codebase audit (7 parallel domain reviews, then an independent adversarial review of the fixes themselves) — see `Arch_Docs` and project memory for the full findings list. Highlights below.
+
+### Fixed
+
+- **Critical: sync could hang the tab.** `recalculateTrackers()` could enter an infinite loop when a tracker's period couldn't actually advance (a PAYDAY tracker with no `next_payday` configured, or `next_payday` itself stuck in the past) — it now only marks progress when a tracker's stored value actually changes, so termination no longer depends on the caller always running `advanceNextPaydayIfNeeded()` first. See `src/services/sync.ts`, `src/services/sync.test.ts` (new).
+- **Payday date regression:** `prevPaydayDate()` / `getPreviousPaydayDate()` mis-computed the previous payday for "last weekday of month" configs (`payday_day` 100–105) whenever the payday fell on the 29th–31st, producing zero-length PAYDAY tracker periods — a regression in the 2026-06-20 fix that the existing test didn't actually exercise. See `src/services/sync.ts`, `src/services/trackers.ts`, `src/services/trackers.test.ts`.
+- **Notifications:** large-transaction alerts could be permanently suppressed for transactions that settle after the check runs (checkpoint was anchored to wall-clock time instead of the transaction's own timestamp, with a further hardening for same-instant timestamp collisions); saver-milestone notifications now fire the highest reached tier instead of the lowest; bill-notification dedup no longer cross-matches unrelated charges whose names are substrings of each other. See `src/services/notificationChecks.ts`.
+- **Net Worth:** Up Bank `HOME_LOAN` accounts now show as a liability instead of inside Assets; negative dollar amounts no longer render as the malformed `$-X.XX` (now `-$X.XX`) anywhere on the Net Worth card or page. See `src/services/netWorth.ts`, `src/components/dashboard/NetWorthCard.tsx`, `src/pages/analytics/AnalyticsNetWorth.tsx`.
+- **Date-range filtering:** every date-range filter and report (Transactions page, Analytics Reports, year totals) compared local calendar dates directly against UTC timestamps, shifting results by the user's UTC offset at both ends. See `src/lib/format.ts` (new `localDateStartUtc`/`localDateEndUtc`), `src/services/transactions.ts`, `src/services/insights.ts`.
+- **Budget Plan:** bucket detail page hardcoded PAYDAY-frequency trackers to a monthly conversion instead of the user's actual pay frequency, producing visibly inconsistent totals on the same screen. See `src/pages/analytics/AnalyticsBudgetPlanBucket.tsx`.
+- Missing router error/404 handling (unmatched routes now render inside the app shell instead of a bare browser error page); a stale toast could replay after an inactivity-lock/unlock cycle; the "lock after inactivity" Settings option didn't take effect until the next lock cycle. See `src/appRouter.tsx`, `src/components/ToastProvider.tsx`, `src/hooks/useInactivityLock.ts`, `src/stores/sessionStore.ts`.
+
+### Security
+
+- Enabling or re-registering biometric unlock in Settings never actually activated a working session — the toggle showed "on" but the fingerprint prompt silently didn't appear until a full passphrase unlock. Rotating the API token didn't refresh the cached biometric session, so a fingerprint unlock after rotation could restore the old, rotated-out token. "Delete all data" and the lock screen's reset flow left the biometric key and encrypted token behind despite promising permanent deletion. All three fixed in `src/pages/Settings.tsx`, `src/pages/Unlock.tsx`. See `Arch_Docs/08_Security.md`.
+
+### Removed
+
+- **Budget Plan "pin transaction to bucket"** — this feature wrote data (`budget_transaction_anchors`) that was never read anywhere; silently dropped in an earlier UI rewrite while the entry point stayed live, giving a false "this is tracked" signal. Removed the entry point and the now-dead service functions. See `src/pages/Transactions.tsx`, `src/services/budgetTransactionAnchors.ts`.
+
+### Changed
+
+- Dead code removed (`src/lib/progressVariant.ts`, unused `SEMANTIC_COLORS`), a profile-import FK validation gap closed, a synchronous DB read moved off the inactivity-lock hot path, and assorted stale copy fixed (Help page stats now derive from the changelog data instead of a hardcoded count).
+
 ## [0.7.1] - 2026-06-27
 
 ### Fixed
