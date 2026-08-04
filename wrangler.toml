@@ -1,0 +1,6 @@
+# Cloudflare Pages project config. Documents the project name and build
+# output directory in-repo; actual deploys are still triggered by Cloudflare
+# Pages' git integration (dashboard-configured), not by running wrangler here.
+name = "vantura"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-08-04"

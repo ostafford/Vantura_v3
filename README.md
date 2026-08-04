@@ -75,10 +75,10 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 **CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` on every push. Cloudflare Pages handles deployment automatically on push to `main`.
 
-**Cloudflare Pages build settings** (configured in the Cloudflare dashboard):
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Environment variable: `NODE_VERSION=24`
+**Cloudflare Pages build settings:**
+- Project name + build output directory: see [`wrangler.toml`](wrangler.toml) (in-repo, verifiable)
+- Build command: `npm run build` (configured in the Cloudflare dashboard)
+- Environment variable: `NODE_VERSION=24` (configured in the Cloudflare dashboard)
 
 **Local preview:** `npm run preview`
 
