@@ -857,7 +857,7 @@ export function getYearComparisonPeriods(year: number): {
     const py = endPrev.getFullYear()
     const pm = endPrev.getMonth() + 1
     const pd = endPrev.getDate()
-    const previousTo = `${py}-${pad(pm)}-${pd}`
+    const previousTo = `${py}-${pad(pm)}-${pad(pd)}`
 
     return {
       current: { from: `${year}-01-01`, to: currentTo },
