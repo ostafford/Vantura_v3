@@ -1,6 +1,6 @@
 /**
  * Spendable balance: available (transactional accounts) minus reserved (prorated upcoming charges).
- * Reserved calculation per Arch_Docs 05_Calculation_logic.md Section 5.2.
+ * Reserved calculation per Reference_Docs 05_Calculation_logic.md Section 5.2.
  */
 
 import { getDb, getAppSetting } from '@/db'

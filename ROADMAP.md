@@ -203,10 +203,14 @@ Features that have been discussed or noted as potential future additions. Nothin
 - **Profile export v2** — Include Budget Plan buckets in the exported profile file
 - **Recurring transaction detection** — Auto-suggest upcoming charges based on transaction history patterns
 - **Multi-currency display** — Show foreign transaction amounts alongside AUD equivalents
-- **Tags / custom labels** — User-defined transaction tags for finer categorisation beyond Up Bank's category tree
 - **Saver round-up tracking** — Dedicated view for Loose Change saver accumulation over time
 - **Android / desktop PWA biometric** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
 - **Logo gradient on favicon** — Static `logo-icon.svg` uses neutral silver gradient; future work to generate per-accent favicons or use a Canvas-based approach
+- **Advanced charts** — Category trends and spending heatmaps beyond the current Weekly Insights / Savers bar charts
+- **CSV export of transactions** — Export transaction history to CSV
+- **Budget forecasting** — Predict future balance based on trackers, upcoming charges, and Budget Plan
+- **Background auto-sync** — Sync automatically on app open instead of requiring a manual tap
+- **Multi-account support** — Multiple Up Bank accounts/tokens (e.g. joint accounts) in one Vantura profile
 
 ---
 

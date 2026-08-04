@@ -38,5 +38,5 @@ Thumbs.db
 .npm-cache
 node_modules
 
-# Internal architecture docs (not in public repo)
-Arch_Docs
+# Internal reference docs (working detail, not meant for a public repo)
+Reference_Docs

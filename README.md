@@ -91,4 +91,4 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 | [ROADMAP.md](ROADMAP.md) | Full feature timeline — what was built, when, and what's under consideration |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version change log |
 | [SECURITY.md](SECURITY.md) | Data handling and vulnerability reporting |
-| `Arch_Docs/` | Architecture and design reference docs |
+| `Reference_Docs/` | Deep technical reference (schema, calc logic, sync, UI/UX, security) — not in the public repo, working detail for active development |
