@@ -19,12 +19,56 @@ describe('colorSystem', () => {
     })
 
     it('falls back to the neutral Uncategorised colour for an unmapped id', () => {
-      // Category id -> family/shade table isn't populated yet (blocked on
-      // real Up Bank category ids) — every id should safely fall back
-      // rather than fabricate a colour.
-      expect(getCategoryColor('groceries', 'light')).toBe(
+      // Unknown/unsynced category ids should safely fall back rather than
+      // fabricate a colour.
+      expect(getCategoryColor('not-a-real-category-id', 'light')).toBe(
         getUncategorisedColor('light')
       )
+    })
+
+    it('resolves a real, mapped category id to its family colour, not the fallback', () => {
+      const groceries = getCategoryColor('groceries', 'light')
+      expect(groceries).not.toBe(getUncategorisedColor('light'))
+      expect(groceries).toMatch(/^#[0-9a-f]{6}$/)
+    })
+
+    it('is deterministic — the same category id always returns the same colour', () => {
+      expect(getCategoryColor('groceries', 'dark')).toBe(
+        getCategoryColor('groceries', 'dark')
+      )
+    })
+
+    it('gives every child of the same parent a distinct shade, and different parents distinct hues', () => {
+      // Home children should all differ from each other...
+      const homeIds = [
+        'groceries',
+        'home-insurance-and-rates',
+        'home-maintenance-and-improvements',
+        'homeware-and-appliances',
+        'internet',
+        'pets',
+        'rent-and-mortgage',
+        'utilities',
+      ]
+      const homeHexes = homeIds.map((id) => getCategoryColor(id, 'light'))
+      expect(new Set(homeHexes).size).toBe(homeIds.length)
+
+      // ...and a Transport category should never collide with a Home one.
+      const fuelHex = getCategoryColor('fuel', 'light')
+      expect(homeHexes).not.toContain(fuelHex)
+    })
+
+    it('splits Good Life and Personal into their two sub-hue families', () => {
+      // Good Life "going out" (A) vs "home/vices" (B) should use visibly
+      // different hues, not just different shades of one hue.
+      const eventsHex = getCategoryColor('events-and-gigs', 'light') // goodLifeA
+      const boozeHex = getCategoryColor('booze', 'light') // goodLifeB
+      expect(eventsHex).not.toBe(boozeHex)
+
+      // Personal "self & body" (A) vs "admin & obligations" (B) likewise.
+      const fitnessHex = getCategoryColor('fitness-and-wellbeing', 'light') // personalA
+      const familyHex = getCategoryColor('family', 'light') // personalB
+      expect(fitnessHex).not.toBe(familyHex)
     })
 
     it('returns valid 6-digit hex for both modes', () => {

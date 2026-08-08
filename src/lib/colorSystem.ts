@@ -107,29 +107,70 @@ const CATEGORY_RAMPS: Record<CategoryFamily, Record<ColorMode, string[]>> = {
 }
 
 /**
- * Maps every real Up Bank category id to its family + ordinal shade index.
+ * Maps every real Up Bank category id (confirmed 2026-08-09 via
+ * `GET /api/v1/categories` against a live account — 4 parents, 40 children,
+ * matches the previously-curated display-name taxonomy exactly) to its
+ * family + ordinal shade index.
  *
- * NOT YET POPULATED — blocked on the real Up Bank category id list (the
- * display names collected during design aren't enough; Up's ids are
- * separate strings like "groceries", "good-life"). Until this is filled
- * in, getCategoryColor() falls back to the neutral Uncategorised gray for
- * every category, which is a safe (if visually flat) default — no category
- * will render an incorrect or fabricated colour.
- *
- * Fill this from `GET /api/v1/categories` output, matching each id against
- * the display-name list already curated (4 parents / 40 children):
- *   home: Groceries, Homeware & Appliances, Internet, Maintenance &
- *     Improvements, Pets, Rates & Insurance, Rent & Mortgage, Utilities
- *   transport: Car Insurance/Rego/Maintenance, Cycling, Fuel, Parking,
- *     Public Transport, Repayments, Taxis & Share Cars, Tolls
- *   goodLifeA/goodLifeB: split Good Life's 12 children 6/6
- *   personalA/personalB: split Personal's 12 children 6/6
+ * Good Life and Personal are each split 6/6 into their two sub-hue families
+ * by theme, not alphabetically: Good Life A = "going out" (events, hobbies,
+ * holidays, pubs, restaurants, takeaway), Good Life B = "home/vices" (apps,
+ * booze, gambling, tobacco, TV/music, adult); Personal A = "self & body"
+ * (clothing, fitness, hair/beauty, health, news/books, technology),
+ * Personal B = "admin & obligations" (family, education, gifts/charity,
+ * investments, life admin, mobile phone). Within each sub-group, shade
+ * index is assigned alphabetically by id — no meaning beyond determinism.
  */
 const CATEGORY_ID_TO_SLOT: Record<
   string,
   { family: CategoryFamily; index: number }
 > = {
-  // TODO: populate from real Up Bank category ids
+  // home
+  groceries: { family: 'home', index: 0 },
+  'home-insurance-and-rates': { family: 'home', index: 1 },
+  'home-maintenance-and-improvements': { family: 'home', index: 2 },
+  'homeware-and-appliances': { family: 'home', index: 3 },
+  internet: { family: 'home', index: 4 },
+  pets: { family: 'home', index: 5 },
+  'rent-and-mortgage': { family: 'home', index: 6 },
+  utilities: { family: 'home', index: 7 },
+  // transport
+  'car-insurance-and-maintenance': { family: 'transport', index: 0 },
+  'car-repayments': { family: 'transport', index: 1 },
+  cycling: { family: 'transport', index: 2 },
+  fuel: { family: 'transport', index: 3 },
+  parking: { family: 'transport', index: 4 },
+  'public-transport': { family: 'transport', index: 5 },
+  'taxis-and-share-cars': { family: 'transport', index: 6 },
+  'toll-roads': { family: 'transport', index: 7 },
+  // good life — "going out"
+  'events-and-gigs': { family: 'goodLifeA', index: 0 },
+  hobbies: { family: 'goodLifeA', index: 1 },
+  'holidays-and-travel': { family: 'goodLifeA', index: 2 },
+  'pubs-and-bars': { family: 'goodLifeA', index: 3 },
+  'restaurants-and-cafes': { family: 'goodLifeA', index: 4 },
+  takeaway: { family: 'goodLifeA', index: 5 },
+  // good life — "home / vices"
+  adult: { family: 'goodLifeB', index: 0 },
+  booze: { family: 'goodLifeB', index: 1 },
+  'games-and-software': { family: 'goodLifeB', index: 2 },
+  'lottery-and-gambling': { family: 'goodLifeB', index: 3 },
+  'tobacco-and-vaping': { family: 'goodLifeB', index: 4 },
+  'tv-and-music': { family: 'goodLifeB', index: 5 },
+  // personal — "self & body"
+  'clothing-and-accessories': { family: 'personalA', index: 0 },
+  'fitness-and-wellbeing': { family: 'personalA', index: 1 },
+  'hair-and-beauty': { family: 'personalA', index: 2 },
+  'health-and-medical': { family: 'personalA', index: 3 },
+  'news-magazines-and-books': { family: 'personalA', index: 4 },
+  technology: { family: 'personalA', index: 5 },
+  // personal — "admin & obligations"
+  'education-and-student-loans': { family: 'personalB', index: 0 },
+  family: { family: 'personalB', index: 1 },
+  'gifts-and-charity': { family: 'personalB', index: 2 },
+  investments: { family: 'personalB', index: 3 },
+  'life-admin': { family: 'personalB', index: 4 },
+  'mobile-phone': { family: 'personalB', index: 5 },
 }
 
 export function getCategoryColor(
