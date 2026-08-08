@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Colour is no longer user-configurable.** The six-swatch colour picker for tracker badges, Budget Plan buckets, and Weekly Insights categories is gone — every colour is now assigned automatically. Removes `src/lib/accentPalettes.ts`, `src/components/ChartColorPicker.tsx`, `src/components/CategoryColorsSection.tsx` (and the "Category colours" section in Settings → Appearance), and their storage (`trackers.badge_color`, `budget_buckets.colour`, `insights_category_colors` — dropped in schema v37).
+
+### Added
+
+- **Fully computed categorical colour system:** `src/lib/colorSystem.ts` derives every tracker, bucket, and category colour deterministically from the entity's own id — validated for colour-vision-deficiency safety against Vantura's real light/dark surfaces. Categories use 6 hue families (Home, Transport, Good Life ×2, Personal ×2 — split because Good Life and Personal each have 12 real Up Bank child categories) with a distinct shade per child; buckets/trackers draw from a separate 3-hue pool.
+- **Tracker frequency badges are now colour-consistent:** every `WEEKLY`/`FORTNIGHTLY`/`MONTHLY`/`PAYDAY` badge uses the same fixed, low-chroma tint regardless of which tracker it belongs to — fixes a bug where a tracker's own colour bled into its frequency badge, making two same-frequency trackers look like different frequencies. Tracker identity moved to a small colour dot beside the name instead.
+
+### Changed
+
+- **Weekly Insights groups by parent category:** spending categories are now grouped under their real Up Bank parent (Home, Transport, Good Life, Personal) in a fixed order, sorted by spend within each group, with the smallest categories folded into a single "Other" row once more than 7 categories have spend in a week. See `src/services/insights.ts`, `src/components/charts/InsightsBarChart.tsx`.
+
 ## [0.8.1] - 2026-07-30
 
 Full-codebase audit (7 parallel domain reviews, then an independent adversarial review of the fixes themselves) — see `Arch_Docs` and project memory for the full findings list. Highlights below.
