@@ -32,6 +32,19 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 
 - Dead code removed (`src/lib/progressVariant.ts`, unused `SEMANTIC_COLORS`), a profile-import FK validation gap closed, a synchronous DB read moved off the inactivity-lock hot path, and assorted stale copy fixed (Help page stats now derive from the changelog data instead of a hardcoded count).
 
+## [0.8.0] - 2026-06-27
+
+### Added
+
+- **Light / Dark / System theme:** Choose between light mode, dark mode, or let your device switch automatically — System mode follows the OS `prefers-color-scheme` in real time.
+- **Sky locked as the single app accent:** One consistent `#90caf9` Sky blue across every button, icon, and highlight, replacing the previous per-user accent selection — nothing looks out of place depending on which colour was previously selected. See `src/index.css`.
+- **Vibrant colour palette refresh:** All 6 accent swatches (used for per-item colour-coding — tracker badges, Weekly Insights categories, Budget Plan buckets) updated to richer Material Design 300-level values.
+
+### Changed
+
+- **Page icons unified:** All 19 section header icons now share one solid Sky style — previously 17 were overriding individually with a dark navy gradient, causing visible inconsistency between pages.
+- **Logo simplified:** The Vantura cipher monogram and wordmark now use a single solid Sky colour in both light and dark mode, with no gradient and no store dependency.
+
 ## [0.7.1] - 2026-06-27
 
 ### Fixed
@@ -48,6 +61,37 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 
 - **`calculateReservedBreakdown`** — pure function returning a per-charge breakdown of reserved amounts, including occurrence count and prorated/multi-occurrence labels. 8 new unit tests added. See `src/services/balance.ts`, `src/services/balance.test.ts`.
 
+## [0.7.0] - 2026-06-27
+
+### Added
+
+- **Net Worth dashboard card and Analytics page:** Total assets minus liabilities at a glance, with a delta arrow versus the previous snapshot and a stale-account warning; `/analytics/net-worth` shows a full breakdown of Up Bank balances alongside manually entered external accounts. A daily snapshot is written on every sync (`writeNetWorthSnapshot()`), building a 12-month trend chart over time. See `src/components/dashboard/NetWorthCard.tsx`, `src/components/charts/NetWorthTrendChart.tsx`, `src/pages/analytics/AnalyticsNetWorth.tsx`.
+- **Manually-entered external accounts:** 10 account types — Credit Card, Mortgage, Personal/Car Loan, HECS/HELP, Superannuation, Investment Portfolio, Property, Savings (other bank), and more — each with optional interest rate and notes. Up Bank balances still sync automatically; external accounts are entered and updated manually. Schema v30 adds `manual_accounts` and `net_worth_snapshots` tables. See `src/services/manualAccounts.ts`, `src/db/schema.ts`.
+- **Stale balance warnings:** Per-type freshness thresholds (Credit Card: 7 days; Loans/Super/Investments: 30–90 days; Property: 1 year) flag manual accounts that may need a balance update.
+- **Liability repayment charge type:** Upcoming charges can be marked `LIABILITY_REPAYMENT` so credit card payments are excluded from projected net worth (asset↓ + liability↓ nets to zero — not a real expense). Adds `charge_type` and `linked_manual_account_id` to `upcoming_charges` (schema v30).
+
+## [0.6.1] - 2026-06-25
+
+### Changed
+
+- **Settings redesign:** Help and What's New consolidated into Settings → About; sidebar footer reduced to just Settings and Lock. Settings section nav gained icons for each section. Notification types regrouped into "Spending alerts" and "Reminders & system". Browser notification-permission status now surfaced directly in Notifications settings when blocked at the OS level. A dedicated "Danger zone" card in Data settings separates the destructive Clear all data action from safe operations like export and import.
+
+### Fixed
+
+- **Payday validation:** The next-payday date field now rejects a date in the past, preventing a misconfigured payday from silently breaking Spendable.
+
+## [0.6.0] - 2026-06-24
+
+### Changed
+
+- **Changelog & Roadmap redesign:** "Exploring Next" expanded to 11 upcoming features, each with a verdict badge (Extension, Revival, Partial, New) and an expandable explanation; features grouped by type (Extensions, Revivals, Partially there, Brand new). Release-history cards and groups now collapse by default, starting compact on every visit. Every milestone in the release timeline gained a themed icon. See `src/pages/Changelog.tsx`, `src/data/changelog.ts`.
+
+## [0.5.6] - 2026-06-24
+
+### Changed
+
+- **Navigation refinements:** Sidebar icons moved to sit alongside their labels, consistent with other navigation patterns. Settings, Help, and What's New moved to the bottom of the sidebar — primary destinations up top, utility links at the foot. The Vantura logo is now a pure brand mark; a dedicated collapse button (‹ ›) handles sidebar collapse instead of the logo doing double duty. Breadcrumbs removed from top-level pages where they implied a hierarchy that doesn't exist.
+
 ## [0.5.5] - 2026-06-23
 
 ### Added
@@ -57,6 +101,22 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 ### Changed
 
 - **Hosting consolidated to Cloudflare Pages:** Domain (`myvantura.xyz`), CDN, and hosting now reside within a single provider, eliminating the intermediate Netlify hop. SPA routing handled by `public/_redirects`; security headers (CSP, HSTS, etc.) served via `public/_headers`. All headers verified live (`server: cloudflare`, `cf-ray: SYD`). Netlify configuration (`netlify.toml`) retained for reference but is no longer the active host. See `public/_redirects`, `public/_headers`.
+
+## [0.5.4] - 2026-06-21
+
+### Fixed
+
+- **Update banner crash on lock screen:** The PWA update banner's "What's new" link no longer crashes the app when the banner is shown before unlock.
+
+## [0.5.3] - 2026-06-21
+
+### Added
+
+- **Export/Import v2 — full settings and Budget Plan coverage:** Budget Plan (buckets, hypotheticals) is now exported and imported, with `bucket_id` preserved on trackers and upcoming charges via ID remapping. `SETTINGS_WHITELIST` expanded to include `payday_raw_text`, `payday_description`, `lock_timeout_minutes`, `saver_account_order`, and all notification preferences (master toggle, per-type toggles, large-transaction threshold). Dynamic `saver_goal_date_*` keys are now collected via a `LIKE` query and restored on import. `EXPORT_PAYLOAD_VERSION` bumped to 3. See `src/services/profileExport.ts`.
+
+### Removed
+
+- Dead `importProfile`/`importPayload` functions, superseded by `importPayloadWithOptions()`.
 
 ## [0.5.2] - 2026-06-21
 
@@ -99,8 +159,8 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 - **Improved payday detection:** Payday landed notification uses two tiers — precise `raw_text` match on the identified salary transaction, falling back to an amount heuristic (≥80% of `pay_amount_cents`). See `src/services/notificationChecks.ts`.
 - **Budget Plan:** Group expenses into named buckets at `/analytics/budget`. Each bucket holds upcoming charges and optional hypothetical "what if?" lines. Summary footer shows Income, Committed spend, and Free Spending. Period toggle: weekly / fortnightly / monthly. Tables: `budget_buckets`, `budget_hypotheticals`, `budget_transaction_anchors` (schema v24). See `src/services/budgetBuckets.ts`, `src/pages/analytics/AnalyticsBudgetPlan.tsx`.
 - **Biometric unlock:** Touch ID / Face ID via WebAuthn (Settings → Security). Configurable inactivity lock timeout (1–30 minutes, default 3 minutes). See `src/lib/webauthn.ts`, `src/hooks/useInactivityLock.ts`.
-- **Pastel accent colour system:** Six pastel swatches — Sky, Mint, Lavender, Peach, Blush, Lemon. See `src/lib/accentPalettes.ts`, `src/stores/accentStore.ts`.
-- **Maybuys:** Deliberate-spending wishlist at `/analytics/maybuys`. "Days thinking" timer; mark as Bought or Skipped; History tab. See `src/services/maybuys.ts`, `src/pages/analytics/AnalyticsMaybuys.tsx`.
+- **Pastel accent colour system:** Six pastel swatches — Sky, Mint, Lavender, Peach, Blush, Lemon. See `src/lib/accentPalettes.ts`.
+- Maybuys, a deliberate-spending wishlist feature, was built and then fully removed prior to this release (commit `47f311b`, 2026-06-06) — it was not part of the v0.5.0 codebase and is not listed as Added here.
 - **Analytics Savers and Up API alignment:** Collapsible balance/contribution charts, drag-to-reorder, On track / Behind pace status, saver forecasting. See `src/pages/analytics/AnalyticsSavers.tsx`.
 - **Profile export/import:** Export settings, trackers, and upcoming charges to a passphrase-encrypted file; import on another device. See `src/services/profileExport.ts`.
 - **Analytics section:** `/analytics` with overview and detail pages for Reports, Trackers, and Savers. See `src/pages/analytics/*`.
@@ -113,7 +173,7 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 - **Plan and standalone wants/goals:** Removed `/plan` workspace, `goals`/`goal_snapshots` tables (schema migration v12). Legacy URLs redirect to `/analytics`.
 - **50/30/20 budget:** Removed the old Analytics budget experience and `budget_3020_config` from profile export.
 - **Light theme:** Dark-only UI; theme toggle removed from Settings.
-- **Maybuys dashboard card:** Moved to Analytics-only; no longer a reorderable Dashboard section.
+- **Maybuys:** Fully removed (commit `47f311b`, 2026-06-06) — not merely moved off the Dashboard as earlier notes implied; the feature, its table, and all its pages/components were deleted.
 
 ### Changed
 
@@ -137,8 +197,8 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 - **Improved payday detection:** Payday landed notification uses two tiers — precise match on the `raw_text` bank reference of the user's identified salary transaction, falling back to an amount heuristic (≥80% of `pay_amount_cents`) when no source is linked. See `src/services/notificationChecks.ts`.
 - **Budget Plan:** Group expenses into named buckets (Subscriptions, Household, Lifestyle, etc.) at `/analytics/budget`. Each bucket holds upcoming charges and optional hypothetical lines (flask icon, removable at any time) for “what if?” scenarios. Summary footer shows Income, Committed spend, and Free Spending. Period toggle: weekly / fortnightly / monthly. Income requires pay amount in Settings → Payday. Tables: `budget_buckets`, `budget_hypotheticals`, `budget_transaction_anchors` (schema v24). See `src/services/budgetBuckets.ts`, `src/pages/analytics/AnalyticsBudgetPlan.tsx`, `src/pages/analytics/AnalyticsBudgetPlanBucket.tsx`.
 - **Biometric unlock:** Touch ID / Face ID via WebAuthn (Settings → Security). Enrolled credential ID stored in `app_settings.biometric_credential_id`; the derived key is cached in the browser credential store and recalled on unlock without re-entering the passphrase. Falls back to passphrase if biometrics unavailable or fail. Configurable inactivity lock timeout (1–30 minutes, default 3 minutes) stored in `app_settings.lock_timeout_minutes`. See `src/lib/webauthn.ts`, `src/hooks/useInactivityLock.ts`.
-- **Pastel accent colour system:** Six pastel accent swatches — Sky, Mint, Lavender, Peach, Blush, Lemon — replace the previous purple/blue palette. Each swatch applies a coordinated primary, chart, and badge colour. Default accent: Sky. See `src/lib/accentPalettes.ts`, `src/stores/accentStore.ts`.
-- **Maybuys:** Deliberate-spending wishlist at `/analytics/maybuys`. Add items you're considering buying (name, price, optional URL and notes); a “days thinking” timer nudges toward an intentional decision. Mark each item as **Bought** or **Skipped** — decided items move to a History tab with a days-held count. Optionally link a Saver account to see how much you've already set aside. See `src/services/maybuys.ts`, `src/pages/analytics/AnalyticsMaybuys.tsx`.
+- **Pastel accent colour system:** Six pastel accent swatches — Sky, Mint, Lavender, Peach, Blush, Lemon — replace the previous purple/blue palette. Each swatch applies a coordinated primary, chart, and badge colour. Default accent: Sky. See `src/lib/accentPalettes.ts`.
+- Maybuys, a deliberate-spending wishlist feature (add items you're considering buying, a "days thinking" timer, Bought/Skipped decisions), was built and then fully removed prior to this release (commit `47f311b`, 2026-06-06) — it was not part of the v0.5.0 codebase and is not listed as Added here.
 - **Analytics Savers and Up API alignment:** Cursor-paginated `GET /accounts`, synced `ownershipType` and `HOME_LOAN` accounts, `round_up_amount` on transactions (schema v15). Weekly insights **Savers** adds sum of `round_up_amount` for round-up lines. `/analytics/savers` lists saver (and home loan) balances with links to transactions; `/analytics/savers/:id` opens Transactions with saver filters for that account. Transactions page: optional saver-related filter and URL params `saverActivity=1`, `linkedAccountId`. See `src/api/upBank.ts`, `src/services/sync.ts`, `src/services/insights.ts`, `src/services/accounts.ts`, `src/services/transactions.ts`, `src/pages/analytics/AnalyticsSavers.tsx`, `src/App.tsx`.
 - **Profile export/import:** Export whitelisted settings, trackers, and upcoming charges to a passphrase-encrypted file (Settings > Data). Import on another device to restore your setup. Never exports transactions, API tokens, or bank data. Uses PBKDF2 + AES-GCM; file format versioned for forward compatibility. See `src/services/profileExport.ts`, `src/pages/Settings.tsx`.
 - **Analytics section:** `/analytics` with overview and detail pages for Reports, Trackers, Insights, and Monthly review. Uses existing transaction data to surface longer-term trends across your finances. See `src/App.tsx`, `src/pages/analytics/*`.
@@ -151,7 +211,7 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 - **Plan and standalone wants (goals):** Removed the **Plan** workspace (`/plan`), sidebar entry, Dashboard Plan section, Analytics Wants routes and pages, `goals` / `goal_snapshots` tables (schema migration v12), and wants from profile export/import. Legacy URLs (`/plan`, `/analytics/wants`, `/analytics/goals`, etc.) redirect to `/analytics`. See `src/db/schema.ts`, `src/App.tsx`, `src/services/profileExport.ts`.
 - **50/30/20 budget:** Removed the Analytics budget experience (overview card, `/analytics/budget` and `/analytics/income` now redirect to `/analytics`), supporting services, the transaction “count as income” control used for that flow, and Future items plus `budget_3020_config` from profile export/import. The `future_items` table and `transaction_user_data.is_income` column remain in the database for existing installs but are unused by the app.
 - **Light theme:** Dark-only UI; theme toggle removed from Settings.
-- **Maybuys dashboard card:** Moved to Analytics-only at `/analytics/maybuys`; no longer a reorderable Dashboard section.
+- **Maybuys:** Fully removed (commit `47f311b`, 2026-06-06) — not merely moved off the Dashboard as earlier notes implied; the feature, its table, and all its pages/components were deleted.
 
 ### Changed
 
@@ -197,7 +257,17 @@ Full-codebase audit (7 parallel domain reviews, then an independent adversarial 
 - **Deployment (Phase 6):** Production build with GitHub Pages base path; GitHub Actions deploy on push to `main`; SPA routing via `404.html`.
 - **Settings (Phase 7):** Re-sync, Clear all data (confirmation modal, delete DB, reload to Onboarding).
 
-[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/ostafford/Vantura_v3/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/ostafford/Vantura_v3/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/ostafford/Vantura_v3/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/ostafford/Vantura_v3/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/ostafford/Vantura_v3/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/ostafford/Vantura_v3/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/ostafford/Vantura_v3/compare/v0.5.6...v0.6.0
+[0.5.6]: https://github.com/ostafford/Vantura_v3/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/ostafford/Vantura_v3/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/ostafford/Vantura_v3/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/ostafford/Vantura_v3/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ostafford/Vantura_v3/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ostafford/Vantura_v3/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ostafford/Vantura_v3/compare/v0.0.2...v0.5.0

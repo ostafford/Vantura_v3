@@ -17,7 +17,7 @@ A local-first financial insights app for Up Bank customers. All data stays on yo
 - **Analytics** — Deeper trends across Trackers, Reports, and Savers.
 - **Savers** — Track Up Bank saver accounts with goal amounts, target dates, contribution history, and drag-to-reorder cards.
 - **Budget Plan** — Group expenses into named buckets with hypothetical "what if?" lines and a free-spending summary.
-- **Notifications** — Bell inbox in the navbar with 8 financial alert types (bills due, tracker overspent, low spendable, payday, large transactions, saver milestones, and more); per-type toggles in Settings.
+- **Notifications** — Bell inbox in the navbar with 9 financial alert types (bills due, tracker overspent, low spendable, payday, possible payday detected, large transactions, saver milestones, and more); 8 of the 9 have per-type toggles in Settings.
 - **Transactions** — Full history with filters (date, category, amount, search) and round-up linking.
 - **Profile export / import** — Back up settings, trackers, and upcoming charges to an encrypted file; restore on another device.
 - **Biometric unlock** — Touch ID / Face ID via WebAuthn with configurable inactivity lock (Settings → Security).
@@ -48,7 +48,7 @@ Open the URL shown in the terminal.
 
 **Demo / sample data:** Choose "Try with sample data" on the first onboarding step to explore the app without an Up Bank token. A DEMO badge appears in the navbar.
 
-**Validate (format, lint, typecheck):** `npm run validate` — CI runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` before each build.
+**Validate (format, lint, typecheck):** `npm run validate` — CI runs format-check, lint, typecheck, unit tests, e2e tests, and `npm audit --audit-level=critical` before each build.
 
 **Troubleshooting:**
 - *"Could not load app storage"* — IndexedDB failed to initialise; try another browser, clear site data, or check storage quota.
@@ -73,7 +73,7 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 **Old URL redirect:** `https://ostafford.github.io/Vantura_v3/` now redirects automatically to `https://myvantura.xyz/` via a `gh-pages` branch redirect page.
 
-**CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, tests, and `npm audit --audit-level=critical` on every push. Cloudflare Pages handles deployment automatically on push to `main`.
+**CI:** GitHub Actions (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, unit tests, e2e tests, and `npm audit --audit-level=critical` on every push. Cloudflare Pages handles deployment automatically on push to `main`.
 
 **Cloudflare Pages build settings:**
 - Project name + build output directory: see [`wrangler.toml`](wrangler.toml) (in-repo, verifiable)

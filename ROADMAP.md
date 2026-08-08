@@ -128,7 +128,7 @@ The initial build established the full technical foundation: local-first storage
 | Date | Feature |
 |------|---------|
 | Jun 13 | **Pastel accent colour system** — Six pastel swatches (Sky, Mint, Lavender, Peach, Blush, Lemon) replace previous purple palette; dark text on pastel surfaces; default: Sky |
-| Jun 13 | Light theme removed; dark-only UI |
+| Jun 13 | Light theme removed; dark-only UI *(reinstated 27 Jun — see Light Mode & Colour System below)* |
 | Jun 16 | **Biometric unlock** — Touch ID / Face ID via WebAuthn (Settings → Security); credential ID stored locally; derived key cached in browser credential store; falls back to passphrase |
 | Jun 16 | **Configurable inactivity lock** — Auto-lock after 1–30 minutes of inactivity (default 3); configurable in Settings → Security |
 | Jun 18 | Biometric UX improvements — enrolment flow, error states, fallback behaviour |
@@ -193,6 +193,45 @@ The initial build established the full technical foundation: local-first storage
 | Jun 18 | **Tooltip improvements** — HelpPopovers added to Weekly Insights, Budget Plan, and Savers pages; Trackers and Upcoming copy updated; balance card tooltips made more precise |
 | Jun 18 | **Dashboard tour overhaul** — Section steps now follow the user's saved section order; all 8 steps use HTML formatting (bold key terms, line breaks); Month at a glance added as a tour step |
 | Jun 18 | Internal documentation audit — README, CHANGELOG, SECURITY, Arch_Docs updated to reflect current state |
+
+---
+
+### Export, Hosting & Navigation — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 21 | **Export/Import v2** (`v0.5.3`) — Budget Plan (buckets, hypotheticals), notification preferences, lock timeout, payday source transaction, and saver preferences all now included in profile export; `EXPORT_PAYLOAD_VERSION` bumped to 3 |
+| Jun 21 | Stability fix (`v0.5.4`) — PWA update banner no longer crashes the app when shown on the lock screen |
+| Jun 23 | **Hosting consolidated to Cloudflare Pages** (`v0.5.5`) — permanent home at `myvantura.xyz`; domain, CDN, and hosting unified under one provider; security headers (HSTS, CSP) verified live |
+| Jun 24 | **Navigation refinements** (`v0.5.6`) — sidebar icons moved alongside labels; Settings, Help, and What's New moved to the sidebar footer; dedicated collapse button replaces logo-as-toggle; breadcrumbs removed from top-level pages |
+| Jun 24 | **Changelog & Roadmap redesign** (`v0.6.0`) — "Exploring Next" expanded to 11 items with verdict badges (Extension, Revival, Partial, New); release-history cards collapse by default |
+| Jun 25 | **Settings redesign** (`v0.6.1`) — Help/What's New folded into Settings → About; notification types regrouped; Danger Zone card separates destructive actions; next-payday date validated against the past |
+
+---
+
+### Net Worth, Accuracy & Theming — June 2026
+
+| Date | Feature |
+|------|---------|
+| Jun 27 | **Net Worth tracking** (`v0.7.0`) — Dashboard card and `/analytics/net-worth` page combining synced Up Bank balances with 10 types of manually-entered external accounts (mortgage, HECS, super, etc.); per-type stale-balance warnings; `LIABILITY_REPAYMENT` charge type excludes credit card payments from projected net worth; 12-month trend chart from daily snapshots; schema v30 (`manual_accounts`, `net_worth_snapshots`) |
+| Jun 27 | **Spendable double-count fix** (`v0.7.1`) — Up Bank's balance is already net of held/pending transactions; Vantura was subtracting them a second time. Formula corrected to `Spendable = Available − Reserved`, now matches Up Bank exactly |
+| Jun 27 | **Light Mode & Colour System** (`v0.8.0`) — Light/Dark/System theme reinstated; Sky locked as the single app-wide accent (replacing per-user accent selection); all 6 categorical swatches refreshed to MD-300 values; page icons and logo unified on Sky |
+
+---
+
+### Stability & Accuracy Audit — July 2026
+
+| Date | Feature |
+|------|---------|
+| Jul 30 | **Full-codebase audit** (`v0.8.1`) — 7 parallel domain reviews plus an adversarial pass on the fixes; ~24 bugs fixed including a critical sync-hang (infinite loop in `recalculateTrackers`), a payday date regression for "last weekday of month" configs, several notification-timing bugs, and a HOME_LOAN net worth display fix |
+
+---
+
+### Documentation Audit — August 2026
+
+| Date | Feature |
+|------|---------|
+| Aug 4 | `CLAUDE.md` added as the primary AI/developer guidance file; `Arch_Docs` renamed to `Reference_Docs`; `wrangler.toml` added so Cloudflare Pages project config is verifiable in-repo |
 
 ---
 

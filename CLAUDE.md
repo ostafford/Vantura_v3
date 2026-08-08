@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Vantura is a **local-first** personal finance app for Up Bank customers. All data lives in the browser (SQLite via sql.js, persisted to IndexedDB) — nothing is sent to a server. There is no backend; sync means "call the Up Bank REST API directly from the browser and write results into the local DB."
 
+## Product philosophy
+
+Vantura's product vision, target users, and non-negotiable design principles live in `Reference_Docs/01_Overview.md` — read it before making product/UX judgment calls, not just architectural ones. In short: Spendable is a safety-net "source of truth" value, and the Up Bank API is ground truth beneath it.
+
+## Engineering standards & working agreement
+
+- **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version.
+- **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
+- **Docs are collaborative, not autonomous.** Never edit any `*.md` file (this file, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) without first proposing the change and getting explicit confirmation. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it.
+
 ## Commands
 
 ```bash
