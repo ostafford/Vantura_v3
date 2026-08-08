@@ -1,10 +1,8 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
   Card,
-  Modal,
-  Button,
   Row,
   Col,
   OverlayTrigger,
@@ -13,7 +11,7 @@ import {
 import {
   getWeekRange,
   getWeeklyInsights,
-  getWeeklyCategoryBreakdown,
+  getWeeklyCategoryBreakdownGrouped,
   getWeeklyInsightsRawCount,
   getWeeklyInsightsDebugCounts,
 } from '@/services/insights'
@@ -23,19 +21,14 @@ import {
   formatDollars,
 } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
-import {
-  getInsightsCategoryColors,
-  setInsightsCategoryColor,
-  normalizeCategoryIdForColor,
-} from '@/lib/chartColors'
-import { ChartColorPicker } from '@/components/ChartColorPicker'
+import { themeStore, resolveTheme } from '@/stores/themeStore'
+import { getCategoryColor, getUncategorisedColor } from '@/lib/colorSystem'
 import { HelpPopover } from '@/components/HelpPopover'
 import { StatCard } from '@/components/StatCard'
-import { toast } from '@/stores/toastStore'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import { InsightsBarChart } from '@/components/charts/InsightsBarChart'
-import type { InsightsChartDatum } from '@/types/charts'
+import type { InsightsChartRow } from '@/types/charts'
 import type React from 'react'
 
 /**
@@ -43,25 +36,17 @@ import type React from 'react'
  * Charges (count of spending), and spending-by-category chart.
  * Definitions and filters are in @/services/insights.ts; see the file-level comment there.
  */
-type EditingCategory = {
-  category_id: string
-  category_name: string
-  totalDollars: number
-}
-
 export function InsightsSection({
   dragHandleProps,
 }: {
   dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>
 }) {
-  const [refresh, setRefresh] = useState(0)
   const [weekOffset, setWeekOffset] = useState(0)
-  const [editingCategory, setEditingCategory] =
-    useState<EditingCategory | null>(null)
-  const [categoryBarColor, setCategoryBarColor] = useState<string | null>(null)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
 
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode = resolveTheme(themeMode)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
   const { startStr, endIso } = weekRange
   const insights = useMemo(
@@ -69,8 +54,8 @@ export function InsightsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [weekRange, lastSyncCompletedAt]
   )
-  const categories = useMemo(
-    () => getWeeklyCategoryBreakdown(weekRange),
+  const sections = useMemo(
+    () => getWeeklyCategoryBreakdownGrouped(weekRange),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [weekRange, lastSyncCompletedAt]
   )
@@ -83,57 +68,54 @@ export function InsightsSection({
       import.meta.env.DEV ? getWeeklyInsightsDebugCounts(weekRange) : null,
     [weekRange]
   )
-  const chartPalette = ['#c2def8', '#90caf9', '#5b9fd4']
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const categoryColors = useMemo(() => getInsightsCategoryColors(), [refresh])
 
-  function getThemeChartCategoryColor(index: number): string {
-    if (typeof document === 'undefined')
-      return chartPalette[index % chartPalette.length]
-    const varName = `--vantura-chart-category-${(index % 6) + 1}`
-    const value = getComputedStyle(document.documentElement)
-      .getPropertyValue(varName)
-      .trim()
-    return value || chartPalette[index % chartPalette.length]
-  }
-
-  const chartData: InsightsChartDatum[] = categories.map((c, index) => {
-    const totalDollars = Number.isFinite(c.total / 100) ? c.total / 100 : 0
-    const colorKey = normalizeCategoryIdForColor(c.category_id)
-    return {
-      category_id: c.category_id ?? '',
-      name: c.category_name,
-      totalDollars,
-      fill: categoryColors[colorKey] ?? getThemeChartCategoryColor(index),
-      stroke: categoryColors[colorKey] ?? getThemeChartCategoryColor(index),
-    }
-  })
+  // Every section (including the 4 real parent groups when they have zero
+  // spend, Uncategorised, and Other) gets a header row — this keeps the
+  // group order fixed and every group boundary a real visual divider,
+  // which the categorical colour system's adjacency validation depends on
+  // (see colorSystem.ts and getWeeklyCategoryBreakdownGrouped's doc comment).
+  const rows: InsightsChartRow[] = useMemo(
+    () =>
+      sections.flatMap((section) => {
+        const header: InsightsChartRow = {
+          kind: 'header',
+          key: `header:${section.parentId ?? section.parentName}`,
+          label: section.parentName,
+        }
+        const bars: InsightsChartRow[] = section.rows.map((r) => {
+          const isNeutral = section.isOther || section.parentId === null
+          const hex = isNeutral
+            ? getUncategorisedColor(mode)
+            : getCategoryColor(r.category_id, mode)
+          return {
+            kind: 'bar',
+            datum: {
+              category_id:
+                r.category_id ??
+                (section.isOther ? '__other__' : '__uncategorised__'),
+              name: r.category_name,
+              totalDollars: r.total / 100,
+              fill: hex,
+              stroke: hex,
+            },
+          }
+        })
+        return [header, ...bars]
+      }),
+    [sections, mode]
+  )
+  const barCount = sections.reduce((sum, s) => sum + s.rows.length, 0)
+  const otherSection = sections.find((s) => s.isOther)
 
   const maxDomain = Math.max(
     1,
-    ...chartData.map((d) => d.totalDollars).filter(Number.isFinite)
+    ...rows
+      .filter(
+        (r): r is Extract<InsightsChartRow, { kind: 'bar' }> => r.kind === 'bar'
+      )
+      .map((r) => r.datum.totalDollars)
+      .filter(Number.isFinite)
   )
-
-  const openCategoryEdit = useCallback(
-    (payload: { category_id: string; name: string; totalDollars: number }) => {
-      setEditingCategory({
-        category_id: payload.category_id,
-        category_name: payload.name,
-        totalDollars: payload.totalDollars,
-      })
-      const colorKey = normalizeCategoryIdForColor(payload.category_id)
-      setCategoryBarColor(categoryColors[colorKey] ?? null)
-    },
-    [categoryColors]
-  )
-
-  function handleSaveCategoryColor() {
-    if (!editingCategory) return
-    setInsightsCategoryColor(editingCategory.category_id, categoryBarColor)
-    setEditingCategory(null)
-    setRefresh((r) => r + 1)
-    toast.success('Colour updated for all weeks.')
-  }
 
   const titleBlock = (
     <div className="d-flex align-items-center">
@@ -146,7 +128,7 @@ export function InsightsSection({
           <HelpPopover
             id="insights-help"
             title="Weekly Insights"
-            content="Shows money in, money out, saver movement, and transaction count for the selected week. Use the arrows to browse previous weeks. The bar chart breaks spending down by category — click a bar to change its colour."
+            content="Shows money in, money out, saver movement, and transaction count for the selected week. Use the arrows to browse previous weeks. The bar chart breaks spending down by category, grouped by parent category."
             ariaLabel="What is Weekly Insights?"
           />
         </div>
@@ -218,185 +200,148 @@ export function InsightsSection({
   )
 
   return (
-    <>
-      <Card>
-        <Card.Header
+    <Card>
+      <Card.Header
+        className={
+          isMobile
+            ? 'd-flex flex-column gap-2 section-header'
+            : 'd-flex align-items-center justify-content-between flex-wrap gap-2 section-header'
+        }
+      >
+        {titleBlock}
+        <div
           className={
             isMobile
-              ? 'd-flex flex-column gap-2 section-header'
-              : 'd-flex align-items-center justify-content-between flex-wrap gap-2 section-header'
+              ? 'd-flex justify-content-center gap-2 align-items-center'
+              : 'd-flex gap-2 flex-grow-1 justify-content-end align-items-center'
           }
         >
-          {titleBlock}
-          <div
-            className={
-              isMobile
-                ? 'd-flex justify-content-center gap-2 align-items-center'
-                : 'd-flex gap-2 flex-grow-1 justify-content-end align-items-center'
-            }
-          >
-            {navControls}
+          {navControls}
+        </div>
+      </Card.Header>
+      {import.meta.env.DEV && (
+        <Card.Body className="py-1 small text-muted border-bottom">
+          <div>
+            Range: {startStr} – {endIso} · {rawCount} transactions in range
           </div>
-        </Card.Header>
-        {import.meta.env.DEV && (
-          <Card.Body className="py-1 small text-muted border-bottom">
-            <div>
-              Range: {startStr} – {endIso} · {rawCount} transactions in range
+          {debugCounts != null && (
+            <div className="mt-1">
+              Charges (spending): {debugCounts.charges} · Round-ups:{' '}
+              {debugCounts.roundUps} · Transfers: {debugCounts.transfers}
             </div>
-            {debugCounts != null && (
-              <div className="mt-1">
-                Charges (spending): {debugCounts.charges} · Round-ups:{' '}
-                {debugCounts.roundUps} · Transfers: {debugCounts.transfers}
-              </div>
-            )}
-          </Card.Body>
-        )}
-        <Card.Body>
-          {/* Metrics: see src/services/insights.ts for term definitions (Money In = income only, Money Out = spending only, etc.) */}
-          <Row className="mb-3 g-2 g-md-3">
-            <Col xs={6} md>
-              <StatCard
-                title="Money In"
-                value={insights.moneyIn}
-                gradient="success"
-                compact
-              />
-            </Col>
-            <Col xs={6} md>
-              <StatCard
-                title="Money Out"
-                value={insights.moneyOut}
-                gradient="danger"
-                compact
-              />
-            </Col>
-            <Col xs={6} md>
-              <StatCard
-                title="Savers"
-                value={Math.abs(insights.saverChanges)}
-                displayValue={
-                  (insights.saverChanges <= 0 ? '+' : '-') +
-                  '$' +
-                  formatMoney(Math.abs(insights.saverChanges))
-                }
-                gradient="success"
-                compact
-              />
-            </Col>
-            <Col xs={6} md>
-              <StatCard
-                title="Charges"
-                value={0}
-                displayValue={insights.charges}
-                gradient="danger"
-                tooltip="Count of spending transactions this week (excludes transfers)."
-                compact
-              />
-            </Col>
-          </Row>
-          {categories.length > 0 ? (
-            <>
-              <div
-                className="visually-hidden"
-                role="region"
-                aria-label="Spending by category this week (table)"
-              >
-                <table className="table table-sm mb-0">
-                  <caption className="visually-hidden">
-                    Spending by category this week
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Category</th>
-                      <th scope="col" className="text-end">
-                        Spent
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chartData.map((d) => (
-                      <tr key={d.category_id}>
-                        <td>{d.name}</td>
-                        <td className="text-end">
-                          ${formatDollars(d.totalDollars)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div
-                style={{
-                  width: '100%',
-                  height: isMobile
-                    ? Math.max(280, chartData.length * 48)
-                    : Math.max(200, chartData.length * 32),
-                }}
-              >
-                <InsightsBarChart
-                  chartData={chartData}
-                  maxDomain={maxDomain}
-                  isMobile={isMobile}
-                  onBarClick={openCategoryEdit}
-                  aria-label="Spending by category this week (bar chart)"
-                />
-              </div>
-              {categories.length === 15 && (
-                <p className="text-muted small mb-0 mt-1 text-end">
-                  Showing top 15 categories
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-muted small mb-0">
-              No spending by category this week.
-            </p>
           )}
         </Card.Body>
-      </Card>
-
-      <Modal
-        show={editingCategory != null}
-        onHide={() => setEditingCategory(null)}
-        aria-labelledby="insights-color-modal-title"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title id="insights-color-modal-title">
-            Edit category bar colour
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {editingCategory && (
-            <>
-              <p className="mb-2">
-                <strong>{editingCategory.category_name}</strong>
-                <span className="text-muted small ms-1">
-                  ${formatDollars(editingCategory.totalDollars)} this week
-                </span>
-              </p>
-              <p className="text-muted small mb-3">
-                This colour will apply to this category in all weeks (past and
-                future).
-              </p>
-              <ChartColorPicker
-                aria-label="Category bar colour"
-                value={categoryBarColor}
-                onChange={setCategoryBarColor}
-                allowReset
+      )}
+      <Card.Body>
+        {/* Metrics: see src/services/insights.ts for term definitions (Money In = income only, Money Out = spending only, etc.) */}
+        <Row className="mb-3 g-2 g-md-3">
+          <Col xs={6} md>
+            <StatCard
+              title="Money In"
+              value={insights.moneyIn}
+              gradient="success"
+              compact
+            />
+          </Col>
+          <Col xs={6} md>
+            <StatCard
+              title="Money Out"
+              value={insights.moneyOut}
+              gradient="danger"
+              compact
+            />
+          </Col>
+          <Col xs={6} md>
+            <StatCard
+              title="Savers"
+              value={Math.abs(insights.saverChanges)}
+              displayValue={
+                (insights.saverChanges <= 0 ? '+' : '-') +
+                '$' +
+                formatMoney(Math.abs(insights.saverChanges))
+              }
+              gradient="success"
+              compact
+            />
+          </Col>
+          <Col xs={6} md>
+            <StatCard
+              title="Charges"
+              value={0}
+              displayValue={insights.charges}
+              gradient="danger"
+              tooltip="Count of spending transactions this week (excludes transfers)."
+              compact
+            />
+          </Col>
+        </Row>
+        {sections.length > 0 ? (
+          <>
+            <div
+              className="visually-hidden"
+              role="region"
+              aria-label="Spending by category this week (table)"
+            >
+              <table className="table table-sm mb-0">
+                <caption className="visually-hidden">
+                  Spending by category this week, grouped by parent category
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Category</th>
+                    <th scope="col" className="text-end">
+                      Spent
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) =>
+                    r.kind === 'bar' ? (
+                      <tr key={r.datum.category_id}>
+                        <td>{r.datum.name}</td>
+                        <td className="text-end">
+                          ${formatDollars(r.datum.totalDollars)}
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={r.key}>
+                        <th scope="rowgroup" colSpan={2}>
+                          {r.label}
+                        </th>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div
+              style={{
+                width: '100%',
+                height: isMobile
+                  ? Math.max(280, rows.length * 40)
+                  : Math.max(200, rows.length * 28),
+              }}
+            >
+              <InsightsBarChart
+                rows={rows}
+                maxDomain={maxDomain}
+                isMobile={isMobile}
+                aria-label="Spending by category this week (bar chart)"
               />
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setEditingCategory(null)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSaveCategoryColor}>
-            Save
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </>
+            </div>
+            {otherSection && (
+              <p className="text-muted small mb-0 mt-1 text-end">
+                Top {barCount - otherSection.rows.length} categories shown
+                individually · {otherSection.rows[0]?.category_name}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-muted small mb-0">
+            No spending by category this week.
+          </p>
+        )}
+      </Card.Body>
+    </Card>
   )
 }

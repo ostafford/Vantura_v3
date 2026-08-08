@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(36)
+    expect(SCHEMA_VERSION).toBe(37)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -250,6 +250,107 @@ describe('v36 migration: bank-statement-import removal', () => {
     const upTx = db.exec(`SELECT * FROM transactions WHERE id = 'up-tx-1'`)
     expect(upTx.length).toBe(1)
 
+    db.close()
+  })
+})
+
+/**
+ * Minimal v36-shaped fixture: only the tables the v37 migration touches
+ * (colour is now fully computed — src/lib/colorSystem.ts — so the stored
+ * badge_color/colour columns and the insights_category_colors setting go
+ * away).
+ */
+function buildLegacyV36Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '36')`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('insights_category_colors', '{"groceries":"#f48fb1"}')`
+  )
+  db.run(`
+    CREATE TABLE trackers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      budget_amount INTEGER NOT NULL,
+      reset_frequency TEXT NOT NULL,
+      reset_day INTEGER,
+      start_date TEXT NOT NULL,
+      last_reset_date TEXT NOT NULL,
+      next_reset_date TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      badge_color TEXT,
+      bucket_id INTEGER
+    )
+  `)
+  db.run(
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color, bucket_id)
+     VALUES ('Groceries', 20000, 'WEEKLY', NULL, '2026-01-01', '2026-01-01', '2026-01-08', 1, '2026-01-01', '#f48fb1', NULL)`
+  )
+  db.run(`
+    CREATE TABLE budget_buckets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      colour TEXT NOT NULL DEFAULT 'sky',
+      icon TEXT NOT NULL DEFAULT 'mdi-wallet',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `)
+  db.run(
+    `INSERT INTO budget_buckets (name, colour, icon, sort_order, created_at)
+     VALUES ('Bills', 'mint', 'mdi-home', 0, '2026-01-01')`
+  )
+  return db
+}
+
+describe('v37 migration: computed colour system', () => {
+  it('drops badge_color and colour columns, deletes the stored category-colour setting, preserves everything else', () => {
+    const db = buildLegacyV36Database()
+
+    runMigrations(db)
+
+    const versionRow = db.exec(
+      `SELECT value FROM app_settings WHERE key = 'schema_version'`
+    )
+    expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
+
+    const trackerCols = db.exec(`PRAGMA table_info(trackers)`)
+    const trackerColNames = trackerCols[0].values.map((r) => String(r[1]))
+    expect(trackerColNames).not.toContain('badge_color')
+    expect(trackerColNames).toEqual(
+      expect.arrayContaining(['id', 'name', 'reset_frequency', 'bucket_id'])
+    )
+
+    const bucketCols = db.exec(`PRAGMA table_info(budget_buckets)`)
+    const bucketColNames = bucketCols[0].values.map((r) => String(r[1]))
+    expect(bucketColNames).not.toContain('colour')
+    expect(bucketColNames).toEqual(
+      expect.arrayContaining(['id', 'name', 'icon', 'sort_order'])
+    )
+
+    const storedColourSetting = db.exec(
+      `SELECT 1 FROM app_settings WHERE key = 'insights_category_colors'`
+    )
+    expect(storedColourSetting.length).toBe(0)
+
+    // Existing tracker/bucket rows survive the column drop, other columns intact.
+    const tracker = db.exec(`SELECT name, reset_frequency FROM trackers`)
+    expect(tracker[0].values[0]).toEqual(['Groceries', 'WEEKLY'])
+    const bucket = db.exec(`SELECT name, icon FROM budget_buckets`)
+    expect(bucket[0].values[0]).toEqual(['Bills', 'mdi-home'])
+
+    db.close()
+  })
+
+  it('is a no-op on an already-current database (idempotent)', () => {
+    const db = buildLegacyV36Database()
+    runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
 })

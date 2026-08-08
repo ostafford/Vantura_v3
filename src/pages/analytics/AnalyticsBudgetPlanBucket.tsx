@@ -25,6 +25,7 @@ import {
   getTrackersForPicker,
   type BucketTrackerItem,
   type TrackerPickerItem,
+  type TrackerResetFrequency,
 } from '@/services/trackers'
 import {
   searchRecentDebits,
@@ -39,10 +40,16 @@ import { getAppSetting } from '@/db'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import {
-  bucketColourHex,
   BUDGET_FREQUENCIES,
   BUDGET_DISPLAY_PERIODS,
 } from '@/lib/budgetBucketMeta'
+import {
+  getBucketColor,
+  getTrackerColor,
+  getFrequencyBadgeColors,
+  type ColorMode,
+} from '@/lib/colorSystem'
+import { themeStore, resolveTheme } from '@/stores/themeStore'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -353,6 +360,8 @@ function AddTrackerModal({
   onClose,
   onSaved,
 }: AddTrackerModalProps) {
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode = resolveTheme(themeMode)
   const allTrackers: TrackerPickerItem[] = useMemo(
     () => (show ? getTrackersForPicker() : []),
 
@@ -408,21 +417,40 @@ function AddTrackerModal({
                   e.currentTarget.style.background = ''
                 }}
               >
-                <div>
-                  <div className="fw-medium">{t.name}</div>
-                  {t.current_bucket_name && (
-                    <div className="text-warning small">
-                      Currently in "{t.current_bucket_name}" — will be moved
-                    </div>
-                  )}
+                <div className="d-flex align-items-center gap-2 min-w-0">
+                  <span
+                    className="rounded-circle flex-shrink-0"
+                    style={{
+                      width: 10,
+                      height: 10,
+                      backgroundColor: getTrackerColor(
+                        { id: t.id, bucket_id: t.current_bucket_id },
+                        mode
+                      ),
+                    }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <div className="fw-medium text-truncate">{t.name}</div>
+                    {t.current_bucket_name && (
+                      <div className="text-warning small">
+                        Currently in "{t.current_bucket_name}" — will be moved
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <span
-                  className="badge badge-frequency-default flex-shrink-0"
-                  style={
-                    t.badge_color
-                      ? { backgroundColor: t.badge_color, color: '#1a1a2e' }
-                      : undefined
-                  }
+                  className="badge flex-shrink-0"
+                  style={{
+                    backgroundColor: getFrequencyBadgeColors(
+                      t.reset_frequency as TrackerResetFrequency,
+                      mode
+                    ).bg,
+                    color: getFrequencyBadgeColors(
+                      t.reset_frequency as TrackerResetFrequency,
+                      mode
+                    ).text,
+                  }}
                 >
                   {frequencyLabel(t.reset_frequency)}
                 </span>
@@ -740,6 +768,7 @@ function UpcomingRow({
 
 interface TrackerBucketRowProps {
   tracker: BucketTrackerItem
+  bucketId: number
   period: BudgetDisplayPeriod
   periodLabel: string
   onUnassign: () => void
@@ -747,15 +776,22 @@ interface TrackerBucketRowProps {
 
 function TrackerBucketRow({
   tracker,
+  bucketId,
   period,
   periodLabel,
   onUnassign,
 }: TrackerBucketRowProps) {
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode = resolveTheme(themeMode)
   const freq =
     tracker.reset_frequency === 'PAYDAY'
       ? (getAppSetting('payday_frequency') ?? 'MONTHLY')
       : tracker.reset_frequency
   const periodCents = toPeriodCents(tracker.budget_amount, freq, period)
+  const frequencyColors = getFrequencyBadgeColors(
+    tracker.reset_frequency as TrackerResetFrequency,
+    mode
+  )
 
   return (
     <div
@@ -767,22 +803,26 @@ function TrackerBucketRow({
       }}
     >
       <div className="d-flex align-items-center gap-2 min-w-0">
-        <i
-          className="mdi mdi-chart-line text-muted flex-shrink-0"
+        <span
+          className="rounded-circle flex-shrink-0"
+          style={{
+            width: 10,
+            height: 10,
+            backgroundColor: getTrackerColor(
+              { id: tracker.id, bucket_id: bucketId },
+              mode
+            ),
+          }}
           aria-hidden
         />
         <span className="text-truncate fw-medium">{tracker.name}</span>
         <span
-          className="badge badge-frequency-default flex-shrink-0"
-          style={
-            tracker.badge_color
-              ? {
-                  fontSize: '0.65rem',
-                  backgroundColor: tracker.badge_color,
-                  color: '#1a1a2e',
-                }
-              : { fontSize: '0.65rem' }
-          }
+          className="badge flex-shrink-0"
+          style={{
+            fontSize: '0.65rem',
+            backgroundColor: frequencyColors.bg,
+            color: frequencyColors.text,
+          }}
         >
           {frequencyLabel(tracker.reset_frequency)}
         </span>
@@ -885,6 +925,8 @@ export function AnalyticsBudgetPlanBucket() {
   const { bucketId } = useParams<{ bucketId: string }>()
   const navigate = useNavigate()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const periodParam = searchParams.get('period')
@@ -954,7 +996,7 @@ export function AnalyticsBudgetPlanBucket() {
     )
   }
 
-  const hex = bucketColourHex(bucket.colour)
+  const hex = getBucketColor(bucket.id, mode)
   const periodLabel =
     BUDGET_DISPLAY_PERIODS.find((p) => p.value === period)?.label ?? period
 
@@ -1082,10 +1124,12 @@ export function AnalyticsBudgetPlanBucket() {
               period.
             </p>
           ) : (
+            id != null &&
             trackers.map((t) => (
               <TrackerBucketRow
                 key={t.id}
                 tracker={t}
+                bucketId={id}
                 period={period}
                 periodLabel={periodLabel}
                 onUnassign={() => handleUnassignTracker(t)}

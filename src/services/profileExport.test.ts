@@ -102,7 +102,6 @@ describe('profileExport', () => {
           {
             id: 1,
             name: 'Food',
-            colour: 'sky',
             icon: 'mdi-food',
             sort_order: 0,
           },
@@ -232,7 +231,6 @@ describe('profileExport', () => {
           {
             id: 1,
             name: 'Bills',
-            colour: 'rose',
             icon: 'mdi-bill',
             sort_order: 0,
           },

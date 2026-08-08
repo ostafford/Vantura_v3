@@ -8,7 +8,6 @@ import { getHypotheticalLines } from '@/services/budgetHypotheticals'
 export interface BudgetBucketRow {
   id: number
   name: string
-  colour: string
   icon: string
   sort_order: number
   created_at: string
@@ -29,19 +28,18 @@ export function getBuckets(): BudgetBucketRow[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, colour, icon, sort_order, created_at
+    `SELECT id, name, icon, sort_order, created_at
      FROM budget_buckets ORDER BY sort_order, name`
   )
   const list: BudgetBucketRow[] = []
   while (stmt.step()) {
-    const row = stmt.get() as [number, string, string, string, number, string]
+    const row = stmt.get() as [number, string, string, number, string]
     list.push({
       id: row[0],
       name: row[1],
-      colour: row[2],
-      icon: row[3],
-      sort_order: row[4],
-      created_at: row[5],
+      icon: row[2],
+      sort_order: row[3],
+      created_at: row[4],
     })
   }
   stmt.free()
@@ -52,30 +50,25 @@ export function getBucket(id: number): BudgetBucketRow | null {
   const db = getDb()
   if (!db) return null
   const stmt = db.prepare(
-    `SELECT id, name, colour, icon, sort_order, created_at FROM budget_buckets WHERE id = ?`
+    `SELECT id, name, icon, sort_order, created_at FROM budget_buckets WHERE id = ?`
   )
   stmt.bind([id])
   if (!stmt.step()) {
     stmt.free()
     return null
   }
-  const row = stmt.get() as [number, string, string, string, number, string]
+  const row = stmt.get() as [number, string, string, number, string]
   stmt.free()
   return {
     id: row[0],
     name: row[1],
-    colour: row[2],
-    icon: row[3],
-    sort_order: row[4],
-    created_at: row[5],
+    icon: row[2],
+    sort_order: row[3],
+    created_at: row[4],
   }
 }
 
-export function createBucket(
-  name: string,
-  colour: string,
-  icon: string
-): number {
+export function createBucket(name: string, icon: string): number {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   const now = new Date().toISOString()
@@ -84,8 +77,8 @@ export function createBucket(
   )
   const nextOrder = ((maxRes[0]?.values?.[0]?.[0] as number) ?? -1) + 1
   db.run(
-    `INSERT INTO budget_buckets (name, colour, icon, sort_order, created_at) VALUES (?, ?, ?, ?, ?)`,
-    [name, colour, icon, nextOrder, now]
+    `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES (?, ?, ?, ?)`,
+    [name, icon, nextOrder, now]
   )
   const result = db.exec('SELECT last_insert_rowid()')
   const id = (result[0]?.values?.[0]?.[0] as number) ?? 0
@@ -93,18 +86,14 @@ export function createBucket(
   return id
 }
 
-export function updateBucket(
-  id: number,
-  name: string,
-  colour: string,
-  icon: string
-): void {
+export function updateBucket(id: number, name: string, icon: string): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
-  db.run(
-    `UPDATE budget_buckets SET name = ?, colour = ?, icon = ? WHERE id = ?`,
-    [name, colour, icon, id]
-  )
+  db.run(`UPDATE budget_buckets SET name = ?, icon = ? WHERE id = ?`, [
+    name,
+    icon,
+    id,
+  ])
   schedulePersist()
 }
 

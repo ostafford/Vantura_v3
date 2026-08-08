@@ -36,12 +36,7 @@ import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { HelpPopover } from '@/components/HelpPopover'
-import { ACCENT_PALETTES, type AccentId } from '@/lib/accentPalettes'
 import type React from 'react'
-
-const BADGE_COLOR_SWATCHES = (Object.keys(ACCENT_PALETTES) as AccentId[]).map(
-  (id) => ACCENT_PALETTES[id].primary
-)
 
 const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },
@@ -149,7 +144,6 @@ export function TrackersSection({
   const [frequency, setFrequency] = useState<TrackerResetFrequency>('WEEKLY')
   const [resetDay, setResetDay] = useState(1)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
-  const [badgeColor, setBadgeColor] = useState<string | null>(null)
   const [categoryUsage, setCategoryUsage] = useState<Record<string, string>>({})
   const [displayPeriod, setDisplayPeriod] =
     useState<BudgetDisplayPeriod>('MONTHLY')
@@ -264,7 +258,6 @@ export function TrackersSection({
     setFrequency('WEEKLY')
     setResetDay(1)
     setSelectedCategoryIds([])
-    setBadgeColor(null)
     setCategoryUsage(getTrackerCategoryUsage(null))
     setShowModal(true)
   }
@@ -275,7 +268,6 @@ export function TrackersSection({
     budget_amount: number
     reset_frequency: string
     reset_day: number | null
-    badge_color?: string | null
   }) {
     setEditingId(t.id)
     setName(t.name)
@@ -283,7 +275,6 @@ export function TrackersSection({
     setFrequency(t.reset_frequency as TrackerResetFrequency)
     setResetDay(t.reset_day ?? 1)
     setSelectedCategoryIds(getTrackerCategoryIds(t.id))
-    setBadgeColor(t.badge_color ?? null)
     setCategoryUsage(getTrackerCategoryUsage(t.id))
     setShowModal(true)
   }
@@ -308,8 +299,7 @@ export function TrackersSection({
           budgetCents,
           frequency,
           resetDay,
-          selectedCategoryIds,
-          badgeColor
+          selectedCategoryIds
         )
         toast.success('Tracker saved.')
       } else {
@@ -318,8 +308,7 @@ export function TrackersSection({
           budgetCents,
           frequency,
           resetDay,
-          selectedCategoryIds,
-          badgeColor
+          selectedCategoryIds
         )
         toast.success('Tracker created.')
       }
@@ -719,51 +708,6 @@ export function TrackersSection({
                 </Form.Select>
               </Form.Group>
             )}
-            <Form.Group className="mb-2">
-              <Form.Label>Frequency badge colour</Form.Label>
-              <div className="d-flex flex-wrap gap-2 align-items-center">
-                {BADGE_COLOR_SWATCHES.map((hex) => {
-                  const isSelected = badgeColor === hex
-                  return (
-                    <button
-                      key={hex}
-                      type="button"
-                      className="border rounded-circle p-0 d-flex align-items-center justify-content-center"
-                      style={{
-                        width: 32,
-                        height: 32,
-                        background: hex,
-                        borderWidth: isSelected ? 3 : 1,
-                        borderColor: isSelected
-                          ? 'var(--vantura-text)'
-                          : 'var(--vantura-border)',
-                      }}
-                      onClick={() => setBadgeColor(hex)}
-                      aria-label={`Select badge colour ${hex}`}
-                      aria-pressed={isSelected}
-                    >
-                      {isSelected && (
-                        <i
-                          className="mdi mdi-check"
-                          style={{ fontSize: '1rem', color: '#1a1a2e' }}
-                          aria-hidden
-                        />
-                      )}
-                    </button>
-                  )
-                })}
-                {badgeColor != null && (
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm p-0 text-muted"
-                    onClick={() => setBadgeColor(null)}
-                    aria-label="Use default badge colour"
-                  >
-                    Use default
-                  </button>
-                )}
-              </div>
-            </Form.Group>
             {modalPaydayExceedsPay && (
               <Alert variant="warning" className="mb-2">
                 Total PAYDAY budgets will be ${formatMoney(newTotalPaydayCents)}{' '}

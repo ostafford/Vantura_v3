@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 36
+const SCHEMA_VERSION = 37
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -93,7 +93,6 @@ const DDL_STATEMENTS = [
     next_reset_date TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
-    badge_color TEXT,
     bucket_id INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS tracker_categories (
@@ -155,7 +154,6 @@ const DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS budget_buckets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    colour TEXT NOT NULL DEFAULT 'sky',
     icon TEXT NOT NULL DEFAULT 'mdi-wallet',
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
@@ -936,6 +934,36 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['36']
+    )
+  }
+
+  // Colour is now fully computed (src/lib/colorSystem.ts) — no more
+  // user-chosen tracker badge colour, bucket colour, or per-category chart
+  // colour overrides. Drop the columns/setting that stored them.
+  if (version < 37) {
+    const trackerCols = database.exec(`PRAGMA table_info(trackers)`)
+    const trackerHasBadgeColor = (trackerCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'badge_color'
+    )
+    if (trackerHasBadgeColor) {
+      database.run(`ALTER TABLE trackers DROP COLUMN badge_color`)
+    }
+
+    const bucketCols = database.exec(`PRAGMA table_info(budget_buckets)`)
+    const bucketHasColour = (bucketCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'colour'
+    )
+    if (bucketHasColour) {
+      database.run(`ALTER TABLE budget_buckets DROP COLUMN colour`)
+    }
+
+    database.run(
+      `DELETE FROM app_settings WHERE key = 'insights_category_colors'`
+    )
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['37']
     )
   }
 }

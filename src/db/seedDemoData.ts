@@ -578,8 +578,8 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       'Groceries',
       80000,
@@ -589,7 +589,6 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
-      '#a5d6a7',
     ]
   )
   const tracker1Result = db.exec('SELECT last_insert_rowid()')
@@ -600,8 +599,8 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       'Dining & Takeaway',
       30000,
@@ -611,7 +610,6 @@ export function seedDemoData(): void {
       lastResetStr,
       nextResetStr,
       NOW,
-      '#ef9a9a',
     ]
   )
   const tracker2Result = db.exec('SELECT last_insert_rowid()')
@@ -622,19 +620,9 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-    [
-      'Coffee',
-      8000,
-      'WEEKLY',
-      1,
-      weeklyLast,
-      weeklyLast,
-      weeklyNext,
-      NOW,
-      '#ffcc80',
-    ]
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    ['Coffee', 8000, 'WEEKLY', 1, weeklyLast, weeklyLast, weeklyNext, NOW]
   )
   const tracker3Result = db.exec('SELECT last_insert_rowid()')
   const tracker3Id = (tracker3Result[0]?.values?.[0]?.[0] as number) ?? 3
@@ -644,8 +632,8 @@ export function seedDemoData(): void {
   )
 
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       'Entertainment',
       20000,
@@ -655,7 +643,6 @@ export function seedDemoData(): void {
       fortLast,
       fortNext,
       NOW,
-      '#ce93d8',
     ]
   )
   const tracker4Result = db.exec('SELECT last_insert_rowid()')
@@ -668,8 +655,8 @@ export function seedDemoData(): void {
   // PAYDAY tracker: period aligned to the monthly payday on the 15th.
   // This demonstrates the PAYDAY frequency and shows a different period tab on the dashboard.
   run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       'Transport',
       15000,
@@ -679,7 +666,6 @@ export function seedDemoData(): void {
       lastPaydayStr,
       nextPayday,
       NOW,
-      '#90caf9',
     ]
   )
   const tracker5Result = db.exec('SELECT last_insert_rowid()')

@@ -24,7 +24,7 @@ export interface TrackerRow {
   reset_day: number | null
   last_reset_date: string
   next_reset_date: string
-  badge_color?: string | null
+  bucket_id: number | null
 }
 
 export interface TrackerWithProgress extends TrackerRow {
@@ -220,7 +220,7 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, badge_color
+    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, bucket_id
      FROM trackers WHERE is_active = 1 ORDER BY name`
   )
   const list: TrackerWithProgress[] = []
@@ -234,7 +234,7 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
       number | null,
       string,
       string,
-      string | null,
+      number | null,
     ]
     const id = row[0]
     const budget_amount = row[2]
@@ -251,10 +251,7 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
       reset_day: row[4],
       last_reset_date: row[5],
       next_reset_date: row[6],
-      badge_color:
-        row[7] != null && String(row[7]).trim() !== ''
-          ? String(row[7]).trim()
-          : undefined,
+      bucket_id: row[7],
       spent,
       remaining,
       daysLeft,
@@ -272,7 +269,7 @@ export function getTracker(trackerId: number): TrackerRow | null {
   const db = getDb()
   if (!db) return null
   const stmt = db.prepare(
-    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, badge_color
+    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, bucket_id
      FROM trackers WHERE id = ? AND is_active = 1`
   )
   stmt.bind([trackerId])
@@ -288,7 +285,7 @@ export function getTracker(trackerId: number): TrackerRow | null {
     number | null,
     string,
     string,
-    string | null,
+    number | null,
   ]
   stmt.free()
   return {
@@ -299,10 +296,7 @@ export function getTracker(trackerId: number): TrackerRow | null {
     reset_day: row[4],
     last_reset_date: row[5],
     next_reset_date: row[6],
-    badge_color:
-      row[7] != null && String(row[7]).trim() !== ''
-        ? String(row[7]).trim()
-        : undefined,
+    bucket_id: row[7],
   }
 }
 
@@ -389,7 +383,7 @@ export function getTrackersWithProgressForPeriod(
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, badge_color
+    `SELECT id, name, budget_amount, reset_frequency, reset_day, last_reset_date, next_reset_date, bucket_id
      FROM trackers WHERE is_active = 1 ORDER BY name`
   )
   const list: TrackerWithProgress[] = []
@@ -403,7 +397,7 @@ export function getTrackersWithProgressForPeriod(
       number | null,
       string,
       string,
-      string | null,
+      number | null,
     ]
     const id = row[0]
     const trackerRow: TrackerRow = {
@@ -414,10 +408,7 @@ export function getTrackersWithProgressForPeriod(
       reset_day: row[4],
       last_reset_date: row[5],
       next_reset_date: row[6],
-      badge_color:
-        row[7] != null && String(row[7]).trim() !== ''
-          ? String(row[7]).trim()
-          : undefined,
+      bucket_id: row[7],
     }
     const bounds = getPeriodBoundsForOffset(trackerRow, periodOffset)
     if (!bounds) continue
@@ -535,8 +526,7 @@ export function createTracker(
   budgetAmountCents: number,
   resetFrequency: TrackerResetFrequency,
   resetDay: number,
-  categoryIds: string[],
-  badgeColor?: string | null
+  categoryIds: string[]
 ): number {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
@@ -554,8 +544,8 @@ export function createTracker(
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
   }
   db.run(
-    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, badge_color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       name,
       budgetAmountCents,
@@ -565,7 +555,6 @@ export function createTracker(
       lastReset,
       nextReset,
       now,
-      badgeColor ?? null,
     ]
   )
   const result = db.exec('SELECT last_insert_rowid()')
@@ -591,8 +580,7 @@ export function updateTracker(
   budgetAmountCents: number,
   resetFrequency: TrackerResetFrequency,
   resetDay: number,
-  categoryIds: string[],
-  badgeColor?: string | null
+  categoryIds: string[]
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
@@ -618,13 +606,12 @@ export function updateTracker(
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
   }
   db.run(
-    `UPDATE trackers SET name = ?, budget_amount = ?, reset_frequency = ?, reset_day = ?, badge_color = ?, last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
+    `UPDATE trackers SET name = ?, budget_amount = ?, reset_frequency = ?, reset_day = ?, last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
     [
       name,
       budgetAmountCents,
       resetFrequency,
       resetDay,
-      badgeColor ?? null,
       lastReset,
       nextReset,
       id,
@@ -984,7 +971,6 @@ export interface BucketTrackerItem {
   name: string
   budget_amount: number
   reset_frequency: string
-  badge_color?: string | null
 }
 
 export interface TrackerPickerItem extends BucketTrackerItem {
@@ -996,22 +982,18 @@ export function getBucketTrackers(bucketId: number): BucketTrackerItem[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, budget_amount, reset_frequency, badge_color
+    `SELECT id, name, budget_amount, reset_frequency
      FROM trackers WHERE bucket_id = ? AND is_active = 1 ORDER BY name`
   )
   stmt.bind([bucketId])
   const list: BucketTrackerItem[] = []
   while (stmt.step()) {
-    const row = stmt.get() as [number, string, number, string, string | null]
+    const row = stmt.get() as [number, string, number, string]
     list.push({
       id: row[0],
       name: row[1],
       budget_amount: row[2],
       reset_frequency: row[3],
-      badge_color:
-        row[4] != null && String(row[4]).trim() !== ''
-          ? String(row[4]).trim()
-          : undefined,
     })
   }
   stmt.free()
@@ -1035,7 +1017,7 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT t.id, t.name, t.budget_amount, t.reset_frequency, t.badge_color,
+    `SELECT t.id, t.name, t.budget_amount, t.reset_frequency,
             t.bucket_id, bb.name as bucket_name
      FROM trackers t
      LEFT JOIN budget_buckets bb ON t.bucket_id = bb.id
@@ -1048,7 +1030,6 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
       string,
       number,
       string,
-      string | null,
       number | null,
       string | null,
     ]
@@ -1057,12 +1038,8 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
       name: row[1],
       budget_amount: row[2],
       reset_frequency: row[3],
-      badge_color:
-        row[4] != null && String(row[4]).trim() !== ''
-          ? String(row[4]).trim()
-          : undefined,
-      current_bucket_id: row[5],
-      current_bucket_name: row[6],
+      current_bucket_id: row[4],
+      current_bucket_name: row[5],
     })
   }
   stmt.free()

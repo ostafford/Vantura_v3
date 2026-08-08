@@ -37,6 +37,7 @@ import {
   weekNarrativePriorLabel,
   yearNarrativePriorLabel,
 } from '@/lib/monthLabels'
+import { getCategoriesWithParent } from '@/services/categories'
 
 export interface WeekRange {
   start: Date
@@ -376,6 +377,147 @@ export function getWeeklyCategoryBreakdown(
   }
   stmt.free()
   return list
+}
+
+/** One category's row inside a Weekly Insights group section. */
+export interface CategoryGroupedRow {
+  category_id: string | null
+  category_name: string
+  total: number
+}
+
+/**
+ * One parent-category cluster in the grouped Weekly Insights chart, plus the
+ * two synthetic tail sections (Uncategorised, Other-overflow).
+ */
+export interface CategoryGroupSection {
+  parentId: string | null
+  parentName: string
+  rows: CategoryGroupedRow[]
+  isOther: boolean
+}
+
+const MAX_INDIVIDUAL_CATEGORIES = 7
+
+/**
+ * Up Bank's 4 real parent categories, in the fixed display order the
+ * categorical colour system was validated against (src/lib/colorSystem.ts —
+ * the 6 category-family hues were CVD-safety-checked as a specific ordered
+ * chain: Home, Transport, Good Life [split A/B], Personal [split A/B]).
+ * Changing this order, or letting group order vary by spend, breaks that
+ * validation — two families that were only checked as chain-neighbours could
+ * end up directly adjacent with no colour-safety guarantee. Matched by name
+ * (Up Bank's parent category names), not id, since real ids aren't yet
+ * wired into this codebase — see colorSystem.ts's CATEGORY_ID_TO_SLOT.
+ */
+const PARENT_DISPLAY_ORDER = ['Home', 'Transport', 'Good Life', 'Personal']
+
+/**
+ * Weekly category spend, grouped by real parent category in a fixed order,
+ * sorted by spend within each group, with everything past the top
+ * MAX_INDIVIDUAL_CATEGORIES individual categories (by spend, across all
+ * parents) folded into a single "Other" row. Every real parent group always
+ * renders (even with zero rows) so the chart's group dividers stay in a
+ * fixed sequence — required for the colour system's adjacency guarantees;
+ * see PARENT_DISPLAY_ORDER above.
+ */
+export function getWeeklyCategoryBreakdownGrouped(
+  weekRange?: WeekRange
+): CategoryGroupSection[] {
+  const db = getDb()
+  if (!db) return []
+  const { startIso, endIso } = weekRange ?? getWeekRange()
+  const stmt = db.prepare(
+    `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
+     FROM transactions t
+     LEFT JOIN categories c ON t.category_id = c.id
+     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
+     AND COALESCE(t.created_at, t.settled_at) >= ? AND COALESCE(t.created_at, t.settled_at) <= ?
+     GROUP BY t.category_id ORDER BY total DESC`
+  )
+  stmt.bind([startIso, endIso])
+  const raw: CategoryBreakdownRow[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [string, string | null, number]
+    raw.push({
+      category_id: row[0],
+      category_name: row[1] ?? 'Uncategorised',
+      total: row[2],
+    })
+  }
+  stmt.free()
+  if (raw.length === 0) return []
+
+  const individual = raw.slice(0, MAX_INDIVIDUAL_CATEGORIES)
+  const overflow = raw.slice(MAX_INDIVIDUAL_CATEGORIES)
+
+  const categoryTree = getCategoriesWithParent()
+  const parentById = new Map(categoryTree.map((c) => [c.id, c.parent_id]))
+  const realParents = categoryTree.filter((c) => c.parent_id === null)
+
+  const rowsByParentId = new Map<string, CategoryGroupedRow[]>()
+  const uncategorisedRows: CategoryGroupedRow[] = []
+  for (const c of individual) {
+    const row: CategoryGroupedRow = {
+      category_id: c.category_id,
+      category_name: c.category_name,
+      total: c.total,
+    }
+    const parentId = c.category_id
+      ? (parentById.get(c.category_id) ?? null)
+      : null
+    if (!parentId) {
+      uncategorisedRows.push(row)
+      continue
+    }
+    if (!rowsByParentId.has(parentId)) rowsByParentId.set(parentId, [])
+    rowsByParentId.get(parentId)!.push(row)
+  }
+
+  const orderIndex = (name: string) => {
+    const i = PARENT_DISPLAY_ORDER.indexOf(name)
+    return i === -1 ? PARENT_DISPLAY_ORDER.length : i
+  }
+  const orderedParents = [...realParents].sort(
+    (a, b) =>
+      orderIndex(a.name) - orderIndex(b.name) || a.name.localeCompare(b.name)
+  )
+
+  const sections: CategoryGroupSection[] = orderedParents.map((p) => ({
+    parentId: p.id,
+    parentName: p.name,
+    rows: rowsByParentId.get(p.id) ?? [],
+    isOther: false,
+  }))
+
+  if (uncategorisedRows.length > 0) {
+    sections.push({
+      parentId: null,
+      parentName: 'Uncategorised',
+      rows: uncategorisedRows,
+      isOther: false,
+    })
+  }
+
+  if (overflow.length > 0) {
+    const overflowTotal = overflow.reduce((sum, c) => sum + c.total, 0)
+    sections.push({
+      parentId: null,
+      parentName: 'Other',
+      rows: [
+        {
+          category_id: null,
+          category_name: `Other (${overflow.length} ${
+            overflow.length === 1 ? 'category' : 'categories'
+          })`,
+          total: overflowTotal,
+        },
+      ],
+      isOther: true,
+    })
+  }
+
+  return sections
 }
 
 /**

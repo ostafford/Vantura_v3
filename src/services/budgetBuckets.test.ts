@@ -24,7 +24,7 @@ beforeEach(async () => {
   for (const key of Object.keys(appSettings)) delete appSettings[key]
 
   db.run(
-    `INSERT INTO budget_buckets (name, colour, icon, sort_order, created_at) VALUES ('Bills', '#000', 'icon', 0, '2026-01-01')`
+    `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Bills', 'icon', 0, '2026-01-01')`
   )
 })
 

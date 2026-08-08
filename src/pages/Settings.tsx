@@ -21,7 +21,6 @@ import {
 } from '@/lib/payday'
 import { usePwaUpdate } from '@/hooks/usePwaUpdate'
 import { setDashboardTourCompleted } from '@/lib/dashboardTour'
-import { CategoryColorsSection } from '@/components/CategoryColorsSection'
 import {
   getDashboardSectionOrder,
   setDashboardSectionOrder,
@@ -1097,14 +1096,6 @@ export function Settings() {
                       </button>
                     ))}
                   </div>
-
-                  <hr className="my-4" />
-                  <h6 className="text-muted mb-1">Category colours</h6>
-                  <p className="small text-muted mb-3">
-                    Customise the colours used for spending categories in charts
-                    and reports.
-                  </p>
-                  <CategoryColorsSection />
                 </>
               )}
               {activeSection === 'payday' && (

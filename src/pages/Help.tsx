@@ -729,8 +729,9 @@ export function Help() {
                     Appearance
                   </SectionHeading>
                   <p className="mb-2">
-                    Change the app&apos;s accent colour. You can also customise
-                    the colours used for spending categories in charts.
+                    Choose Light, Dark, or System theme. Colours for trackers,
+                    buckets, and spending categories are assigned automatically
+                    and aren&apos;t user-configurable.
                   </p>
 
                   <SectionHeading icon="mdi-view-dashboard-outline">
@@ -748,8 +749,7 @@ export function Help() {
                     Export your settings to an encrypted, passphrase-protected
                     file and import it on another device. Includes appearance,
                     payday schedule, notification preferences, lock timeout,
-                    chart colours, trackers, upcoming charges, and Budget Plan
-                    buckets.{' '}
+                    trackers, upcoming charges, and Budget Plan buckets.{' '}
                     <em>
                       Transactions, account data, and API tokens are never
                       exported.

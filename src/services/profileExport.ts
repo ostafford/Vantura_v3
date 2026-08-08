@@ -34,7 +34,6 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'payday_description',
   'spendable_alert_below_cents',
   'spendable_alert_below_pct_pay',
-  'insights_category_colors',
   'dashboard_tour_completed',
   'dashboard_section_order',
   'lock_timeout_minutes',
@@ -83,7 +82,6 @@ export interface TrackerExportRow {
   last_reset_date: string
   next_reset_date: string
   is_active: number
-  badge_color: string | null
   bucket_id: number | null
 }
 
@@ -103,7 +101,6 @@ export interface UpcomingChargeExportRow {
 export interface BudgetBucketExportRow {
   id: number
   name: string
-  colour: string
   icon: string
   sort_order: number
 }
@@ -152,7 +149,7 @@ function collectTrackers(): TrackerExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT id, name, budget_amount, reset_frequency, reset_day, start_date,
-            last_reset_date, next_reset_date, is_active, badge_color, bucket_id
+            last_reset_date, next_reset_date, is_active, bucket_id
      FROM trackers ORDER BY id`
   )
   const rows: TrackerExportRow[] = []
@@ -167,7 +164,6 @@ function collectTrackers(): TrackerExportRow[] {
       string,
       string,
       number,
-      string | null,
       number | null,
     ]
     rows.push({
@@ -180,8 +176,7 @@ function collectTrackers(): TrackerExportRow[] {
       last_reset_date: r[6],
       next_reset_date: r[7],
       is_active: r[8],
-      badge_color: r[9],
-      bucket_id: r[10] ?? null,
+      bucket_id: r[9] ?? null,
     })
   }
   stmt.free()
@@ -249,18 +244,17 @@ function collectBudgetBuckets(): BudgetBucketExportRow[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, name, colour, icon, sort_order
+    `SELECT id, name, icon, sort_order
      FROM budget_buckets ORDER BY sort_order, id`
   )
   const rows: BudgetBucketExportRow[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [number, string, string, string, number]
+    const r = stmt.get() as [number, string, string, number]
     rows.push({
       id: r[0],
       name: r[1],
-      colour: r[2],
-      icon: r[3],
-      sort_order: r[4],
+      icon: r[2],
+      sort_order: r[3],
     })
   }
   stmt.free()
@@ -492,13 +486,12 @@ export function replaceBudgetPlan(
   const bucketsArr = Array.isArray(budgetBuckets) ? budgetBuckets : []
   for (const b of bucketsArr) {
     if (typeof b.name !== 'string' || b.name === '') continue
-    const colour = typeof b.colour === 'string' && b.colour ? b.colour : 'sky'
     const icon = typeof b.icon === 'string' && b.icon ? b.icon : 'mdi-wallet'
     const sortOrder = typeof b.sort_order === 'number' ? b.sort_order : 0
     db.run(
-      `INSERT INTO budget_buckets (name, colour, icon, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [b.name, colour, icon, sortOrder, now]
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [b.name, icon, sortOrder, now]
     )
     const result = db.exec('SELECT last_insert_rowid()')
     const newId = (result[0]?.values?.[0]?.[0] as number) ?? 0
@@ -565,18 +558,14 @@ export function replaceTrackers(
         ? t.next_reset_date.slice(0, 10)
         : startDate
     const isActive = typeof t.is_active === 'number' ? t.is_active : 1
-    const badgeColor =
-      t.badge_color != null && typeof t.badge_color === 'string'
-        ? t.badge_color
-        : null
     const bucketId =
       t.bucket_id != null ? (bucketIdMap.get(t.bucket_id) ?? null) : null
 
     db.run(
       `INSERT INTO trackers
          (name, budget_amount, reset_frequency, reset_day, start_date,
-          last_reset_date, next_reset_date, is_active, created_at, badge_color, bucket_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          last_reset_date, next_reset_date, is_active, created_at, bucket_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         t.name,
         t.budget_amount,
@@ -587,7 +576,6 @@ export function replaceTrackers(
         nextReset,
         isActive,
         now,
-        badgeColor,
         bucketId,
       ]
     )

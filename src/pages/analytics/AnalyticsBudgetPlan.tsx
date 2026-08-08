@@ -25,12 +25,9 @@ import {
 import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { toast } from '@/stores/toastStore'
-import {
-  bucketColourHex,
-  PASTEL_SWATCHES,
-  BUCKET_ICONS,
-  BUDGET_DISPLAY_PERIODS,
-} from '@/lib/budgetBucketMeta'
+import { BUCKET_ICONS, BUDGET_DISPLAY_PERIODS } from '@/lib/budgetBucketMeta'
+import { getBucketColor } from '@/lib/colorSystem'
+import { themeStore, resolveTheme } from '@/stores/themeStore'
 import type { BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import type React from 'react'
 import { HelpPopover } from '@/components/HelpPopover'
@@ -46,13 +43,11 @@ interface BucketModalProps {
 
 function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
   const [name, setName] = useState('')
-  const [colour, setColour] = useState('sky')
   const [icon, setIcon] = useState('mdi-wallet')
 
   useMemo(() => {
     if (show) {
       setName(editing?.name ?? '')
-      setColour(editing?.colour ?? 'sky')
       setIcon(editing?.icon ?? 'mdi-wallet')
     }
   }, [show, editing])
@@ -61,10 +56,10 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
     const trimmed = name.trim()
     if (!trimmed) return
     if (editing) {
-      updateBucket(editing.id, trimmed, colour, icon)
+      updateBucket(editing.id, trimmed, icon)
       toast.success('Bucket updated')
     } else {
-      createBucket(trimmed, colour, icon)
+      createBucket(trimmed, icon)
       toast.success('Bucket created')
     }
     onSaved()
@@ -89,33 +84,6 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Colour</Form.Label>
-          <div className="d-flex gap-2 flex-wrap">
-            {PASTEL_SWATCHES.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                aria-label={s.label}
-                onClick={() => setColour(s.id)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  backgroundColor: s.hex,
-                  border:
-                    colour === s.id
-                      ? '3px solid var(--vantura-primary)'
-                      : '2px solid transparent',
-                  cursor: 'pointer',
-                  padding: 0,
-                  outline: 'none',
-                }}
-              />
-            ))}
-          </div>
-        </Form.Group>
-
         <Form.Group>
           <Form.Label>Icon</Form.Label>
           <div
@@ -138,11 +106,11 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
                   borderRadius: 8,
                   border:
                     icon === opt.icon
-                      ? `2px solid ${bucketColourHex(colour)}`
+                      ? '2px solid var(--vantura-primary)'
                       : '2px solid transparent',
                   backgroundColor:
                     icon === opt.icon
-                      ? `${bucketColourHex(colour)}22`
+                      ? 'color-mix(in srgb, var(--vantura-primary) 13%, transparent)'
                       : 'var(--bs-body-bg)',
                   cursor: 'pointer',
                   display: 'flex',
@@ -151,7 +119,7 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
                   fontSize: '1.25rem',
                   color:
                     icon === opt.icon
-                      ? bucketColourHex(colour)
+                      ? 'var(--vantura-primary)'
                       : 'var(--bs-body-color)',
                   transition: 'border-color 0.1s, background-color 0.1s',
                 }}
@@ -293,6 +261,8 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 
 export function AnalyticsBudgetPlan() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const periodParam = searchParams.get('period')
@@ -479,7 +449,7 @@ export function AnalyticsBudgetPlan() {
       {/* Bucket grid */}
       <Row className="g-3 mb-4">
         {buckets.map((b) => {
-          const hex = bucketColourHex(b.colour)
+          const hex = getBucketColor(b.id, mode)
           const summary = bucketSummaries[b.id] ?? {
             plannedCents: 0,
             hypotheticalCents: 0,

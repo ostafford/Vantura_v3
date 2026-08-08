@@ -21,17 +21,20 @@ import {
   getTrackerSpentInPeriod,
   getTrackerPeriodsInRange,
   type TrackerPeriodSlice,
+  type TrackerResetFrequency,
 } from '@/services/trackers'
 import {
   getUpcomingChargesForMonth,
   type UpcomingChargeRow,
 } from '@/services/upcoming'
 import {
-  getInsightsCategoryColors,
-  normalizeCategoryIdForColor,
-} from '@/lib/chartColors'
+  getCategoryColor,
+  getTrackerColor,
+  getFrequencyBadgeColors,
+} from '@/lib/colorSystem'
 import { useStore } from 'zustand'
 import { syncStore } from '@/stores/syncStore'
+import { themeStore, resolveTheme } from '@/stores/themeStore'
 import {
   sidebarPinsStore,
   PINNABLE_ANALYTICS_PAGES,
@@ -169,7 +172,6 @@ function makeDelta(current: number, previous: number): MonthDelta {
 // ─── Spending Category List ───────────────────────────────────────────────────
 
 const SPENDING_LIST_DEFAULT_VISIBLE = 8
-const CHART_PALETTE = ['#c2def8', '#90caf9', '#5b9fd4']
 
 function SpendingCategoryList({
   chartData,
@@ -415,7 +417,8 @@ export function AnalyticsReports() {
 
   // --- Store ---
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
-  const categoryColors = getInsightsCategoryColors()
+  const themeMode = useStore(themeStore, (s) => s.mode)
+  const mode = resolveTheme(themeMode)
 
   // --- Data ---
   const comparison = useMemo(
@@ -535,21 +538,17 @@ export function AnalyticsReports() {
 
   const chartData: InsightsChartDatum[] = useMemo(
     () =>
-      categories.map((c, index) => {
-        const colorKey = normalizeCategoryIdForColor(c.category_id)
+      categories.map((c) => {
+        const hex = getCategoryColor(c.category_id, mode)
         return {
           category_id: c.category_id ?? '',
           name: c.category_name,
           totalDollars: c.total / 100,
-          fill:
-            categoryColors[colorKey] ??
-            CHART_PALETTE[index % CHART_PALETTE.length],
-          stroke:
-            categoryColors[colorKey] ??
-            CHART_PALETTE[index % CHART_PALETTE.length],
+          fill: hex,
+          stroke: hex,
         }
       }),
-    [categories, categoryColors]
+    [categories, mode]
   )
   const totalSpent = categories.reduce((s, c) => s + c.total, 0)
   const top3Total = categories.slice(0, 3).reduce((s, c) => s + c.total, 0)
@@ -1086,23 +1085,40 @@ export function AnalyticsReports() {
                       <Col key={tracker.id} xs={12} md={6}>
                         <div className="border rounded p-3">
                           <div className="d-flex justify-content-between align-items-start mb-1">
-                            <span className="fw-medium">{tracker.name}</span>
-                            {tracker.badge_color?.trim() ? (
+                            <span className="d-flex align-items-center gap-2 min-w-0">
                               <span
-                                className="badge badge-frequency-custom"
+                                className="rounded-circle flex-shrink-0"
                                 style={{
-                                  backgroundColor: tracker.badge_color.trim(),
+                                  width: 9,
+                                  height: 9,
+                                  backgroundColor: getTrackerColor(
+                                    tracker,
+                                    mode
+                                  ),
                                 }}
-                              >
-                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                  tracker.reset_frequency}
+                                aria-hidden
+                              />
+                              <span className="fw-medium text-truncate">
+                                {tracker.name}
                               </span>
-                            ) : (
-                              <span className="badge badge-frequency-default">
-                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                  tracker.reset_frequency}
-                              </span>
-                            )}
+                            </span>
+                            <span
+                              className="badge badge-frequency-default"
+                              style={{
+                                backgroundImage: 'none',
+                                backgroundColor: getFrequencyBadgeColors(
+                                  tracker.reset_frequency as TrackerResetFrequency,
+                                  mode
+                                ).bg,
+                                color: getFrequencyBadgeColors(
+                                  tracker.reset_frequency as TrackerResetFrequency,
+                                  mode
+                                ).text,
+                              }}
+                            >
+                              {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                tracker.reset_frequency}
+                            </span>
                           </div>
                           <div className="small text-muted mb-3">
                             ${formatMoney(spent)} total
@@ -1200,23 +1216,40 @@ export function AnalyticsReports() {
                       >
                         <div className="border rounded p-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
-                            <span className="fw-medium">{tracker.name}</span>
-                            {tracker.badge_color?.trim() ? (
+                            <span className="d-flex align-items-center gap-2 min-w-0">
                               <span
-                                className="badge badge-frequency-custom"
+                                className="rounded-circle flex-shrink-0"
                                 style={{
-                                  backgroundColor: tracker.badge_color.trim(),
+                                  width: 9,
+                                  height: 9,
+                                  backgroundColor: getTrackerColor(
+                                    tracker,
+                                    mode
+                                  ),
                                 }}
-                              >
-                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                  tracker.reset_frequency}
+                                aria-hidden
+                              />
+                              <span className="fw-medium text-truncate">
+                                {tracker.name}
                               </span>
-                            ) : (
-                              <span className="badge badge-frequency-default">
-                                {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                  tracker.reset_frequency}
-                              </span>
-                            )}
+                            </span>
+                            <span
+                              className="badge badge-frequency-default"
+                              style={{
+                                backgroundImage: 'none',
+                                backgroundColor: getFrequencyBadgeColors(
+                                  tracker.reset_frequency as TrackerResetFrequency,
+                                  mode
+                                ).bg,
+                                color: getFrequencyBadgeColors(
+                                  tracker.reset_frequency as TrackerResetFrequency,
+                                  mode
+                                ).text,
+                              }}
+                            >
+                              {FREQUENCY_LABELS[tracker.reset_frequency] ??
+                                tracker.reset_frequency}
+                            </span>
                           </div>
                           <ProgressBar
                             now={Math.min(100, progress)}

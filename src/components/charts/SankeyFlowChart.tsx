@@ -6,20 +6,18 @@
 import { useEffect, useRef } from 'react'
 import { select, scaleLinear, line, curveMonotoneX } from 'd3'
 import type { CategoryBreakdownRow } from '@/services/insights'
-import { getInsightsCategoryColors } from '@/lib/chartColors'
-import { normalizeCategoryIdForColor } from '@/lib/chartColors'
-import { UNCATEGORISED_COLOR_KEY } from '@/lib/chartColors'
+import { getCategoryColor, type ColorMode } from '@/lib/colorSystem'
 const NODE_WIDTH = 12
 const COLUMN_GAP = 80
 const MIN_LINK_WIDTH = 2
 const MAX_LINK_WIDTH = 24
-const CHART_PALETTE = ['#c2def8', '#90caf9', '#5b9fd4']
 
 export interface SankeyFlowChartProps {
   moneyInCents: number
   categories: CategoryBreakdownRow[]
   width: number
   height: number
+  mode: ColorMode
   ariaLabel?: string
 }
 
@@ -28,10 +26,10 @@ export function SankeyFlowChart({
   categories,
   width,
   height,
+  mode,
   ariaLabel = 'Income to spending flow',
 }: SankeyFlowChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const categoryColors = getInsightsCategoryColors()
 
   useEffect(() => {
     const svg = svgRef.current
@@ -62,13 +60,9 @@ export function SankeyFlowChart({
       .append('g')
       .attr('transform', 'translate(0,0)')
 
-    categoryNodes.forEach((cat, i) => {
+    categoryNodes.forEach((cat) => {
       const linkWidth = linkScale(cat.total)
-      const colorKey = normalizeCategoryIdForColor(cat.category_id)
-      const color =
-        categoryColors[colorKey] ??
-        categoryColors[UNCATEGORISED_COLOR_KEY] ??
-        CHART_PALETTE[i % CHART_PALETTE.length]
+      const color = getCategoryColor(cat.category_id, mode)
       const path = line().curve(curveMonotoneX)([
         [leftX + NODE_WIDTH, centerY],
         [leftX + NODE_WIDTH + COLUMN_GAP * 0.3, centerY],
@@ -91,16 +85,12 @@ export function SankeyFlowChart({
       .attr('y', incomeNodeY)
       .attr('width', NODE_WIDTH)
       .attr('height', NODE_WIDTH)
-      .attr('fill', CHART_PALETTE[0])
+      .attr('fill', 'var(--vantura-success)')
       .attr('opacity', 0.9)
       .attr('rx', 2)
 
-    categoryNodes.forEach((cat, i) => {
-      const colorKey = normalizeCategoryIdForColor(cat.category_id)
-      const color =
-        categoryColors[colorKey] ??
-        categoryColors[UNCATEGORISED_COLOR_KEY] ??
-        CHART_PALETTE[i % CHART_PALETTE.length]
+    categoryNodes.forEach((cat) => {
+      const color = getCategoryColor(cat.category_id, mode)
       container
         .append('rect')
         .attr('x', rightX)
@@ -137,7 +127,7 @@ export function SankeyFlowChart({
             : cat.category_name
         )
     })
-  }, [moneyInCents, categories, width, height, categoryColors])
+  }, [moneyInCents, categories, width, height, mode])
 
   return (
     <svg
