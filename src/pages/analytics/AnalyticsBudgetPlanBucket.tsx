@@ -36,7 +36,6 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
-import { getAppSetting } from '@/db'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import {
@@ -783,11 +782,11 @@ function TrackerBucketRow({
 }: TrackerBucketRowProps) {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
-  const freq =
-    tracker.reset_frequency === 'PAYDAY'
-      ? (getAppSetting('payday_frequency') ?? 'MONTHLY')
-      : tracker.reset_frequency
-  const periodCents = toPeriodCents(tracker.budget_amount, freq, period)
+  const periodCents = toPeriodCents(
+    tracker.budget_amount,
+    tracker.reset_frequency,
+    period
+  )
   const frequencyColors = getFrequencyBadgeColors(
     tracker.reset_frequency as TrackerResetFrequency,
     mode

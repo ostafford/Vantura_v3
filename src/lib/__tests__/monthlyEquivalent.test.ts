@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import {
-  monthlyEquivalentMultiplier,
-  toMonthlyEquivalentCents,
-  toPeriodCents,
-} from '@/lib/monthlyEquivalent'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const appSettings: Record<string, string> = {}
+
+vi.mock('@/db', () => ({
+  getAppSetting: (key: string) => appSettings[key] ?? null,
+}))
+
+const { monthlyEquivalentMultiplier, toMonthlyEquivalentCents, toPeriodCents } =
+  await import('@/lib/monthlyEquivalent')
 
 describe('monthlyEquivalent', () => {
   it('converts recurring frequencies to monthly multipliers', () => {
@@ -75,5 +79,35 @@ describe('toPeriodCents', () => {
 
   it('clamps negative amounts to 0', () => {
     expect(toPeriodCents(-500, 'MONTHLY', 'YEARLY')).toBe(0)
+  })
+})
+
+describe('PAYDAY frequency resolution', () => {
+  afterEach(() => {
+    delete appSettings.payday_frequency
+  })
+
+  it('resolves PAYDAY to the configured payday_frequency, not a hardcoded MONTHLY', () => {
+    appSettings.payday_frequency = 'WEEKLY'
+    // $100/payday, paid WEEKLY → $5200/year, same as a native WEEKLY tracker.
+    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).toBe(
+      toPeriodCents(10000, 'WEEKLY', 'YEARLY')
+    )
+    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).not.toBe(
+      toPeriodCents(10000, 'MONTHLY', 'YEARLY')
+    )
+  })
+
+  it('resolves PAYDAY to FORTNIGHTLY when that is the configured cadence', () => {
+    appSettings.payday_frequency = 'FORTNIGHTLY'
+    expect(toPeriodCents(10000, 'PAYDAY', 'MONTHLY')).toBe(
+      toPeriodCents(10000, 'FORTNIGHTLY', 'MONTHLY')
+    )
+  })
+
+  it('falls back to MONTHLY only when payday_frequency is unconfigured', () => {
+    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).toBe(
+      toPeriodCents(10000, 'MONTHLY', 'YEARLY')
+    )
   })
 })

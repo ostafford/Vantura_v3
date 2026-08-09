@@ -145,9 +145,11 @@ export function AnalyticsTrackers() {
       } else {
         const bounds = getCalendarPeriodBounds(displayPeriod)
         spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
-        const freq =
-          t.reset_frequency === 'PAYDAY' ? 'MONTHLY' : t.reset_frequency
-        budget = toPeriodCents(t.budget_amount, freq, displayPeriod)
+        budget = toPeriodCents(
+          t.budget_amount,
+          t.reset_frequency,
+          displayPeriod
+        )
         dateRangeLabel = bounds.label
       }
       const progress = budget > 0 ? (spent / budget) * 100 : 0

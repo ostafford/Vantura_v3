@@ -230,9 +230,11 @@ export function TrackersSection({
       } else {
         const bounds = getCalendarPeriodBounds(displayPeriod)
         spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
-        const freq =
-          t.reset_frequency === 'PAYDAY' ? 'MONTHLY' : t.reset_frequency
-        budget = toPeriodCents(t.budget_amount, freq, displayPeriod)
+        budget = toPeriodCents(
+          t.budget_amount,
+          t.reset_frequency,
+          displayPeriod
+        )
         daysLeft = calendarDaysLeft(bounds.to)
         dateRangeLabel = bounds.label
       }

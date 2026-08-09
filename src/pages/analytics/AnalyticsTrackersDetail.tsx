@@ -70,11 +70,9 @@ function buildCalendarPeriodHistory(
   trackerFrequency: TrackerResetFrequency
 ): TrackerPeriodHistoryRow[] {
   const today = new Date()
-  const normalizedFreq =
-    trackerFrequency === 'PAYDAY' ? 'MONTHLY' : trackerFrequency
   const normalizedBudget = toPeriodCents(
     trackerBudget,
-    normalizedFreq,
+    trackerFrequency,
     displayPeriod
   )
   const result: TrackerPeriodHistoryRow[] = []
