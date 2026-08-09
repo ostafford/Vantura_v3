@@ -1,6 +1,6 @@
 /**
- * Spendable balance: available (transactional accounts) minus reserved (prorated upcoming charges).
- * Reserved calculation per Reference_Docs 05_Calculation_logic.md Section 5.2.
+ * Spendable balance: available (transactional accounts) minus reserved upcoming charges.
+ * Reserved calculation documented in docs/features/payday-spendable/OVERVIEW.md.
  */
 
 import { getDb, getAppSetting } from '@/db'
@@ -31,18 +31,6 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function daysBetween(dateStrA: string, dateStrB: string): number {
-  const a = new Date(dateStrA + 'T12:00:00Z').getTime()
-  const b = new Date(dateStrB + 'T12:00:00Z').getTime()
-  return Math.round((b - a) / (24 * 60 * 60 * 1000))
-}
-
-const PAYDAY_DAYS: Record<string, number> = {
-  WEEKLY: 7,
-  FORTNIGHTLY: 14,
-  MONTHLY: 30,
-}
-
 interface ChargeReservedResult {
   reservedAmount: number
   occurrenceCount: number
@@ -51,13 +39,14 @@ interface ChargeReservedResult {
 
 /**
  * Calculates the reserved amount for a single charge within the pay window.
- * Returns null if the charge has no qualifying occurrence before nextPayday.
+ * Returns null if the charge has no qualifying occurrence strictly before nextPayday.
+ * Charges due ON the payday itself are excluded — that day's incoming pay covers them,
+ * so they don't need to be reserved from the current balance.
  * Single source of truth — used by both calculateReservedAmount and calculateReservedBreakdown.
  */
 function calcChargeReserved(
   charge: UpcomingChargeRow,
   nextPayday: string,
-  paydayFrequency: string,
   today: string
 ): ChargeReservedResult | null {
   const projectedDate = firstOccurrenceOnOrAfter(
@@ -66,20 +55,18 @@ function calcChargeReserved(
     today,
     charge.cancel_by_date ?? null
   )
-  if (!projectedDate || projectedDate > nextPayday) return null
-
-  const daysUntilCharge = daysBetween(today, projectedDate)
+  if (!projectedDate || projectedDate >= nextPayday) return null
 
   switch (charge.frequency) {
     case 'WEEKLY':
     case 'FORTNIGHTLY': {
-      // Count every occurrence up to and including the payday date.
+      // Count every occurrence strictly before payday.
       // A 26-day window can contain 3–4 weekly or 2 fortnightly occurrences.
       const stepDays = charge.frequency === 'WEEKLY' ? 7 : 14
       let occDate = projectedDate
       let total = 0
       let count = 0
-      while (occDate <= nextPayday) {
+      while (occDate < nextPayday) {
         if (charge.cancel_by_date && occDate > charge.cancel_by_date) break
         total += charge.amount
         count++
@@ -89,25 +76,10 @@ function calcChargeReserved(
       }
       return { reservedAmount: total, occurrenceCount: count, projectedDate }
     }
-    case 'ONCE':
-      return {
-        reservedAmount: charge.amount,
-        occurrenceCount: 1,
-        projectedDate,
-      }
-    case 'MONTHLY':
-    case 'QUARTERLY':
-    case 'YEARLY': {
-      const payPeriodDays = PAYDAY_DAYS[paydayFrequency] ?? 30
-      const payPeriodsUntilCharge =
-        payPeriodDays > 0 ? Math.ceil(daysUntilCharge / payPeriodDays) : 1
-      const amountPerPeriod =
-        payPeriodsUntilCharge > 0
-          ? charge.amount / payPeriodsUntilCharge
-          : charge.amount
-      const portion = Math.round(Math.min(amountPerPeriod, charge.amount))
-      return { reservedAmount: portion, occurrenceCount: 1, projectedDate }
-    }
+    // ONCE / MONTHLY / QUARTERLY / YEARLY: a charge that reaches this point already has
+    // its one qualifying occurrence strictly before nextPayday (the guard above only lets
+    // charges due within one pay cycle through), so it's always reserved in full — there's
+    // no "periods until due" left to prorate across.
     default:
       return {
         reservedAmount: charge.amount,
@@ -129,12 +101,7 @@ export function calculateReservedAmount(
   const today = todayDateString()
   let total = 0
   for (const charge of upcomingCharges.filter((c) => c.is_reserved === 1)) {
-    const result = calcChargeReserved(
-      charge,
-      nextPayday,
-      paydayFrequency,
-      today
-    )
+    const result = calcChargeReserved(charge, nextPayday, today)
     if (result) total += result.reservedAmount
   }
   return Math.round(total)
@@ -153,7 +120,7 @@ export function calculateReservedBreakdown(
   const today = todayDateString()
   const result: ReservedBreakdownItem[] = []
   for (const charge of charges.filter((c) => c.is_reserved === 1)) {
-    const calc = calcChargeReserved(charge, nextPayday, paydayFrequency, today)
+    const calc = calcChargeReserved(charge, nextPayday, today)
     if (!calc) continue
     result.push({
       name: charge.name,
@@ -210,7 +177,7 @@ export function getAvailableBalance(): number {
 }
 
 /**
- * Reserved amount (cents) from upcoming_charges using 5.2 proration.
+ * Reserved amount (cents) from upcoming_charges due before next payday.
  */
 export function getReservedAmount(): number {
   const db = getDb()

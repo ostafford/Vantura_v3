@@ -99,7 +99,10 @@ describe('calculateReservedAmount', () => {
     ).toBe(3000)
   })
 
-  it('prorates MONTHLY charge until next payday', () => {
+  it('reserves full amount for MONTHLY charge before next payday, not a prorated fraction', () => {
+    // Proration was removed 2026-08-09: a charge only ever reaches this branch after
+    // already being confirmed due within the current pay cycle, so there's no "future
+    // periods" left to divide across — it was always full amount in every reachable case.
     const reserved = calculateReservedAmount(
       [
         {
@@ -112,8 +115,7 @@ describe('calculateReservedAmount', () => {
       '2025-03-09',
       'MONTHLY'
     )
-    expect(reserved).toBeGreaterThan(0)
-    expect(reserved).toBeLessThanOrEqual(3000)
+    expect(reserved).toBe(3000)
   })
 
   it('includes recurring charges using projected next occurrence date', () => {
@@ -282,9 +284,11 @@ describe('calculateReservedAmount', () => {
     ).toBe(15000) // 3 × $50 (Feb 24, Mar 3, Mar 10)
   })
 
-  // ── Payday boundary: charges ON the payday date are now included ────────────
+  // ── Payday boundary: charges ON the payday date are excluded ────────────────
+  // That day's incoming pay covers them, so they don't need to be reserved from
+  // the current balance. Changed 2026-08-09 — previously included.
 
-  it('includes a ONCE charge due exactly on the payday date', () => {
+  it('excludes a ONCE charge due exactly on the payday date', () => {
     expect(
       calculateReservedAmount(
         [
@@ -298,7 +302,7 @@ describe('calculateReservedAmount', () => {
         '2025-03-01',
         'MONTHLY'
       )
-    ).toBe(9900)
+    ).toBe(0)
   })
 
   it('excludes a ONCE charge due the day after payday', () => {
@@ -318,8 +322,9 @@ describe('calculateReservedAmount', () => {
     ).toBe(0)
   })
 
-  it('includes FORTNIGHTLY occurrence that falls exactly on payday date', () => {
-    // Fortnightly from Feb 23 → Feb 23, Mar 9, Mar 23 (= payday). All three ≤ Mar 23.
+  it('excludes the FORTNIGHTLY occurrence that falls exactly on payday date', () => {
+    // Fortnightly from Feb 23 → Feb 23, Mar 9, Mar 23 (= payday). Mar 23 is excluded
+    // (on-payday), so only Feb 23 and Mar 9 count.
     expect(
       calculateReservedAmount(
         [
@@ -333,7 +338,26 @@ describe('calculateReservedAmount', () => {
         '2025-03-23',
         'FORTNIGHTLY'
       )
-    ).toBe(6000) // 3 × $20 (Feb 23, Mar 9, Mar 23)
+    ).toBe(4000) // 2 × $20 (Feb 23, Mar 9 — Mar 23 excluded)
+  })
+
+  it('excludes the WEEKLY occurrence that falls exactly on payday date', () => {
+    // Weekly from Feb 23 → Feb 23, Mar 2, ..., Mar 23 (= payday, 4 weeks later).
+    // Mar 23 is excluded (on-payday).
+    expect(
+      calculateReservedAmount(
+        [
+          {
+            next_charge_date: '2025-02-23',
+            frequency: 'WEEKLY',
+            amount: 1000,
+            is_reserved: 1,
+          },
+        ],
+        '2025-03-23',
+        'WEEKLY'
+      )
+    ).toBe(4000) // 4 × $10 (Feb 23, Mar 2, Mar 9, Mar 16 — Mar 23 excluded)
   })
 
   // ── Real-world regression: the $159 Up Bank discrepancy ────────────────────
@@ -360,11 +384,11 @@ describe('calculateReservedAmount', () => {
 
   // ── Multiple charges combined ───────────────────────────────────────────────
 
-  it('combines ONCE, WEEKLY multi-occurrence, MONTHLY prorated, and ignored charge correctly', () => {
+  it('combines ONCE, WEEKLY multi-occurrence, MONTHLY full-amount, and ignored charge correctly', () => {
     // Today Feb 23, payday Mar 23 (28 days), fortnightly pay.
     // ONCE $20 due Feb 28 → $20 = 2000 cents
     // WEEKLY $10 from Feb 24 → Feb 24, Mar 3, Mar 10, Mar 17 = 4 × $10 = $40 = 4000 cents
-    // MONTHLY $300 due Mar 10 (15 days away): ceil(15/14)=2 periods → $300/2=$150 = 15000 cents
+    // MONTHLY $300 due Mar 10 → full amount (no proration) = 30000 cents
     // is_reserved=0 charge → ignored
     const reserved = calculateReservedAmount(
       [
@@ -396,8 +420,8 @@ describe('calculateReservedAmount', () => {
       '2025-03-23',
       'FORTNIGHTLY'
     )
-    // $20 + $40 + $150 = $210 = 21000 cents
-    expect(reserved).toBe(21000)
+    // $20 + $40 + $300 = $360 = 36000 cents
+    expect(reserved).toBe(36000)
   })
 })
 
@@ -543,8 +567,7 @@ describe('calculateReservedBreakdown', () => {
     expect(result[0].reservedAmount).toBe(4000)
   })
 
-  it('sets occurrenceCount=1 and reservedAmount < fullAmount for prorated MONTHLY', () => {
-    // Charge of $300 due Mar 10 (15 days away), fortnightly pay: prorated to $150
+  it('sets occurrenceCount=1 and reservedAmount === fullAmount for MONTHLY (no proration)', () => {
     const result = calculateReservedBreakdown(
       [
         {
@@ -560,7 +583,7 @@ describe('calculateReservedBreakdown', () => {
     )
     expect(result).toHaveLength(1)
     expect(result[0].occurrenceCount).toBe(1)
-    expect(result[0].reservedAmount).toBeLessThan(result[0].fullAmount)
+    expect(result[0].reservedAmount).toBe(result[0].fullAmount)
   })
 
   it('excludes charges after nextPayday', () => {
