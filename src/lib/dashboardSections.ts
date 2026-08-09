@@ -18,10 +18,10 @@ export type DashboardSectionId = (typeof DASHBOARD_SECTION_IDS)[number]
 
 export const DEFAULT_DASHBOARD_SECTION_ORDER: DashboardSectionId[] = [
   'month_summary',
+  'net_worth',
   'insights',
   'trackers',
   'upcoming',
-  'net_worth',
 ]
 
 function migrateLegacySectionId(id: unknown): DashboardSectionId | null {
@@ -86,10 +86,10 @@ export const DEFAULT_SECTION_SIZES: Record<
   DashboardSectionId,
   DashboardSectionSize
 > = {
-  month_summary: 'large',
-  insights: 'large',
+  month_summary: 'medium',
+  insights: 'medium',
   trackers: 'medium',
-  upcoming: 'small',
+  upcoming: 'large',
   net_worth: 'small',
 }
 
