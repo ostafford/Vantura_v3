@@ -693,6 +693,36 @@ export function AnalyticsSavers() {
                             <span className="badge bg-secondary">
                               No history
                             </span>
+                          ) : projection.onTrack &&
+                            Number.isFinite(projection.requiredMonthlyCents) ? (
+                            <OverlayTrigger
+                              placement="top"
+                              container={document.body}
+                              overlay={
+                                <Tooltip>
+                                  <div>
+                                    Need $
+                                    {formatMoney(
+                                      projection.requiredMonthlyCents
+                                    )}
+                                    /mo to reach goal by{' '}
+                                    {formatGoalDate(activeGoalDate!)}
+                                  </div>
+                                  <div style={{ opacity: 0.75 }}>
+                                    Last mo. $
+                                    {formatMoney(projection.lastMonthCents)} —
+                                    at that rate you're ahead of pace
+                                  </div>
+                                </Tooltip>
+                              }
+                            >
+                              <span
+                                className="badge bg-success"
+                                style={{ cursor: 'default' }}
+                              >
+                                On track
+                              </span>
+                            </OverlayTrigger>
                           ) : projection.onTrack ? (
                             <span className="badge bg-success">On track</span>
                           ) : (
