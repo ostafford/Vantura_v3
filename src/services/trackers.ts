@@ -518,6 +518,23 @@ function getNextResetDate(
 }
 
 /**
+ * Throws CATEGORY_ALREADY_ASSIGNED:<categoryId> if any of categoryIds is already
+ * used by another active tracker. A category may only belong to one tracker at a
+ * time — sharing would double-count spend against two budgets simultaneously.
+ */
+function assertCategoriesAvailable(
+  categoryIds: string[],
+  excludeTrackerId?: number | null
+): void {
+  const usage = getTrackerCategoryUsage(excludeTrackerId)
+  for (const catId of categoryIds) {
+    if (usage[catId]) {
+      throw new Error(`CATEGORY_ALREADY_ASSIGNED:${catId}`)
+    }
+  }
+}
+
+/**
  * Create tracker and set start_date, last_reset_date, next_reset_date.
  * For PAYDAY use app_settings next_payday; for others use period start (e.g. last Monday) so the tracker shows the full frequency window.
  */
@@ -530,6 +547,7 @@ export function createTracker(
 ): number {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  assertCategoriesAvailable(categoryIds)
   const now = new Date().toISOString()
   const today = todayDateString()
   let lastReset: string
@@ -584,6 +602,7 @@ export function updateTracker(
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  assertCategoriesAvailable(categoryIds, id)
   const today = todayDateString()
   const existing = getTracker(id)
   const needsPeriodReset =

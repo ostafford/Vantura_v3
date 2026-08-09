@@ -321,6 +321,17 @@ export function TrackersSection({
         )
         return
       }
+      if (
+        e instanceof Error &&
+        e.message.startsWith('CATEGORY_ALREADY_ASSIGNED:')
+      ) {
+        const catId = e.message.slice('CATEGORY_ALREADY_ASSIGNED:'.length)
+        const catName = categories.find((c) => c.id === catId)?.name ?? catId
+        toast.error(
+          `"${catName}" is already assigned to another tracker. A category can only belong to one tracker at a time.`
+        )
+        return
+      }
       throw e
     }
     setShowModal(false)
@@ -334,9 +345,11 @@ export function TrackersSection({
   }
 
   function toggleCategory(id: string) {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
+    setSelectedCategoryIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id)
+      if (categoryUsage[id]) return prev // already claimed by another tracker
+      return [...prev, id]
+    })
   }
 
   const resetDayOptions =
@@ -722,25 +735,30 @@ export function TrackersSection({
                 className="border rounded p-2"
                 style={{ maxHeight: 160, overflowY: 'auto' }}
               >
-                {categories.map((c) => (
-                  <Form.Check
-                    key={c.id}
-                    type="checkbox"
-                    id={`cat-${c.id}`}
-                    label={
-                      <>
-                        {c.name}
-                        {categoryUsage[c.id] && (
-                          <span className="text-warning small ms-1">
-                            (in: {categoryUsage[c.id]})
-                          </span>
-                        )}
-                      </>
-                    }
-                    checked={selectedCategoryIds.includes(c.id)}
-                    onChange={() => toggleCategory(c.id)}
-                  />
-                ))}
+                {categories.map((c) => {
+                  const isSelected = selectedCategoryIds.includes(c.id)
+                  const takenBy = categoryUsage[c.id]
+                  return (
+                    <Form.Check
+                      key={c.id}
+                      type="checkbox"
+                      id={`cat-${c.id}`}
+                      label={
+                        <>
+                          {c.name}
+                          {takenBy && !isSelected && (
+                            <span className="text-muted small ms-1">
+                              (already in: {takenBy})
+                            </span>
+                          )}
+                        </>
+                      }
+                      checked={isSelected}
+                      disabled={!!takenBy && !isSelected}
+                      onChange={() => toggleCategory(c.id)}
+                    />
+                  )
+                })}
               </div>
             </Form.Group>
           </Form>
