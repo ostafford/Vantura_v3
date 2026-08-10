@@ -69,13 +69,11 @@ API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2
 
 ## Documentation map
 
-Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo) — one folder per feature under `docs/features/`, plus `docs/DATABASE.md` for the schema and `docs/PRODUCT.md` for product vision/design principles. This replaces the old flat `Reference_Docs/` structure (still on disk during migration — see note below).
+Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo) — one folder per feature under `docs/features/`, plus `docs/DATABASE.md` for the schema and `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
 
 **Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — it's a short router that points to `OVERVIEW.md` (how the feature works, always present), `CONTEXT.md` (why it's built this way, if that folder has one), and `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
 
-Feature folders: `dashboard/`, `settings/`, `payday-spendable/`, `trackers/`, `budget-plan/`, `upcoming-charges/`, `savers/`, `net-worth/`, `weekly-insights/`, `month-at-a-glance/`, `reports/`, `sync/`, `transactions/`, `profile-data/`, `notifications/`, `security-auth/`, `appearance-theme/`.
-
-**Mid-migration note:** as of 2026-08-09, every folder above has only a `CLAUDE.md` stub — `OVERVIEW.md`/`CONTEXT.md` content is being migrated from `Reference_Docs/*.md` one feature at a time. Until a folder's `OVERVIEW.md` exists, fall back to the relevant `Reference_Docs/*.md` file for that topic (schema → `03_Database_Schema.md`, behavior → `04_Core_Features.md`, calculation → `05_Calculation_logic.md`, sync → `06_Sync_Strategy.md`, theme → `07_UI_UX_Design.md`, security → `08_Security.md`). Remove this note once migration is complete and `Reference_Docs/` is retired.
+Feature folders: `dashboard/`, `settings/`, `payday-spendable/`, `trackers/`, `budget-plan/`, `upcoming-charges/`, `savers/`, `net-worth/`, `weekly-insights/`, `month-at-a-glance/`, `reports/`, `analytics-overview/`, `sync/`, `transactions/`, `profile-data/`, `notifications/`, `security-auth/`, `appearance-theme/`.
 
 Root-level docs (public, in git):
 - `ROADMAP.md` — feature timeline and what's under consideration.

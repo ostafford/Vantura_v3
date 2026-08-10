@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import {
   SETTINGS_WHITELIST,
   FORBIDDEN_KEYS,
@@ -8,9 +9,11 @@ import {
   parseImportFile,
   previewImportProfile,
   applySettings,
+  replaceBudgetPlan,
   IMPORT_ERROR_INVALID_FILE,
   IMPORT_ERROR_WRONG_PASSPHRASE,
   type ExportPayload,
+  type BudgetBucketExportRow,
 } from './profileExport'
 
 vi.mock('@/db', () => ({
@@ -329,5 +332,90 @@ describe('profileExport', () => {
         '15'
       )
     })
+  })
+})
+
+describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
+  let SQL: SqlJsStatic
+  let realDb: Database
+
+  beforeEach(async () => {
+    SQL = await initSqlJs()
+    const { runSchema } = await import('@/db/schema')
+    realDb = new SQL.Database()
+    runSchema(realDb)
+
+    const db = await import('@/db')
+    vi.mocked(db.getDb).mockReturnValue(realDb as never)
+    vi.mocked(db.schedulePersist).mockImplementation(() => {})
+  })
+
+  function insertBucket(name: string): number {
+    realDb.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES (?, 'mdi-wallet', 0, '2026-01-01')`,
+      [name]
+    )
+    return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
+  }
+
+  function insertAnchor(bucketId: number, transactionId: string): void {
+    realDb.run(
+      `INSERT INTO budget_transaction_anchors (bucket_id, transaction_id, description_pattern, frequency, created_at)
+       VALUES (?, ?, 'PATTERN', 'MONTHLY', '2026-01-01')`,
+      [bucketId, transactionId]
+    )
+  }
+
+  function anchorBucketIds(): number[] {
+    const stmt = realDb.prepare(
+      `SELECT bucket_id FROM budget_transaction_anchors ORDER BY id`
+    )
+    const ids: number[] = []
+    while (stmt.step()) ids.push(stmt.get()[0] as number)
+    stmt.free()
+    return ids
+  }
+
+  it('remaps anchors to the new bucket id when the bucket name survives the import', () => {
+    const billsId = insertBucket('Bills')
+    insertAnchor(billsId, 'tx-1')
+
+    const imported: BudgetBucketExportRow[] = [
+      { id: 999, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
+    ]
+    const bucketIdMap = replaceBudgetPlan(imported, [])
+    const newBillsId = bucketIdMap.get(999)
+
+    expect(newBillsId).toBeDefined()
+    expect(newBillsId).not.toBe(billsId)
+    expect(anchorBucketIds()).toEqual([newBillsId])
+  })
+
+  it('deletes anchors whose bucket name does not survive the import', () => {
+    const groceriesId = insertBucket('Groceries')
+    insertAnchor(groceriesId, 'tx-2')
+
+    const imported: BudgetBucketExportRow[] = [
+      { id: 999, name: 'Entertainment', icon: 'mdi-wallet', sort_order: 0 },
+    ]
+    replaceBudgetPlan(imported, [])
+
+    expect(anchorBucketIds()).toEqual([])
+  })
+
+  it('leaves anchors on unrelated surviving buckets untouched when other buckets are dropped', () => {
+    const billsId = insertBucket('Bills')
+    const groceriesId = insertBucket('Groceries')
+    insertAnchor(billsId, 'tx-1')
+    insertAnchor(groceriesId, 'tx-2')
+
+    // Only "Bills" is re-imported; "Groceries" is dropped from the plan.
+    const imported: BudgetBucketExportRow[] = [
+      { id: 1, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
+    ]
+    const bucketIdMap = replaceBudgetPlan(imported, [])
+    const newBillsId = bucketIdMap.get(1)
+
+    expect(anchorBucketIds()).toEqual([newBillsId])
   })
 })

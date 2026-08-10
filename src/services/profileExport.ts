@@ -474,9 +474,20 @@ export function replaceBudgetPlan(
   const db = getDb()
   if (!db) throw new Error('Database not ready')
 
-  // budget_transaction_anchors reference both buckets and transactions;
-  // clear them so FK constraints don't block the bucket delete.
-  db.run(`DELETE FROM budget_transaction_anchors`)
+  // budget_transaction_anchors link real local transactions to a bucket —
+  // losing that link is real data loss unrelated to what's being imported.
+  // Match existing local buckets to imported ones by name (best-effort; the
+  // only identifier that can survive an export/import across databases,
+  // since ids are local-database-specific) so anchors on a bucket that
+  // still exists after the swap are remapped, not destroyed.
+  const existingBucketsStmt = db.prepare(`SELECT id, name FROM budget_buckets`)
+  const existingIdByName = new Map<string, number>()
+  while (existingBucketsStmt.step()) {
+    const [id, name] = existingBucketsStmt.get() as [number, string]
+    existingIdByName.set(name, id)
+  }
+  existingBucketsStmt.free()
+
   db.run(`DELETE FROM budget_hypotheticals`)
   db.run(`DELETE FROM budget_buckets`)
 
@@ -497,7 +508,21 @@ export function replaceBudgetPlan(
     const newId = (result[0]?.values?.[0]?.[0] as number) ?? 0
     const oldId = typeof b.id === 'number' ? b.id : bucketsArr.indexOf(b) + 1
     bucketIdMap.set(oldId, newId)
+
+    const existingLocalId = existingIdByName.get(b.name)
+    if (existingLocalId != null) {
+      db.run(
+        `UPDATE budget_transaction_anchors SET bucket_id = ? WHERE bucket_id = ?`,
+        [newId, existingLocalId]
+      )
+    }
   }
+
+  // Anchors whose bucket didn't survive the swap (renamed or removed) now
+  // point at a deleted bucket id — clean those up.
+  db.run(
+    `DELETE FROM budget_transaction_anchors WHERE bucket_id NOT IN (SELECT id FROM budget_buckets)`
+  )
 
   const hypsArr = Array.isArray(budgetHypotheticals) ? budgetHypotheticals : []
   for (const h of hypsArr) {
