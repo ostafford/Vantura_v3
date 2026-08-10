@@ -71,9 +71,9 @@ export function MonthSummarySection({
         </div>
         <div className="d-flex gap-2 align-items-center">
           <Link
-            to="/analytics/reports"
+            to={`/analytics/reports?year=${year}&month=${month}`}
             className="btn-icon"
-            aria-label="View full monthly review"
+            aria-label="View monthly review"
           >
             <i className="mdi mdi-chart-box" aria-hidden />
           </Link>
@@ -131,6 +131,10 @@ export function MonthSummarySection({
           comparison={comparison}
           vsPriorLabel={monthPairLabels.vsPriorShort}
         />
+
+        {comparison.periodNote && (
+          <div className="small text-muted mt-1">{comparison.periodNote}</div>
+        )}
 
         {comparison.hasPreviousData && comparison.narratives.length > 0 && (
           <ComparisonNarratives narratives={comparison.narratives} />

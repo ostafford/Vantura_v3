@@ -975,16 +975,28 @@ export function getYearComparisonPeriods(year: number): {
   }
 }
 
-/** Year-over-year KPI comparison for analytics (uses YTD when viewing the current year). */
+/**
+ * Year-over-year KPI comparison for analytics (uses YTD when viewing the
+ * current year). When the year is still in progress, sets periodNote so the
+ * UI can clarify this is a YTD comparison, not a full-year one — mirrors the
+ * equivalent clarifier in getMonthComparison.
+ */
 export function getYearComparison(year: number): MonthComparisonData {
   const { current, previous } = getYearComparisonPeriods(year)
-  return getPeriodComparison(
+  const result = getPeriodComparison(
     current.from,
     current.to,
     previous.from,
     previous.to,
     'year'
   )
+
+  const isCurrentYear = year === new Date().getFullYear()
+  const periodNote = isCurrentYear
+    ? `${fmtDayMonth(current.from)}–${fmtDayMonth(current.to)}, ${year} vs ${fmtDayMonth(previous.from)}–${fmtDayMonth(previous.to)}, ${year - 1}`
+    : undefined
+
+  return { ...result, periodNote }
 }
 
 /**

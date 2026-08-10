@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Row,
@@ -387,12 +387,35 @@ export function AnalyticsReports() {
     reportsPinnablePage != null &&
     pins.some((p) => p.path === reportsPinnablePage.path)
 
+  // --- Deep-linked period, from "View monthly review" links elsewhere in the app ---
+  const [searchParams] = useSearchParams()
+  const qpYear = parseInt(searchParams.get('year') ?? '', 10)
+  const qpMonth = parseInt(searchParams.get('month') ?? '', 10)
+  const qpDateFrom = searchParams.get('dateFrom')
+  const qpDateTo = searchParams.get('dateTo')
+  const hasValidMonthParams =
+    !Number.isNaN(qpYear) &&
+    !Number.isNaN(qpMonth) &&
+    qpMonth >= 1 &&
+    qpMonth <= 12
+  const hasValidRangeParams = !!qpDateFrom && !!qpDateTo
+
   // --- Period state ---
-  const [year, setYear] = useState(currentYear)
-  const [month, setMonth] = useState(currentMonth)
-  const [isCustomRange, setIsCustomRange] = useState(false)
-  const [dateFrom, setDateFrom] = useState(() => getDefaultDateRange().from)
-  const [dateTo, setDateTo] = useState(() => getDefaultDateRange().to)
+  const [year, setYear] = useState(() =>
+    hasValidMonthParams ? qpYear : currentYear
+  )
+  const [month, setMonth] = useState(() =>
+    hasValidMonthParams ? qpMonth : currentMonth
+  )
+  const [isCustomRange, setIsCustomRange] = useState(
+    () => hasValidRangeParams && !hasValidMonthParams
+  )
+  const [dateFrom, setDateFrom] = useState(() =>
+    hasValidRangeParams ? qpDateFrom! : getDefaultDateRange().from
+  )
+  const [dateTo, setDateTo] = useState(() =>
+    hasValidRangeParams ? qpDateTo! : getDefaultDateRange().to
+  )
 
   // --- Tracker frequency filter ---
   const [trackerFreqFilter, setTrackerFreqFilter] = useState('MONTHLY')

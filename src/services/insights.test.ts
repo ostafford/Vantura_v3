@@ -8,6 +8,7 @@ import {
   getYearMonthlyTotals,
   getYearComparisonPeriods,
   getWeekComparison,
+  getYearComparison,
 } from './insights'
 import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
@@ -81,6 +82,41 @@ describe('getYearComparisonPeriods', () => {
     expect(r.current.to).toBe('2026-04-15')
     expect(r.previous.from).toBe('2025-01-01')
     expect(r.previous.to).toBe('2025-04-15')
+  })
+})
+
+describe('getYearComparison periodNote', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  function mockEmptyDb() {
+    const stmt = {
+      bind: () => {},
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+  }
+
+  it('sets a YTD clarifying note for the current, in-progress year', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 15))
+    mockEmptyDb()
+
+    const result = getYearComparison(2026)
+    expect(result.periodNote).toBe('Jan 1–Apr 15, 2026 vs Jan 1–Apr 15, 2025')
+  })
+
+  it('has no periodNote for a fully-elapsed past year', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 15))
+    mockEmptyDb()
+
+    const result = getYearComparison(2024)
+    expect(result.periodNote).toBeUndefined()
   })
 })
 

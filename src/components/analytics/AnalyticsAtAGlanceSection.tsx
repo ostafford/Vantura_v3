@@ -13,6 +13,7 @@ import {
   getMonthDayByDaySeries,
   getMonthBoundsForOffset,
   getYearComparison,
+  getYearComparisonPeriods,
   getWeekComparison,
   getWeekDayByDaySeries,
   getWeekRange,
@@ -48,6 +49,10 @@ function yearMetricValue(p: YearMonthPoint, m: MonthMetric): number {
   if (m === 'spending') return p.moneyOut
   if (m === 'income') return p.moneyIn
   return p.moneyIn - p.moneyOut
+}
+
+function toDateOnlyLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function formatWeekOfLabel(week: ReturnType<typeof getWeekRange>): string {
@@ -228,6 +233,20 @@ export function AnalyticsAtAGlanceSection() {
   const formatWeekX = (d: number) =>
     WEEK_SHORT[Math.min(7, Math.max(1, d)) - 1] ?? `Day ${d}`
 
+  /** Deep-links "View monthly review" into the exact period being viewed, rather than always Reports' default (current month). */
+  const reviewLinkTo = useMemo(() => {
+    if (mode === 'month') {
+      return `/analytics/reports?year=${monthYear}&month=${monthNum}`
+    }
+    if (mode === 'week') {
+      const from = toDateOnlyLocal(weekRange.start)
+      const to = toDateOnlyLocal(weekRange.end)
+      return `/analytics/reports?dateFrom=${from}&dateTo=${to}`
+    }
+    const { current } = getYearComparisonPeriods(year)
+    return `/analytics/reports?dateFrom=${current.from}&dateTo=${current.to}`
+  }, [mode, monthYear, monthNum, weekRange, year])
+
   return (
     <Card className="mb-4">
       <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2 section-header">
@@ -256,7 +275,7 @@ export function AnalyticsAtAGlanceSection() {
         </div>
         <div className="d-flex gap-2 align-items-center flex-wrap">
           <Link
-            to="/analytics/reports"
+            to={reviewLinkTo}
             className="btn-icon"
             aria-label="View monthly review"
           >
@@ -431,6 +450,10 @@ export function AnalyticsAtAGlanceSection() {
       </Card.Header>
       <Card.Body className="py-3">
         <ComparisonKpis comparison={comparison} vsPriorLabel={vsPriorLabel} />
+
+        {comparison.periodNote && (
+          <div className="small text-muted mt-1">{comparison.periodNote}</div>
+        )}
 
         {comparison.hasPreviousData && comparison.narratives.length > 0 && (
           <ComparisonNarratives narratives={comparison.narratives} />
@@ -760,7 +783,7 @@ export function AnalyticsAtAGlanceSection() {
               series={weekSeries.series}
               metric={metric}
               height={230}
-              showAverage={false}
+              showAverage={showAverageLine}
               showCurrent={showCurrent}
               showPrevious={showPrevious}
               formatXAxisTick={formatWeekX}
@@ -812,6 +835,28 @@ export function AnalyticsAtAGlanceSection() {
                     aria-hidden
                   />
                   <span>{weekLineLabels.current}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn btn-outline-secondary btn-sm month-summary-legend-toggle d-flex align-items-center gap-2 ${
+                    showAverageLine ? 'active' : ''
+                  }`}
+                  onClick={() => setShowAverageLine((v) => !v)}
+                  aria-pressed={showAverageLine}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 10,
+                      height: 0,
+                      borderBottom:
+                        '1px dashed var(--vantura-chart-average, #f2994a)',
+                      opacity: showAverageLine ? 1 : 0.35,
+                    }}
+                    aria-hidden
+                  />
+                  <span>Average</span>
                 </button>
               </div>
             </div>
