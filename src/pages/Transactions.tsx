@@ -1408,7 +1408,7 @@ export function Transactions() {
               rel="noopener noreferrer"
               className="btn btn-outline-secondary btn-sm"
             >
-              Open in Up ↗
+              Open in Up app ↗
             </a>
           ) : (
             <span />
