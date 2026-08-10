@@ -36,8 +36,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   async function handleStep2Submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (passphrase.length < 8) {
-      setError('Passphrase must be at least 8 characters.')
+    if (passphrase.length < 12) {
+      setError('Passphrase must be at least 12 characters.')
       return
     }
     if (passphrase !== passphraseConfirm) {
@@ -256,9 +256,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   type="password"
                   value={passphrase}
                   onChange={(e) => setPassphrase(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder="At least 12 characters"
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={12}
                 />
               </Form.Group>
               <Form.Group className="mb-3">
