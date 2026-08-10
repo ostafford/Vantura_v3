@@ -1,4 +1,5 @@
 import { getDb, schedulePersist } from '@/db'
+import { writeNetWorthSnapshot } from '@/services/netWorth'
 
 export type ManualAccountType =
   | 'CREDIT_CARD'
@@ -190,6 +191,7 @@ export function addManualAccount(input: ManualAccountInput): number {
   const id =
     (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ?? 0
   schedulePersist()
+  writeNetWorthSnapshot()
   return id
 }
 
@@ -221,6 +223,7 @@ export function updateManualAccount(
     ]
   )
   schedulePersist()
+  writeNetWorthSnapshot()
 }
 
 export function updateManualAccountBalance(
@@ -234,6 +237,7 @@ export function updateManualAccountBalance(
     [balanceCents, todayIso(), id]
   )
   schedulePersist()
+  writeNetWorthSnapshot()
 }
 
 export function deleteManualAccount(id: number): void {
@@ -246,6 +250,7 @@ export function deleteManualAccount(id: number): void {
   )
   db.run(`DELETE FROM manual_accounts WHERE id = ?`, [id])
   schedulePersist()
+  writeNetWorthSnapshot()
 }
 
 export function reorderManualAccounts(orderedIds: number[]): void {

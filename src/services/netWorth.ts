@@ -152,7 +152,7 @@ export function getNetWorthSnapshots(months = 12): NetWorthSnapshot[] {
   return rows
 }
 
-/** Called at end of each successful sync. Uses INSERT OR REPLACE so only one snapshot per day is kept. */
+/** Called at end of each successful sync, and after every manual account create/update/delete. Uses INSERT OR REPLACE so only one snapshot per day is kept. */
 export function writeNetWorthSnapshot(): void {
   const db = getDb()
   if (!db) return

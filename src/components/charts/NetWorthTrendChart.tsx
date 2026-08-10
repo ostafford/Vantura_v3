@@ -149,7 +149,7 @@ export function NetWorthTrendChart({
           year: 'numeric',
         })
         setTooltipContent(tooltipEl, dateLabel, [
-          `Net worth: $${formatMoney(point.total)}`,
+          `Net worth: ${point.total < 0 ? '−' : ''}$${formatMoney(Math.abs(point.total))}`,
         ])
         tooltipEl.style.display = 'block'
         positionTooltip(tooltipEl, container, event, 160, 44)
@@ -174,7 +174,10 @@ export function NetWorthTrendChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(4)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => {
+        const val = Number(d)
+        return `${val < 0 ? '−' : ''}$${formatMoney(Math.abs(val))}`
+      })
       .tickSizeOuter(0)
 
     g.append('g').call(yAxis).style('font-size', '11px')
