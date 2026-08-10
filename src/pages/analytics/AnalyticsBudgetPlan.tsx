@@ -15,6 +15,7 @@ import {
   createBucket,
   updateBucket,
   deleteBucket,
+  reorderBuckets,
   getBucketCardSummary,
   getUnassignedUpcoming,
   getIncomeCents,
@@ -305,6 +306,50 @@ export function AnalyticsBudgetPlan() {
     [buckets, period, version, lastSyncCompletedAt]
   )
 
+  // Drag-and-drop reorder — same native-DnD pattern as Savers, but bucket
+  // order lives directly on sort_order (no app_settings key needed): a drop
+  // just rewrites sort_order and refreshes, buckets already come back
+  // ordered from getBuckets().
+  const [dragOverId, setDragOverId] = useState<number | null>(null)
+
+  const handleDragStart = useCallback((e: React.DragEvent, id: number) => {
+    e.dataTransfer.setData('text/plain', String(id))
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverId(id)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
+  const handleBucketDrop = useCallback(
+    (e: React.DragEvent, targetId: number) => {
+      e.preventDefault()
+      setDragOverId(null)
+      const sourceId = parseInt(e.dataTransfer.getData('text/plain'), 10)
+      if (Number.isNaN(sourceId) || sourceId === targetId) return
+      const order = buckets.map((b) => b.id)
+      const from = order.indexOf(sourceId)
+      const to = order.indexOf(targetId)
+      if (from === -1 || to === -1) return
+      const next = [...order]
+      next.splice(from, 1)
+      next.splice(to, 0, sourceId)
+      reorderBuckets(next)
+      refresh()
+    },
+    [buckets, refresh]
+  )
+
+  const handleDragEnd = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
   const unassignedUpcoming = useMemo(
     () => getUnassignedUpcoming(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -321,6 +366,15 @@ export function AnalyticsBudgetPlan() {
     () =>
       Object.values(bucketSummaries).reduce(
         (sum, s) => sum + s.plannedCents,
+        0
+      ),
+    [bucketSummaries]
+  )
+
+  const totalHypotheticalCents = useMemo(
+    () =>
+      Object.values(bucketSummaries).reduce(
+        (sum, s) => sum + s.hypotheticalCents,
         0
       ),
     [bucketSummaries]
@@ -456,7 +510,18 @@ export function AnalyticsBudgetPlan() {
           }
 
           return (
-            <Col key={b.id} xs={12} sm={6} lg={4}>
+            <Col
+              key={b.id}
+              xs={12}
+              sm={6}
+              lg={4}
+              draggable
+              onDragStart={(e) => handleDragStart(e, b.id)}
+              onDragOver={(e) => handleDragOver(e, b.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleBucketDrop(e, b.id)}
+              onDragEnd={handleDragEnd}
+            >
               <Link
                 to={`/analytics/budget/${b.id}?period=${period}`}
                 className="text-decoration-none"
@@ -468,6 +533,7 @@ export function AnalyticsBudgetPlan() {
                     borderLeft: `4px solid ${hex}`,
                     cursor: 'pointer',
                     transition: 'box-shadow 0.15s ease',
+                    opacity: dragOverId === b.id ? 0.6 : 1,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.boxShadow =
@@ -642,6 +708,21 @@ export function AnalyticsBudgetPlan() {
                   </span>
                 )}
               </div>
+              {totalHypotheticalCents > 0 && (
+                <div
+                  className="mt-1 d-flex align-items-center justify-content-center gap-1"
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  <i
+                    className="mdi mdi-flask-outline"
+                    style={{ color: 'var(--bs-warning)' }}
+                    aria-hidden
+                  />
+                  <span className="text-muted">
+                    incl. ${formatMoney(totalHypotheticalCents)} hypothetical
+                  </span>
+                </div>
+              )}
             </Col>
             <Col xs={12} sm={4}>
               <div className="text-muted small mb-1">

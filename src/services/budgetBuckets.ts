@@ -97,6 +97,21 @@ export function updateBucket(id: number, name: string, icon: string): void {
   schedulePersist()
 }
 
+/**
+ * Persists a new bucket display order by rewriting sort_order to match array index.
+ * Unlike Trackers/Dashboard/Savers, bucket order lives on the row itself
+ * (sort_order), not a separate app_settings key — there's already exactly
+ * one place order is stored, so reordering just rewrites it directly.
+ */
+export function reorderBuckets(orderedIds: number[]): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  orderedIds.forEach((id, index) => {
+    db.run(`UPDATE budget_buckets SET sort_order = ? WHERE id = ?`, [index, id])
+  })
+  schedulePersist()
+}
+
 export function deleteBucket(id: number): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')

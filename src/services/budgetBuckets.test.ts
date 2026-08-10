@@ -11,7 +11,8 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getBucketCardSummary } = await import('./budgetBuckets')
+const { getBucketCardSummary, getBuckets, reorderBuckets } =
+  await import('./budgetBuckets')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -129,5 +130,39 @@ describe('getBucketCardSummary', () => {
     const summary = getBucketCardSummary(1, 'MONTHLY')
     expect(summary.plannedCents).toBe(200000 + 8000 + 30000)
     expect(summary.hypotheticalCents).toBe(8000)
+  })
+})
+
+describe('reorderBuckets', () => {
+  beforeEach(() => {
+    // bucket 1 ('Bills') already exists from the top-level beforeEach
+    db.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Household', 'icon', 1, '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Lifestyle', 'icon', 2, '2026-01-01')`
+    )
+  })
+
+  it('rewrites sort_order to match the given array order', () => {
+    expect(getBuckets().map((b) => b.name)).toEqual([
+      'Bills',
+      'Household',
+      'Lifestyle',
+    ])
+    reorderBuckets([3, 1, 2]) // Lifestyle, Bills, Household
+    expect(getBuckets().map((b) => b.name)).toEqual([
+      'Lifestyle',
+      'Bills',
+      'Household',
+    ])
+  })
+
+  it('assigns sequential sort_order values starting at 0', () => {
+    reorderBuckets([2, 3, 1])
+    const buckets = getBuckets()
+    expect(buckets.find((b) => b.id === 2)?.sort_order).toBe(0)
+    expect(buckets.find((b) => b.id === 3)?.sort_order).toBe(1)
+    expect(buckets.find((b) => b.id === 1)?.sort_order).toBe(2)
   })
 })
