@@ -67,17 +67,16 @@ export type NotifType =
   | 'tracker_pace'
   | 'spendable_low'
   | 'payday'
+  | 'possible_payday'
   | 'large_tx'
   | 'saver_milestone'
   | 'sync_stale'
 
-/** Returns true if the per-type sub-toggle is on (defaults to true for most types). */
+/** Returns true if the per-type sub-toggle is on. All types default on — the
+ * user opts out per type, rather than some types requiring opt-in. */
 export function getNotifTypeEnabled(type: NotifType): boolean {
   const raw = getAppSetting(`notif_${type}`)
-  // Default on for most types; large_tx and sync_stale default off (need user opt-in)
-  if (raw === null) {
-    return type !== 'large_tx' && type !== 'sync_stale'
-  }
+  if (raw === null) return true
   return raw === '1'
 }
 
@@ -109,14 +108,14 @@ export interface NotificationHistoryItem {
   read_at: string | null
 }
 
-const HISTORY_RETENTION_DAYS = 30
+const HISTORY_RETENTION_DAYS = 7
 
 function todayDateString(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Insert a notification into history and prune entries older than 30 days. */
+/** Insert a notification into history and prune entries older than HISTORY_RETENTION_DAYS. */
 export function addNotificationToHistory(
   type: string,
   title: string,
@@ -136,7 +135,7 @@ export function addNotificationToHistory(
   schedulePersist()
 }
 
-/** All notifications from the last 30 days, newest first. */
+/** All notifications from the last HISTORY_RETENTION_DAYS, newest first. */
 export function getNotificationHistory(): NotificationHistoryItem[] {
   const db = getDb()
   if (!db) return []
@@ -177,7 +176,7 @@ export function getNotificationHistory(): NotificationHistoryItem[] {
   return out
 }
 
-/** Count of unread notification history entries from the last 30 days. */
+/** Count of unread notification history entries from the last HISTORY_RETENTION_DAYS. */
 export function getUnreadCount(): number {
   const db = getDb()
   if (!db) return 0

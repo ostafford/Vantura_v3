@@ -126,6 +126,11 @@ const NOTIF_TYPES: { key: NotifType; label: string; desc: string }[] = [
     desc: 'When a salary-sized credit appears on your account',
   },
   {
+    key: 'possible_payday',
+    label: 'Possible payday detected',
+    desc: 'When a recurring credit looks like it might be your salary, before you link a source',
+  },
+  {
     key: 'large_tx',
     label: 'Large transaction',
     desc: 'Unexpected debits above the threshold you set',
@@ -156,6 +161,7 @@ const NOTIF_GROUPS: { label: string; icon: string; keys: NotifType[] }[] = [
       'tracker_pace',
       'spendable_low',
       'payday',
+      'possible_payday',
       'large_tx',
     ],
   },
@@ -375,6 +381,7 @@ export function Settings() {
           'tracker_pace',
           'spendable_low',
           'payday',
+          'possible_payday',
           'large_tx',
           'saver_milestone',
           'sync_stale',

@@ -554,6 +554,7 @@ function checkSyncStale(): void {
  * Won't re-suggest the same merchant unless the user clears their payday settings.
  */
 function checkPossiblePayday(): void {
+  if (!getNotifTypeEnabled('possible_payday')) return
   // Only runs when the user hasn't identified their salary source yet
   if (getAppSetting('payday_raw_text')) return
 
