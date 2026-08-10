@@ -9,6 +9,7 @@ import {
   OverlayTrigger,
   Tooltip,
   ProgressBar,
+  Alert,
 } from 'react-bootstrap'
 import {
   getMonthComparison,
@@ -410,6 +411,8 @@ export function AnalyticsReports() {
   )
   const canGoForward =
     !isCustomRange && !(year === currentYear && month === currentMonth)
+  const isInvalidRange =
+    isCustomRange && !!dateFrom && !!dateTo && dateFrom > dateTo
   const monthPairLabels = useMemo(
     () => comparisonMonthPairLabels(year, month),
     [year, month]
@@ -722,6 +725,7 @@ export function AnalyticsReports() {
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
                     aria-label="Report start date"
+                    isInvalid={isInvalidRange}
                   />
                 </Form.Group>
               </Col>
@@ -734,6 +738,7 @@ export function AnalyticsReports() {
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
                     aria-label="Report end date"
+                    isInvalid={isInvalidRange}
                   />
                 </Form.Group>
               </Col>
@@ -758,649 +763,687 @@ export function AnalyticsReports() {
         </div>
       </div>
 
-      {/* ─── Block 1: Financial Snapshot ──────────────────────────────────── */}
-      <Card className="grid-margin">
-        <Card.Header>
-          <Card.Title className="mb-0">
-            {periodLabel} — Financial Snapshot
-          </Card.Title>
-        </Card.Header>
-        <Card.Body>
-          <div className="d-flex flex-wrap gap-3">
-            <KpiCell
-              label="Money in"
-              value={`$${formatMoney(moneyIn)}`}
-              valueClass="text-success"
-              delta={
-                comparison?.hasPreviousData ? comparison.moneyIn : undefined
-              }
-              vsPriorLabel={monthPairLabels.vsPriorShort}
-            />
-            <KpiCell
-              label="Money out"
-              value={`$${formatMoney(moneyOut)}`}
-              valueClass="text-danger"
-              delta={
-                comparison?.hasPreviousData ? comparison.moneyOut : undefined
-              }
-              vsPriorLabel={monthPairLabels.vsPriorShort}
-              invert
-              detail={
-                chargesCount > 0 ? `${chargesCount} transactions` : undefined
-              }
-            />
-            <KpiCell
-              label="Net"
-              value={`${net >= 0 ? '+' : '−'}$${formatMoney(Math.abs(net))}`}
-              valueClass={net >= 0 ? 'text-success' : 'text-danger'}
-              delta={
-                comparison?.hasPreviousData && netDelta ? netDelta : undefined
-              }
-              vsPriorLabel={monthPairLabels.vsPriorShort}
-            />
-            {!isCustomRange && chargeGroups.length > 0 && (
-              <KpiCell
-                label="Upcoming"
-                value={`$${formatMoney(committedTotal)}`}
-                valueClass="text-warning"
-                detail={
-                  committedPct > 0 ? `${committedPct}% of income` : undefined
-                }
-              />
-            )}
-          </div>
-        </Card.Body>
-      </Card>
-
-      {/* ─── Block 1b: What changed ───────────────────────────────────────── */}
-      {!isCustomRange && comparison?.hasPreviousData && (
-        <Card className="grid-margin">
-          <Card.Header>
-            <Card.Title className="mb-0">
-              What changed vs {monthPairLabels.previousLabel}
-            </Card.Title>
-            {comparison.periodNote && (
-              <Card.Text as="div" className="small text-muted mt-1">
-                {comparison.periodNote}
-              </Card.Text>
-            )}
-          </Card.Header>
-          <Card.Body>
-            <ComparisonVisual
-              comparison={comparison}
-              currentLabel={monthPairLabels.currentLabel}
-              priorLabel={monthPairLabels.previousLabel}
-            />
-          </Card.Body>
-        </Card>
+      {isInvalidRange && (
+        <Alert variant="warning" className="grid-margin">
+          End date must be on or after the start date.
+        </Alert>
       )}
 
-      {/* ─── Block 2: Spending Habits ─────────────────────────────────────── */}
-      <Card className="grid-margin">
-        <Card.Header>
-          <Card.Title className="mb-0">Spending Habits</Card.Title>
-          {chartData.length > 0 && top3Pct > 0 && (
-            <Card.Text as="div" className="small text-muted mt-1">
-              {top3Names} account for {top3Pct}% of spending
-            </Card.Text>
-          )}
-        </Card.Header>
-        <Card.Body>
-          {chartData.length === 0 ? (
-            <p className="text-muted small mb-0">
-              No spending recorded for this period.
-            </p>
-          ) : (
-            <SpendingCategoryList chartData={chartData} from={from} to={to} />
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* ─── Block 3: Tracker Performance ─────────────────────────────────── */}
-      {trackerSpend.length > 0 && (
-        <Card className="grid-margin">
-          <Card.Header>
-            <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
-              <div>
-                <Card.Title className="mb-0">
-                  Tracker Performance — {periodLabel}
-                </Card.Title>
-                <Card.Text as="div" className="small text-muted mt-1">
-                  {!isCustomRange &&
-                    `${trackersWithinBudget} of ${filteredTrackerSpend.length} within budget.`}
-                  {prevMonthBounds && ` Compared to ${prevMonthBounds.label}.`}
-                </Card.Text>
-              </div>
-              <Form.Select
-                size="sm"
-                value={trackerFreqFilter}
-                onChange={(e) => setTrackerFreqFilter(e.target.value)}
-                aria-label="Filter by frequency"
-                style={{ width: 'auto', minWidth: 150 }}
-              >
-                {availableFrequencies.length > 1 && (
-                  <option value="">All frequencies</option>
-                )}
-                {availableFrequencies.map((f) => (
-                  <option key={f} value={f}>
-                    {FREQUENCY_LABELS[f] ?? f}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            {filteredTrackerSpend.length === 0 ? (
-              <p className="text-muted mb-0 small">
-                No trackers match the selected frequency.
-              </p>
-            ) : filteredTrackerSpend.length > 4 ? (
-              /* ── List view (compact, >4 trackers) ── */
-              <ul className="list-group list-group-flush">
-                {filteredTrackerSpend.map(({ tracker, spent, prevSpent }) => {
-                  const budget = tracker.budget_amount
-                  const spendDelta =
-                    prevSpent !== null ? spent - prevSpent : null
-                  const hasDelta =
-                    spendDelta !== null && Math.abs(spendDelta) >= 1
-                  const deltaColor = hasDelta
-                    ? spendDelta! > 0
-                      ? 'var(--vantura-danger)'
-                      : 'var(--vantura-success)'
-                    : undefined
-                  const periods = trackerPeriodBreakdowns[tracker.id]
-
-                  if (periods) {
-                    // Weekly / fortnightly — show each period as a sub-row
-                    const hasPartial = periods.some((p) => p.isPartial)
-                    return (
-                      <li
-                        key={tracker.id}
-                        className="list-group-item px-0 py-2"
-                      >
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <span className="fw-medium small">
-                            {tracker.name}
-                          </span>
-                          <div className="d-flex align-items-center gap-2">
-                            <span className="small text-muted">
-                              ${formatMoney(spent)} total
-                            </span>
-                            {hasDelta && spendDelta !== null && (
-                              <span
-                                className="small fw-medium"
-                                style={{ color: deltaColor }}
-                              >
-                                {spendDelta > 0 ? '↑' : '↓'} $
-                                {formatMoney(Math.abs(spendDelta))} vs{' '}
-                                {prevMonthBounds?.label}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {periods.map((p) => (
-                          <div
-                            key={p.periodStart}
-                            className="mb-2"
-                            style={{ paddingLeft: 8 }}
-                          >
-                            <div className="d-flex justify-content-between align-items-center mb-1">
-                              <span
-                                className="text-muted"
-                                style={{ fontSize: '0.75rem' }}
-                              >
-                                {p.label}
-                                {p.isPartial && ' *'}
-                              </span>
-                              <span style={{ fontSize: '0.75rem' }}>
-                                <span
-                                  style={{ color: trackerBarColor(p.progress) }}
-                                >
-                                  ${formatMoney(p.spent)}
-                                </span>
-                                <span className="text-muted">
-                                  {' '}
-                                  / ${formatMoney(p.budget)}
-                                </span>
-                              </span>
-                            </div>
-                            <ProgressBar
-                              now={Math.min(100, p.progress)}
-                              {...getProgressVariant(p.progress)}
-                              label={`${Math.round(p.progress)}%`}
-                              style={{ height: 13 }}
-                            />
-                          </div>
-                        ))}
-                        {hasPartial && (
-                          <div
-                            className="text-muted"
-                            style={{ fontSize: '0.7rem', paddingLeft: 8 }}
-                          >
-                            * Partial week — spans into adjacent month
-                          </div>
-                        )}
-                      </li>
-                    )
+      {/* ─── Block 1: Financial Snapshot ──────────────────────────────────── */}
+      {!isInvalidRange && (
+        <>
+          <Card className="grid-margin">
+            <Card.Header>
+              <Card.Title className="mb-0">
+                {periodLabel} — Financial Snapshot
+              </Card.Title>
+            </Card.Header>
+            <Card.Body>
+              <div className="d-flex flex-wrap gap-3">
+                <KpiCell
+                  label="Money in"
+                  value={`$${formatMoney(moneyIn)}`}
+                  valueClass="text-success"
+                  delta={
+                    comparison?.hasPreviousData ? comparison.moneyIn : undefined
                   }
+                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                />
+                <KpiCell
+                  label="Money out"
+                  value={`$${formatMoney(moneyOut)}`}
+                  valueClass="text-danger"
+                  delta={
+                    comparison?.hasPreviousData
+                      ? comparison.moneyOut
+                      : undefined
+                  }
+                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                  invert
+                  detail={
+                    chargesCount > 0
+                      ? `${chargesCount} transactions`
+                      : undefined
+                  }
+                />
+                <KpiCell
+                  label="Net"
+                  value={`${net >= 0 ? '+' : '−'}$${formatMoney(Math.abs(net))}`}
+                  valueClass={net >= 0 ? 'text-success' : 'text-danger'}
+                  delta={
+                    comparison?.hasPreviousData && netDelta
+                      ? netDelta
+                      : undefined
+                  }
+                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                />
+                {!isCustomRange && chargeGroups.length > 0 && (
+                  <KpiCell
+                    label="Upcoming"
+                    value={`$${formatMoney(committedTotal)}`}
+                    valueClass="text-warning"
+                    detail={
+                      committedPct > 0
+                        ? `${committedPct}% of income`
+                        : undefined
+                    }
+                  />
+                )}
+              </div>
+            </Card.Body>
+          </Card>
 
-                  // Monthly — single bar
-                  const progress = budget > 0 ? (spent / budget) * 100 : 0
-                  const overBudget = spent > budget
-                  return (
-                    <OverlayTrigger
-                      key={tracker.id}
-                      placement="top"
-                      container={document.body}
-                      overlay={
-                        <Tooltip>
-                          <div>
-                            <span
-                              style={{
-                                color: overBudget
-                                  ? 'var(--vantura-danger)'
-                                  : 'var(--vantura-success)',
-                              }}
-                            >
-                              ${formatMoney(spent)}
-                            </span>{' '}
-                            spent · ${formatMoney(budget)} budget
-                          </div>
-                          {prevSpent !== null && prevMonthBounds && (
-                            <div style={{ opacity: 0.75 }}>
-                              ${formatMoney(prevSpent)} in{' '}
-                              {prevMonthBounds.label}
-                            </div>
-                          )}
-                          {hasDelta && spendDelta !== null && (
-                            <div style={{ color: deltaColor }}>
-                              {spendDelta > 0 ? '↑' : '↓'} $
-                              {formatMoney(Math.abs(spendDelta))}{' '}
-                              {spendDelta > 0 ? 'more' : 'less'} than{' '}
-                              {prevMonthBounds?.label}
-                            </div>
-                          )}
-                        </Tooltip>
-                      }
-                    >
-                      <li className="list-group-item px-0 py-2">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <span className="fw-medium small">
-                            {tracker.name}
-                          </span>
-                          <div className="d-flex align-items-center gap-2">
-                            <span className="small">
-                              <span
-                                style={{ color: trackerBarColor(progress) }}
-                              >
-                                ${formatMoney(spent)}
-                              </span>
-                              <span className="text-muted">
-                                {' '}
-                                / ${formatMoney(budget)}
-                              </span>
-                            </span>
-                            {hasDelta && spendDelta !== null && (
-                              <span
-                                className="small fw-medium"
-                                style={{ color: deltaColor }}
-                              >
-                                {spendDelta > 0 ? '↑' : '↓'} $
-                                {formatMoney(Math.abs(spendDelta))}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ProgressBar
-                          now={Math.min(100, progress)}
-                          {...getProgressVariant(progress)}
-                          label={`${Math.round(progress)}%`}
-                          style={{ height: 13 }}
-                        />
-                      </li>
-                    </OverlayTrigger>
-                  )
-                })}
-              </ul>
-            ) : (
-              /* ── Card view (detailed, ≤4 trackers) ── */
-              <Row className="g-3">
-                {filteredTrackerSpend.map(({ tracker, spent, prevSpent }) => {
-                  const budget = tracker.budget_amount
-                  const spendDelta =
-                    prevSpent !== null ? spent - prevSpent : null
-                  const hasDelta =
-                    spendDelta !== null && Math.abs(spendDelta) >= 1
-                  const deltaColor = hasDelta
-                    ? spendDelta! > 0
-                      ? 'var(--vantura-danger)'
-                      : 'var(--vantura-success)'
-                    : undefined
-                  const periods = trackerPeriodBreakdowns[tracker.id]
+          {/* ─── Block 1b: What changed ───────────────────────────────────────── */}
+          {!isCustomRange && comparison?.hasPreviousData && (
+            <Card className="grid-margin">
+              <Card.Header>
+                <Card.Title className="mb-0">
+                  What changed vs {monthPairLabels.previousLabel}
+                </Card.Title>
+                {comparison.periodNote && (
+                  <Card.Text as="div" className="small text-muted mt-1">
+                    {comparison.periodNote}
+                  </Card.Text>
+                )}
+              </Card.Header>
+              <Card.Body>
+                <ComparisonVisual
+                  comparison={comparison}
+                  currentLabel={monthPairLabels.currentLabel}
+                  priorLabel={monthPairLabels.previousLabel}
+                />
+              </Card.Body>
+            </Card>
+          )}
 
-                  if (periods) {
-                    // Weekly / fortnightly card — per-period breakdown
-                    const hasPartial = periods.some((p) => p.isPartial)
-                    return (
-                      <Col key={tracker.id} xs={12} md={6}>
-                        <div className="border rounded p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-1">
-                            <span className="d-flex align-items-center gap-2 min-w-0">
-                              <span
-                                className="rounded-circle flex-shrink-0"
-                                style={{
-                                  width: 9,
-                                  height: 9,
-                                  backgroundColor: getTrackerColor(
-                                    tracker,
-                                    mode
-                                  ),
-                                }}
-                                aria-hidden
-                              />
-                              <span className="fw-medium text-truncate">
-                                {tracker.name}
-                              </span>
-                            </span>
-                            <span
-                              className="badge badge-frequency-default"
-                              style={{
-                                backgroundImage: 'none',
-                                backgroundColor: getFrequencyBadgeColors(
-                                  tracker.reset_frequency as TrackerResetFrequency,
-                                  mode
-                                ).bg,
-                                color: getFrequencyBadgeColors(
-                                  tracker.reset_frequency as TrackerResetFrequency,
-                                  mode
-                                ).text,
-                              }}
+          {/* ─── Block 2: Spending Habits ─────────────────────────────────────── */}
+          <Card className="grid-margin">
+            <Card.Header>
+              <Card.Title className="mb-0">Spending Habits</Card.Title>
+              {chartData.length > 0 && top3Pct > 0 && (
+                <Card.Text as="div" className="small text-muted mt-1">
+                  {top3Names} account for {top3Pct}% of spending
+                </Card.Text>
+              )}
+            </Card.Header>
+            <Card.Body>
+              {chartData.length === 0 ? (
+                <p className="text-muted small mb-0">
+                  No spending recorded for this period.
+                </p>
+              ) : (
+                <SpendingCategoryList
+                  chartData={chartData}
+                  from={from}
+                  to={to}
+                />
+              )}
+            </Card.Body>
+          </Card>
+
+          {/* ─── Block 3: Tracker Performance ─────────────────────────────────── */}
+          {trackerSpend.length > 0 && (
+            <Card className="grid-margin">
+              <Card.Header>
+                <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                  <div>
+                    <Card.Title className="mb-0">
+                      Tracker Performance — {periodLabel}
+                    </Card.Title>
+                    <Card.Text as="div" className="small text-muted mt-1">
+                      {!isCustomRange &&
+                        `${trackersWithinBudget} of ${filteredTrackerSpend.length} within budget.`}
+                      {prevMonthBounds &&
+                        ` Compared to ${prevMonthBounds.label}.`}
+                    </Card.Text>
+                  </div>
+                  <Form.Select
+                    size="sm"
+                    value={trackerFreqFilter}
+                    onChange={(e) => setTrackerFreqFilter(e.target.value)}
+                    aria-label="Filter by frequency"
+                    style={{ width: 'auto', minWidth: 150 }}
+                  >
+                    {availableFrequencies.length > 1 && (
+                      <option value="">All frequencies</option>
+                    )}
+                    {availableFrequencies.map((f) => (
+                      <option key={f} value={f}>
+                        {FREQUENCY_LABELS[f] ?? f}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </div>
+              </Card.Header>
+              <Card.Body>
+                {filteredTrackerSpend.length === 0 ? (
+                  <p className="text-muted mb-0 small">
+                    No trackers match the selected frequency.
+                  </p>
+                ) : filteredTrackerSpend.length > 4 ? (
+                  /* ── List view (compact, >4 trackers) ── */
+                  <ul className="list-group list-group-flush">
+                    {filteredTrackerSpend.map(
+                      ({ tracker, spent, prevSpent }) => {
+                        const budget = tracker.budget_amount
+                        const spendDelta =
+                          prevSpent !== null ? spent - prevSpent : null
+                        const hasDelta =
+                          spendDelta !== null && Math.abs(spendDelta) >= 1
+                        const deltaColor = hasDelta
+                          ? spendDelta! > 0
+                            ? 'var(--vantura-danger)'
+                            : 'var(--vantura-success)'
+                          : undefined
+                        const periods = trackerPeriodBreakdowns[tracker.id]
+
+                        if (periods) {
+                          // Weekly / fortnightly — show each period as a sub-row
+                          const hasPartial = periods.some((p) => p.isPartial)
+                          return (
+                            <li
+                              key={tracker.id}
+                              className="list-group-item px-0 py-2"
                             >
-                              {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                tracker.reset_frequency}
-                            </span>
-                          </div>
-                          <div className="small text-muted mb-3">
-                            ${formatMoney(spent)} total
-                            {hasDelta && spendDelta !== null && (
-                              <span
-                                className="ms-2 fw-medium"
-                                style={{ color: deltaColor }}
-                              >
-                                {spendDelta > 0 ? '↑' : '↓'} $
-                                {formatMoney(Math.abs(spendDelta))} vs{' '}
-                                {prevMonthBounds?.label}
-                              </span>
-                            )}
-                          </div>
-                          {periods.map((p) => (
-                            <div key={p.periodStart} className="mb-3">
-                              <div className="d-flex justify-content-between align-items-center mb-1">
-                                <span className="small text-muted">
-                                  {p.label}
-                                  {p.isPartial && ' *'}
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="fw-medium small">
+                                  {tracker.name}
                                 </span>
-                                <span className="small">
+                                <div className="d-flex align-items-center gap-2">
+                                  <span className="small text-muted">
+                                    ${formatMoney(spent)} total
+                                  </span>
+                                  {hasDelta && spendDelta !== null && (
+                                    <span
+                                      className="small fw-medium"
+                                      style={{ color: deltaColor }}
+                                    >
+                                      {spendDelta > 0 ? '↑' : '↓'} $
+                                      {formatMoney(Math.abs(spendDelta))} vs{' '}
+                                      {prevMonthBounds?.label}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {periods.map((p) => (
+                                <div
+                                  key={p.periodStart}
+                                  className="mb-2"
+                                  style={{ paddingLeft: 8 }}
+                                >
+                                  <div className="d-flex justify-content-between align-items-center mb-1">
+                                    <span
+                                      className="text-muted"
+                                      style={{ fontSize: '0.75rem' }}
+                                    >
+                                      {p.label}
+                                      {p.isPartial && ' *'}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem' }}>
+                                      <span
+                                        style={{
+                                          color: trackerBarColor(p.progress),
+                                        }}
+                                      >
+                                        ${formatMoney(p.spent)}
+                                      </span>
+                                      <span className="text-muted">
+                                        {' '}
+                                        / ${formatMoney(p.budget)}
+                                      </span>
+                                    </span>
+                                  </div>
+                                  <ProgressBar
+                                    now={Math.min(100, p.progress)}
+                                    {...getProgressVariant(p.progress)}
+                                    label={`${Math.round(p.progress)}%`}
+                                    style={{ height: 13 }}
+                                  />
+                                </div>
+                              ))}
+                              {hasPartial && (
+                                <div
+                                  className="text-muted"
+                                  style={{ fontSize: '0.7rem', paddingLeft: 8 }}
+                                >
+                                  * Partial week — spans into adjacent month
+                                </div>
+                              )}
+                            </li>
+                          )
+                        }
+
+                        // Monthly — single bar
+                        const progress = budget > 0 ? (spent / budget) * 100 : 0
+                        const overBudget = spent > budget
+                        return (
+                          <OverlayTrigger
+                            key={tracker.id}
+                            placement="top"
+                            container={document.body}
+                            overlay={
+                              <Tooltip>
+                                <div>
                                   <span
                                     style={{
-                                      color: trackerBarColor(p.progress),
+                                      color: overBudget
+                                        ? 'var(--vantura-danger)'
+                                        : 'var(--vantura-success)',
                                     }}
                                   >
-                                    ${formatMoney(p.spent)}
+                                    ${formatMoney(spent)}
+                                  </span>{' '}
+                                  spent · ${formatMoney(budget)} budget
+                                </div>
+                                {prevSpent !== null && prevMonthBounds && (
+                                  <div style={{ opacity: 0.75 }}>
+                                    ${formatMoney(prevSpent)} in{' '}
+                                    {prevMonthBounds.label}
+                                  </div>
+                                )}
+                                {hasDelta && spendDelta !== null && (
+                                  <div style={{ color: deltaColor }}>
+                                    {spendDelta > 0 ? '↑' : '↓'} $
+                                    {formatMoney(Math.abs(spendDelta))}{' '}
+                                    {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                                    {prevMonthBounds?.label}
+                                  </div>
+                                )}
+                              </Tooltip>
+                            }
+                          >
+                            <li className="list-group-item px-0 py-2">
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="fw-medium small">
+                                  {tracker.name}
+                                </span>
+                                <div className="d-flex align-items-center gap-2">
+                                  <span className="small">
+                                    <span
+                                      style={{
+                                        color: trackerBarColor(progress),
+                                      }}
+                                    >
+                                      ${formatMoney(spent)}
+                                    </span>
+                                    <span className="text-muted">
+                                      {' '}
+                                      / ${formatMoney(budget)}
+                                    </span>
+                                  </span>
+                                  {hasDelta && spendDelta !== null && (
+                                    <span
+                                      className="small fw-medium"
+                                      style={{ color: deltaColor }}
+                                    >
+                                      {spendDelta > 0 ? '↑' : '↓'} $
+                                      {formatMoney(Math.abs(spendDelta))}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <ProgressBar
+                                now={Math.min(100, progress)}
+                                {...getProgressVariant(progress)}
+                                label={`${Math.round(progress)}%`}
+                                style={{ height: 13 }}
+                              />
+                            </li>
+                          </OverlayTrigger>
+                        )
+                      }
+                    )}
+                  </ul>
+                ) : (
+                  /* ── Card view (detailed, ≤4 trackers) ── */
+                  <Row className="g-3">
+                    {filteredTrackerSpend.map(
+                      ({ tracker, spent, prevSpent }) => {
+                        const budget = tracker.budget_amount
+                        const spendDelta =
+                          prevSpent !== null ? spent - prevSpent : null
+                        const hasDelta =
+                          spendDelta !== null && Math.abs(spendDelta) >= 1
+                        const deltaColor = hasDelta
+                          ? spendDelta! > 0
+                            ? 'var(--vantura-danger)'
+                            : 'var(--vantura-success)'
+                          : undefined
+                        const periods = trackerPeriodBreakdowns[tracker.id]
+
+                        if (periods) {
+                          // Weekly / fortnightly card — per-period breakdown
+                          const hasPartial = periods.some((p) => p.isPartial)
+                          return (
+                            <Col key={tracker.id} xs={12} md={6}>
+                              <div className="border rounded p-3">
+                                <div className="d-flex justify-content-between align-items-start mb-1">
+                                  <span className="d-flex align-items-center gap-2 min-w-0">
+                                    <span
+                                      className="rounded-circle flex-shrink-0"
+                                      style={{
+                                        width: 9,
+                                        height: 9,
+                                        backgroundColor: getTrackerColor(
+                                          tracker,
+                                          mode
+                                        ),
+                                      }}
+                                      aria-hidden
+                                    />
+                                    <span className="fw-medium text-truncate">
+                                      {tracker.name}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className="badge badge-frequency-default"
+                                    style={{
+                                      backgroundImage: 'none',
+                                      backgroundColor: getFrequencyBadgeColors(
+                                        tracker.reset_frequency as TrackerResetFrequency,
+                                        mode
+                                      ).bg,
+                                      color: getFrequencyBadgeColors(
+                                        tracker.reset_frequency as TrackerResetFrequency,
+                                        mode
+                                      ).text,
+                                    }}
+                                  >
+                                    {FREQUENCY_LABELS[
+                                      tracker.reset_frequency
+                                    ] ?? tracker.reset_frequency}
+                                  </span>
+                                </div>
+                                <div className="small text-muted mb-3">
+                                  ${formatMoney(spent)} total
+                                  {hasDelta && spendDelta !== null && (
+                                    <span
+                                      className="ms-2 fw-medium"
+                                      style={{ color: deltaColor }}
+                                    >
+                                      {spendDelta > 0 ? '↑' : '↓'} $
+                                      {formatMoney(Math.abs(spendDelta))} vs{' '}
+                                      {prevMonthBounds?.label}
+                                    </span>
+                                  )}
+                                </div>
+                                {periods.map((p) => (
+                                  <div key={p.periodStart} className="mb-3">
+                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                      <span className="small text-muted">
+                                        {p.label}
+                                        {p.isPartial && ' *'}
+                                      </span>
+                                      <span className="small">
+                                        <span
+                                          style={{
+                                            color: trackerBarColor(p.progress),
+                                          }}
+                                        >
+                                          ${formatMoney(p.spent)}
+                                        </span>
+                                        <span className="text-muted">
+                                          {' '}
+                                          / ${formatMoney(p.budget)}
+                                        </span>
+                                      </span>
+                                    </div>
+                                    <ProgressBar
+                                      now={Math.min(100, p.progress)}
+                                      {...getProgressVariant(p.progress)}
+                                      label={`${Math.round(p.progress)}%`}
+                                      style={{ height: 13 }}
+                                    />
+                                  </div>
+                                ))}
+                                {hasPartial && (
+                                  <div
+                                    className="text-muted mt-1"
+                                    style={{ fontSize: '0.7rem' }}
+                                  >
+                                    * Partial week — spans into adjacent month
+                                  </div>
+                                )}
+                              </div>
+                            </Col>
+                          )
+                        }
+
+                        // Monthly card — single bar
+                        const progress = budget > 0 ? (spent / budget) * 100 : 0
+                        const overBudget = spent > budget
+                        return (
+                          <Col key={tracker.id} xs={12} md={6}>
+                            <OverlayTrigger
+                              placement="top"
+                              container={document.body}
+                              overlay={
+                                <Tooltip>
+                                  <div>
+                                    <span
+                                      style={{
+                                        color: overBudget
+                                          ? 'var(--vantura-danger)'
+                                          : 'var(--vantura-success)',
+                                      }}
+                                    >
+                                      ${formatMoney(spent)}
+                                    </span>{' '}
+                                    spent · ${formatMoney(budget)} budget
+                                  </div>
+                                  {prevSpent !== null && prevMonthBounds && (
+                                    <div style={{ opacity: 0.75 }}>
+                                      ${formatMoney(prevSpent)} in{' '}
+                                      {prevMonthBounds.label}
+                                    </div>
+                                  )}
+                                  {hasDelta && spendDelta !== null && (
+                                    <div style={{ color: deltaColor }}>
+                                      {spendDelta > 0 ? '↑' : '↓'} $
+                                      {formatMoney(Math.abs(spendDelta))}{' '}
+                                      {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                                      {prevMonthBounds?.label}
+                                    </div>
+                                  )}
+                                </Tooltip>
+                              }
+                            >
+                              <div className="border rounded p-3">
+                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                  <span className="d-flex align-items-center gap-2 min-w-0">
+                                    <span
+                                      className="rounded-circle flex-shrink-0"
+                                      style={{
+                                        width: 9,
+                                        height: 9,
+                                        backgroundColor: getTrackerColor(
+                                          tracker,
+                                          mode
+                                        ),
+                                      }}
+                                      aria-hidden
+                                    />
+                                    <span className="fw-medium text-truncate">
+                                      {tracker.name}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className="badge badge-frequency-default"
+                                    style={{
+                                      backgroundImage: 'none',
+                                      backgroundColor: getFrequencyBadgeColors(
+                                        tracker.reset_frequency as TrackerResetFrequency,
+                                        mode
+                                      ).bg,
+                                      color: getFrequencyBadgeColors(
+                                        tracker.reset_frequency as TrackerResetFrequency,
+                                        mode
+                                      ).text,
+                                    }}
+                                  >
+                                    {FREQUENCY_LABELS[
+                                      tracker.reset_frequency
+                                    ] ?? tracker.reset_frequency}
+                                  </span>
+                                </div>
+                                <ProgressBar
+                                  now={Math.min(100, progress)}
+                                  {...getProgressVariant(progress)}
+                                  label={`${Math.round(progress)}%`}
+                                  style={{ height: 13 }}
+                                  className="mb-2"
+                                />
+                                <div className="small mt-2">
+                                  <span
+                                    style={{ color: trackerBarColor(progress) }}
+                                  >
+                                    ${formatMoney(spent)} spent
                                   </span>
                                   <span className="text-muted">
                                     {' '}
-                                    / ${formatMoney(p.budget)}
+                                    · ${formatMoney(budget)} budget
+                                    {overBudget && (
+                                      <span
+                                        className="ms-1 fw-medium"
+                                        style={{
+                                          color: trackerBarColor(progress),
+                                        }}
+                                      >
+                                        (${formatMoney(spent - budget)} over)
+                                      </span>
+                                    )}
                                   </span>
-                                </span>
+                                </div>
+                                {hasDelta && spendDelta !== null && (
+                                  <div
+                                    className="small mt-1 fw-medium"
+                                    style={{ color: deltaColor }}
+                                  >
+                                    {spendDelta > 0 ? '↑' : '↓'} $
+                                    {formatMoney(Math.abs(spendDelta))}{' '}
+                                    {spendDelta > 0 ? 'more' : 'less'} than{' '}
+                                    {prevMonthBounds?.label}
+                                  </div>
+                                )}
                               </div>
-                              <ProgressBar
-                                now={Math.min(100, p.progress)}
-                                {...getProgressVariant(p.progress)}
-                                label={`${Math.round(p.progress)}%`}
-                                style={{ height: 13 }}
-                              />
-                            </div>
-                          ))}
-                          {hasPartial && (
-                            <div
-                              className="text-muted mt-1"
-                              style={{ fontSize: '0.7rem' }}
-                            >
-                              * Partial week — spans into adjacent month
-                            </div>
-                          )}
-                        </div>
-                      </Col>
-                    )
-                  }
-
-                  // Monthly card — single bar
-                  const progress = budget > 0 ? (spent / budget) * 100 : 0
-                  const overBudget = spent > budget
-                  return (
-                    <Col key={tracker.id} xs={12} md={6}>
-                      <OverlayTrigger
-                        placement="top"
-                        container={document.body}
-                        overlay={
-                          <Tooltip>
-                            <div>
-                              <span
-                                style={{
-                                  color: overBudget
-                                    ? 'var(--vantura-danger)'
-                                    : 'var(--vantura-success)',
-                                }}
-                              >
-                                ${formatMoney(spent)}
-                              </span>{' '}
-                              spent · ${formatMoney(budget)} budget
-                            </div>
-                            {prevSpent !== null && prevMonthBounds && (
-                              <div style={{ opacity: 0.75 }}>
-                                ${formatMoney(prevSpent)} in{' '}
-                                {prevMonthBounds.label}
-                              </div>
-                            )}
-                            {hasDelta && spendDelta !== null && (
-                              <div style={{ color: deltaColor }}>
-                                {spendDelta > 0 ? '↑' : '↓'} $
-                                {formatMoney(Math.abs(spendDelta))}{' '}
-                                {spendDelta > 0 ? 'more' : 'less'} than{' '}
-                                {prevMonthBounds?.label}
-                              </div>
-                            )}
-                          </Tooltip>
-                        }
-                      >
-                        <div className="border rounded p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <span className="d-flex align-items-center gap-2 min-w-0">
-                              <span
-                                className="rounded-circle flex-shrink-0"
-                                style={{
-                                  width: 9,
-                                  height: 9,
-                                  backgroundColor: getTrackerColor(
-                                    tracker,
-                                    mode
-                                  ),
-                                }}
-                                aria-hidden
-                              />
-                              <span className="fw-medium text-truncate">
-                                {tracker.name}
-                              </span>
-                            </span>
-                            <span
-                              className="badge badge-frequency-default"
-                              style={{
-                                backgroundImage: 'none',
-                                backgroundColor: getFrequencyBadgeColors(
-                                  tracker.reset_frequency as TrackerResetFrequency,
-                                  mode
-                                ).bg,
-                                color: getFrequencyBadgeColors(
-                                  tracker.reset_frequency as TrackerResetFrequency,
-                                  mode
-                                ).text,
-                              }}
-                            >
-                              {FREQUENCY_LABELS[tracker.reset_frequency] ??
-                                tracker.reset_frequency}
-                            </span>
-                          </div>
-                          <ProgressBar
-                            now={Math.min(100, progress)}
-                            {...getProgressVariant(progress)}
-                            label={`${Math.round(progress)}%`}
-                            style={{ height: 13 }}
-                            className="mb-2"
-                          />
-                          <div className="small mt-2">
-                            <span style={{ color: trackerBarColor(progress) }}>
-                              ${formatMoney(spent)} spent
-                            </span>
-                            <span className="text-muted">
-                              {' '}
-                              · ${formatMoney(budget)} budget
-                              {overBudget && (
-                                <span
-                                  className="ms-1 fw-medium"
-                                  style={{ color: trackerBarColor(progress) }}
-                                >
-                                  (${formatMoney(spent - budget)} over)
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          {hasDelta && spendDelta !== null && (
-                            <div
-                              className="small mt-1 fw-medium"
-                              style={{ color: deltaColor }}
-                            >
-                              {spendDelta > 0 ? '↑' : '↓'} $
-                              {formatMoney(Math.abs(spendDelta))}{' '}
-                              {spendDelta > 0 ? 'more' : 'less'} than{' '}
-                              {prevMonthBounds?.label}
-                            </div>
-                          )}
-                        </div>
-                      </OverlayTrigger>
-                    </Col>
-                  )
-                })}
-              </Row>
-            )}
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* ─── Block 4: Upcoming Charges ────────────────────────────────────── */}
-      {!isCustomRange && chargeGroups.length > 0 && (
-        <Card className="grid-margin">
-          <Card.Header>
-            <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
-              <div>
-                <Card.Title className="mb-0">
-                  Upcoming Charges — {monthNameLong(year, month)} {year}
-                </Card.Title>
-                <Card.Text as="div" className="small text-muted mt-1">
-                  Upcoming charges for this month.
-                </Card.Text>
-              </div>
-              <Form.Select
-                size="sm"
-                value={chargeFreqFilter}
-                onChange={(e) => setChargeFreqFilter(e.target.value)}
-                aria-label="Filter by frequency"
-                style={{ width: 'auto', minWidth: 150 }}
-              >
-                {availableChargeFrequencies.length > 1 && (
-                  <option value="">All frequencies</option>
+                            </OverlayTrigger>
+                          </Col>
+                        )
+                      }
+                    )}
+                  </Row>
                 )}
-                {availableChargeFrequencies.map((f) => (
-                  <option key={f} value={f}>
-                    {formatFrequency(f)}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            {(() => {
-              const maxTotal = filteredChargeGroups[0]?.total ?? 1
-              return filteredChargeGroups.map((g) => {
-                const perOccurrence = g.total / g.occurrences
-                const barWidth = (g.total / maxTotal) * 100
-                return (
-                  <div key={g.id} className="mb-3">
-                    <div className="d-flex align-items-baseline justify-content-between gap-2 mb-1">
-                      <span
-                        className="fw-medium small"
-                        style={{ flex: 1, minWidth: 0 }}
-                      >
-                        {g.name}
-                      </span>
-                      <span className="fw-medium small">
-                        ${formatMoney(g.total)}
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2 mb-1">
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: '0.65rem',
-                          background: 'var(--vantura-surface)',
-                          color: 'var(--vantura-text-secondary)',
-                          border: '1px solid var(--vantura-border)',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {formatFrequency(g.frequency)}
-                      </span>
-                      <span
-                        className="text-muted"
-                        style={{ fontSize: '0.75rem' }}
-                      >
-                        ${formatMoney(perOccurrence)}
-                        {g.occurrences > 1 && <> × {g.occurrences}</>}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        height: 7,
-                        borderRadius: 4,
-                        background: 'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${barWidth}%`,
-                          height: '100%',
-                          borderRadius: 4,
-                          background: 'var(--vantura-primary)',
-                          opacity: 0.75,
-                          transition: 'width 0.3s ease',
-                        }}
-                      />
-                    </div>
+              </Card.Body>
+            </Card>
+          )}
+
+          {/* ─── Block 4: Upcoming Charges ────────────────────────────────────── */}
+          {!isCustomRange && chargeGroups.length > 0 && (
+            <Card className="grid-margin">
+              <Card.Header>
+                <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                  <div>
+                    <Card.Title className="mb-0">
+                      Upcoming Charges — {monthNameLong(year, month)} {year}
+                    </Card.Title>
+                    <Card.Text as="div" className="small text-muted mt-1">
+                      Upcoming charges for this month.
+                    </Card.Text>
                   </div>
-                )
-              })
-            })()}
-            <div className="pt-2 border-top d-flex justify-content-between fw-medium small">
-              <span>Total upcoming</span>
-              <span>
-                $
-                {formatMoney(
-                  filteredChargeGroups.reduce((s, g) => s + g.total, 0)
-                )}
-              </span>
-            </div>
-          </Card.Body>
-        </Card>
+                  <Form.Select
+                    size="sm"
+                    value={chargeFreqFilter}
+                    onChange={(e) => setChargeFreqFilter(e.target.value)}
+                    aria-label="Filter by frequency"
+                    style={{ width: 'auto', minWidth: 150 }}
+                  >
+                    {availableChargeFrequencies.length > 1 && (
+                      <option value="">All frequencies</option>
+                    )}
+                    {availableChargeFrequencies.map((f) => (
+                      <option key={f} value={f}>
+                        {formatFrequency(f)}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </div>
+              </Card.Header>
+              <Card.Body>
+                {(() => {
+                  const maxTotal = filteredChargeGroups[0]?.total ?? 1
+                  return filteredChargeGroups.map((g) => {
+                    const perOccurrence = g.total / g.occurrences
+                    const barWidth = (g.total / maxTotal) * 100
+                    return (
+                      <div key={g.id} className="mb-3">
+                        <div className="d-flex align-items-baseline justify-content-between gap-2 mb-1">
+                          <span
+                            className="fw-medium small"
+                            style={{ flex: 1, minWidth: 0 }}
+                          >
+                            {g.name}
+                          </span>
+                          <span className="fw-medium small">
+                            ${formatMoney(g.total)}
+                          </span>
+                        </div>
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <span
+                            className="badge"
+                            style={{
+                              fontSize: '0.65rem',
+                              background: 'var(--vantura-surface)',
+                              color: 'var(--vantura-text-secondary)',
+                              border: '1px solid var(--vantura-border)',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {formatFrequency(g.frequency)}
+                          </span>
+                          <span
+                            className="text-muted"
+                            style={{ fontSize: '0.75rem' }}
+                          >
+                            ${formatMoney(perOccurrence)}
+                            {g.occurrences > 1 && <> × {g.occurrences}</>}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            height: 7,
+                            borderRadius: 4,
+                            background:
+                              'var(--bs-secondary-bg, rgba(0,0,0,0.08))',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${barWidth}%`,
+                              height: '100%',
+                              borderRadius: 4,
+                              background: 'var(--vantura-primary)',
+                              opacity: 0.75,
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+                <div className="pt-2 border-top d-flex justify-content-between fw-medium small">
+                  <span>Total upcoming</span>
+                  <span>
+                    $
+                    {formatMoney(
+                      filteredChargeGroups.reduce((s, g) => s + g.total, 0)
+                    )}
+                  </span>
+                </div>
+              </Card.Body>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )

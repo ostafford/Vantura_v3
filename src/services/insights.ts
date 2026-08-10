@@ -553,45 +553,6 @@ export function getCategoryBreakdownForDateRange(
 }
 
 /**
- * Money In (real income, no internal transfers) for a date range. For Reports Sankey.
- */
-export function getMoneyInForDateRange(
-  dateFrom: string,
-  dateTo: string
-): number {
-  const db = getDb()
-  if (!db) return 0
-  const stmt = db.prepare(
-    `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up'
-     AND COALESCE(created_at, settled_at) >= ? AND COALESCE(created_at, settled_at) <= ?`
-  )
-  stmt.bind([localDateStartUtc(dateFrom), localDateEndUtc(dateTo)])
-  stmt.step()
-  const row = stmt.get()
-  stmt.free()
-  return row ? Number(row[0]) : 0
-}
-
-/**
- * Data for Reports Sankey: income and spending by category in a date range.
- */
-export interface ReportsSankeyData {
-  moneyIn: number
-  categories: CategoryBreakdownRow[]
-}
-
-export function getReportsSankeyData(
-  dateFrom: string,
-  dateTo: string
-): ReportsSankeyData {
-  return {
-    moneyIn: getMoneyInForDateRange(dateFrom, dateTo),
-    categories: getCategoryBreakdownForDateRange(dateFrom, dateTo),
-  }
-}
-
-/**
  * Insight metrics for an arbitrary date range (e.g. a month). Same definitions as WeeklyInsightsData.
  */
 export function getInsightsForDateRange(
@@ -1026,15 +987,33 @@ export function getYearComparison(year: number): MonthComparisonData {
   )
 }
 
-/** Week-over-week KPI comparison (this ISO week vs previous week). */
+/**
+ * Week-over-week KPI comparison (this ISO week vs previous week).
+ *
+ * When the current week is in progress, caps the previous week to the same
+ * number of elapsed days so the comparison is apples-to-apples — mirrors
+ * the equivalent capping in getMonthComparison.
+ */
 export function getWeekComparison(weekOffset: number): MonthComparisonData {
   const cur = getWeekRange(weekOffset)
   const prev = getWeekRange(weekOffset - 1)
+
+  let effectivePreviousEndIso = prev.endIso
+  if (weekOffset === 0) {
+    const daysElapsed = getDaysElapsedInWeek(cur, new Date(), weekOffset)
+    if (daysElapsed < 7) {
+      const prevEnd = new Date(prev.start)
+      prevEnd.setDate(prevEnd.getDate() + daysElapsed - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      effectivePreviousEndIso = prevEnd.toISOString()
+    }
+  }
+
   return getPeriodComparison(
     cur.startIso,
     cur.endIso,
     prev.startIso,
-    prev.endIso,
+    effectivePreviousEndIso,
     'week'
   )
 }

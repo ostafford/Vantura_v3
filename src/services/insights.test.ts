@@ -4,7 +4,11 @@ vi.mock('@/db', () => ({
   getDb: vi.fn(),
 }))
 
-import { getYearMonthlyTotals, getYearComparisonPeriods } from './insights'
+import {
+  getYearMonthlyTotals,
+  getYearComparisonPeriods,
+  getWeekComparison,
+} from './insights'
 import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
 
@@ -77,5 +81,82 @@ describe('getYearComparisonPeriods', () => {
     expect(r.current.to).toBe('2026-04-15')
     expect(r.previous.from).toBe('2025-01-01')
     expect(r.previous.to).toBe('2025-04-15')
+  })
+})
+
+describe('getWeekComparison', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('caps the previous week to the same elapsed-day count as the current in-progress week', () => {
+    // 2026-04-15 is a Wednesday: 3 days elapsed in the current week (Mon-Wed).
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 15))
+    vi.clearAllMocks()
+
+    const bindCalls: unknown[][] = []
+    const stmt = {
+      bind: (args: unknown[]) => bindCalls.push(args),
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+
+    getWeekComparison(0)
+
+    // Expected previous-week bounds: previous Monday at local midnight,
+    // capped end = previous Monday + 2 days (3 elapsed days - 1) at local
+    // end-of-day — mirrors the production computation.
+    const prevMonday = new Date(2026, 3, 6)
+    prevMonday.setHours(0, 0, 0, 0)
+    const expectedPrevStartIso = prevMonday.toISOString()
+    const expectedPrevEnd = new Date(prevMonday)
+    expectedPrevEnd.setDate(expectedPrevEnd.getDate() + 2)
+    expectedPrevEnd.setHours(23, 59, 59, 999)
+    const expectedPrevEndIso = expectedPrevEnd.toISOString()
+
+    const previousBoundCalls = bindCalls.filter(
+      (args) => args[0] === expectedPrevStartIso
+    )
+    expect(previousBoundCalls.length).toBeGreaterThan(0)
+    for (const args of previousBoundCalls) {
+      expect(args[1]).toBe(expectedPrevEndIso)
+    }
+  })
+
+  it('does not cap a past (fully elapsed) week', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 15))
+    vi.clearAllMocks()
+
+    const bindCalls: unknown[][] = []
+    const stmt = {
+      bind: (args: unknown[]) => bindCalls.push(args),
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+
+    // weekOffset -1 compares last week vs the week before — both fully elapsed.
+    getWeekComparison(-1)
+
+    const priorMonday = new Date(2026, 2, 30) // 2026-03-30
+    priorMonday.setHours(0, 0, 0, 0)
+    const expectedPrevStartIso = priorMonday.toISOString()
+    const expectedPrevEnd = new Date(priorMonday)
+    expectedPrevEnd.setDate(expectedPrevEnd.getDate() + 6)
+    expectedPrevEnd.setHours(23, 59, 59, 999)
+    const expectedPrevEndIso = expectedPrevEnd.toISOString()
+
+    const previousBoundCalls = bindCalls.filter(
+      (args) => args[0] === expectedPrevStartIso
+    )
+    expect(previousBoundCalls.length).toBeGreaterThan(0)
+    for (const args of previousBoundCalls) {
+      expect(args[1]).toBe(expectedPrevEndIso)
+    }
   })
 })

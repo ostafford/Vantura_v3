@@ -515,10 +515,8 @@ export function Help() {
 
                   <SectionHeading icon="mdi-file-chart">Reports</SectionHeading>
                   <p className="mb-2">
-                    Category spending over any date range, weekly money in/out
-                    trends, monthly spending comparisons, tracker spend
-                    summaries, and an optional income-to-spending flow chart
-                    (Sankey diagram).
+                    Category spending over any date range, monthly spending
+                    comparisons, and tracker spend summaries.
                   </p>
 
                   <SectionHeading icon="mdi-piggy-bank">Savers</SectionHeading>
