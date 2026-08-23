@@ -222,3 +222,45 @@ export function computeNextPaydayFromReference(
   }
   return { paydayDay, nextPayday: next.toISOString().slice(0, 10) }
 }
+
+/**
+ * The payday date immediately before fromDate, for a configured frequency/paydayDay.
+ * fromDate is typically next_payday or a tracker's period-end/reset date — this function
+ * doesn't care which, it just steps back one payday cadence from whatever date it's given.
+ */
+export function previousPaydayDate(
+  fromDate: string,
+  frequency: PaydayFrequency,
+  paydayDay: number
+): string {
+  const from = new Date(fromDate + 'T12:00:00Z')
+
+  if (frequency === 'WEEKLY') {
+    const prev = new Date(from)
+    prev.setUTCDate(prev.getUTCDate() - 7)
+    return prev.toISOString().slice(0, 10)
+  }
+
+  if (frequency === 'FORTNIGHTLY') {
+    const prev = new Date(from)
+    prev.setUTCDate(prev.getUTCDate() - 14)
+    return prev.toISOString().slice(0, 10)
+  }
+
+  // MONTHLY
+  if (isMonthlyLastWeekday(paydayDay)) {
+    let targetYear = from.getUTCFullYear()
+    let targetMonth = from.getUTCMonth() - 1
+    if (targetMonth < 0) {
+      targetMonth = 11
+      targetYear -= 1
+    }
+    return monthlyPaydayDate(paydayDay, targetYear, targetMonth)
+      .toISOString()
+      .slice(0, 10)
+  }
+  const prev = new Date(from)
+  prev.setUTCMonth(prev.getUTCMonth() - 1)
+  if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
+  return prev.toISOString().slice(0, 10)
+}

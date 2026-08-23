@@ -15,7 +15,12 @@ import {
   type UpCategory,
   type UpTag,
 } from '@/api/upBank'
-import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
+import {
+  isMonthlyLastWeekday,
+  monthlyPaydayDate,
+  previousPaydayDate,
+  type PaydayFrequency,
+} from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
 
 /** Return today as YYYY-MM-DD in local time. */
@@ -346,37 +351,14 @@ function upsertCategory(cat: UpCategory): void {
 function prevPaydayDate(nextPayday: string): string | null {
   const frequency = getAppSetting('payday_frequency')
   const dayStr = getAppSetting('payday_day')
-  if (!frequency) return null
+  if (
+    frequency !== 'WEEKLY' &&
+    frequency !== 'FORTNIGHTLY' &&
+    frequency !== 'MONTHLY'
+  )
+    return null
   const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  const from = new Date(nextPayday + 'T12:00:00Z')
-  if (frequency === 'WEEKLY') {
-    const prev = new Date(from)
-    prev.setUTCDate(prev.getUTCDate() - 7)
-    return prev.toISOString().slice(0, 10)
-  }
-  if (frequency === 'FORTNIGHTLY') {
-    const prev = new Date(from)
-    prev.setUTCDate(prev.getUTCDate() - 14)
-    return prev.toISOString().slice(0, 10)
-  }
-  if (frequency === 'MONTHLY') {
-    if (isMonthlyLastWeekday(paydayDay)) {
-      let targetYear = from.getUTCFullYear()
-      let targetMonth = from.getUTCMonth() - 1
-      if (targetMonth < 0) {
-        targetMonth = 11
-        targetYear -= 1
-      }
-      return monthlyPaydayDate(paydayDay, targetYear, targetMonth)
-        .toISOString()
-        .slice(0, 10)
-    }
-    const prev = new Date(from)
-    prev.setUTCMonth(prev.getUTCMonth() - 1)
-    if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
-    return prev.toISOString().slice(0, 10)
-  }
-  return null
+  return previousPaydayDate(nextPayday, frequency as PaydayFrequency, paydayDay)
 }
 
 /**

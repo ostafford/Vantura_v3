@@ -46,48 +46,16 @@ function insertTracker(overrides: {
   )
 }
 
-// prevPaydayDate's MONTHLY "last weekday of month" branch (payday_day 100-105)
-// previously mutated a Date that still carried the original day-of-month
-// before deriving the target month, so short months (e.g. February) rolled
-// the date back into the SAME month as the input for any day-of-month in
-// 29-31 — producing a zero-length PAYDAY tracker period. These cases are the
-// actual regression trigger; day-of-month <=28 never exhibited the bug and
-// so is an insufficient regression guard on its own (see the day-15 cases
-// below, kept as sanity checks of the non-buggy path).
-describe('prevPaydayDate — MONTHLY "last weekday" rules with day-of-month 29-31 inputs', () => {
-  beforeEach(() => {
+// Full edge-case coverage of the underlying math (including the MONTHLY "last
+// weekday" day-31 regression this used to guard directly) lives in
+// payday.test.ts against previousPaydayDate() directly. This only proves
+// prevPaydayDate reads app_settings (parsing payday_day, defaulting to 1
+// when unset) and delegates correctly.
+describe('prevPaydayDate', () => {
+  it('reads app_settings and delegates to payday.ts for the math', () => {
     appSettings.payday_frequency = 'MONTHLY'
-  })
-
-  it('day-of-month 31, "last business day" rule (100): March 31 -> last business day of February', () => {
     appSettings.payday_day = '100'
-    // Feb 2026 has 28 days; Feb 28 2026 is a Saturday, so the last business
-    // day is Feb 27. The pre-fix code returned '2026-03-27' (stayed in March).
     expect(prevPaydayDate('2026-03-31')).toBe('2026-02-27')
-  })
-
-  it('day-of-month 31, "last Friday" rule (105): May 31 -> last Friday of April', () => {
-    appSettings.payday_day = '105'
-    expect(prevPaydayDate('2026-05-31')).toBe('2026-04-24')
-  })
-
-  it('day-of-month 30, "last business day" rule (100): still resolves to the prior month', () => {
-    appSettings.payday_day = '100'
-    expect(prevPaydayDate('2026-03-30')).toBe('2026-02-27')
-  })
-
-  it('day-of-month 15 (non-overflowing), "last business day" rule (100): sanity check', () => {
-    appSettings.payday_day = '100'
-    expect(prevPaydayDate('2026-03-15')).toBe('2026-02-27')
-  })
-
-  it('January input correctly wraps to the previous December', () => {
-    appSettings.payday_day = '100'
-    // Dec 31 2025 is a Wednesday (a business day), so it's its own last
-    // business day. Dec 2025 has 31 days, so day-of-month 31 doesn't
-    // overflow here — this exercises the year-wraparound arithmetic
-    // (Jan -> Dec, year-1) rather than the short-month bug.
-    expect(prevPaydayDate('2026-01-31')).toBe('2025-12-31')
   })
 })
 

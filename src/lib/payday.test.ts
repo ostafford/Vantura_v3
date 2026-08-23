@@ -11,6 +11,7 @@ import {
   computeNextMonthlyLastWeekday,
   computeNextPaydayFromReference,
   getPaydayDayLabel,
+  previousPaydayDate,
 } from './payday'
 
 // Calendar reference — Jan 1 2026 = Thursday (JS getUTCDay 4). Derived:
@@ -422,5 +423,69 @@ describe('getPaydayDayLabel', () => {
   it('returns stringified value for unknown frequency or code', () => {
     expect(getPaydayDayLabel('QUARTERLY', 3)).toBe('3')
     expect(getPaydayDayLabel('MONTHLY', 999)).toBe('999')
+  })
+})
+
+describe('previousPaydayDate', () => {
+  it('WEEKLY steps back 7 days', () => {
+    expect(previousPaydayDate('2026-03-15', 'WEEKLY', 1)).toBe('2026-03-08')
+  })
+
+  it('FORTNIGHTLY steps back 14 days', () => {
+    expect(previousPaydayDate('2026-03-15', 'FORTNIGHTLY', 1)).toBe(
+      '2026-03-01'
+    )
+  })
+
+  it('MONTHLY with a fixed day-of-month steps back one UTC month', () => {
+    expect(previousPaydayDate('2026-03-20', 'MONTHLY', 15)).toBe('2026-02-15')
+  })
+
+  it('MONTHLY with "last business day" rule (code 100) resolves to the previous month’s last business day', () => {
+    // Previous month of March 2026 is February 2026; Feb 28 2026 is a Saturday → last business day is Feb 27.
+    expect(previousPaydayDate('2026-03-15', 'MONTHLY', 100)).toBe('2026-02-27')
+  })
+
+  it('MONTHLY with "last Friday" rule (code 105) resolves correctly across the month rollback', () => {
+    // Last Friday of February 2026 is Feb 27.
+    expect(previousPaydayDate('2026-03-15', 'MONTHLY', 105)).toBe('2026-02-27')
+  })
+
+  // MONTHLY "last weekday" rules previously mutated a Date that still carried the
+  // original day-of-month before deriving the target month, so short months (e.g.
+  // February) rolled back into the SAME month as the input for any day-of-month in
+  // 29-31 — producing a zero-length PAYDAY tracker period. These are the actual
+  // regression trigger; day-of-month <=28 never exhibited the bug, so it's an
+  // insufficient regression guard on its own (kept above as a sanity check of the
+  // non-buggy path).
+  describe('"last weekday" rules with day-of-month 29-31 inputs (regression)', () => {
+    it('day-of-month 31, "last business day" rule (100): March 31 -> last business day of February', () => {
+      // Pre-fix code returned '2026-03-27' (stayed in March).
+      expect(previousPaydayDate('2026-03-31', 'MONTHLY', 100)).toBe(
+        '2026-02-27'
+      )
+    })
+
+    it('day-of-month 31, "last Friday" rule (105): May 31 -> last Friday of April', () => {
+      expect(previousPaydayDate('2026-05-31', 'MONTHLY', 105)).toBe(
+        '2026-04-24'
+      )
+    })
+
+    it('day-of-month 30, "last business day" rule (100): still resolves to the prior month', () => {
+      expect(previousPaydayDate('2026-03-30', 'MONTHLY', 100)).toBe(
+        '2026-02-27'
+      )
+    })
+
+    it('January input correctly wraps to the previous December', () => {
+      // Dec 31 2025 is a Wednesday (a business day), so it's its own last business
+      // day. Dec 2025 has 31 days, so day-of-month 31 doesn't overflow here — this
+      // exercises the year-wraparound arithmetic (Jan -> Dec, year-1) rather than
+      // the short-month bug.
+      expect(previousPaydayDate('2026-01-31', 'MONTHLY', 100)).toBe(
+        '2025-12-31'
+      )
+    })
   })
 })

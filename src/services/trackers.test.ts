@@ -108,58 +108,18 @@ describe('getNextResetDate', () => {
 })
 
 describe('getPreviousPaydayDate', () => {
+  // Full edge-case coverage of the underlying math (WEEKLY/FORTNIGHTLY/MONTHLY,
+  // including the "last weekday" day-31 regression) lives in payday.test.ts
+  // against previousPaydayDate() directly. These only prove this wrapper reads
+  // app_settings (parsing payday_day, defaulting to 1 when unset) correctly.
   it('returns null when payday_frequency is not configured', () => {
     expect(getPreviousPaydayDate('2026-03-15')).toBeNull()
   })
 
-  it('WEEKLY steps back 7 days', () => {
-    appSettings.payday_frequency = 'WEEKLY'
-    appSettings.payday_day = '1'
-    expect(getPreviousPaydayDate('2026-03-15')).toBe('2026-03-08')
-  })
-
-  it('FORTNIGHTLY steps back 14 days', () => {
-    appSettings.payday_frequency = 'FORTNIGHTLY'
-    appSettings.payday_day = '1'
-    expect(getPreviousPaydayDate('2026-03-15')).toBe('2026-03-01')
-  })
-
-  it('MONTHLY with a fixed day-of-month steps back one UTC month', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '15'
-    expect(getPreviousPaydayDate('2026-03-20')).toBe('2026-02-15')
-  })
-
-  it('MONTHLY with "last business day" rule (code 100) resolves to the previous month’s last business day', () => {
+  it('reads app_settings and delegates to payday.ts for the math', () => {
     appSettings.payday_frequency = 'MONTHLY'
     appSettings.payday_day = '100'
-    // Previous month of March 2026 is February 2026; Feb 28 2026 is a Saturday → last business day is Feb 27.
-    expect(getPreviousPaydayDate('2026-03-15')).toBe('2026-02-27')
-  })
-
-  it('MONTHLY with "last Friday" rule (code 105) resolves correctly across the month rollback', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '105'
-    // Last Friday of February 2026 is Feb 27.
-    expect(getPreviousPaydayDate('2026-03-15')).toBe('2026-02-27')
-  })
-
-  it('MONTHLY "last weekday" rule with a day-of-month-31 input correctly rolls back a full month (regression: day <=28 inputs do not exercise this)', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '100'
-    // fromDate itself is the 31st — the pre-fix code mutated a Date that
-    // still carried day=31 before deriving the target month, so for short
-    // months (Feb) it rolled back into the SAME month as fromDate instead
-    // of the prior one. Mar 31 -> should resolve to Feb 27 (last business
-    // day of Feb 2026), not stay in March.
     expect(getPreviousPaydayDate('2026-03-31')).toBe('2026-02-27')
-  })
-
-  it('MONTHLY "last Friday" rule with a day-of-month-31 input correctly rolls back a full month', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '105'
-    // May 31 -> last Friday of April 2026 is Apr 24, not stuck in May.
-    expect(getPreviousPaydayDate('2026-05-31')).toBe('2026-04-24')
   })
 })
 

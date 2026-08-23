@@ -3,7 +3,7 @@
  */
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
-import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
+import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
 
 function todayDateString(): string {
   const d = new Date()
@@ -161,35 +161,14 @@ function stepBackOnePeriod(
 function getPreviousPaydayDate(fromDate: string): string | null {
   const frequency = getAppSetting('payday_frequency')
   const dayStr = getAppSetting('payday_day')
-  if (!frequency) return null
-  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  const from = new Date(fromDate + 'T12:00:00Z')
-  let prev: Date
-  if (frequency === 'WEEKLY') {
-    prev = new Date(from)
-    prev.setUTCDate(prev.getUTCDate() - 7)
-  } else if (frequency === 'FORTNIGHTLY') {
-    prev = new Date(from)
-    prev.setUTCDate(prev.getUTCDate() - 14)
-  } else if (frequency === 'MONTHLY') {
-    if (isMonthlyLastWeekday(paydayDay)) {
-      let targetYear = from.getUTCFullYear()
-      let targetMonth = from.getUTCMonth() - 1
-      if (targetMonth < 0) {
-        targetMonth = 11
-        targetYear -= 1
-      }
-      return monthlyPaydayDate(paydayDay, targetYear, targetMonth)
-        .toISOString()
-        .slice(0, 10)
-    }
-    prev = new Date(from)
-    prev.setUTCMonth(prev.getUTCMonth() - 1)
-    if (paydayDay >= 1 && paydayDay <= 28) prev.setUTCDate(paydayDay)
-  } else {
+  if (
+    frequency !== 'WEEKLY' &&
+    frequency !== 'FORTNIGHTLY' &&
+    frequency !== 'MONTHLY'
+  )
     return null
-  }
-  return prev.toISOString().slice(0, 10)
+  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
+  return previousPaydayDate(fromDate, frequency as PaydayFrequency, paydayDay)
 }
 
 /** Period bounds for a tracker and period offset. 0 = current period, -1 = previous, etc. */
