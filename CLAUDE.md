@@ -14,23 +14,19 @@ Vantura's product vision, target users, and non-negotiable design principles liv
 
 - **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
-- **Docs are collaborative, not autonomous.** Never edit any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) without first proposing the change and getting explicit confirmation. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `CONTEXT.md` files specifically need an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
+- **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `CONTEXT.md` files specifically need an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
 
 ## Commands
 
+Run `npm run` for the full script list. The non-obvious ones:
+
 ```bash
-npm run dev              # start dev server (Vite)
-npm run build             # tsc -b && vite build
 npm run validate           # format:check + lint + typecheck — run before considering work done
-npm run test               # vitest run (unit tests, node environment)
-npm run test:watch          # vitest watch mode
-npm run test:coverage        # vitest with v8 coverage
-npm run test:e2e            # playwright (chromium)
 npx vitest run path/to/file.test.ts        # single test file
 npx vitest run -t "test name substring"     # single test by name
 ```
 
-CI (`.github/workflows/deploy.yml`) runs format-check, lint, typecheck, unit tests, e2e tests, and `npm audit` on every push. Cloudflare Pages auto-deploys `main` on push — no manual deploy step. `npm run validate` mirrors the fast part of CI locally.
+CI (see `.github/workflows/deploy.yml`) runs `npm run validate` plus the unit and e2e test suites on every push. Cloudflare Pages auto-deploys `main` on push — no manual deploy step.
 
 Pre-commit hook (`husky` + `lint-staged`) auto-formats/lints staged `.ts`/`.tsx`/`.css` files.
 
@@ -45,11 +41,11 @@ Pre-commit hook (`husky` + `lint-staged`) auto-formats/lints staged `.ts`/`.tsx`
 ### Sync: Up Bank API → local DB
 
 - `src/api/upBank.ts` wraps the Up Bank REST API (Personal Access Token, ~60 req/min rate limit).
-- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives payday/tracker recalculation. It is called on every app boot (`App.tsx`) via `advanceNextPaydayIfNeeded()` then `recalculateTrackers()`, and again on manual/periodic sync. Check `docs/features/sync/` before touching pagination, rate limiting, or the initial-vs-incremental sync split.
+- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives payday/tracker recalculation. It is called on every app boot (`App.tsx`) via `advanceNextPaydayIfNeeded()` then `recalculateTrackers()`, and again on manual/periodic sync. Touching pagination, rate limiting, or the initial-vs-incremental sync split? Check `docs/features/sync/` first.
 
 ### Payday-centric domain model
 
-A recurring theme across the codebase: budgets, trackers, and the "Spendable" balance are all anchored to the user's **payday cycle**, not the calendar month. `src/lib/payday.ts` defines the payday frequency/day encoding (including special codes 100–105 for "last weekday/Mon–Fri of the month"), and `advanceNextPaydayIfNeeded()` in `sync.ts` rolls `next_payday` forward whenever it's in the past. Trackers can reset weekly/fortnightly/monthly/`PAYDAY`; when touching tracker reset logic, budget periods, or the Spendable calculation, check `src/lib/payday.ts` and `docs/features/payday-spendable/` and `docs/features/trackers/` first — this logic has had several date-edge-case bugs historically (unpadded dates, month-rollover, relative payday rules).
+A recurring theme across the codebase: budgets, trackers, and the "Spendable" balance are all anchored to the user's **payday cycle**, not the calendar month. `src/lib/payday.ts` defines the payday frequency/day encoding (including special codes 100–105 for "last weekday/Mon–Fri of the month"), and `advanceNextPaydayIfNeeded()` in `sync.ts` rolls `next_payday` forward whenever it's in the past. Trackers can reset weekly/fortnightly/monthly/`PAYDAY`. Touching tracker reset logic, budget periods, or the Spendable calculation? Check `src/lib/payday.ts`, `docs/features/payday-spendable/`, and `docs/features/trackers/` first — this logic has had several date-edge-case bugs historically (unpadded dates, month-rollover, relative payday rules).
 
 ### State management: vanilla zustand stores, not React context
 
@@ -57,7 +53,7 @@ Stores in `src/stores/*.ts` use `zustand/vanilla`'s `createStore`, consumed in c
 
 ### Security model
 
-API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2-SHA256 → AES-GCM 256-bit) using a key derived from the user's passphrase; the passphrase itself is never persisted. Biometric unlock (`src/lib/webauthn.ts`, `src/lib/biometricSession.ts`) is an optional convenience layer on top of the passphrase, not a replacement. See `SECURITY.md` and `docs/features/security-auth/` for the full model before touching auth/encryption code.
+API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2-SHA256 → AES-GCM 256-bit) using a key derived from the user's passphrase; the passphrase itself is never persisted. Biometric unlock (`src/lib/webauthn.ts`, `src/lib/biometricSession.ts`) is an optional convenience layer on top of the passphrase, not a replacement. Touching auth/encryption code? See `SECURITY.md` and `docs/features/security-auth/` for the full model first.
 
 ### Routing & app shell
 
@@ -73,7 +69,7 @@ Vantura's deep technical reference lives in `docs/` (gitignored, not in the publ
 
 **Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — it's a short router that points to `OVERVIEW.md` (how the feature works, always present), `CONTEXT.md` (why it's built this way, if that folder has one), and `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
 
-Feature folders: `dashboard/`, `settings/`, `payday-spendable/`, `trackers/`, `budget-plan/`, `upcoming-charges/`, `savers/`, `net-worth/`, `weekly-insights/`, `month-at-a-glance/`, `reports/`, `analytics-overview/`, `sync/`, `transactions/`, `profile-data/`, `notifications/`, `security-auth/`, `appearance-theme/`.
+Feature folders live under `docs/features/` — list that directory rather than a name here that can drift out of sync with it.
 
 Root-level docs (public, in git):
 - `ROADMAP.md` — feature timeline and what's under consideration.
