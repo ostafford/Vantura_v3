@@ -6,6 +6,7 @@ import {
   formatShortDate,
   formatShortDateFromDate,
   formatShortDateWithYear,
+  localDateString,
 } from './format'
 
 describe('formatMoney', () => {
@@ -64,6 +65,17 @@ describe('formatShortDate', () => {
   })
   it('returns Invalid Date string for unparseable input', () => {
     expect(formatShortDate('x')).toBe('Invalid Date')
+  })
+})
+
+describe('localDateString', () => {
+  it('defaults to today when called with no argument', () => {
+    const now = new Date()
+    const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    expect(localDateString()).toBe(expected)
+  })
+  it('formats an explicit local date as YYYY-MM-DD', () => {
+    expect(localDateString(new Date(2025, 1, 9))).toBe('2025-02-09')
   })
 })
 

@@ -14,7 +14,6 @@ import {
 } from 'react-bootstrap'
 import {
   getTracker,
-  getTrackersWithProgress,
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
   getTrackerSpentInPeriod,
@@ -23,6 +22,7 @@ import {
   createTracker,
   updateTracker,
   deleteTracker,
+  calculatePaydayBudgetTotal,
   type TrackerResetFrequency,
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
@@ -175,12 +175,8 @@ export function TrackersSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const payAmountCents = useMemo(() => getPayAmountCents(), [refresh])
   const totalPaydayBudgetCents = useMemo(
-    () =>
-      getTrackersWithProgress()
-        .filter((t) => t.reset_frequency === 'PAYDAY')
-        .reduce((sum, t) => sum + t.budget_amount, 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
+    () => calculatePaydayBudgetTotal(trackers),
+    [trackers]
   )
   const periodTxsByTrackerId = useMemo(() => {
     const map: Record<
@@ -358,12 +354,10 @@ export function TrackersSection({
       : [1, 2, 3, 4, 5, 6, 7]
 
   const budgetCentsForModal = Math.round(parseFloat(budget || '0') * 100)
-  const otherPaydayBudgetCents =
-    editingId != null
-      ? trackers
-          .filter((t) => t.reset_frequency === 'PAYDAY' && t.id !== editingId)
-          .reduce((sum, t) => sum + t.budget_amount, 0)
-      : totalPaydayBudgetCents
+  const otherPaydayBudgetCents = calculatePaydayBudgetTotal(
+    trackers,
+    editingId ?? undefined
+  )
   const newTotalPaydayCents = otherPaydayBudgetCents + budgetCentsForModal
   const modalPaydayExceedsPay =
     frequency === 'PAYDAY' &&

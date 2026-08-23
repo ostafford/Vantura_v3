@@ -4,11 +4,7 @@
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
 import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+import { localDateString } from '@/lib/format'
 
 export type TrackerResetFrequency =
   | 'WEEKLY'
@@ -76,24 +72,16 @@ function daysBetween(dateStrA: string, dateStrB: string): number {
 /**
  * Spent in current period (cents). 5.1: tracker_categories + transactions, display date
  * (COALESCE(created_at, settled_at)) in [last_reset, next_reset), amount < 0, not round-up.
+ * Delegates to getTrackerSpentInPeriod for the tracker's current last_reset_date/next_reset_date.
  */
 export function getTrackerSpent(trackerId: number): number {
-  const db = getDb()
-  if (!db) return 0
-  const stmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
-     FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ?
-       AND COALESCE(t.created_at, t.settled_at) >= (SELECT last_reset_date FROM trackers WHERE id = ?)
-       AND COALESCE(t.created_at, t.settled_at) < (SELECT next_reset_date FROM trackers WHERE id = ?)
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+  const row = getTracker(trackerId)
+  if (!row) return 0
+  return getTrackerSpentInPeriod(
+    trackerId,
+    row.last_reset_date,
+    row.next_reset_date
   )
-  stmt.bind([trackerId, trackerId, trackerId])
-  stmt.step()
-  const row = stmt.get()
-  stmt.free()
-  return row ? Number(row[0]) : 0
 }
 
 /**
@@ -203,7 +191,7 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
      FROM trackers WHERE is_active = 1 ORDER BY name`
   )
   const list: TrackerWithProgress[] = []
-  const today = todayDateString()
+  const today = localDateString()
   while (stmt.step()) {
     const row = stmt.get() as [
       number,
@@ -217,8 +205,9 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
     ]
     const id = row[0]
     const budget_amount = row[2]
+    const last_reset_date = row[5]
     const next_reset_date = row[6]
-    const spent = getTrackerSpent(id)
+    const spent = getTrackerSpentInPeriod(id, last_reset_date, next_reset_date)
     const remaining = Math.max(0, budget_amount - spent)
     const daysLeft = Math.max(0, daysBetween(today, next_reset_date))
     const progress = budget_amount > 0 ? (spent / budget_amount) * 100 : 0
@@ -239,6 +228,23 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
   }
   stmt.free()
   return list
+}
+
+/**
+ * Total budgeted across PAYDAY-frequency trackers, optionally excluding one tracker
+ * (the one being edited, so its pending value can be added back separately).
+ */
+export function calculatePaydayBudgetTotal(
+  trackers: Array<{
+    id: number
+    reset_frequency: string
+    budget_amount: number
+  }>,
+  excludeId?: number
+): number {
+  return trackers
+    .filter((t) => t.reset_frequency === 'PAYDAY' && t.id !== excludeId)
+    .reduce((sum, t) => sum + t.budget_amount, 0)
 }
 
 /**
@@ -366,7 +372,7 @@ export function getTrackersWithProgressForPeriod(
      FROM trackers WHERE is_active = 1 ORDER BY name`
   )
   const list: TrackerWithProgress[] = []
-  const today = todayDateString()
+  const today = localDateString()
   while (stmt.step()) {
     const row = stmt.get() as [
       number,
@@ -528,7 +534,7 @@ export function createTracker(
   if (!db) throw new Error('Database not ready')
   assertCategoriesAvailable(categoryIds)
   const now = new Date().toISOString()
-  const today = todayDateString()
+  const today = localDateString()
   let lastReset: string
   let nextReset: string
   if (resetFrequency === 'PAYDAY') {
@@ -582,7 +588,7 @@ export function updateTracker(
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   assertCategoriesAvailable(categoryIds, id)
-  const today = todayDateString()
+  const today = localDateString()
   const existing = getTracker(id)
   const needsPeriodReset =
     !existing ||

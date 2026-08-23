@@ -3,6 +3,7 @@
  */
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
+import { localDateString } from '@/lib/format'
 
 export interface UpcomingChargeRow {
   id: number
@@ -30,11 +31,6 @@ export interface UpcomingGrouped {
   nextPay: UpcomingChargeRow[]
   later: UpcomingChargeRow[]
   nextPayday: string | null
-}
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function parseDate(dateStr: string): Date {
@@ -209,7 +205,7 @@ export function getUpcomingChargesGrouped(): UpcomingGrouped {
   const nextPayday = getAppSetting('next_payday')
   const nextPay: UpcomingChargeRow[] = []
   const later: UpcomingChargeRow[] = []
-  const today = todayDateString()
+  const today = localDateString()
   const rows = readUpcomingRows(db)
   for (const row of rows) {
     const nextOccurrence = firstOccurrenceOnOrAfter(
@@ -358,7 +354,7 @@ export function getUpcomingChargesForMonth(
 
 /** Days until next charge; negative if past. Used for "Due in N days" reminder. */
 export function daysUntilCharge(nextChargeDate: string): number {
-  const today = todayDateString()
+  const today = localDateString()
   const a = new Date(today + 'T12:00:00Z').getTime()
   const b = new Date(nextChargeDate.slice(0, 10) + 'T12:00:00Z').getTime()
   return Math.round((b - a) / (24 * 60 * 60 * 1000))
@@ -371,7 +367,7 @@ export function daysUntilCharge(nextChargeDate: string): number {
 export function getDueSoonCharges(): UpcomingChargeRow[] {
   const db = getDb()
   if (!db) return []
-  const today = todayDateString()
+  const today = localDateString()
   const stmt = db.prepare(
     `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
       reminder_days_before, is_subscription, cancel_by_date,

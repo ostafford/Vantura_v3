@@ -8,6 +8,8 @@
  * For codes 101–105: ISO weekday = code − 100. JS getUTCDay() is identical for Mon–Fri.
  */
 
+import { localDateString } from '@/lib/format'
+
 export type PaydayFrequency = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
 
 export const PAYDAY_DAYS_WEEKLY: { value: number; label: string }[] = [
@@ -166,8 +168,7 @@ export function computeNextPaydayFromReference(
   frequency: PaydayFrequency
 ): { paydayDay: number; nextPayday: string } {
   const ref = new Date(refDate + 'T12:00:00Z')
-  const dt = new Date()
-  const todayStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+  const todayStr = localDateString()
   const today = new Date(todayStr + 'T12:00:00Z')
 
   if (frequency === 'MONTHLY') {

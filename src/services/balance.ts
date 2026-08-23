@@ -5,6 +5,7 @@
 
 import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
+import { localDateString } from '@/lib/format'
 import { firstOccurrenceOnOrAfter } from './upcoming'
 
 export type { PaydayFrequency }
@@ -24,11 +25,6 @@ export interface ReservedBreakdownItem {
   reservedAmount: number
   occurrenceCount: number
   frequency: string
-}
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 interface ChargeReservedResult {
@@ -98,7 +94,7 @@ export function calculateReservedAmount(
   paydayFrequency: string | null
 ): number {
   if (!nextPayday || !paydayFrequency) return 0
-  const today = todayDateString()
+  const today = localDateString()
   let total = 0
   for (const charge of upcomingCharges.filter((c) => c.is_reserved === 1)) {
     const result = calcChargeReserved(charge, nextPayday, today)
@@ -117,7 +113,7 @@ export function calculateReservedBreakdown(
   paydayFrequency: string | null
 ): ReservedBreakdownItem[] {
   if (!nextPayday || !paydayFrequency) return []
-  const today = todayDateString()
+  const today = localDateString()
   const result: ReservedBreakdownItem[] = []
   for (const charge of charges.filter((c) => c.is_reserved === 1)) {
     const calc = calcChargeReserved(charge, nextPayday, today)

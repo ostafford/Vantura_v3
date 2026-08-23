@@ -22,6 +22,11 @@ export function localDateEndUtc(dateStr: string): string {
   return new Date(dateStr.slice(0, 10) + 'T23:59:59.999').toISOString()
 }
 
+/** Format a Date as a local calendar-day string (YYYY-MM-DD), e.g. for "today" comparisons/storage. Defaults to now. */
+export function localDateString(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function formatMoney(cents: number): string {
   return (cents / 100).toLocaleString(undefined, {
     minimumFractionDigits: 2,

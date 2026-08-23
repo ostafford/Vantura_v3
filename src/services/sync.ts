@@ -22,12 +22,7 @@ import {
   type PaydayFrequency,
 } from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
-
-/** Return today as YYYY-MM-DD in local time. */
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+import { localDateString } from '@/lib/format'
 
 /**
  * If stored next_payday is in the past, advance it using payday_frequency and payday_day.
@@ -39,7 +34,7 @@ export function advanceNextPaydayIfNeeded(): void {
   if (!frequency) return
   let nextPayday = getAppSetting('next_payday')
   if (!nextPayday) return
-  const today = todayDateString()
+  const today = localDateString()
   const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
 
   while (today >= nextPayday) {
@@ -324,7 +319,7 @@ function upsertTransactionTags(transactionId: string, tagIds: string[]): void {
 }
 
 function snapshotSaverBalances(accounts: UpAccount[]): void {
-  const today = todayDateString()
+  const today = localDateString()
   for (const acc of accounts) {
     if (acc.attributes.accountType !== 'SAVER') continue
     const balance = acc.attributes.balance?.valueInBaseUnits ?? 0

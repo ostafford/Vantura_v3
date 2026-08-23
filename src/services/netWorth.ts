@@ -1,5 +1,6 @@
 import { getDb, schedulePersist, getAppSetting } from '@/db'
 import { calculateReservedAmount, type UpcomingChargeRow } from './balance'
+import { localDateString } from '@/lib/format'
 
 export interface NetWorthSummary {
   /** Sum of all synced Up Bank account balances (TRANSACTIONAL + SAVER + HOME_LOAN). HOME_LOAN balances are negative, so this is a net figure — use upBankAssetsCents/upBankLiabilitiesCents for an assets/liabilities breakdown. */
@@ -19,11 +20,6 @@ export interface NetWorthSnapshot {
   manual_assets_cents: number
   manual_liabilities_cents: number
   total_cents: number
-}
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function getNetWorthSummary(): NetWorthSummary {
@@ -147,7 +143,7 @@ export function getNetWorthSnapshots(months = 12): NetWorthSnapshot[] {
   if (!db) return []
   const cutoff = new Date()
   cutoff.setMonth(cutoff.getMonth() - months)
-  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+  const cutoffStr = localDateString(cutoff)
   const stmt = db.prepare(
     `SELECT snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents
      FROM net_worth_snapshots
@@ -180,7 +176,7 @@ export function getNetWorthSnapshots(months = 12): NetWorthSnapshot[] {
 export function writeNetWorthSnapshot(): void {
   const db = getDb()
   if (!db) return
-  const today = todayDateString()
+  const today = localDateString()
   const summary = getNetWorthSummary()
   db.run(
     `INSERT OR REPLACE INTO net_worth_snapshots

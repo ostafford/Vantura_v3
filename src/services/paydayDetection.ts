@@ -15,6 +15,7 @@ import {
   computeNextMonthlyLastWeekday,
   getPaydayDayLabel,
 } from '@/lib/payday'
+import { localDateString } from '@/lib/format'
 
 export interface PaydayDetectionResult {
   frequency: PaydayFrequency
@@ -23,11 +24,6 @@ export interface PaydayDetectionResult {
   dayLabel: string
   /** All matched pay dates, ascending YYYY-MM-DD — shown to user as evidence. */
   sampleDates: string[]
-}
-
-function todayStr(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function medianOf(nums: number[]): number {
@@ -129,7 +125,7 @@ export function detectPaySchedule(
   else if (med >= 25 && med <= 35) frequency = 'MONTHLY'
   else return null
 
-  const today = todayStr()
+  const today = localDateString()
   let paydayDay: number
   let nextPayday: string
 

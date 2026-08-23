@@ -6,7 +6,7 @@
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
 import type { Database } from 'sql.js'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, localDateString } from '@/lib/format'
 import {
   getNotificationsEnabled,
   getNotifTypeEnabled,
@@ -28,11 +28,6 @@ import { getTrackersWithProgress } from '@/services/trackers'
 import { getAccountsByTypes } from '@/services/accounts'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /**
  * LIKE pattern matching a bills_due notification body for this exact charge
@@ -230,7 +225,7 @@ function checkTrackerPace(): void {
   if (!getNotifTypeEnabled('tracker_pace')) return
 
   const trackers = getTrackersWithProgress()
-  const today = todayDateString()
+  const today = localDateString()
 
   for (const t of trackers) {
     if (t.progress >= 100) continue // overspent check handles this
@@ -659,7 +654,7 @@ export function ensureBillsDueNotifications(
          AND body LIKE ? ESCAPE '\\'
          AND substr(created_at, 1, 10) = ?
        LIMIT 1`,
-      [pattern, todayDateString()]
+      [pattern, localDateString()]
     )
     if (existing[0]?.values?.length) continue
 

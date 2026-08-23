@@ -45,46 +45,18 @@ export function getBudgetLines(bucketId: number): BudgetLineRow[] {
   return list
 }
 
-/** Variable budget lines only (is_hypothetical = 0). */
+/**
+ * Variable budget lines only (is_hypothetical = 0). getBudgetLines orders by
+ * (is_hypothetical, name), so filtering its result preserves name order within
+ * this subset without a second query.
+ */
 export function getVariableLines(bucketId: number): BudgetLineRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT id, bucket_id, name, amount_cents, frequency, is_hypothetical, created_at
-     FROM budget_hypotheticals WHERE bucket_id = ? AND is_hypothetical = 0 ORDER BY name`
-  )
-  stmt.bind([bucketId])
-  const list: BudgetLineRow[] = []
-  while (stmt.step()) {
-    list.push(
-      rowToLine(
-        stmt.get() as [number, number, string, number, string, number, string]
-      )
-    )
-  }
-  stmt.free()
-  return list
+  return getBudgetLines(bucketId).filter((l) => !l.is_hypothetical)
 }
 
-/** Hypothetical lines only (is_hypothetical = 1). */
+/** Hypothetical lines only (is_hypothetical = 1). See {@link getVariableLines}. */
 export function getHypotheticalLines(bucketId: number): BudgetLineRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT id, bucket_id, name, amount_cents, frequency, is_hypothetical, created_at
-     FROM budget_hypotheticals WHERE bucket_id = ? AND is_hypothetical = 1 ORDER BY name`
-  )
-  stmt.bind([bucketId])
-  const list: BudgetLineRow[] = []
-  while (stmt.step()) {
-    list.push(
-      rowToLine(
-        stmt.get() as [number, number, string, number, string, number, string]
-      )
-    )
-  }
-  stmt.free()
-  return list
+  return getBudgetLines(bucketId).filter((l) => l.is_hypothetical)
 }
 
 export function createBudgetLine(

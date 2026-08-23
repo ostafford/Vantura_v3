@@ -5,6 +5,7 @@
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
 import { APP_VERSION } from '@/lib/appVersion'
+import { localDateString } from '@/lib/format'
 import type { Milestone } from '@/data/changelog'
 
 const NOTIFICATIONS_ENABLED_KEY = 'notifications_enabled'
@@ -48,15 +49,11 @@ export function showNotification(title: string, body: string): void {
 /** Check if we already fired due-soon notifications today (avoid spamming). */
 export function hasNotifiedToday(): boolean {
   const last = getAppSetting(LAST_NOTIFICATION_DATE_KEY)
-  const d = new Date()
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return last === today
+  return last === localDateString()
 }
 
 export function markNotifiedToday(): void {
-  const d = new Date()
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  setAppSetting(LAST_NOTIFICATION_DATE_KEY, today)
+  setAppSetting(LAST_NOTIFICATION_DATE_KEY, localDateString())
 }
 
 // ─── Per-type toggle helpers ──────────────────────────────────────────────────
@@ -109,11 +106,6 @@ export interface NotificationHistoryItem {
 }
 
 const HISTORY_RETENTION_DAYS = 7
-
-function todayDateString(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /** Insert a notification into history and prune entries older than HISTORY_RETENTION_DAYS. */
 export function addNotificationToHistory(
@@ -287,11 +279,11 @@ export function seedWhatsNewNotifications(milestones: Milestone[]): void {
 /** True if the guard key for this check type was already set to today's date. */
 export function hasCheckedToday(guardKey: string): boolean {
   const stored = getAppSetting(guardKey)
-  return stored === todayDateString()
+  return stored === localDateString()
 }
 
 export function markCheckedToday(guardKey: string): void {
-  setAppSetting(guardKey, todayDateString())
+  setAppSetting(guardKey, localDateString())
 }
 
 /**

@@ -8,7 +8,8 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { __test__, getPeriodBoundsForOffset } = await import('./trackers')
+const { __test__, getPeriodBoundsForOffset, calculatePaydayBudgetTotal } =
+  await import('./trackers')
 const {
   daysBetween,
   stepBackOnePeriod,
@@ -209,5 +210,43 @@ describe('getPeriodBoundsForOffset', () => {
       periodStart: '2026-02-15',
       periodEnd: '2026-03-01',
     })
+  })
+})
+
+describe('calculatePaydayBudgetTotal', () => {
+  it('returns 0 when there are no trackers', () => {
+    expect(calculatePaydayBudgetTotal([])).toBe(0)
+  })
+
+  it('sums budget_amount across PAYDAY-frequency trackers only', () => {
+    const trackers = [
+      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
+      { id: 2, reset_frequency: 'MONTHLY', budget_amount: 5000 },
+      { id: 3, reset_frequency: 'PAYDAY', budget_amount: 2500 },
+    ]
+    expect(calculatePaydayBudgetTotal(trackers)).toBe(12500)
+  })
+
+  it('returns 0 when no trackers are PAYDAY-frequency', () => {
+    const trackers = [
+      { id: 1, reset_frequency: 'WEEKLY', budget_amount: 10000 },
+      { id: 2, reset_frequency: 'MONTHLY', budget_amount: 5000 },
+    ]
+    expect(calculatePaydayBudgetTotal(trackers)).toBe(0)
+  })
+
+  it('excludes the tracker matching excludeId from the total', () => {
+    const trackers = [
+      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
+      { id: 2, reset_frequency: 'PAYDAY', budget_amount: 2500 },
+    ]
+    expect(calculatePaydayBudgetTotal(trackers, 1)).toBe(2500)
+  })
+
+  it('excludeId that matches no tracker leaves the total unchanged', () => {
+    const trackers = [
+      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
+    ]
+    expect(calculatePaydayBudgetTotal(trackers, 999)).toBe(10000)
   })
 })
