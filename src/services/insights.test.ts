@@ -9,6 +9,7 @@ import {
   getYearComparisonPeriods,
   getWeekComparison,
   getYearComparison,
+  getMonthComparison,
 } from './insights'
 import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
@@ -116,6 +117,53 @@ describe('getYearComparison periodNote', () => {
     mockEmptyDb()
 
     const result = getYearComparison(2024)
+    expect(result.periodNote).toBeUndefined()
+  })
+})
+
+describe('getMonthComparison', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  function mockEmptyDb() {
+    const stmt = {
+      bind: () => {},
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+  }
+
+  it('caps the previous month to the same elapsed-day count as the current in-progress month', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 15)) // Apr 15, 2026
+    mockEmptyDb()
+
+    const result = getMonthComparison('2026-04-01', '2026-04-30')
+    // 15 days elapsed (Apr 1–15) -> previous month capped to Mar 1–15.
+    expect(result.periodNote).toBe('Apr 1–Apr 15 vs Mar 1–Mar 15')
+  })
+
+  it("clamps the capped previous end to a shorter previous month's natural length", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 2, 30)) // Mar 30, 2026 (2026 is not a leap year)
+    mockEmptyDb()
+
+    const result = getMonthComparison('2026-03-01', '2026-03-31')
+    // 30 days elapsed would push the capped end to Mar 2 in a 28-day Feb —
+    // clamped back to Feb's actual last day instead.
+    expect(result.periodNote).toBe('Mar 1–Mar 30 vs Feb 1–Feb 28')
+  })
+
+  it('has no periodNote for a fully-elapsed past month', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 4, 1)) // May 1, 2026 — April is over
+    mockEmptyDb()
+
+    const result = getMonthComparison('2026-04-01', '2026-04-30')
     expect(result.periodNote).toBeUndefined()
   })
 })

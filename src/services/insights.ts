@@ -62,6 +62,25 @@ function toDateOnly(d: Date): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+/**
+ * Caps a previous-period end date so an in-progress current period's
+ * comparison stays apples-to-apples: the previous period should span the
+ * same number of days elapsed in the current one, never more than its own
+ * natural length (shorter months, etc). All dates are local "YYYY-MM-DD".
+ * Shared by getMonthComparison and getWeekComparison's elapsed-day capping —
+ * each computes daysElapsed itself, from its own date representation.
+ */
+function capPreviousPeriodEnd(
+  previousStart: string,
+  daysElapsed: number,
+  naturalPreviousEnd: string
+): string {
+  const end = new Date(previousStart + 'T00:00:00')
+  end.setDate(end.getDate() + daysElapsed - 1)
+  const endStr = toDateOnly(end)
+  return endStr < naturalPreviousEnd ? endStr : naturalPreviousEnd
+}
+
 export function getWeekRange(weekOffset?: number): WeekRange {
   const today = new Date()
   const dayOfWeek = today.getDay()
@@ -905,10 +924,7 @@ export function getMonthComparison(
     const todayMs = new Date(todayStr + 'T00:00:00').getTime()
     const daysElapsed = Math.floor((todayMs - fromMs) / 86400000) + 1
 
-    const prevEnd = new Date(prev.from + 'T00:00:00')
-    prevEnd.setDate(prevEnd.getDate() + daysElapsed - 1)
-    const prevEndStr = toDateOnly(prevEnd)
-    effectivePreviousTo = prevEndStr < prev.to ? prevEndStr : prev.to
+    effectivePreviousTo = capPreviousPeriodEnd(prev.from, daysElapsed, prev.to)
 
     periodNote = `${fmtDayMonth(currentFrom)}–${fmtDayMonth(todayStr)} vs ${fmtDayMonth(prev.from)}–${fmtDayMonth(effectivePreviousTo)}`
   }
@@ -1014,8 +1030,12 @@ export function getWeekComparison(weekOffset: number): MonthComparisonData {
   if (weekOffset === 0) {
     const daysElapsed = getDaysElapsedInWeek(cur, new Date(), weekOffset)
     if (daysElapsed < 7) {
-      const prevEnd = new Date(prev.start)
-      prevEnd.setDate(prevEnd.getDate() + daysElapsed - 1)
+      const cappedEndStr = capPreviousPeriodEnd(
+        prev.startStr,
+        daysElapsed,
+        toDateOnly(prev.end)
+      )
+      const prevEnd = new Date(cappedEndStr + 'T00:00:00')
       prevEnd.setHours(23, 59, 59, 999)
       effectivePreviousEndIso = prevEnd.toISOString()
     }
