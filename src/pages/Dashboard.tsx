@@ -9,6 +9,7 @@ import {
   getSpendableBalance,
   getPayAmountCents,
 } from '@/services/balance'
+import { getForecastSpendable } from '@/services/forecast'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
@@ -91,6 +92,7 @@ export function Dashboard() {
   const {
     availableCents,
     spendableCents,
+    forecastCents,
     payAmountCents,
     thresholdCentsRaw,
     pctPayRaw,
@@ -101,6 +103,7 @@ export function Dashboard() {
     () => ({
       availableCents: getAvailableBalance(),
       spendableCents: getSpendableBalance(),
+      forecastCents: getForecastSpendable(),
       payAmountCents: getPayAmountCents(),
       thresholdCentsRaw: getAppSetting(SPENDABLE_ALERT_KEY),
       pctPayRaw: getAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY),
@@ -155,6 +158,41 @@ export function Dashboard() {
     payAmountCents != null
       ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}`
       : 'Balance as reported by Up Bank'
+
+  const forecastGradient = forecastCents < 0 ? 'danger' : 'info'
+  const forecastDisplayValue =
+    forecastCents < 0 ? `−$${formatMoney(Math.abs(forecastCents))}` : undefined
+  const forecastSubtitle =
+    nextPayday && nextPayday.trim() !== ''
+      ? `Projected for ${formatShortDate(nextPayday)}`
+      : 'Projected to next payday'
+  const forecastTooltip = (
+    <div style={{ fontSize: '0.82rem' }}>
+      <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
+        {forecastCents < 0
+          ? 'Forecast is negative'
+          : 'How Forecast is calculated'}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div>
+          • <strong>Spendable</strong> — your current safety-net balance
+        </div>
+        <div>
+          • minus the <strong>remaining budget</strong> in each active
+          tracker&apos;s current period
+        </div>
+        <div style={{ opacity: 0.7 }}>
+          Doesn&apos;t assume future tracker resets or a spending pace — just
+          what&apos;s left to spend right now.
+        </div>
+        {forecastCents < 0 && (
+          <div style={{ marginTop: '0.3rem', color: 'var(--vantura-danger)' }}>
+            Tracker budgets remaining exceed your current Spendable balance.
+          </div>
+        )}
+      </div>
+    </div>
+  )
 
   const spendableTooltip = (() => {
     const fmtSigned = (c: number) =>
@@ -562,7 +600,7 @@ export function Dashboard() {
         </div>
       </div>
       <Row className="g-3 mb-4" data-tour="balance-cards">
-        <Col md={6} className="stretch-card">
+        <Col md={4} className="stretch-card">
           <StatCard
             title="Available"
             value={availableCents}
@@ -603,7 +641,7 @@ export function Dashboard() {
             }
           />
         </Col>
-        <Col id="dashboard-spendable-card" md={6} className="stretch-card">
+        <Col id="dashboard-spendable-card" md={4} className="stretch-card">
           <div
             role="button"
             tabIndex={0}
@@ -626,6 +664,16 @@ export function Dashboard() {
               tooltip={spendableTooltip}
             />
           </div>
+        </Col>
+        <Col md={4} className="stretch-card">
+          <StatCard
+            title="Forecast"
+            value={forecastCents}
+            displayValue={forecastDisplayValue}
+            subtitle={forecastSubtitle}
+            gradient={forecastGradient}
+            tooltip={forecastTooltip}
+          />
         </Col>
       </Row>
       {dueSoonAlert}
