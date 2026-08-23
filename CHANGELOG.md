@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Weekly Insights groups by parent category:** spending categories are now grouped under their real Up Bank parent (Home, Transport, Good Life, Personal) in a fixed order, sorted by spend within each group, with the smallest categories folded into a single "Other" row once more than 7 categories have spend in a week. See `src/services/insights.ts`, `src/components/charts/InsightsBarChart.tsx`.
 
+### Fixed
+
+- **Net Worth's projected balance undercounted recurring charges.** The "upcoming expense" figure on the Net Worth card only counted the first occurrence of a WEEKLY/FORTNIGHTLY reserved charge before payday, while Spendable's Reserved amount correctly summed every occurrence in the window — the two cards could disagree by the charge's amount times its occurrence count. `getProjectedNetWorth()` now shares Reserved's occurrence-counting logic. See `src/services/netWorth.ts`, `src/services/netWorth.test.ts` (new).
+
 ## [0.8.1] - 2026-07-30
 
 Full-codebase audit (7 parallel domain reviews, then an independent adversarial review of the fixes themselves) — see `Arch_Docs` and project memory for the full findings list. Highlights below.

@@ -1,5 +1,5 @@
 import { getDb, schedulePersist, getAppSetting } from '@/db'
-import { firstOccurrenceOnOrAfter } from '@/services/upcoming'
+import { calculateReservedAmount, type UpcomingChargeRow } from './balance'
 
 export interface NetWorthSummary {
   /** Sum of all synced Up Bank account balances (TRANSACTIONAL + SAVER + HOME_LOAN). HOME_LOAN balances are negative, so this is a net figure — use upBankAssetsCents/upBankLiabilitiesCents for an assets/liabilities breakdown. */
@@ -76,7 +76,16 @@ export function getNetWorthSummary(): NetWorthSummary {
   }
 }
 
-/** Net worth after subtracting EXPENSE upcoming charges due before next payday. LIABILITY_REPAYMENT charges are excluded — they are asset-liability transfers, not expenses. */
+/**
+ * Net worth after subtracting reserved EXPENSE upcoming charges due before next payday.
+ * LIABILITY_REPAYMENT charges are excluded — paying down a loan is a transfer between
+ * asset (cash) and liability (the loan balance), not a loss of net worth. This is a
+ * deliberate difference from Spendable's Reserved amount, which reserves cash for *any*
+ * upcoming payment regardless of type — see docs/features/net-worth/CONTEXT.md.
+ *
+ * Occurrence-counting (how many WEEKLY/FORTNIGHTLY occurrences before payday count) is
+ * shared with Spendable via calculateReservedAmount, so the two numbers agree on that axis.
+ */
 export function getProjectedNetWorth(totalCents?: number): {
   projectedCents: number
   upcomingExpenseCents: number
@@ -86,9 +95,8 @@ export function getProjectedNetWorth(totalCents?: number): {
   if (!db) return { projectedCents: total, upcomingExpenseCents: 0 }
 
   const nextPayday = getAppSetting('next_payday')
+  const paydayFrequency = getAppSetting('payday_frequency')
   if (!nextPayday) return { projectedCents: total, upcomingExpenseCents: 0 }
-
-  const today = todayDateString()
 
   const stmt = db.prepare(
     `SELECT next_charge_date, frequency, amount, cancel_by_date
@@ -96,24 +104,40 @@ export function getProjectedNetWorth(totalCents?: number): {
      WHERE (charge_type IS NULL OR charge_type = 'EXPENSE')
        AND is_reserved = 1`
   )
-  let upcomingExpenseCents = 0
+  const charges: UpcomingChargeRow[] = []
   while (stmt.step()) {
     const [next_charge_date, frequency, amount, cancel_by_date] =
       stmt.get() as [string, string, number, string | null]
-    const occurrence = firstOccurrenceOnOrAfter(
+    charges.push({
       next_charge_date,
       frequency,
-      today,
-      cancel_by_date
-    )
-    if (occurrence && occurrence >= today && occurrence < nextPayday) {
-      upcomingExpenseCents += amount
-    }
+      amount,
+      is_reserved: 1,
+      cancel_by_date,
+    })
   }
   stmt.free()
 
+  return computeProjectedNetWorth(charges, nextPayday, paydayFrequency, total)
+}
+
+/**
+ * Pure calculation behind getProjectedNetWorth, split out for direct unit testing
+ * without a DB fixture. charges must already be filtered to EXPENSE + is_reserved = 1.
+ */
+export function computeProjectedNetWorth(
+  charges: UpcomingChargeRow[],
+  nextPayday: string,
+  paydayFrequency: string | null,
+  totalCents: number
+): { projectedCents: number; upcomingExpenseCents: number } {
+  const upcomingExpenseCents = calculateReservedAmount(
+    charges,
+    nextPayday,
+    paydayFrequency
+  )
   return {
-    projectedCents: total - upcomingExpenseCents,
+    projectedCents: totalCents - upcomingExpenseCents,
     upcomingExpenseCents,
   }
 }
