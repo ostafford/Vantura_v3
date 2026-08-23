@@ -5,6 +5,7 @@
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
+import type { Database } from 'sql.js'
 import { formatMoney } from '@/lib/format'
 import {
   getNotificationsEnabled,
@@ -14,6 +15,8 @@ import {
   addNotificationToHistory,
   hasCheckedToday,
   markCheckedToday,
+  hasFiredForValue,
+  markFiredForValue,
 } from '@/lib/notifications'
 import { getSpendableBalance } from '@/services/balance'
 import {
@@ -76,7 +79,7 @@ function checkBillsSettled(): void {
 
     // Per-cycle guard keyed on projected date — advances each month automatically
     const guardKey = `notif_bill_settled_${chargeId}_${nextChargeDate}`
-    if (getAppSetting(guardKey)) continue
+    if (hasFiredForValue(guardKey, '1')) continue
 
     // Accept payment up to 5 days before the projected charge date (early payments)
     const windowStart = new Date(nextChargeDate.slice(0, 10) + 'T12:00:00Z')
@@ -102,7 +105,7 @@ function checkBillsSettled(): void {
       [billNotificationPattern(chargeName)]
     )
     schedulePersist()
-    setAppSetting(guardKey, '1')
+    markFiredForValue(guardKey, '1')
   }
 }
 
@@ -205,10 +208,9 @@ function checkTrackerOverspent(): void {
     if (t.progress <= 100) continue
     // Fire at most once per budget period per tracker
     const guardKey = `notif_to_${t.id}`
-    const lastFiredPeriod = getAppSetting(guardKey)
-    if (lastFiredPeriod === t.next_reset_date) continue
+    if (hasFiredForValue(guardKey, t.next_reset_date)) continue
 
-    setAppSetting(guardKey, t.next_reset_date)
+    markFiredForValue(guardKey, t.next_reset_date)
     const overpct = Math.round(t.progress - 100)
     const body = `You've spent $${formatMoney(t.spent)} of your $${formatMoney(t.budget_amount)} budget — ${overpct}% over.`
     addNotificationToHistory(
@@ -255,10 +257,9 @@ function checkTrackerPace(): void {
     if (pacePct < 1.1) continue
 
     const guardKey = `notif_tp_${t.id}`
-    const lastFiredPeriod = getAppSetting(guardKey)
-    if (lastFiredPeriod === t.next_reset_date) continue
+    if (hasFiredForValue(guardKey, t.next_reset_date)) continue
 
-    setAppSetting(guardKey, t.next_reset_date)
+    markFiredForValue(guardKey, t.next_reset_date)
     const daysLeft = t.daysLeft
     const projectedTotal =
       t.budget_amount > 0 ? Math.round(t.spent / timeElapsedPct) : t.spent
@@ -276,6 +277,42 @@ function checkTrackerPace(): void {
 
 // ─── 5. Payday landed ────────────────────────────────────────────────────────
 
+/**
+ * Runs a payday-candidate query (TRANSACTIONAL-account credits matching
+ * whereSql) and returns the newest result whose settlement date is strictly
+ * after lastFiredDate — i.e. the first one not already notified about.
+ * whereSql is ANDed onto the shared account-type/table setup; params bind
+ * in the order they appear in whereSql's placeholders.
+ */
+function findFirstUnseenCredit(
+  db: Database,
+  whereSql: string,
+  params: (string | number)[],
+  lastFiredDate: string | null
+): { amount: number; date: string; description: string } | null {
+  const stmt = db.prepare(
+    `SELECT t.amount, COALESCE(t.settled_at, t.created_at) as tx_date, t.description
+     FROM transactions t
+     JOIN accounts a ON t.account_id = a.id
+     WHERE a.account_type = 'TRANSACTIONAL'
+       ${whereSql}
+     ORDER BY COALESCE(t.settled_at, t.created_at) DESC
+     LIMIT 5`
+  )
+  stmt.bind(params)
+  let result: { amount: number; date: string; description: string } | null =
+    null
+  while (stmt.step()) {
+    const r = stmt.get() as [number, string, string]
+    const txDateStr = r[1].slice(0, 10)
+    if (lastFiredDate && txDateStr <= lastFiredDate) continue
+    result = { amount: r[0], date: txDateStr, description: r[2] }
+    break
+  }
+  stmt.free()
+  return result
+}
+
 function checkPaydayLanded(): void {
   if (!getNotifTypeEnabled('payday')) return
 
@@ -288,34 +325,19 @@ function checkPaydayLanded(): void {
   cutoff.setDate(cutoff.getDate() - 2)
   const cutoffIso = cutoff.toISOString()
 
-  let detected: { amount: number; date: string; description: string } | null =
-    null
-
   const paydayRawText = getAppSetting('payday_raw_text')
+
+  let detected: { amount: number; date: string; description: string } | null
 
   if (paydayRawText) {
     // Precise match: the user identified their salary source in Settings.
     // Match on raw_text (the bank's internal reference) which is stable across pays.
-    const stmt = db.prepare(
-      `SELECT t.amount, COALESCE(t.settled_at, t.created_at) as tx_date, t.description
-       FROM transactions t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE a.account_type = 'TRANSACTIONAL'
-         AND t.raw_text = ?
-         AND t.amount > 0
-         AND COALESCE(t.settled_at, t.created_at) >= ?
-       ORDER BY COALESCE(t.settled_at, t.created_at) DESC
-       LIMIT 5`
+    detected = findFirstUnseenCredit(
+      db,
+      'AND t.raw_text = ? AND t.amount > 0 AND COALESCE(t.settled_at, t.created_at) >= ?',
+      [paydayRawText, cutoffIso],
+      lastFiredDate
     )
-    stmt.bind([paydayRawText, cutoffIso])
-    while (stmt.step()) {
-      const r = stmt.get() as [number, string, string]
-      const txDateStr = r[1].slice(0, 10)
-      if (lastFiredDate && txDateStr <= lastFiredDate) continue
-      detected = { amount: r[0], date: txDateStr, description: r[2] }
-      break
-    }
-    stmt.free()
   } else {
     // Fallback: no salary source identified yet — use amount heuristic.
     // Requires pay_amount_cents to be set.
@@ -325,26 +347,12 @@ function checkPaydayLanded(): void {
     if (Number.isNaN(payAmt) || payAmt <= 0) return
 
     const minAmt = Math.round(payAmt * 0.8)
-    const stmt = db.prepare(
-      `SELECT t.amount, COALESCE(t.settled_at, t.created_at) as tx_date, t.description
-       FROM transactions t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE a.account_type = 'TRANSACTIONAL'
-         AND t.amount >= ?
-         AND t.transfer_account_id IS NULL
-         AND COALESCE(t.settled_at, t.created_at) >= ?
-       ORDER BY COALESCE(t.settled_at, t.created_at) DESC
-       LIMIT 5`
+    detected = findFirstUnseenCredit(
+      db,
+      'AND t.amount >= ? AND t.transfer_account_id IS NULL AND COALESCE(t.settled_at, t.created_at) >= ?',
+      [minAmt, cutoffIso],
+      lastFiredDate
     )
-    stmt.bind([minAmt, cutoffIso])
-    while (stmt.step()) {
-      const r = stmt.get() as [number, string, string]
-      const txDateStr = r[1].slice(0, 10)
-      if (lastFiredDate && txDateStr <= lastFiredDate) continue
-      detected = { amount: r[0], date: txDateStr, description: r[2] }
-      break
-    }
-    stmt.free()
   }
 
   if (!detected) return
@@ -485,15 +493,15 @@ function checkSaverMilestones(): void {
       if (pct < milestone) continue
       const guardKey = `notif_sm_${saver.id}_${milestone}`
       // Store the target at time of firing so we re-fire if the goal changes
-      const storedTarget = getAppSetting(guardKey)
-      if (storedTarget === String(saver.target_amount_cents)) continue
+      if (hasFiredForValue(guardKey, String(saver.target_amount_cents)))
+        continue
 
       // Mark this and every lower milestone as covered too, so a balance
       // that jumps straight past 50%/75% to 100% only ever produces a
       // single "highest milestone reached" notification, not one per tier.
       for (const m of [50, 75, 100] as const) {
         if (m <= milestone) {
-          setAppSetting(
+          markFiredForValue(
             `notif_sm_${saver.id}_${m}`,
             String(saver.target_amount_cents)
           )
@@ -607,10 +615,12 @@ function checkPossiblePayday(): void {
   if (!candidate) return
 
   // Don't re-suggest the same payee we've already flagged
-  const lastSuggested = getAppSetting('notif_possible_payday_suggested_for')
-  if (lastSuggested === candidate.matchKey) return
+  if (
+    hasFiredForValue('notif_possible_payday_suggested_for', candidate.matchKey)
+  )
+    return
 
-  setAppSetting('notif_possible_payday_suggested_for', candidate.matchKey)
+  markFiredForValue('notif_possible_payday_suggested_for', candidate.matchKey)
 
   const body = `$${formatMoney(candidate.amount)} received from "${candidate.description}" — this looks like a recurring payment. Set it as your pay source so Vantura can track your spending cycle.`
   addNotificationToHistory(
@@ -698,4 +708,9 @@ export function runNotificationChecks(): void {
   checkLargeTransaction()
   checkSaverMilestones()
   checkSyncStale()
+}
+
+export const __test__ = {
+  checkPaydayLanded,
+  findFirstUnseenCredit,
 }

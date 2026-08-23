@@ -293,3 +293,18 @@ export function hasCheckedToday(guardKey: string): boolean {
 export function markCheckedToday(guardKey: string): void {
   setAppSetting(guardKey, todayDateString())
 }
+
+/**
+ * True if the guard key was already recorded with this exact value — for checks
+ * that should only re-fire when the thing they're watching actually changes
+ * (a tracker's reset date, a saver's target amount, a matched payee), not on a
+ * fixed daily cadence. Pass a fixed sentinel (e.g. '1') for a plain "has this
+ * ever fired" guard.
+ */
+export function hasFiredForValue(guardKey: string, value: string): boolean {
+  return getAppSetting(guardKey) === value
+}
+
+export function markFiredForValue(guardKey: string, value: string): void {
+  setAppSetting(guardKey, value)
+}

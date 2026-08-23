@@ -9,7 +9,8 @@ vi.mock('@/db', () => ({
   },
 }))
 
-const { getNotifTypeEnabled } = await import('./notifications')
+const { getNotifTypeEnabled, hasFiredForValue, markFiredForValue } =
+  await import('./notifications')
 
 beforeEach(() => {
   for (const key of Object.keys(appSettings)) delete appSettings[key]
@@ -43,5 +44,32 @@ describe('getNotifTypeEnabled', () => {
   it('respects an explicit on setting', () => {
     appSettings['notif_sync_stale'] = '1'
     expect(getNotifTypeEnabled('sync_stale')).toBe(true)
+  })
+})
+
+describe('hasFiredForValue / markFiredForValue', () => {
+  it('has not fired when the guard key is unset', () => {
+    expect(hasFiredForValue('notif_to_1', '2026-04-01')).toBe(false)
+  })
+
+  it('has not fired when the stored value differs from the value checked', () => {
+    markFiredForValue('notif_to_1', '2026-03-01')
+    expect(hasFiredForValue('notif_to_1', '2026-04-01')).toBe(false)
+  })
+
+  it('has fired once the exact value is marked', () => {
+    markFiredForValue('notif_to_1', '2026-04-01')
+    expect(hasFiredForValue('notif_to_1', '2026-04-01')).toBe(true)
+  })
+
+  it('re-fires when the value changes after being marked (e.g. a new period)', () => {
+    markFiredForValue('notif_to_1', '2026-04-01')
+    expect(hasFiredForValue('notif_to_1', '2026-05-01')).toBe(false)
+  })
+
+  it('supports a fixed sentinel for a plain "has this ever fired" guard', () => {
+    expect(hasFiredForValue('notif_bill_settled_1_2026-04-01', '1')).toBe(false)
+    markFiredForValue('notif_bill_settled_1_2026-04-01', '1')
+    expect(hasFiredForValue('notif_bill_settled_1_2026-04-01', '1')).toBe(true)
   })
 })
