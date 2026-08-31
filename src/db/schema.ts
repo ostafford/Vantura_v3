@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 41
+const SCHEMA_VERSION = 42
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -29,7 +29,6 @@ const DDL_STATEMENTS = [
     synced_at TEXT,
     is_closed INTEGER NOT NULL DEFAULT 0,
     target_amount_cents INTEGER,
-    monthly_deposit_target_cents INTEGER,
     opening_balance_cents INTEGER,
     opening_balance_date TEXT
   )`,
@@ -1127,6 +1126,25 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['41']
+    )
+  }
+
+  // #28 — accounts.monthly_deposit_target_cents was added by an early migration
+  // and read into AccountRow, but sync never wrote it and no UI surfaced it. Any
+  // "how much am I saving" figure is derived from real transaction history. Drop it.
+  if (version < 42) {
+    const accCols = database.exec(`PRAGMA table_info(accounts)`)
+    const accHasMonthlyTarget = (accCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'monthly_deposit_target_cents'
+    )
+    if (accHasMonthlyTarget) {
+      database.run(
+        `ALTER TABLE accounts DROP COLUMN monthly_deposit_target_cents`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['42']
     )
   }
 }
