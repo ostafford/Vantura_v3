@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { Card, Row, Col, Modal, Button, Form, Badge } from 'react-bootstrap'
 import { syncStore } from '@/stores/syncStore'
@@ -26,6 +27,7 @@ import {
   type ManualAccountType,
   type ManualAccountInput,
 } from '@/services/manualAccounts'
+import { getUpcomingChargeById } from '@/services/upcoming'
 import { NetWorthTrendChart } from '@/components/charts/NetWorthTrendChart'
 import { HelpPopover } from '@/components/HelpPopover'
 import { toast } from '@/stores/toastStore'
@@ -362,16 +364,21 @@ function AccountForm({
 
 function QuickUpdateModal({
   account,
+  prefillCents,
   onSave,
   onClose,
   onFullEdit,
 }: {
   account: ManualAccountRow
+  /** Overrides the field's initial value — e.g. the balance suggested after a detected liability repayment. */
+  prefillCents?: number | null
   onSave: (balanceCents: number) => void
   onClose: () => void
   onFullEdit: () => void
 }) {
-  const [value, setValue] = useState((account.balance_cents / 100).toFixed(2))
+  const [value, setValue] = useState(
+    ((prefillCents ?? account.balance_cents) / 100).toFixed(2)
+  )
   const label = LIABILITY_TYPES.includes(account.account_type)
     ? 'Update balance owing ($)'
     : account.account_type === 'PROPERTY'
@@ -406,6 +413,13 @@ function QuickUpdateModal({
             }}
             autoFocus
           />
+          {prefillCents != null && (
+            <Form.Text className="text-muted">
+              Suggested from a detected repayment — was $
+              {formatMoney(account.balance_cents)}. Adjust if the real payment
+              differed.
+            </Form.Text>
+          )}
         </Form.Group>
       </Modal.Body>
       <Modal.Footer className="justify-content-between">
@@ -632,12 +646,16 @@ function AccountRow({
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export function AnalyticsNetWorth() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [refresh, setRefresh] = useState(0)
 
   // State for modals
   const [quickUpdateAccount, setQuickUpdateAccount] =
     useState<ManualAccountRow | null>(null)
+  const [quickUpdatePrefillCents, setQuickUpdatePrefillCents] = useState<
+    number | null
+  >(null)
   const [editAccount, setEditAccount] = useState<ManualAccountRow | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [addInitialType, setAddInitialType] =
@@ -687,20 +705,58 @@ export function AnalyticsNetWorth() {
 
   const hasApproximate = staleAccounts.length > 0
 
-  function openQuickUpdate(account: ManualAccountRow) {
+  // Deep link from the "Liability payment detected" notification (#19):
+  // /analytics/net-worth?repay=<chargeId> opens the linked account's quick-update
+  // modal prefilled with (current balance − configured charge amount), clamped
+  // at 0. The user confirms or edits — nothing is written until they save. The
+  // param is consumed (cleared) so it fires once, not on every re-render.
+  useEffect(() => {
+    const repayRaw = searchParams.get('repay')
+    if (!repayRaw) return
+
+    setSearchParams(
+      (prev) => {
+        prev.delete('repay')
+        return prev
+      },
+      { replace: true }
+    )
+
+    const chargeId = Number(repayRaw)
+    if (!Number.isInteger(chargeId)) return
+    const charge = getUpcomingChargeById(chargeId)
+    if (!charge || charge.linked_manual_account_id == null) return
+    const account = manualAccounts.find(
+      (a) => a.id === charge.linked_manual_account_id
+    )
+    if (!account || account.kind !== 'liability') return
+
     setQuickUpdateAccount(account)
+    setQuickUpdatePrefillCents(
+      Math.max(0, account.balance_cents - charge.amount)
+    )
+  }, [searchParams, setSearchParams, manualAccounts])
+
+  function openQuickUpdate(account: ManualAccountRow) {
+    setQuickUpdatePrefillCents(null)
+    setQuickUpdateAccount(account)
+  }
+
+  function closeQuickUpdate() {
+    setQuickUpdateAccount(null)
+    setQuickUpdatePrefillCents(null)
   }
 
   function handleQuickSave(balanceCents: number) {
     if (!quickUpdateAccount) return
     updateManualAccountBalance(quickUpdateAccount.id, balanceCents)
     toast.success('Balance updated.')
-    setQuickUpdateAccount(null)
+    closeQuickUpdate()
     bump()
   }
 
   function openFullEdit(account: ManualAccountRow) {
-    setQuickUpdateAccount(null)
+    closeQuickUpdate()
     setEditAccount(account)
   }
 
@@ -1033,9 +1089,11 @@ export function AnalyticsNetWorth() {
       {/* ── Modals ───────────────────────────────────────────────────────── */}
       {quickUpdateAccount && (
         <QuickUpdateModal
+          key={`${quickUpdateAccount.id}-${quickUpdatePrefillCents ?? 'current'}`}
           account={quickUpdateAccount}
+          prefillCents={quickUpdatePrefillCents}
           onSave={handleQuickSave}
-          onClose={() => setQuickUpdateAccount(null)}
+          onClose={closeQuickUpdate}
           onFullEdit={() => openFullEdit(quickUpdateAccount)}
         />
       )}

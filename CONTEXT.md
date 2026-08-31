@@ -109,7 +109,7 @@ Auto-clearing a bill's due notification when a real synced transaction matches t
 _Avoid_: reconciliation, matching, clearing
 
 **Liability repayment charge**:
-An upcoming charge with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. The verify-and-deduct behaviour is not yet built (#19).
+An upcoming charge with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it also carries a `linked_manual_account_id` and a `match_raw_text`, a detected payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
 _Avoid_: loan payment, debt payment, transfer
 
 ### Comparisons

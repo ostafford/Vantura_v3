@@ -1177,8 +1177,10 @@ export function UpcomingSection({
                           ))}
                         </Form.Select>
                         <Form.Text className="text-muted">
-                          When linked, Vantura will prompt you to update the
-                          account balance after this charge fires.
+                          Once this is linked and a settlement transaction is
+                          set below, Vantura prompts you to reduce this
+                          account&apos;s balance each time a payment is
+                          detected.
                         </Form.Text>
                       </Form.Group>
                     )}

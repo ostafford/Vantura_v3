@@ -326,6 +326,30 @@ export function deleteUpcomingCharge(id: number): void {
   schedulePersist()
 }
 
+/** A single charge by id (raw stored row, no date projection), or null. */
+export function getUpcomingChargeById(id: number): UpcomingChargeRow | null {
+  const db = getDb()
+  if (!db) return null
+  return readUpcomingRows(db).find((c) => c.id === id) ?? null
+}
+
+/**
+ * LIABILITY_REPAYMENT charges that are BOTH linked to a manual account AND carry
+ * a settlement fingerprint (`match_raw_text`) — the only charges the #19
+ * verify-and-prompt flow (`checkLiabilityRepayments`) acts on. Raw stored rows.
+ */
+export function getLinkedLiabilityRepaymentCharges(): UpcomingChargeRow[] {
+  const db = getDb()
+  if (!db) return []
+  return readUpcomingRows(db).filter(
+    (c) =>
+      c.charge_type === 'LIABILITY_REPAYMENT' &&
+      c.linked_manual_account_id != null &&
+      c.match_raw_text != null &&
+      c.match_raw_text !== ''
+  )
+}
+
 /**
  * Charges whose next_charge_date falls in the given month (for calendar view).
  * month is 1-12, year is full year.

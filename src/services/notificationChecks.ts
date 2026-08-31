@@ -22,10 +22,13 @@ import { getSpendableBalance, getSpendableAlert } from '@/services/balance'
 import {
   getDueSoonCharges,
   daysUntilCharge,
+  firstOccurrenceOnOrAfter,
+  getLinkedLiabilityRepaymentCharges,
   type UpcomingChargeRow,
 } from '@/services/upcoming'
 import { getTrackersWithProgress } from '@/services/trackers'
 import { getAccountsByTypes } from '@/services/accounts'
+import { getManualAccountById } from '@/services/manualAccounts'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,40 @@ import { getAccountsByTypes } from '@/services/accounts'
 function billNotificationPattern(chargeName: string): string {
   const escaped = chargeName.replace(/%/g, '\\%').replace(/_/g, '\\_')
   return `${escaped} ($%`
+}
+
+/**
+ * Start of the settlement-detection window for a charge: 5 days before its
+ * projected date, as a `YYYY-MM-DD` string. The 5-day lead allows for a payment
+ * that clears early. Shared by `checkBillsSettled` and `checkLiabilityRepayments`.
+ */
+function settlementWindowStart(projectedDate: string): string {
+  const d = new Date(projectedDate.slice(0, 10) + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 5)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * True when a synced transaction matching `rawText` (a `raw_text` fingerprint)
+ * has settled on or after `windowStartStr` — a real, non-transfer debit. The
+ * single settlement test behind both the bill-settled notification clear and the
+ * liability-repayment prompt, so the two always agree on what counts as "paid".
+ */
+function hasMatchingSettledDebit(
+  db: Database,
+  rawText: string,
+  windowStartStr: string
+): boolean {
+  const res = db.exec(
+    `SELECT id FROM transactions
+     WHERE raw_text = ?
+       AND amount < 0
+       AND transfer_account_id IS NULL
+       AND substr(COALESCE(settled_at, created_at), 1, 10) >= ?
+     LIMIT 1`,
+    [rawText, windowStartStr]
+  )
+  return !!res[0]?.values?.length
 }
 
 // ─── 0. Auto-clear settled bill notifications ────────────────────────────────
@@ -71,27 +108,20 @@ function checkBillsSettled(): void {
       next_charge_date: nextChargeDate,
       match_raw_text: matchRawText,
     } = charge
+    if (!matchRawText) continue // guaranteed by the filter above; narrows the type
 
     // Per-cycle guard keyed on projected date — advances each month automatically
     const guardKey = `notif_bill_settled_${chargeId}_${nextChargeDate}`
     if (hasFiredForValue(guardKey, '1')) continue
 
-    // Accept payment up to 5 days before the projected charge date (early payments)
-    const windowStart = new Date(nextChargeDate.slice(0, 10) + 'T12:00:00Z')
-    windowStart.setUTCDate(windowStart.getUTCDate() - 5)
-    const windowStartStr = windowStart.toISOString().slice(0, 10)
-
-    const txRes = db.exec(
-      `SELECT id FROM transactions
-       WHERE raw_text = ?
-         AND amount < 0
-         AND transfer_account_id IS NULL
-         AND substr(COALESCE(settled_at, created_at), 1, 10) >= ?
-       LIMIT 1`,
-      [matchRawText, windowStartStr]
+    if (
+      !hasMatchingSettledDebit(
+        db,
+        matchRawText,
+        settlementWindowStart(nextChargeDate)
+      )
     )
-
-    if (!txRes[0]?.values?.length) continue
+      continue
 
     // Payment found — remove matching bills_due notifications for this charge
     db.run(
@@ -101,6 +131,92 @@ function checkBillsSettled(): void {
     )
     schedulePersist()
     markFiredForValue(guardKey, '1')
+  }
+}
+
+// ─── 0b. Liability-repayment balance prompts (#19) ───────────────────────────
+
+/**
+ * For each LIABILITY_REPAYMENT charge that is BOTH linked to a manual liability
+ * account AND has a settlement fingerprint, detect that cycle's payment the same
+ * way `checkBillsSettled` does, then post a one-time actionable notification
+ * prompting the user to reduce the linked account's balance by the *configured
+ * charge amount*.
+ *
+ * The balance is deliberately NOT changed here — tapping the notification opens
+ * the Net Worth quick-update modal (`/analytics/net-worth?repay=<id>`) prefilled
+ * with the suggested new balance, so the user confirms (or edits) the figure.
+ *
+ * Gated on the `bills` toggle. Per-cycle guard `liab_repay_<id>_<projectedDate>`
+ * fires once per cycle and advances with the projection. On the first run after
+ * this feature ships, the current cycle of every existing linked charge is
+ * seeded as already-handled (no retro-prompt for a payment the user has likely
+ * already reconciled by hand) — tracked by the `liab_repay_backfilled` flag.
+ */
+function checkLiabilityRepayments(): void {
+  if (!getNotifTypeEnabled('bills')) return
+
+  const db = getDb()
+  if (!db) return
+
+  const charges = getLinkedLiabilityRepaymentCharges()
+  if (charges.length === 0) return
+
+  const today = localDateString()
+  const backfilling = getAppSetting('liab_repay_backfilled') !== '1'
+
+  for (const charge of charges) {
+    if (!charge.match_raw_text || charge.linked_manual_account_id == null)
+      continue
+
+    const projected = firstOccurrenceOnOrAfter(
+      charge.next_charge_date,
+      charge.frequency,
+      today,
+      charge.cancel_by_date
+    )
+    if (!projected) continue
+
+    const guardKey = `liab_repay_${charge.id}_${projected}`
+    if (hasFiredForValue(guardKey, '1')) continue
+
+    if (backfilling) {
+      // Seed this cycle as handled; only the next cycle onward can prompt.
+      markFiredForValue(guardKey, '1')
+      continue
+    }
+
+    if (
+      !hasMatchingSettledDebit(
+        db,
+        charge.match_raw_text,
+        settlementWindowStart(projected)
+      )
+    )
+      continue
+
+    const account = getManualAccountById(charge.linked_manual_account_id)
+    // Only prompt while the link is still valid. A stale link (account deleted,
+    // or retyped to an asset) is guarded so it stops being re-checked every open.
+    if (account && account.kind === 'liability') {
+      const newBalanceCents = Math.max(0, account.balance_cents - charge.amount)
+      const title = 'Liability payment detected'
+      const body = `Payment to ${account.name} detected — tap to reduce its balance by $${formatMoney(charge.amount)} (to $${formatMoney(newBalanceCents)}).`
+      addNotificationToHistory(
+        'liability_repayment',
+        title,
+        body,
+        `/analytics/net-worth?repay=${charge.id}`,
+        'Update balance'
+      )
+      showNotification(title, body)
+    }
+    markFiredForValue(guardKey, '1')
+  }
+
+  if (backfilling) {
+    setAppSetting('liab_repay_backfilled', '1')
+    schedulePersist()
   }
 }
 
@@ -689,6 +805,7 @@ export function runNotificationChecks(): void {
   if (!getNotificationsEnabled()) return
 
   checkBillsSettled()
+  checkLiabilityRepayments()
   checkBillsDue()
   checkSpendableLow()
   checkTrackerOverspent()
@@ -703,4 +820,5 @@ export function runNotificationChecks(): void {
 export const __test__ = {
   checkPaydayLanded,
   findFirstUnseenCredit,
+  checkLiabilityRepayments,
 }
