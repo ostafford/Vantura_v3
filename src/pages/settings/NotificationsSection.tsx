@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Form } from 'react-bootstrap'
+import { Link } from 'react-router-dom'
 import { toast } from '@/stores/toastStore'
 import {
   getNotificationsEnabled,
@@ -13,51 +14,76 @@ import {
   type NotifType,
 } from '@/lib/notifications'
 
-const NOTIF_TYPES: { key: NotifType; label: string; desc: string }[] = [
+/**
+ * `setup` maps each toggle back to the feature that drives it (#22). When `to`
+ * is set it renders as a "Set up in: <screen>" link; otherwise `label` is shown
+ * verbatim as a plain note for toggles with nothing to configure elsewhere.
+ */
+const NOTIF_TYPES: {
+  key: NotifType
+  label: string
+  desc: string
+  setup: { label: string; to?: string }
+}[] = [
   {
     key: 'tracker_overspent',
     label: 'Tracker over budget',
     desc: 'When a tracker exceeds 100% of its budget',
+    setup: { label: 'Trackers', to: '/analytics/trackers' },
   },
   {
     key: 'tracker_pace',
     label: 'Tracker pace warning',
     desc: 'When spending is >10% ahead of pace with >20% of the period left',
+    setup: { label: 'Trackers', to: '/analytics/trackers' },
   },
   {
     key: 'spendable_low',
     label: 'Spendable balance low',
     desc: 'When spendable drops below your alert threshold',
+    setup: {
+      label: 'the Spendable card on the Dashboard',
+      to: '/?scroll=spendable',
+    },
   },
   {
     key: 'payday',
     label: 'Payday landed',
     desc: 'When a salary-sized credit appears on your account',
+    setup: { label: 'Payday settings', to: '/settings#payday' },
   },
   {
     key: 'possible_payday',
     label: 'Possible payday detected',
     desc: 'When a recurring credit looks like it might be your salary, before you link a source',
+    setup: { label: 'Payday settings', to: '/settings#payday' },
   },
   {
     key: 'large_tx',
     label: 'Large transaction',
     desc: 'Unexpected debits above the threshold you set',
+    setup: { label: 'Set the dollar amount below.' },
   },
   {
     key: 'bills',
     label: 'Bill reminders',
     desc: 'Upcoming charges within their reminder window',
+    setup: {
+      label: 'the Upcoming section on the Dashboard',
+      to: '/?scroll=upcoming',
+    },
   },
   {
     key: 'saver_milestone',
     label: 'Saver goal milestones',
     desc: 'When a saver reaches 50%, 75%, or 100% of its goal',
+    setup: { label: 'Savers', to: '/analytics/savers' },
   },
   {
     key: 'sync_stale',
     label: 'Data out of date',
     desc: "When Vantura hasn't synced in over 24 hours",
+    setup: { label: 'No setup needed — tracks your last sync automatically.' },
   },
 ]
 
@@ -215,6 +241,29 @@ export function NotificationsSection() {
                       style={{ marginTop: 2, marginLeft: 48 }}
                     >
                       {notifType.desc}
+                    </div>
+                    <div
+                      className="small text-muted"
+                      style={{ marginTop: 2, marginLeft: 48 }}
+                    >
+                      {notifType.setup.to ? (
+                        <>
+                          Set up in:{' '}
+                          <Link
+                            to={notifType.setup.to}
+                            className="text-decoration-none"
+                          >
+                            {notifType.setup.label}
+                            <i
+                              className="mdi mdi-chevron-right"
+                              style={{ fontSize: '0.9rem', verticalAlign: -2 }}
+                              aria-hidden
+                            />
+                          </Link>
+                        </>
+                      ) : (
+                        notifType.setup.label
+                      )}
                     </div>
                     {k === 'large_tx' && notifTypes['large_tx'] && (
                       <Form.Group
