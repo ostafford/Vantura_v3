@@ -431,6 +431,24 @@ export function UpcomingSection({
     )
   }
 
+  // Prefill the form from a picked past transaction (#22). Picking one also
+  // sets match_raw_text — reveal "More options" so the resulting auto-clear
+  // link is visible rather than silently applied.
+  function applySearchTx(tx: AnchorDebitRow) {
+    setName(tx.description)
+    setAmount((tx.amount / 100).toFixed(2))
+    setCategoryId(tx.category_id ?? '')
+    setNextChargeDate(calcNextChargeDate(tx.date, frequency))
+    setImportedFromTx(tx)
+    if (tx.raw_text) {
+      setMatchRawText(tx.raw_text)
+      setMatchDescription(tx.description)
+    }
+    if (tx.category_id || tx.raw_text) setMoreOptionsOpen(true)
+    setCreateStep('form')
+    setTxSearch('')
+  }
+
   const nextPayTotal = nextPay.reduce((s, c) => s + c.amount, 0)
   const laterTotal = later.reduce((s, c) => s + c.amount, 0)
   const hasScheduled = nextPay.length > 0 || later.length > 0
@@ -857,6 +875,11 @@ export function UpcomingSection({
               const txResults = searchRecentDebits(txSearch, 40)
               return (
                 <div>
+                  <p className="small text-muted mb-2">
+                    Pick the transaction this bill matches — Vantura fills in
+                    the details and clears its reminder automatically each time
+                    that payment lands in a sync. Or add it manually below.
+                  </p>
                   <Form.Control
                     type="text"
                     placeholder="Search your transactions…"
@@ -881,39 +904,9 @@ export function UpcomingSection({
                             cursor: 'pointer',
                             borderBottom: '1px solid var(--bs-border-color)',
                           }}
-                          onClick={() => {
-                            setName(tx.description)
-                            setAmount((tx.amount / 100).toFixed(2))
-                            setCategoryId(tx.category_id ?? '')
-                            if (tx.category_id) setMoreOptionsOpen(true)
-                            setNextChargeDate(
-                              calcNextChargeDate(tx.date, frequency)
-                            )
-                            setImportedFromTx(tx)
-                            if (tx.raw_text) {
-                              setMatchRawText(tx.raw_text)
-                              setMatchDescription(tx.description)
-                            }
-                            setCreateStep('form')
-                            setTxSearch('')
-                          }}
+                          onClick={() => applySearchTx(tx)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              setName(tx.description)
-                              setAmount((tx.amount / 100).toFixed(2))
-                              setCategoryId(tx.category_id ?? '')
-                              if (tx.category_id) setMoreOptionsOpen(true)
-                              setNextChargeDate(
-                                calcNextChargeDate(tx.date, frequency)
-                              )
-                              setImportedFromTx(tx)
-                              if (tx.raw_text) {
-                                setMatchRawText(tx.raw_text)
-                                setMatchDescription(tx.description)
-                              }
-                              setCreateStep('form')
-                              setTxSearch('')
-                            }
+                            if (e.key === 'Enter') applySearchTx(tx)
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background =
@@ -1268,10 +1261,10 @@ export function UpcomingSection({
                       </Form.Group>
                     )}
 
-                  {/* ── Settlement tracking ─────────────────────────────────── */}
+                  {/* ── Auto-clear when paid ────────────────────────────────── */}
                   <Form.Group className="mb-2">
                     <Form.Label className="small">
-                      Settlement tracking
+                      Auto-clear when paid
                     </Form.Label>
                     {matchRawText ? (
                       <div
@@ -1282,7 +1275,7 @@ export function UpcomingSection({
                         }}
                       >
                         <i
-                          className="mdi mdi-link-variant flex-shrink-0"
+                          className="mdi mdi-check-circle flex-shrink-0"
                           style={{ color: 'var(--vantura-success)' }}
                           aria-hidden
                         />
@@ -1290,7 +1283,7 @@ export function UpcomingSection({
                           className="small flex-grow-1 text-truncate"
                           title={matchRawText}
                         >
-                          {matchDescription || matchRawText}
+                          Clears when “{matchDescription || matchRawText}” lands
                         </span>
                         <Button
                           variant="link"
@@ -1301,7 +1294,7 @@ export function UpcomingSection({
                             setMatchDescription('')
                             setShowSettlementPicker(false)
                           }}
-                          aria-label="Remove settlement link"
+                          aria-label="Remove the linked transaction"
                         >
                           <i className="mdi mdi-close" aria-hidden />
                         </Button>
@@ -1317,7 +1310,7 @@ export function UpcomingSection({
                             className="mdi mdi-link-variant me-1"
                             aria-hidden
                           />
-                          Link a transaction
+                          Link the matching transaction
                         </Button>
                         {showSettlementPicker && (
                           <div className="mt-2">
@@ -1403,8 +1396,11 @@ export function UpcomingSection({
                       </div>
                     )}
                     <Form.Text className="text-muted d-block mt-1">
-                      When linked, your bill notification stays pinned until
-                      this transaction settles.
+                      Link the real payment this bill matches. Its reminder then
+                      clears itself when that payment next appears in a sync,
+                      instead of you dismissing it by hand. (For a liability
+                      repayment, Vantura also prompts you to update the
+                      balance.)
                     </Form.Text>
                   </Form.Group>
                 </>
