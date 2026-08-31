@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 38
+const SCHEMA_VERSION = 39
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -111,7 +111,6 @@ const DDL_STATEMENTS = [
     category_id TEXT,
     is_reserved INTEGER DEFAULT 1,
     reminder_days_before INTEGER,
-    is_subscription INTEGER DEFAULT 0,
     cancel_by_date TEXT,
     created_at TEXT NOT NULL,
     bucket_id INTEGER,
@@ -1008,6 +1007,23 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['38']
+    )
+  }
+
+  // #21 — upcoming_charges.is_subscription was always dead: no form set it, both
+  // CRUD paths hardcoded it to 0, and nothing read it for behaviour. It could
+  // only be 1 via demo-seed data or a profile-import round-trip. Drop it.
+  if (version < 39) {
+    const ucCols = database.exec(`PRAGMA table_info(upcoming_charges)`)
+    const ucHasIsSubscription = (ucCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'is_subscription'
+    )
+    if (ucHasIsSubscription) {
+      database.run(`ALTER TABLE upcoming_charges DROP COLUMN is_subscription`)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['39']
     )
   }
 }

@@ -93,7 +93,6 @@ export interface UpcomingChargeExportRow {
   category_id: string | null
   is_reserved: number
   reminder_days_before?: number | null
-  is_subscription?: number
   cancel_by_date?: string | null
   bucket_id?: number | null
 }
@@ -206,7 +205,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, is_subscription, cancel_by_date, bucket_id
+      reminder_days_before, cancel_by_date, bucket_id
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -219,7 +218,6 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string | null,
       number,
       number | null,
-      number,
       string | null,
       number | null,
     ]
@@ -231,9 +229,8 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       category_id: r[4],
       is_reserved: r[5],
       reminder_days_before: r[6] ?? null,
-      is_subscription: r[7] ?? 0,
-      cancel_by_date: r[8] ?? null,
-      bucket_id: r[9] ?? null,
+      cancel_by_date: r[7] ?? null,
+      bucket_id: r[8] ?? null,
     })
   }
   stmt.free()
@@ -664,8 +661,6 @@ export function replaceUpcomingCharges(
       typeof uc.reminder_days_before === 'number'
         ? uc.reminder_days_before
         : null
-    const isSubscription =
-      typeof uc.is_subscription === 'number' ? uc.is_subscription : 0
     const cancelByDate =
       typeof uc.cancel_by_date === 'string' && uc.cancel_by_date
         ? uc.cancel_by_date.slice(0, 10)
@@ -676,8 +671,8 @@ export function replaceUpcomingCharges(
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, category_id, is_reserved,
-          reminder_days_before, is_subscription, cancel_by_date, bucket_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reminder_days_before, cancel_by_date, bucket_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -686,7 +681,6 @@ export function replaceUpcomingCharges(
         categoryId,
         isReserved,
         reminderDaysBefore,
-        isSubscription,
         cancelByDate,
         bucketId,
         now,

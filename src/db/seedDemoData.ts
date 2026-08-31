@@ -699,8 +699,8 @@ export function seedDemoData(): void {
   domainNext.setDate(1)
 
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Netflix',
       1999,
@@ -709,19 +709,18 @@ export function seedDemoData(): void {
       catSubscriptions,
       1,
       3,
-      1,
       null,
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['Rent', 180000, 'MONTHLY', rentNextChargeDate, null, 1, 5, 0, null, NOW]
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['Rent', 180000, 'MONTHLY', rentNextChargeDate, null, 1, 5, null, NOW]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Gym',
       2500,
@@ -730,14 +729,13 @@ export function seedDemoData(): void {
       catHealth,
       1,
       1,
-      0,
       null,
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Spotify',
       1299,
@@ -746,14 +744,13 @@ export function seedDemoData(): void {
       catSubscriptions,
       1,
       3,
-      1,
       null,
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Insurance',
       45000,
@@ -762,14 +759,13 @@ export function seedDemoData(): void {
       null,
       1,
       7,
-      0,
       insuranceCancelBy.toISOString().slice(0, 10),
       NOW,
     ]
   )
   run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, is_subscription, cancel_by_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'Domain',
       1500,
@@ -778,7 +774,6 @@ export function seedDemoData(): void {
       null,
       0,
       null,
-      0,
       null,
       NOW,
     ]

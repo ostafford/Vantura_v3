@@ -136,7 +136,6 @@ function AddUpcomingTransactionModal({
       null,
       true,
       null,
-      false,
       null
     )
     assignUpcomingToBucket(newId, bucketId)

@@ -34,7 +34,6 @@ function makeRow(
     category_id: null,
     is_reserved: 1,
     reminder_days_before: null,
-    is_subscription: 0,
     cancel_by_date: null,
     charge_type: 'EXPENSE',
     linked_manual_account_id: null,

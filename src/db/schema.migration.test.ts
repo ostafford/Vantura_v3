@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(38)
+    expect(SCHEMA_VERSION).toBe(39)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -472,6 +472,95 @@ describe('v38 migration: collapse the Spendable alert to a single floor', () => 
     const db = buildLegacyV37Database({})
     expect(() => runMigrations(db)).not.toThrow()
     expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v38-shaped fixture for the v39 migration, which drops the dead
+ * `upcoming_charges.is_subscription` column (nothing ever read it; both CRUD
+ * paths hardcoded 0). Only the one table the migration touches is created.
+ */
+function buildLegacyV38Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '38')`
+  )
+  db.run(`
+    CREATE TABLE upcoming_charges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      frequency TEXT NOT NULL,
+      next_charge_date TEXT NOT NULL,
+      category_id TEXT,
+      is_reserved INTEGER DEFAULT 1,
+      reminder_days_before INTEGER,
+      is_subscription INTEGER DEFAULT 0,
+      cancel_by_date TEXT,
+      created_at TEXT NOT NULL,
+      bucket_id INTEGER,
+      charge_type TEXT NOT NULL DEFAULT 'EXPENSE',
+      linked_manual_account_id INTEGER,
+      match_raw_text TEXT
+    )
+  `)
+  db.run(
+    `INSERT INTO upcoming_charges
+       (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, is_subscription, created_at, charge_type)
+     VALUES ('Netflix', 1999, 'MONTHLY', '2026-02-01', 1, 3, 1, '2026-01-01', 'EXPENSE')`
+  )
+  return db
+}
+
+describe('v39 migration: drop dead is_subscription column', () => {
+  it('drops the column and preserves every other value on existing rows', () => {
+    const db = buildLegacyV38Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const cols = db.exec(`PRAGMA table_info(upcoming_charges)`)
+    const colNames = cols[0].values.map((r) => String(r[1]))
+    expect(colNames).not.toContain('is_subscription')
+    expect(colNames).toEqual(
+      expect.arrayContaining([
+        'id',
+        'name',
+        'amount',
+        'frequency',
+        'next_charge_date',
+        'reminder_days_before',
+        'cancel_by_date',
+        'charge_type',
+        'match_raw_text',
+      ])
+    )
+
+    const row = db.exec(
+      `SELECT name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, charge_type FROM upcoming_charges`
+    )
+    expect(row[0].values[0]).toEqual([
+      'Netflix',
+      1999,
+      'MONTHLY',
+      '2026-02-01',
+      1,
+      3,
+      'EXPENSE',
+    ])
+
+    db.close()
+  })
+
+  it('is a no-op when the column is already gone, and is idempotent', () => {
+    const db = buildLegacyV38Database()
+    runMigrations(db)
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
