@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 40
+const SCHEMA_VERSION = 41
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -144,7 +144,6 @@ const DDL_STATEMENTS = [
     transaction_id TEXT PRIMARY KEY,
     user_notes TEXT,
     user_category_override TEXT,
-    is_income INTEGER DEFAULT 0,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
@@ -1111,6 +1110,23 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['40']
+    )
+  }
+
+  // #26 — transaction_user_data.is_income was added by an early migration but
+  // nothing in src/ ever read or wrote it: no "mark as income" UI, and the
+  // TransactionUserRow interface never carried it. Drop it.
+  if (version < 41) {
+    const tudCols = database.exec(`PRAGMA table_info(transaction_user_data)`)
+    const tudHasIsIncome = (tudCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'is_income'
+    )
+    if (tudHasIsIncome) {
+      database.run(`ALTER TABLE transaction_user_data DROP COLUMN is_income`)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['41']
     )
   }
 }
