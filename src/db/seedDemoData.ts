@@ -574,6 +574,16 @@ export function seedDemoData(): void {
   const fortNext = fortnightlyNextReset(fortLast)
 
   run(
+    `DELETE FROM tracker_config_history_categories WHERE config_id IN (
+       SELECT tch.id FROM tracker_config_history tch
+       JOIN trackers t ON t.id = tch.tracker_id
+       WHERE t.name IN ('Groceries', 'Dining & Takeaway', 'Coffee', 'Entertainment', 'Transport'))`
+  )
+  run(
+    `DELETE FROM tracker_config_history WHERE tracker_id IN (
+       SELECT id FROM trackers WHERE name IN ('Groceries', 'Dining & Takeaway', 'Coffee', 'Entertainment', 'Transport'))`
+  )
+  run(
     `DELETE FROM trackers WHERE name IN ('Groceries', 'Dining & Takeaway', 'Coffee', 'Entertainment', 'Transport')`
   )
 
@@ -674,6 +684,54 @@ export function seedDemoData(): void {
     `INSERT OR IGNORE INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
     [tracker5Id, catTransport]
   )
+
+  // Genesis config-history row per tracker (#16), anchored at the period start,
+  // so "config as of day D" is defined for the split calc / history view.
+  const demoTrackerGenesis: {
+    id: number
+    budget: number
+    effectiveFrom: string
+    cat: string
+  }[] = [
+    {
+      id: tracker1Id,
+      budget: 80000,
+      effectiveFrom: lastResetStr,
+      cat: catGroceries,
+    },
+    {
+      id: tracker2Id,
+      budget: 30000,
+      effectiveFrom: lastResetStr,
+      cat: catDining,
+    },
+    { id: tracker3Id, budget: 8000, effectiveFrom: weeklyLast, cat: catCoffee },
+    {
+      id: tracker4Id,
+      budget: 20000,
+      effectiveFrom: fortLast,
+      cat: catEntertainment,
+    },
+    {
+      id: tracker5Id,
+      budget: 15000,
+      effectiveFrom: lastPaydayStr,
+      cat: catTransport,
+    },
+  ]
+  for (const g of demoTrackerGenesis) {
+    run(
+      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [g.id, g.effectiveFrom, g.budget, NOW]
+    )
+    const cfgId = (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] ??
+      0) as number
+    run(
+      `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
+      [cfgId, g.cat]
+    )
+  }
 
   // Upcoming charges with bill reminders — covers all supported frequencies and
   // both subscription and non-subscription types so the full UI surface is populated.

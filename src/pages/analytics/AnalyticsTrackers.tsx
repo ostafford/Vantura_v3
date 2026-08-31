@@ -137,7 +137,8 @@ export function AnalyticsTrackers() {
       let dateRangeLabel: string
       if (nativeMatch) {
         spent = t.spent
-        budget = t.budget_amount
+        // Effective budget accounts for a mid-period config change (#16).
+        budget = t.effectiveBudget
         dateRangeLabel =
           t.period_start && t.period_end
             ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
@@ -214,7 +215,7 @@ export function AnalyticsTrackers() {
               {sortedTrackers.map((t) => {
                 const effectiveData = effectiveDataByTrackerId[t.id] ?? {
                   spent: t.spent,
-                  budget: t.budget_amount,
+                  budget: t.effectiveBudget,
                   progress: t.progress,
                   dateRangeLabel: '',
                 }

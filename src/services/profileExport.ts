@@ -15,7 +15,7 @@ import {
 import { SCHEMA_VERSION } from '@/db/schema'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 3
+const EXPORT_PAYLOAD_VERSION = 4
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -67,6 +67,8 @@ export interface ExportPayload {
   settings: Record<string, string>
   trackers: TrackerExportRow[]
   trackerCategories: { tracker_id: number; category_id: string }[]
+  /** #16 — per-tracker config timeline. Absent in payloads from before v4. */
+  trackerConfigHistory?: TrackerConfigHistoryExportRow[]
   upcomingCharges: UpcomingChargeExportRow[]
   budgetBuckets: BudgetBucketExportRow[]
   budgetHypotheticals: BudgetHypotheticalExportRow[]
@@ -83,6 +85,13 @@ export interface TrackerExportRow {
   next_reset_date: string
   is_active: number
   bucket_id: number | null
+}
+
+export interface TrackerConfigHistoryExportRow {
+  tracker_id: number
+  effective_from: string
+  budget_amount: number
+  category_ids: string[]
 }
 
 export interface UpcomingChargeExportRow {
@@ -200,6 +209,38 @@ function collectTrackerCategories(): {
   return rows
 }
 
+function collectTrackerConfigHistory(): TrackerConfigHistoryExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, tracker_id, effective_from, budget_amount
+     FROM tracker_config_history ORDER BY tracker_id, effective_from, id`
+  )
+  const byConfigId = new Map<number, TrackerConfigHistoryExportRow>()
+  const rows: TrackerConfigHistoryExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [number, number, string, number]
+    const row: TrackerConfigHistoryExportRow = {
+      tracker_id: r[1],
+      effective_from: String(r[2]).slice(0, 10),
+      budget_amount: r[3],
+      category_ids: [],
+    }
+    byConfigId.set(r[0], row)
+    rows.push(row)
+  }
+  stmt.free()
+  const catStmt = db.prepare(
+    `SELECT config_id, category_id FROM tracker_config_history_categories`
+  )
+  while (catStmt.step()) {
+    const r = catStmt.get() as [number, string]
+    byConfigId.get(r[0])?.category_ids.push(r[1])
+  }
+  catStmt.free()
+  return rows
+}
+
 function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   const db = getDb()
   if (!db) return []
@@ -287,6 +328,7 @@ export function buildExportPayload(): ExportPayload {
   const settings = collectWhitelistedSettings()
   const trackers = collectTrackers()
   const trackerCategories = collectTrackerCategories()
+  const trackerConfigHistory = collectTrackerConfigHistory()
   const upcomingCharges = collectUpcomingCharges()
   const budgetBuckets = collectBudgetBuckets()
   const budgetHypotheticals = collectBudgetHypotheticals()
@@ -298,6 +340,7 @@ export function buildExportPayload(): ExportPayload {
     settings,
     trackers,
     trackerCategories,
+    trackerConfigHistory,
     upcomingCharges,
     budgetBuckets,
     budgetHypotheticals,
@@ -544,14 +587,17 @@ export function replaceBudgetPlan(
   return bucketIdMap
 }
 
-/** Replace trackers and tracker_categories with imported data. */
+/** Replace trackers, tracker_categories and tracker_config_history with imported data. */
 export function replaceTrackers(
   trackers: TrackerExportRow[],
   trackerCategories: { tracker_id: number; category_id: string }[],
+  trackerConfigHistory: TrackerConfigHistoryExportRow[] = [],
   bucketIdMap: Map<number, number> = new Map()
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM tracker_config_history_categories`)
+  db.run(`DELETE FROM tracker_config_history`)
   db.run(`DELETE FROM tracker_categories`)
   db.run(`DELETE FROM trackers`)
 
@@ -623,6 +669,70 @@ export function replaceTrackers(
       `INSERT OR IGNORE INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
       [newTrackerId, tc.category_id]
     )
+  }
+
+  // Config history (#16). Remap tracker ids; drop unknown categories. Every
+  // tracker that ends up with no history row gets a synthesised genesis row
+  // (from a pre-v4 export, or one whose rows were all invalid) so "config as of
+  // day D" stays defined for the split calc.
+  const chArr = Array.isArray(trackerConfigHistory) ? trackerConfigHistory : []
+  const trackersWithHistory = new Set<number>()
+  for (const ch of chArr) {
+    if (
+      typeof ch.tracker_id !== 'number' ||
+      typeof ch.effective_from !== 'string' ||
+      ch.effective_from.length < 10 ||
+      typeof ch.budget_amount !== 'number'
+    ) {
+      continue
+    }
+    const newTrackerId = trackerIdMap.get(ch.tracker_id)
+    if (newTrackerId == null) continue
+    db.run(
+      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [newTrackerId, ch.effective_from.slice(0, 10), ch.budget_amount, now]
+    )
+    const configId =
+      (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ??
+      0
+    for (const catId of Array.isArray(ch.category_ids) ? ch.category_ids : []) {
+      if (typeof catId !== 'string' || !categoryExists(db, catId)) continue
+      db.run(
+        `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
+        [configId, catId]
+      )
+    }
+    trackersWithHistory.add(newTrackerId)
+  }
+  for (const newId of trackerIdMap.values()) {
+    if (trackersWithHistory.has(newId)) continue
+    const trackerRow = db.exec(
+      `SELECT last_reset_date, budget_amount FROM trackers WHERE id = ?`,
+      [newId]
+    )
+    const effectiveFrom = String(
+      trackerRow[0]?.values?.[0]?.[0] ?? now.slice(0, 10)
+    ).slice(0, 10)
+    const budgetAmount = Number(trackerRow[0]?.values?.[0]?.[1] ?? 0)
+    db.run(
+      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [newId, effectiveFrom, budgetAmount, now]
+    )
+    const configId =
+      (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ??
+      0
+    const catRows = db.exec(
+      `SELECT category_id FROM tracker_categories WHERE tracker_id = ?`,
+      [newId]
+    )
+    for (const c of catRows[0]?.values ?? []) {
+      db.run(
+        `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
+        [configId, String(c[0])]
+      )
+    }
   }
 }
 
@@ -718,6 +828,7 @@ export function importPayloadWithOptions(
     replaceTrackers(
       payload.trackers ?? [],
       payload.trackerCategories ?? [],
+      payload.trackerConfigHistory ?? [],
       bucketIdMap
     )
   }

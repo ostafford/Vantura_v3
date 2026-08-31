@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 39
+const SCHEMA_VERSION = 40
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -100,6 +100,23 @@ const DDL_STATEMENTS = [
     category_id TEXT NOT NULL,
     PRIMARY KEY (tracker_id, category_id),
     FOREIGN KEY (tracker_id) REFERENCES trackers(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS tracker_config_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracker_id INTEGER NOT NULL,
+    effective_from TEXT NOT NULL,
+    budget_amount INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (tracker_id) REFERENCES trackers(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_tracker_config_history_tracker
+     ON tracker_config_history(tracker_id, effective_from)`,
+  `CREATE TABLE IF NOT EXISTS tracker_config_history_categories (
+    config_id INTEGER NOT NULL,
+    category_id TEXT NOT NULL,
+    PRIMARY KEY (config_id, category_id),
+    FOREIGN KEY (config_id) REFERENCES tracker_config_history(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
   `CREATE TABLE IF NOT EXISTS upcoming_charges (
@@ -1024,6 +1041,76 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['39']
+    )
+  }
+
+  // #16 — tracker config-history. Budget / category edits now take effect no
+  // earlier than the next day and split the current period rather than
+  // re-judging it whole. tracker_config_history is the timeline the split calc
+  // reads. Backfill one genesis row per tracker (effective from its current
+  // period start, holding its current budget + categories) so "config as of
+  // day D" is always defined for any D in the current period.
+  if (version < 40) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS tracker_config_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tracker_id INTEGER NOT NULL,
+        effective_from TEXT NOT NULL,
+        budget_amount INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (tracker_id) REFERENCES trackers(id) ON DELETE CASCADE
+      )
+    `)
+    database.run(`
+      CREATE INDEX IF NOT EXISTS idx_tracker_config_history_tracker
+        ON tracker_config_history(tracker_id, effective_from)
+    `)
+    database.run(`
+      CREATE TABLE IF NOT EXISTS tracker_config_history_categories (
+        config_id INTEGER NOT NULL,
+        category_id TEXT NOT NULL,
+        PRIMARY KEY (config_id, category_id),
+        FOREIGN KEY (config_id) REFERENCES tracker_config_history(id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES categories(id)
+      )
+    `)
+
+    if (tableExists(database, 'trackers')) {
+      const now = new Date().toISOString()
+      const hasTrackerCategories = tableExists(database, 'tracker_categories')
+      const trackerRows = database.exec(
+        `SELECT id, last_reset_date, budget_amount FROM trackers`
+      )
+      for (const r of trackerRows[0]?.values ?? []) {
+        const trackerId = Number(r[0])
+        const effectiveFrom = String(r[1]).slice(0, 10)
+        const budgetAmount = Number(r[2])
+        database.run(
+          `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+           VALUES (?, ?, ?, ?)`,
+          [trackerId, effectiveFrom, budgetAmount, now]
+        )
+        const configRows = database.exec(`SELECT last_insert_rowid()`)
+        const configId = Number(configRows[0]?.values?.[0]?.[0] ?? 0)
+        const catRows = hasTrackerCategories
+          ? database.exec(
+              `SELECT category_id FROM tracker_categories WHERE tracker_id = ?`,
+              [trackerId]
+            )
+          : []
+        for (const c of catRows[0]?.values ?? []) {
+          database.run(
+            `INSERT INTO tracker_config_history_categories (config_id, category_id)
+             VALUES (?, ?)`,
+            [configId, String(c[0])]
+          )
+        }
+      }
+    }
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['40']
     )
   }
 }

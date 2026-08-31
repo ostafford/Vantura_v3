@@ -62,6 +62,10 @@ _Avoid_: reset frequency (in prose — it is the column name, not the term), bil
 The half-open date window `[last_reset_date, next_reset_date)` a tracker's spend is currently measured in. Advanced by the reset engine once `next_reset_date` passes.
 _Avoid_: cycle, window, budget period
 
+**Config history**:
+The per-tracker timeline of budget-amount and category-set versions (`tracker_config_history`), each with an `effective_from` date. A budget or category edit takes effect the next day and the current tracker period **splits** at that boundary — the part before the change stays judged against the old config, the part after against the new one, each segment's budget prorated by its share of the period's days. Not retroactive, not blended. Current-period only; past periods are unaffected (`docs/adr/0014`).
+_Avoid_: audit log, revision history, effective budget (that is the derived `effectiveBudget` number, not this timeline)
+
 ### Transactions
 
 **Display date**:

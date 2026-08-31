@@ -318,7 +318,7 @@ function checkTrackerOverspent(): void {
 
     markFiredForValue(guardKey, t.next_reset_date)
     const overpct = Math.round(t.progress - 100)
-    const body = `You've spent $${formatMoney(t.spent)} of your $${formatMoney(t.budget_amount)} budget — ${overpct}% over.`
+    const body = `You've spent $${formatMoney(t.spent)} of your $${formatMoney(t.effectiveBudget)} budget — ${overpct}% over.`
     addNotificationToHistory(
       'tracker_overspent',
       `${t.name} is over budget`,
@@ -340,7 +340,7 @@ function checkTrackerPace(): void {
 
   for (const t of trackers) {
     if (t.progress >= 100) continue // overspent check handles this
-    if (t.budget_amount <= 0) continue
+    if (t.effectiveBudget <= 0) continue
 
     // Calculate time elapsed in current period
     const periodStart = t.last_reset_date
@@ -368,7 +368,7 @@ function checkTrackerPace(): void {
     markFiredForValue(guardKey, t.next_reset_date)
     const daysLeft = t.daysLeft
     const projectedTotal =
-      t.budget_amount > 0 ? Math.round(t.spent / timeElapsedPct) : t.spent
+      t.effectiveBudget > 0 ? Math.round(t.spent / timeElapsedPct) : t.spent
     const body = `At current pace you'll spend ~$${formatMoney(projectedTotal)} — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left in the period.`
     addNotificationToHistory(
       'tracker_pace',

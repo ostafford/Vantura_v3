@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(39)
+    expect(SCHEMA_VERSION).toBe(40)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -562,6 +562,103 @@ describe('v39 migration: drop dead is_subscription column', () => {
     const db = buildLegacyV38Database()
     runMigrations(db)
     expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v39-shaped fixture for the v40 migration (#16 tracker config-history).
+ * The migration creates two tables and backfills one genesis config row per
+ * tracker, anchored at its current period start and holding its current budget
+ * and categories.
+ */
+function buildLegacyV39Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '39')`
+  )
+  db.run(`
+    CREATE TABLE categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT)
+  `)
+  db.run(`INSERT INTO categories (id, name) VALUES ('groceries', 'Groceries')`)
+  db.run(`INSERT INTO categories (id, name) VALUES ('dining', 'Dining')`)
+  db.run(`
+    CREATE TABLE trackers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      budget_amount INTEGER NOT NULL,
+      reset_frequency TEXT NOT NULL,
+      reset_day INTEGER,
+      start_date TEXT NOT NULL,
+      last_reset_date TEXT NOT NULL,
+      next_reset_date TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      bucket_id INTEGER
+    )
+  `)
+  db.run(`
+    CREATE TABLE tracker_categories (
+      tracker_id INTEGER NOT NULL,
+      category_id TEXT NOT NULL,
+      PRIMARY KEY (tracker_id, category_id)
+    )
+  `)
+  db.run(
+    `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+     VALUES ('Food', 30000, 'WEEKLY', 1, '2026-01-05', '2026-02-02', '2026-02-09', 1, '2026-01-05')`
+  )
+  db.run(
+    `INSERT INTO tracker_categories (tracker_id, category_id) VALUES (1, 'groceries')`
+  )
+  db.run(
+    `INSERT INTO tracker_categories (tracker_id, category_id) VALUES (1, 'dining')`
+  )
+  return db
+}
+
+describe('v40 migration: tracker config-history', () => {
+  it('creates the tables and backfills a genesis config row per tracker', () => {
+    const db = buildLegacyV39Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const config = db.exec(
+      `SELECT tracker_id, effective_from, budget_amount FROM tracker_config_history`
+    )
+    expect(config[0].values).toEqual([[1, '2026-02-02', 30000]])
+
+    const configId = Number(
+      db.exec(`SELECT id FROM tracker_config_history`)[0].values[0][0]
+    )
+    const cats = db.exec(
+      `SELECT category_id FROM tracker_config_history_categories WHERE config_id = ? ORDER BY category_id`,
+      [configId]
+    )
+    expect(cats[0].values.map((r) => String(r[0]))).toEqual([
+      'dining',
+      'groceries',
+    ])
+
+    db.close()
+  })
+
+  it('is idempotent — a second run adds no further genesis rows', () => {
+    const db = buildLegacyV39Database()
+    runMigrations(db)
+    const countAfterFirst = Number(
+      db.exec(`SELECT COUNT(*) FROM tracker_config_history`)[0].values[0][0]
+    )
+    expect(() => runMigrations(db)).not.toThrow()
+    const countAfterSecond = Number(
+      db.exec(`SELECT COUNT(*) FROM tracker_config_history`)[0].values[0][0]
+    )
+    expect(countAfterSecond).toBe(countAfterFirst)
     db.close()
   })
 })

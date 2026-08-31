@@ -205,6 +205,7 @@ export function TrackersSection({
         progress: number
         daysLeft: number
         dateRangeLabel: string
+        wasAdjusted: boolean
       }
     > = {}
     for (const t of trackers) {
@@ -215,9 +216,13 @@ export function TrackersSection({
       let budget: number
       let daysLeft: number
       let dateRangeLabel: string
+      let wasAdjusted = false
       if (nativeMatch) {
         spent = t.spent
-        budget = t.budget_amount
+        // Effective budget: the sum of the prorated per-segment budgets when a
+        // config change split the current period (#16); otherwise = budget_amount.
+        budget = t.effectiveBudget
+        wasAdjusted = t.wasAdjustedThisPeriod
         daysLeft = t.daysLeft
         dateRangeLabel =
           t.period_start && t.period_end
@@ -243,6 +248,7 @@ export function TrackersSection({
         progress,
         daysLeft,
         dateRangeLabel,
+        wasAdjusted,
       }
     }
     return map
@@ -473,11 +479,12 @@ export function TrackersSection({
                 .map((t) => {
                   const effectiveData = effectiveDataByTrackerId[t.id] ?? {
                     spent: t.spent,
-                    budget: t.budget_amount,
+                    budget: t.effectiveBudget,
                     remaining: t.remaining,
                     progress: t.progress,
                     daysLeft: t.daysLeft,
                     dateRangeLabel: '',
+                    wasAdjusted: t.wasAdjustedThisPeriod,
                   }
                   const progressStyle = getTrackerProgressStyle(
                     effectiveData.progress
@@ -586,6 +593,25 @@ export function TrackersSection({
                         <small className="text-muted">
                           ${formatMoney(effectiveData.spent)} of $
                           {formatMoney(effectiveData.budget)} spent
+                          {effectiveData.wasAdjusted && (
+                            <OverlayTrigger
+                              placement="top"
+                              overlay={
+                                <Tooltip id={`trackers-adjusted-${t.id}`}>
+                                  Budget or categories changed during this
+                                  period. Each part of the period is judged
+                                  against the settings that applied then.
+                                </Tooltip>
+                              }
+                            >
+                              <span className="ms-1 text-muted">
+                                <i
+                                  className="mdi mdi-tune-variant"
+                                  aria-label="adjusted mid-period"
+                                />
+                              </span>
+                            </OverlayTrigger>
+                          )}
                         </small>
                         {effectiveData.dateRangeLabel && (
                           <span className="small text-muted text-end">

@@ -25,9 +25,18 @@ export interface TrackerRow {
 
 export interface TrackerWithProgress extends TrackerRow {
   spent: number
+  /**
+   * Budget the progress is judged against. Equals `budget_amount` unless a
+   * config change split the current period (#16), in which case it's the sum of
+   * the prorated per-segment budgets. For past periods (negative offset) it
+   * equals `budget_amount`.
+   */
+  effectiveBudget: number
   remaining: number
   daysLeft: number
   progress: number
+  /** True when a budget/category change split the current period (#16). */
+  wasAdjustedThisPeriod: boolean
   /** Set when returned from getTrackersWithProgressForPeriod; used for period date range display. */
   period_start?: string
   period_end?: string
@@ -69,19 +78,36 @@ function daysBetween(dateStrA: string, dateStrB: string): number {
   return Math.round((b - a) / (24 * 60 * 60 * 1000))
 }
 
+const normDate = (s: string) => (s.length >= 10 ? s.slice(0, 10) : s)
+
+/** Add `days` (may be negative) to a 'YYYY-MM-DD' string, returning the same form. */
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const d = new Date(normDate(dateStr) + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Same category set, order-insensitive. */
+function sameCategorySet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const setA = new Set(a)
+  return b.every((id) => setA.has(id))
+}
+
 /**
- * Spent in current period (cents). 5.1: tracker_categories + transactions, display date
- * (COALESCE(created_at, settled_at)) in [last_reset, next_reset), amount < 0, not round-up.
- * Delegates to getTrackerSpentInPeriod for the tracker's current last_reset_date/next_reset_date.
+ * Spent in the tracker's current period (cents), summed across config-change
+ * segments (#16). Each segment counts spend against the category set that
+ * applied during it — so a mid-period category add/remove is not retroactive.
  */
 export function getTrackerSpent(trackerId: number): number {
   const row = getTracker(trackerId)
   if (!row) return 0
-  return getTrackerSpentInPeriod(
+  return computeCurrentPeriodSegments(
     trackerId,
     row.last_reset_date,
-    row.next_reset_date
-  )
+    row.next_reset_date,
+    row.budget_amount
+  ).reduce((sum, seg) => sum + seg.spent, 0)
 }
 
 /**
@@ -111,6 +137,202 @@ export function getTrackerSpentInPeriod(
   const row = stmt.get()
   stmt.free()
   return row ? Number(row[0]) : 0
+}
+
+/**
+ * Spent (cents) against an explicit category set over `[periodStart, periodEnd)`.
+ * Same transaction filters as getTrackerSpentInPeriod, but the category set is
+ * passed in rather than joined from tracker_categories — used by the #16 split
+ * calc, where each period segment has its own historical category set.
+ */
+export function getSpentForCategoriesInPeriod(
+  categoryIds: string[],
+  periodStart: string,
+  periodEnd: string
+): number {
+  const db = getDb()
+  if (!db || categoryIds.length === 0) return 0
+  const placeholders = categoryIds.map(() => '?').join(',')
+  const stmt = db.prepare(
+    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
+     FROM transactions t
+     WHERE t.category_id IN (${placeholders})
+       AND COALESCE(t.created_at, t.settled_at) >= ?
+       AND COALESCE(t.created_at, t.settled_at) < ?
+       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+  )
+  stmt.bind([...categoryIds, normDate(periodStart), normDate(periodEnd)])
+  stmt.step()
+  const row = stmt.get()
+  stmt.free()
+  return row ? Number(row[0]) : 0
+}
+
+// ─── Config history (#16) ────────────────────────────────────────────────────
+
+export interface TrackerConfigVersion {
+  id: number
+  effective_from: string
+  budget_amount: number
+  category_ids: string[]
+}
+
+/**
+ * A tracker's config timeline (budget + category set per effective-from date),
+ * oldest first. Post-migration every tracker has at least a genesis row anchored
+ * at its current period start; createTracker writes one too.
+ */
+export function getTrackerConfigHistory(
+  trackerId: number
+): TrackerConfigVersion[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, effective_from, budget_amount
+     FROM tracker_config_history
+     WHERE tracker_id = ?
+     ORDER BY effective_from ASC, id ASC`
+  )
+  stmt.bind([trackerId])
+  const versions: TrackerConfigVersion[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [number, string, number]
+    versions.push({
+      id: r[0],
+      effective_from: normDate(r[1]),
+      budget_amount: r[2],
+      category_ids: [],
+    })
+  }
+  stmt.free()
+  if (versions.length === 0) return versions
+  const catStmt = db.prepare(
+    `SELECT config_id, category_id FROM tracker_config_history_categories
+     WHERE config_id IN (${versions.map(() => '?').join(',')})`
+  )
+  catStmt.bind(versions.map((v) => v.id))
+  const byId = new Map(versions.map((v) => [v.id, v]))
+  while (catStmt.step()) {
+    const r = catStmt.get() as [number, string]
+    byId.get(r[0])?.category_ids.push(r[1])
+  }
+  catStmt.free()
+  return versions
+}
+
+export interface TrackerPeriodSegment {
+  /** inclusive */
+  start: string
+  /** exclusive */
+  end: string
+  /** prorated budget for this segment (cents): configBudget × segmentDays / periodDays */
+  budget: number
+  /** spend against this segment's historical category set over [start, end) */
+  spent: number
+  /** the config version that applied during this segment */
+  category_ids: string[]
+}
+
+/**
+ * Split the tracker's current period `[lastReset, nextReset)` at each config
+ * change whose effective_from lands strictly inside it (#16). One segment when
+ * nothing changed. Each segment's budget is the applicable config's budget
+ * prorated by the segment's share of the period's days; each segment's spend is
+ * measured against that config's category set. `headBudget` / the current
+ * `tracker_categories` are the fallback if the history table is somehow empty.
+ */
+export function computeCurrentPeriodSegments(
+  trackerId: number,
+  lastReset: string,
+  nextReset: string,
+  headBudget: number
+): TrackerPeriodSegment[] {
+  const start = normDate(lastReset)
+  const end = normDate(nextReset)
+  const periodDays = daysBetween(start, end)
+
+  const history = getTrackerConfigHistory(trackerId)
+  // Fallback = "assume the current config" — used when history doesn't reach as
+  // far back as `day` (genesis row missing, or the period was moved earlier than
+  // it). Matches pre-#16 behaviour, which always judged against current config.
+  const fallback: TrackerConfigVersion = {
+    id: 0,
+    effective_from: start,
+    budget_amount: headBudget,
+    category_ids: getTrackerCategoryIds(trackerId),
+  }
+  const configAsOf = (day: string): TrackerConfigVersion => {
+    let chosen: TrackerConfigVersion | null = null
+    for (const v of history) {
+      if (v.effective_from <= day) chosen = v
+      else break
+    }
+    return chosen ?? fallback
+  }
+
+  const boundaries = Array.from(
+    new Set(
+      history
+        .map((v) => v.effective_from)
+        .filter((ef) => ef > start && ef < end)
+    )
+  ).sort()
+
+  const cutStarts = [start, ...boundaries]
+  const cutEnds = [...boundaries, end]
+  const segments: TrackerPeriodSegment[] = []
+  for (let i = 0; i < cutStarts.length; i++) {
+    const s = cutStarts[i]
+    const e = cutEnds[i]
+    const cfg = configAsOf(s)
+    const segDays = daysBetween(s, e)
+    const budget =
+      periodDays > 0
+        ? Math.round((cfg.budget_amount * segDays) / periodDays)
+        : cfg.budget_amount
+    segments.push({
+      start: s,
+      end: e,
+      budget,
+      spent: getSpentForCategoriesInPeriod(cfg.category_ids, s, e),
+      category_ids: cfg.category_ids,
+    })
+  }
+  return segments
+}
+
+/**
+ * Roll a tracker's current-period segments up into the numbers the Dashboard and
+ * notifications use. `effectiveBudget` is the sum of the prorated per-segment
+ * budgets — equal to the head budget when nothing changed this period.
+ */
+function summariseCurrentPeriod(
+  trackerId: number,
+  lastReset: string,
+  nextReset: string,
+  headBudget: number
+): {
+  spent: number
+  effectiveBudget: number
+  remaining: number
+  progress: number
+  wasAdjustedThisPeriod: boolean
+} {
+  const segments = computeCurrentPeriodSegments(
+    trackerId,
+    lastReset,
+    nextReset,
+    headBudget
+  )
+  const spent = segments.reduce((sum, seg) => sum + seg.spent, 0)
+  const effectiveBudget = segments.reduce((sum, seg) => sum + seg.budget, 0)
+  return {
+    spent,
+    effectiveBudget,
+    remaining: Math.max(0, effectiveBudget - spent),
+    progress: effectiveBudget > 0 ? (spent / effectiveBudget) * 100 : 0,
+    wasAdjustedThisPeriod: segments.length > 1,
+  }
 }
 
 /** Step back one period from a given end date. Used for period-offset navigation. */
@@ -207,10 +429,13 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
     const budget_amount = row[2]
     const last_reset_date = row[5]
     const next_reset_date = row[6]
-    const spent = getTrackerSpentInPeriod(id, last_reset_date, next_reset_date)
-    const remaining = Math.max(0, budget_amount - spent)
+    const summary = summariseCurrentPeriod(
+      id,
+      last_reset_date,
+      next_reset_date,
+      budget_amount
+    )
     const daysLeft = Math.max(0, daysBetween(today, next_reset_date))
-    const progress = budget_amount > 0 ? (spent / budget_amount) * 100 : 0
     list.push({
       id: row[0],
       name: row[1],
@@ -220,10 +445,12 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
       last_reset_date: row[5],
       next_reset_date: row[6],
       bucket_id: row[7],
-      spent,
-      remaining,
+      spent: summary.spent,
+      effectiveBudget: summary.effectiveBudget,
+      remaining: summary.remaining,
       daysLeft,
-      progress,
+      progress: summary.progress,
+      wasAdjustedThisPeriod: summary.wasAdjustedThisPeriod,
     })
   }
   stmt.free()
@@ -294,10 +521,56 @@ export type TrackerPeriodTransaction = {
   status: string
 }
 
+/** Spending rows for one category set over [start, end), newest first, capped at `limit`. */
+function readTrackerTxRows(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  categoryIds: string[],
+  startNorm: string,
+  endNorm: string,
+  limit: number
+): TrackerPeriodTransaction[] {
+  if (categoryIds.length === 0) return []
+  const placeholders = categoryIds.map(() => '?').join(',')
+  const stmt = db.prepare(
+    `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
+     FROM transactions t
+     WHERE t.category_id IN (${placeholders})
+       AND COALESCE(t.created_at, t.settled_at) >= ?
+       AND COALESCE(t.created_at, t.settled_at) < ?
+       AND t.amount < 0 AND t.transfer_account_id IS NULL
+     ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ?`
+  )
+  stmt.bind([...categoryIds, startNorm, endNorm, limit])
+  const rows: TrackerPeriodTransaction[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      string,
+      string | null,
+      string | null,
+      number,
+      string,
+    ]
+    rows.push({
+      id: r[0],
+      description: r[1],
+      created_at: r[2],
+      settled_at: r[3],
+      amount: r[4],
+      status: r[5],
+    })
+  }
+  stmt.free()
+  return rows
+}
+
 /**
  * Transactions in a period for a tracker (for list in UI). Uses display date
  * (created_at with fallback to settled_at) for period and ordering. Returns status for Held/Settled.
- * When periodOffset is 0 or omitted, uses current period from DB; otherwise uses computed period.
+ * When periodOffset is 0 or omitted, uses the current period split into
+ * config-change segments (#16) so a mid-period category add/remove shows the
+ * transactions that actually counted; otherwise uses the computed past period
+ * with the current category set.
  * Fetches 21 rows and returns the first 20 plus a hasMore flag.
  */
 export function getTrackerTransactionsInPeriod(
@@ -306,55 +579,39 @@ export function getTrackerTransactionsInPeriod(
 ): { list: TrackerPeriodTransaction[]; hasMore: boolean } {
   const db = getDb()
   if (!db) return { list: [], hasMore: false }
-  let periodStart: string
-  let periodEnd: string
+  const row = getTracker(trackerId)
+  if (!row) return { list: [], hasMore: false }
+
   if (periodOffset === undefined || periodOffset === 0) {
-    const row = getTracker(trackerId)
-    if (!row) return { list: [], hasMore: false }
-    periodStart = row.last_reset_date
-    periodEnd = row.next_reset_date
-  } else {
-    const row = getTracker(trackerId)
-    if (!row) return { list: [], hasMore: false }
-    const bounds = getPeriodBoundsForOffset(row, periodOffset)
-    if (!bounds) return { list: [], hasMore: false }
-    periodStart = bounds.periodStart
-    periodEnd = bounds.periodEnd
-  }
-  const startNorm =
-    periodStart.length >= 10 ? periodStart.slice(0, 10) : periodStart
-  const endNorm = periodEnd.length >= 10 ? periodEnd.slice(0, 10) : periodEnd
-  const stmt = db.prepare(
-    `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
-     FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ?
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT 21`
-  )
-  stmt.bind([trackerId, startNorm, endNorm])
-  const raw: TrackerPeriodTransaction[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [
-      string,
-      string,
-      string | null,
-      string | null,
-      number,
-      string,
-    ]
-    raw.push({
-      id: row[0],
-      description: row[1],
-      created_at: row[2],
-      settled_at: row[3],
-      amount: row[4],
-      status: row[5],
+    const segments = computeCurrentPeriodSegments(
+      trackerId,
+      row.last_reset_date,
+      row.next_reset_date,
+      row.budget_amount
+    )
+    const merged: TrackerPeriodTransaction[] = []
+    for (const seg of segments) {
+      merged.push(
+        ...readTrackerTxRows(db, seg.category_ids, seg.start, seg.end, 21)
+      )
+    }
+    merged.sort((a, b) => {
+      const da = a.created_at ?? a.settled_at ?? ''
+      const dbb = b.created_at ?? b.settled_at ?? ''
+      return dbb.localeCompare(da)
     })
+    return { list: merged.slice(0, 20), hasMore: merged.length > 20 }
   }
-  stmt.free()
+
+  const bounds = getPeriodBoundsForOffset(row, periodOffset)
+  if (!bounds) return { list: [], hasMore: false }
+  const raw = readTrackerTxRows(
+    db,
+    getTrackerCategoryIds(trackerId),
+    normDate(bounds.periodStart),
+    normDate(bounds.periodEnd),
+    21
+  )
   return { list: raw.slice(0, 20), hasMore: raw.length === 21 }
 }
 
@@ -398,18 +655,44 @@ export function getTrackersWithProgressForPeriod(
     const bounds = getPeriodBoundsForOffset(trackerRow, periodOffset)
     if (!bounds) continue
     const { periodStart, periodEnd } = bounds
-    const spent = getTrackerSpentInPeriod(id, periodStart, periodEnd)
     const budget_amount = row[2]
-    const remaining = Math.max(0, budget_amount - spent)
-    const progress = budget_amount > 0 ? (spent / budget_amount) * 100 : 0
     const daysLeft =
       periodOffset >= 0 ? Math.max(0, daysBetween(today, periodEnd)) : 0
+
+    // Offset 0 is the live period — split it at any config change (#16). Past
+    // periods keep the whole-period, current-config reading (out of scope).
+    let spent: number
+    let effectiveBudget: number
+    let remaining: number
+    let progress: number
+    let wasAdjustedThisPeriod: boolean
+    if (periodOffset === 0) {
+      const summary = summariseCurrentPeriod(
+        id,
+        periodStart,
+        periodEnd,
+        budget_amount
+      )
+      spent = summary.spent
+      effectiveBudget = summary.effectiveBudget
+      remaining = summary.remaining
+      progress = summary.progress
+      wasAdjustedThisPeriod = summary.wasAdjustedThisPeriod
+    } else {
+      spent = getTrackerSpentInPeriod(id, periodStart, periodEnd)
+      effectiveBudget = budget_amount
+      remaining = Math.max(0, budget_amount - spent)
+      progress = budget_amount > 0 ? (spent / budget_amount) * 100 : 0
+      wasAdjustedThisPeriod = false
+    }
     list.push({
       ...trackerRow,
       spent,
+      effectiveBudget,
       remaining,
       daysLeft,
       progress,
+      wasAdjustedThisPeriod,
       period_start: periodStart,
       period_end: periodEnd,
     })
@@ -520,6 +803,50 @@ function assertCategoriesAvailable(
 }
 
 /**
+ * Write (or replace, if one already exists at exactly `effectiveFrom`) a config
+ * version for a tracker (#16). The caller owns `schedulePersist()`.
+ */
+function writeTrackerConfigVersion(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  trackerId: number,
+  effectiveFrom: string,
+  budgetAmountCents: number,
+  categoryIds: string[]
+): void {
+  const now = new Date().toISOString()
+  const existing = db.exec(
+    `SELECT id FROM tracker_config_history WHERE tracker_id = ? AND effective_from = ?`,
+    [trackerId, effectiveFrom]
+  )
+  let configId = Number(existing[0]?.values?.[0]?.[0] ?? 0)
+  if (configId > 0) {
+    db.run(`UPDATE tracker_config_history SET budget_amount = ? WHERE id = ?`, [
+      budgetAmountCents,
+      configId,
+    ])
+    db.run(
+      `DELETE FROM tracker_config_history_categories WHERE config_id = ?`,
+      [configId]
+    )
+  } else {
+    db.run(
+      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [trackerId, effectiveFrom, budgetAmountCents, now]
+    )
+    configId = Number(
+      db.exec(`SELECT last_insert_rowid()`)[0]?.values?.[0]?.[0] ?? 0
+    )
+  }
+  for (const catId of categoryIds) {
+    db.run(
+      `INSERT INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
+      [configId, catId]
+    )
+  }
+}
+
+/**
  * Create tracker and set start_date, last_reset_date, next_reset_date.
  * For PAYDAY use app_settings next_payday; for others use period start (e.g. last Monday) so the tracker shows the full frequency window.
  */
@@ -568,6 +895,9 @@ export function createTracker(
       [id, catId]
     )
   }
+  // Genesis config version (#16), anchored at the period start so "config as of
+  // day D" is defined for any D in the first period.
+  writeTrackerConfigVersion(db, id, lastReset, budgetAmountCents, categoryIds)
   schedulePersist()
   return id
 }
@@ -590,10 +920,14 @@ export function updateTracker(
   assertCategoriesAvailable(categoryIds, id)
   const today = localDateString()
   const existing = getTracker(id)
+  const existingCats = existing ? getTrackerCategoryIds(id) : []
   const needsPeriodReset =
     !existing ||
     existing.reset_frequency !== resetFrequency ||
     existing.reset_day !== resetDay
+  const budgetChanged =
+    !existing || existing.budget_amount !== budgetAmountCents
+  const categoriesChanged = !sameCategorySet(existingCats, categoryIds)
 
   let lastReset: string
   let nextReset: string
@@ -626,6 +960,53 @@ export function updateTracker(
     db.run(
       `INSERT INTO tracker_categories (tracker_id, category_id) VALUES (?, ?)`,
       [id, catId]
+    )
+  }
+
+  // Config history (#16).
+  if (needsPeriodReset) {
+    // A frequency / reset-day change re-anchors the period immediately (as
+    // before) and starts the config history fresh from the new period — the
+    // deferred follow-up covers routing frequency changes through history.
+    const oldConfigIds = db.exec(
+      `SELECT id FROM tracker_config_history WHERE tracker_id = ?`,
+      [id]
+    )
+    for (const r of oldConfigIds[0]?.values ?? []) {
+      db.run(
+        `DELETE FROM tracker_config_history_categories WHERE config_id = ?`,
+        [Number(r[0])]
+      )
+    }
+    db.run(`DELETE FROM tracker_config_history WHERE tracker_id = ?`, [id])
+    writeTrackerConfigVersion(db, id, lastReset, budgetAmountCents, categoryIds)
+  } else if (budgetChanged || categoriesChanged) {
+    // Budget / category edits take effect no earlier than tomorrow and split
+    // the current period rather than re-judging it whole.
+    // Defensive: a tracker created outside createTracker/migration (demo seed,
+    // older data) may have no baseline row — synthesise one from the pre-change
+    // config so the segment before tomorrow is judged against the OLD budget.
+    if (existing) {
+      const baseline = getTrackerConfigHistory(id)
+      const hasBaseline = baseline.some(
+        (v) => v.effective_from <= existing.last_reset_date
+      )
+      if (!hasBaseline) {
+        writeTrackerConfigVersion(
+          db,
+          id,
+          existing.last_reset_date,
+          existing.budget_amount,
+          existingCats
+        )
+      }
+    }
+    writeTrackerConfigVersion(
+      db,
+      id,
+      addDaysToDateStr(today, 1),
+      budgetAmountCents,
+      categoryIds
     )
   }
   schedulePersist()
