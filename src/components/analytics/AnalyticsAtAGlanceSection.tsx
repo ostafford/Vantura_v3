@@ -37,14 +37,6 @@ import { syncStore } from '@/stores/syncStore'
 
 const WEEK_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function emptyYearPoints(monthCount: number): YearMonthPoint[] {
-  return Array.from({ length: monthCount }, (_, i) => ({
-    month: i + 1,
-    moneyIn: 0,
-    moneyOut: 0,
-  }))
-}
-
 function yearMetricValue(p: YearMonthPoint, m: MonthMetric): number {
   if (m === 'spending') return p.moneyOut
   if (m === 'income') return p.moneyIn
@@ -509,16 +501,8 @@ export function AnalyticsAtAGlanceSection() {
               </div>
 
               <YearMonthlyLineChart
-                pointsCurrent={
-                  pointsCurrent.length === 12
-                    ? pointsCurrent
-                    : emptyYearPoints(12)
-                }
-                pointsPrevious={
-                  pointsPrevious.length === 12
-                    ? pointsPrevious
-                    : emptyYearPoints(12)
-                }
+                pointsCurrent={pointsCurrent}
+                pointsPrevious={pointsPrevious}
                 currentThroughMonth={yearCurrentThroughMonth}
                 metric={metric}
                 showCurrentYear={showCurrentYear}
