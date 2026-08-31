@@ -28,6 +28,12 @@ export interface UpcomingChargeRow {
 }
 
 export interface UpcomingGrouped {
+  /**
+   * `ONCE` charges whose date has passed with no future occurrence (`#18`). They
+   * need an explicit "was this paid?" resolution — they are kept out of `nextPay`
+   * so a past one-off doesn't inflate the "before next payday" total.
+   */
+  overdue: UpcomingChargeRow[]
   nextPay: UpcomingChargeRow[]
   later: UpcomingChargeRow[]
   nextPayday: string | null
@@ -201,8 +207,9 @@ function readUpcomingRows(
 
 export function getUpcomingChargesGrouped(): UpcomingGrouped {
   const db = getDb()
-  if (!db) return { nextPay: [], later: [], nextPayday: null }
+  if (!db) return { overdue: [], nextPay: [], later: [], nextPayday: null }
   const nextPayday = getAppSetting('next_payday')
+  const overdue: UpcomingChargeRow[] = []
   const nextPay: UpcomingChargeRow[] = []
   const later: UpcomingChargeRow[] = []
   const today = localDateString()
@@ -214,22 +221,25 @@ export function getUpcomingChargesGrouped(): UpcomingGrouped {
       today,
       row.cancel_by_date
     )
-    // Past ONCE charges are shown as overdue until the user explicitly deletes them.
-    // All other frequencies (recurring) are silently dropped once their cycle is exhausted or cancelled.
-    if (!nextOccurrence && row.frequency !== 'ONCE') continue
-    const projected = {
-      ...row,
-      next_charge_date: nextOccurrence ?? row.next_charge_date,
+    if (!nextOccurrence) {
+      // A recurring charge with an exhausted / cancelled cycle is silently
+      // dropped. A past ONCE charge has nowhere to roll to — surface it as
+      // overdue (at its stored past date) for an explicit "was this paid?"
+      // resolution (#18), separate from the payday-relative groups.
+      if (row.frequency === 'ONCE') overdue.push({ ...row })
+      continue
     }
+    const projected = { ...row, next_charge_date: nextOccurrence }
     if (nextPayday && projected.next_charge_date < nextPayday) {
       nextPay.push(projected)
     } else {
       later.push(projected)
     }
   }
+  overdue.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
   nextPay.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
   later.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
-  return { nextPay, later, nextPayday }
+  return { overdue, nextPay, later, nextPayday }
 }
 
 export function createUpcomingCharge(

@@ -100,9 +100,9 @@ _Avoid_: disposable income, spare, remaining, leftover
 A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`), the due-soon banner, and the calendar view.
 _Avoid_: bill (bare), recurring transaction, scheduled payment
 
-**Next pay / Later**:
-The two buckets the upcoming-charges list is split into. *Next pay* = the charge's next occurrence is strictly before `next_payday`; *Later* = everything else (and everything, when no payday is configured).
-_Avoid_: this pay period / future, urgent / non-urgent, upcoming / scheduled
+**Overdue / Next pay / Later**:
+The three buckets the upcoming-charges list is split into. *Overdue* = a `ONCE` charge whose date has passed with no future occurrence — held out of the other two (so it can't inflate their totals) and shown in its own callout with a Paid / Reschedule / Remove resolution (#18). *Next pay* = the charge's next occurrence is strictly before `next_payday`. *Later* = everything else (and every non-overdue charge, when no payday is configured).
+_Avoid_: this pay period / future, urgent / non-urgent, upcoming / scheduled, arrears
 
 **Settlement detection**:
 Auto-clearing a bill's due notification when a real synced transaction matches the charge's linked `match_raw_text` (same amount sign, not a transfer, within 5 days before the projected date). Runs on app open.

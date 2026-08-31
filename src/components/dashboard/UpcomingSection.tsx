@@ -254,7 +254,7 @@ export function UpcomingSection({
     return { year: d.getFullYear(), month: d.getMonth() + 1 }
   })
 
-  const { nextPay, later, nextPayday } = useMemo(
+  const { overdue, nextPay, later, nextPayday } = useMemo(
     () => getUpcomingChargesGrouped(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh]
@@ -418,9 +418,23 @@ export function UpcomingSection({
     onUpcomingChange?.()
   }
 
+  // Resolve an overdue ONCE charge (#18). "Paid" and "Remove" both hard-delete —
+  // a one-off has no next cycle to roll to and Vantura keeps no charge history
+  // (the bank transaction in Transactions is the record). "Reschedule" just
+  // reopens the edit form so the user can set a new future date.
+  function resolveOverdue(c: UpcomingChargeRow, paid: boolean) {
+    deleteUpcomingCharge(c.id)
+    setRefresh((r) => r + 1)
+    onUpcomingChange?.()
+    toast.success(
+      paid ? `"${c.name}" marked paid and removed.` : `"${c.name}" removed.`
+    )
+  }
+
   const nextPayTotal = nextPay.reduce((s, c) => s + c.amount, 0)
   const laterTotal = later.reduce((s, c) => s + c.amount, 0)
-  const hasAny = nextPay.length > 0 || later.length > 0
+  const hasScheduled = nextPay.length > 0 || later.length > 0
+  const hasAny = overdue.length > 0 || hasScheduled
   const totalCount = nextPay.length + later.length
   const isCapped = !showAll && totalCount > DEFAULT_VISIBLE_COUNT
   // Next pay charges are more time-sensitive, so they claim the visible
@@ -485,6 +499,69 @@ export function UpcomingSection({
         <td>{c.frequency.charAt(0) + c.frequency.slice(1).toLowerCase()}</td>
         <td className="text-end">${formatMoney(c.amount)}</td>
       </tr>
+    )
+  }
+
+  function renderOverdueGroup() {
+    return (
+      <div className="border-start border-4 border-warning ps-2 mb-3">
+        <div className="d-flex align-items-center gap-2">
+          <i
+            className="mdi mdi-alert-circle-outline text-warning"
+            aria-hidden
+          />
+          <strong>Overdue — was this paid?</strong>
+        </div>
+        <p className="small text-muted mb-2">
+          One-off charges whose date has passed. Resolve each so it stops
+          showing here and stops counting toward your totals.
+        </p>
+        {overdue.map((c) => {
+          const categoryName = c.category_id
+            ? categoryNameById.get(c.category_id)
+            : null
+          return (
+            <Card key={c.id} className="mb-2 upcoming-card">
+              <Card.Body className="py-2 px-3">
+                <div className="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div className="fw-medium">{c.name}</div>
+                    <div className="small text-muted">
+                      {`Was due ${formatShortDate(c.next_charge_date)}`}
+                      {categoryName ? ` · ${categoryName}` : ''}
+                    </div>
+                  </div>
+                  <div className="text-end">${formatMoney(c.amount)}</div>
+                </div>
+                <div className="d-flex flex-wrap gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="success"
+                    onClick={() => resolveOverdue(c, true)}
+                  >
+                    <i className="mdi mdi-check me-1" aria-hidden />
+                    Paid
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => openEdit(c)}
+                  >
+                    Reschedule
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-danger"
+                    onClick={() => resolveOverdue(c, false)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </Card.Body>
+            </Card>
+          )
+        })}
+      </div>
     )
   }
 
@@ -571,177 +648,183 @@ export function UpcomingSection({
             <p className="text-muted small mb-0">
               No upcoming charges. Add a regular charge to track.
             </p>
-          ) : isMobile ? (
-            <div className="upcoming-list-vertical">
-              {visibleNextPay.length > 0 && (
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <strong>Next pay</strong>
-                    <span className="text-danger fw-normal small">
-                      ${formatMoney(nextPayTotal)} total
-                    </span>
-                  </div>
-                  {visibleNextPay.map((c) => {
-                    const dueLabel = reminderLabel(c)
-                    return (
-                      <Card
-                        key={c.id}
-                        className="mb-2 upcoming-card"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openEdit(c)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openEdit(c)
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <Card.Body className="py-2 px-3">
-                          <div className="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                              <div className="fw-medium">
-                                {c.name}
-                                {dueLabel && (
-                                  <span className="badge badge-reminder ms-1">
-                                    {dueLabel}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="small text-muted">
-                                {[
-                                  `${formatShortDate(c.next_charge_date)} · ${
-                                    c.frequency.charAt(0) +
-                                    c.frequency.slice(1).toLowerCase()
-                                  }`,
-                                  c.category_id
-                                    ? categoryNameById.get(c.category_id)
-                                    : null,
-                                  c.is_reserved === 0
-                                    ? 'excluded from Spendable'
-                                    : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(' · ')}
-                              </div>
-                            </div>
-                            <div className="text-end">
-                              ${formatMoney(c.amount)}
-                            </div>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-              {visibleLater.length > 0 && (
-                <div>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <strong>Later</strong>
-                    <span className="text-muted small">
-                      ${formatMoney(laterTotal)}
-                    </span>
-                  </div>
-                  {visibleLater.map((c) => {
-                    const dueLabel = reminderLabel(c)
-                    return (
-                      <Card
-                        key={c.id}
-                        className="mb-2 upcoming-card"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openEdit(c)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openEdit(c)
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <Card.Body className="py-2 px-3">
-                          <div className="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                              <div className="fw-medium">
-                                {c.name}
-                                {dueLabel && (
-                                  <span className="badge badge-reminder ms-1">
-                                    {dueLabel}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="small text-muted">
-                                {[
-                                  `${formatShortDate(c.next_charge_date)} · ${
-                                    c.frequency.charAt(0) +
-                                    c.frequency.slice(1).toLowerCase()
-                                  }`,
-                                  c.category_id
-                                    ? categoryNameById.get(c.category_id)
-                                    : null,
-                                  c.is_reserved === 0
-                                    ? 'excluded from Spendable'
-                                    : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(' · ')}
-                              </div>
-                            </div>
-                            <div className="text-end">
-                              ${formatMoney(c.amount)}
-                            </div>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
           ) : (
-            <table className="table table-striped mb-0">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Name</th>
-                  <th>Frequency</th>
-                  <th className="text-end">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleNextPay.length > 0 && (
-                  <>
-                    <tr className="upcoming-section-header">
-                      <td colSpan={4}>
-                        <div className="d-flex justify-content-between align-items-center page-title">
+            <>
+              {overdue.length > 0 && renderOverdueGroup()}
+              {hasScheduled &&
+                (isMobile ? (
+                  <div className="upcoming-list-vertical">
+                    {visibleNextPay.length > 0 && (
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
                           <strong>Next pay</strong>
-                          <span className="text-danger fw-normal">
-                            ${formatMoney(nextPayTotal)}{' '}
-                            <span className="text-muted">total</span>
+                          <span className="text-danger fw-normal small">
+                            ${formatMoney(nextPayTotal)} total
                           </span>
                         </div>
-                      </td>
-                    </tr>
-                    {visibleNextPay.map(renderDataRow)}
-                  </>
-                )}
-                {visibleLater.length > 0 && (
-                  <>
-                    <tr className="upcoming-section-header">
-                      <td colSpan={4}>
-                        <div className="d-flex justify-content-between align-items-center">
+                        {visibleNextPay.map((c) => {
+                          const dueLabel = reminderLabel(c)
+                          return (
+                            <Card
+                              key={c.id}
+                              className="mb-2 upcoming-card"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openEdit(c)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  openEdit(c)
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <Card.Body className="py-2 px-3">
+                                <div className="d-flex justify-content-between align-items-start gap-2">
+                                  <div>
+                                    <div className="fw-medium">
+                                      {c.name}
+                                      {dueLabel && (
+                                        <span className="badge badge-reminder ms-1">
+                                          {dueLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="small text-muted">
+                                      {[
+                                        `${formatShortDate(c.next_charge_date)} · ${
+                                          c.frequency.charAt(0) +
+                                          c.frequency.slice(1).toLowerCase()
+                                        }`,
+                                        c.category_id
+                                          ? categoryNameById.get(c.category_id)
+                                          : null,
+                                        c.is_reserved === 0
+                                          ? 'excluded from Spendable'
+                                          : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </div>
+                                  </div>
+                                  <div className="text-end">
+                                    ${formatMoney(c.amount)}
+                                  </div>
+                                </div>
+                              </Card.Body>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {visibleLater.length > 0 && (
+                      <div>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
                           <strong>Later</strong>
-                          <span>${formatMoney(laterTotal)}</span>
+                          <span className="text-muted small">
+                            ${formatMoney(laterTotal)}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                    {visibleLater.map(renderDataRow)}
-                  </>
-                )}
-              </tbody>
-            </table>
+                        {visibleLater.map((c) => {
+                          const dueLabel = reminderLabel(c)
+                          return (
+                            <Card
+                              key={c.id}
+                              className="mb-2 upcoming-card"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openEdit(c)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  openEdit(c)
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <Card.Body className="py-2 px-3">
+                                <div className="d-flex justify-content-between align-items-start gap-2">
+                                  <div>
+                                    <div className="fw-medium">
+                                      {c.name}
+                                      {dueLabel && (
+                                        <span className="badge badge-reminder ms-1">
+                                          {dueLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="small text-muted">
+                                      {[
+                                        `${formatShortDate(c.next_charge_date)} · ${
+                                          c.frequency.charAt(0) +
+                                          c.frequency.slice(1).toLowerCase()
+                                        }`,
+                                        c.category_id
+                                          ? categoryNameById.get(c.category_id)
+                                          : null,
+                                        c.is_reserved === 0
+                                          ? 'excluded from Spendable'
+                                          : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </div>
+                                  </div>
+                                  <div className="text-end">
+                                    ${formatMoney(c.amount)}
+                                  </div>
+                                </div>
+                              </Card.Body>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <table className="table table-striped mb-0">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Frequency</th>
+                        <th className="text-end">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleNextPay.length > 0 && (
+                        <>
+                          <tr className="upcoming-section-header">
+                            <td colSpan={4}>
+                              <div className="d-flex justify-content-between align-items-center page-title">
+                                <strong>Next pay</strong>
+                                <span className="text-danger fw-normal">
+                                  ${formatMoney(nextPayTotal)}{' '}
+                                  <span className="text-muted">total</span>
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                          {visibleNextPay.map(renderDataRow)}
+                        </>
+                      )}
+                      {visibleLater.length > 0 && (
+                        <>
+                          <tr className="upcoming-section-header">
+                            <td colSpan={4}>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <strong>Later</strong>
+                                <span>${formatMoney(laterTotal)}</span>
+                              </div>
+                            </td>
+                          </tr>
+                          {visibleLater.map(renderDataRow)}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                ))}
+            </>
           )}
           {viewMode === 'list' && totalCount > DEFAULT_VISIBLE_COUNT && (
             <button

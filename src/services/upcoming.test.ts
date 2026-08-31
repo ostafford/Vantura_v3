@@ -15,8 +15,12 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getUpcomingChargeById, getLinkedLiabilityRepaymentCharges } =
-  await import('./upcoming')
+const {
+  getUpcomingChargeById,
+  getLinkedLiabilityRepaymentCharges,
+  getUpcomingChargesGrouped,
+} = await import('./upcoming')
+const { localDateString } = await import('@/lib/format')
 
 function makeRow(
   overrides: Partial<UpcomingChargeRow> = {}
@@ -181,5 +185,104 @@ describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
 
     const linked = getLinkedLiabilityRepaymentCharges()
     expect(linked.map((c) => c.id)).toEqual([fullId])
+  })
+})
+
+describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
+  beforeAll(async () => {
+    SQL = await initSqlJs()
+  })
+
+  beforeEach(async () => {
+    const { runSchema } = await import('@/db/schema')
+    db = new SQL.Database()
+    runSchema(db)
+    for (const k of Object.keys(appSettings)) delete appSettings[k]
+  })
+
+  function daysFromToday(delta: number): string {
+    const d = new Date(localDateString() + 'T12:00:00Z')
+    d.setUTCDate(d.getUTCDate() + delta)
+    return d.toISOString().slice(0, 10)
+  }
+
+  function insert(opts: {
+    name: string
+    frequency: string
+    nextChargeDate: string
+    cancelByDate?: string | null
+    amount?: number
+  }) {
+    db.run(
+      `INSERT INTO upcoming_charges
+         (name, amount, frequency, next_charge_date, is_reserved, created_at, cancel_by_date, charge_type)
+       VALUES (?, ?, ?, ?, 1, '2020-01-01T00:00:00.000Z', ?, 'EXPENSE')`,
+      [
+        opts.name,
+        opts.amount ?? 5000,
+        opts.frequency,
+        opts.nextChargeDate,
+        opts.cancelByDate ?? null,
+      ]
+    )
+  }
+
+  it('routes a past ONCE charge to `overdue`, never to nextPay/later, and keeps it out of those totals', () => {
+    appSettings['next_payday'] = daysFromToday(10)
+    insert({
+      name: 'Rego',
+      frequency: 'ONCE',
+      nextChargeDate: daysFromToday(-9),
+    })
+    insert({
+      name: 'Rent',
+      frequency: 'MONTHLY',
+      nextChargeDate: daysFromToday(3),
+      amount: 200000,
+    })
+
+    const { overdue, nextPay, later } = getUpcomingChargesGrouped()
+
+    expect(overdue.map((c) => c.name)).toEqual(['Rego'])
+    expect([...nextPay, ...later].map((c) => c.name)).toEqual(['Rent'])
+  })
+
+  it('sorts overdue oldest-first', () => {
+    insert({ name: 'B', frequency: 'ONCE', nextChargeDate: daysFromToday(-2) })
+    insert({ name: 'A', frequency: 'ONCE', nextChargeDate: daysFromToday(-30) })
+    insert({ name: 'C', frequency: 'ONCE', nextChargeDate: daysFromToday(-1) })
+
+    expect(getUpcomingChargesGrouped().overdue.map((c) => c.name)).toEqual([
+      'A',
+      'B',
+      'C',
+    ])
+  })
+
+  it('a future ONCE charge is scheduled, not overdue', () => {
+    appSettings['next_payday'] = daysFromToday(10)
+    insert({
+      name: 'Insurance',
+      frequency: 'ONCE',
+      nextChargeDate: daysFromToday(4),
+    })
+
+    const { overdue, nextPay } = getUpcomingChargesGrouped()
+    expect(overdue).toHaveLength(0)
+    expect(nextPay.map((c) => c.name)).toEqual(['Insurance'])
+  })
+
+  it('a recurring charge past its cancel_by_date is dropped, not shown as overdue', () => {
+    insert({
+      name: 'Old subscription',
+      frequency: 'MONTHLY',
+      nextChargeDate: daysFromToday(-90),
+      cancelByDate: daysFromToday(-30),
+    })
+
+    const { overdue, nextPay, later } = getUpcomingChargesGrouped()
+    expect(overdue).toHaveLength(0)
+    expect(nextPay).toHaveLength(0)
+    expect(later).toHaveLength(0)
   })
 })
