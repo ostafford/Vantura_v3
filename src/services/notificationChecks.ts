@@ -18,7 +18,7 @@ import {
   hasFiredForValue,
   markFiredForValue,
 } from '@/lib/notifications'
-import { getSpendableBalance } from '@/services/balance'
+import { getSpendableBalance, getSpendableAlert } from '@/services/balance'
 import {
   getDueSoonCharges,
   daysUntilCharge,
@@ -157,23 +157,18 @@ function checkSpendableLow(): void {
   if (hasCheckedToday('notif_last_spendable_low_date')) return
 
   const spendable = getSpendableBalance()
-  const thresholdRaw = getAppSetting('spendable_alert_below_cents')
-  if (!thresholdRaw) return
 
-  const threshold = parseInt(thresholdRaw, 10)
-  if (Number.isNaN(threshold) || threshold <= 0) return
-
-  // Also check % of pay threshold
-  const pctRaw = getAppSetting('spendable_alert_below_pct_pay')
-  const payRaw = getAppSetting('pay_amount_cents')
-  let effectiveThreshold = threshold
-  if (pctRaw && payRaw) {
-    const pct = parseFloat(pctRaw)
-    const pay = parseInt(payRaw, 10)
-    if (!Number.isNaN(pct) && !Number.isNaN(pay) && pct > 0) {
-      effectiveThreshold = Math.max(threshold, Math.round((pct / 100) * pay))
-    }
-  }
+  // Single source of truth shared with the Dashboard card's red state: a dollar
+  // floor OR a %-of-pay floor, never both (schema v38). A %-of-pay alert with no
+  // pay amount set resolves to null here — dormant, same as the card.
+  const alert = getSpendableAlert()
+  if (
+    alert == null ||
+    alert.thresholdCents == null ||
+    alert.thresholdCents <= 0
+  )
+    return
+  const effectiveThreshold = alert.thresholdCents
 
   if (spendable >= effectiveThreshold) return
 

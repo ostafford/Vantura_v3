@@ -140,6 +140,54 @@ export function getPayAmountCents(): number | null {
   return Number.isNaN(cents) || cents < 0 ? null : cents
 }
 
+export type SpendableAlertMode = 'dollars' | 'pct'
+
+export interface SpendableAlert {
+  /** Which floor the user configured — exactly one is ever active (schema v38+). */
+  mode: SpendableAlertMode
+  /** Value as entered: integer cents for `dollars`, integer percent 1–100 for `pct`. */
+  value: number
+  /**
+   * Resolved dollar floor in cents, or null for a `pct` alert when no pay amount
+   * is set — in that state the alert is dormant (card stays neutral, no notification).
+   */
+  thresholdCents: number | null
+}
+
+/**
+ * The single active Spendable low-balance alert, or null when none is configured.
+ *
+ * Since schema v38 (#14) at most one of the two `app_settings` keys is ever
+ * non-zero: a `spendable_alert_below_cents` dollar floor OR a
+ * `spendable_alert_below_pct_pay` percent-of-pay floor, never both. This is the
+ * single source of truth for the Dashboard card's red state and the
+ * `spendable_low` notification. If both keys are somehow non-zero (e.g. a
+ * profile imported from a pre-v38 export), the dollar floor wins — matching the
+ * migration's tie-break.
+ */
+export function getSpendableAlert(): SpendableAlert | null {
+  const dollarsRaw = getAppSetting('spendable_alert_below_cents')
+  const dollars =
+    dollarsRaw != null && dollarsRaw !== '' ? parseInt(dollarsRaw, 10) : 0
+  if (!Number.isNaN(dollars) && dollars > 0) {
+    return { mode: 'dollars', value: dollars, thresholdCents: dollars }
+  }
+
+  const pctRaw = getAppSetting('spendable_alert_below_pct_pay')
+  const pct = pctRaw != null && pctRaw !== '' ? parseInt(pctRaw, 10) : 0
+  if (!Number.isNaN(pct) && pct > 0 && pct <= 100) {
+    const payCents = getPayAmountCents()
+    return {
+      mode: 'pct',
+      value: pct,
+      thresholdCents:
+        payCents != null ? Math.round((payCents * pct) / 100) : null,
+    }
+  }
+
+  return null
+}
+
 /**
  * Sum of absolute amounts (cents) of all HELD (authorised but not yet settled) transactions.
  * Informational only — Up Bank's API account balance already nets these out, so they are

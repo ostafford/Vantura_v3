@@ -8,6 +8,8 @@ import {
   getReservedAmount,
   getSpendableBalance,
   getPayAmountCents,
+  getSpendableAlert,
+  type SpendableAlertMode,
 } from '@/services/balance'
 import { getForecastSpendable } from '@/services/forecast'
 import { formatMoney, formatShortDate } from '@/lib/format'
@@ -86,6 +88,8 @@ export function Dashboard() {
     return getAppSetting('dismissed_due_soon_date') === today
   })
   const [showThresholdModal, setShowThresholdModal] = useState(false)
+  const [thresholdMode, setThresholdMode] =
+    useState<SpendableAlertMode>('dollars')
   const [thresholdDollars, setThresholdDollars] = useState('')
   const [thresholdPctPay, setThresholdPctPay] = useState('')
 
@@ -94,8 +98,7 @@ export function Dashboard() {
     spendableCents,
     forecastCents,
     payAmountCents,
-    thresholdCentsRaw,
-    pctPayRaw,
+    spendableAlert,
     nextPayday,
     reservedCents,
     lastSyncAgeMs,
@@ -105,8 +108,7 @@ export function Dashboard() {
       spendableCents: getSpendableBalance(),
       forecastCents: getForecastSpendable(),
       payAmountCents: getPayAmountCents(),
-      thresholdCentsRaw: getAppSetting(SPENDABLE_ALERT_KEY),
-      pctPayRaw: getAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY),
+      spendableAlert: getSpendableAlert(),
       nextPayday: getAppSetting('next_payday'),
       reservedCents: getReservedAmount(),
       lastSyncAgeMs: (() => {
@@ -118,22 +120,7 @@ export function Dashboard() {
     [lastSyncCompletedAt, dataVersion]
   )
 
-  const thresholdCents =
-    thresholdCentsRaw != null && thresholdCentsRaw !== ''
-      ? parseInt(thresholdCentsRaw, 10)
-      : null
-  const pctPay =
-    pctPayRaw != null && pctPayRaw !== '' ? parseInt(pctPayRaw, 10) : 0
-  const pctThresholdCents =
-    payAmountCents != null && pctPay > 0 && pctPay <= 100
-      ? Math.round((payAmountCents * pctPay) / 100)
-      : null
-  const effectiveThresholdCents =
-    thresholdCents != null && thresholdCents > 0
-      ? pctThresholdCents != null
-        ? Math.max(thresholdCents, pctThresholdCents)
-        : thresholdCents
-      : pctThresholdCents
+  const effectiveThresholdCents = spendableAlert?.thresholdCents ?? null
   const isSpendableLow =
     effectiveThresholdCents != null &&
     effectiveThresholdCents > 0 &&
@@ -346,38 +333,41 @@ export function Dashboard() {
   }, [])
 
   const openThresholdModal = useCallback(() => {
-    const raw = getAppSetting(SPENDABLE_ALERT_KEY)
-    const cents = raw != null && raw !== '' ? parseInt(raw, 10) : 0
-    setThresholdDollars(cents > 0 ? (cents / 100).toFixed(2) : '')
-    const pctRaw = getAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY)
-    setThresholdPctPay(pctRaw != null && pctRaw !== '' ? pctRaw : '')
+    const alert = getSpendableAlert()
+    // % of pay can't be configured without a pay amount to apply it to.
+    const mode =
+      alert?.mode === 'pct' && payAmountCents != null ? 'pct' : 'dollars'
+    setThresholdMode(mode)
+    setThresholdDollars(
+      alert?.mode === 'dollars' ? (alert.value / 100).toFixed(2) : ''
+    )
+    setThresholdPctPay(alert?.mode === 'pct' ? String(alert.value) : '')
     setShowThresholdModal(true)
-  }, [])
+  }, [payAmountCents])
 
+  // One mode wins: the inactive key is always zeroed, so `getSpendableAlert`
+  // never sees both floors set (schema v38 invariant).
   const saveThreshold = useCallback(() => {
-    const trimmed = thresholdDollars.trim()
-    if (trimmed === '') {
-      setAppSetting(SPENDABLE_ALERT_KEY, '0')
-    } else {
-      const cents = Math.round(parseFloat(trimmed) * 100)
-      setAppSetting(
-        SPENDABLE_ALERT_KEY,
-        String(isNaN(cents) ? 0 : Math.max(0, cents))
-      )
-    }
-    const pctTrimmed = thresholdPctPay.trim()
-    if (pctTrimmed === '') {
-      setAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY, '0')
-    } else {
-      const pct = parseInt(pctTrimmed, 10)
+    if (thresholdMode === 'pct') {
+      const pctTrimmed = thresholdPctPay.trim()
+      const pct = pctTrimmed === '' ? 0 : parseInt(pctTrimmed, 10)
       setAppSetting(
         SPENDABLE_ALERT_PCT_PAY_KEY,
         String(Number.isNaN(pct) || pct < 0 || pct > 100 ? 0 : pct)
       )
+      setAppSetting(SPENDABLE_ALERT_KEY, '0')
+    } else {
+      const trimmed = thresholdDollars.trim()
+      const cents = trimmed === '' ? 0 : Math.round(parseFloat(trimmed) * 100)
+      setAppSetting(
+        SPENDABLE_ALERT_KEY,
+        String(Number.isNaN(cents) ? 0 : Math.max(0, cents))
+      )
+      setAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY, '0')
     }
     setShowThresholdModal(false)
     setDataVersion((v) => v + 1)
-  }, [thresholdDollars, thresholdPctPay])
+  }, [thresholdMode, thresholdDollars, thresholdPctPay])
 
   useEffect(() => {
     if (shouldShowDashboardTour()) {
@@ -687,39 +677,67 @@ export function Dashboard() {
           <Modal.Title>Spendable alert threshold</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Alert when Spendable is below ($)</Form.Label>
-            <Form.Control
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Leave empty to disable"
-              value={thresholdDollars}
-              onChange={(e) => setThresholdDollars(e.target.value)}
-              aria-label="Alert when Spendable is below (dollars)"
+          <p className="text-muted mb-3" style={{ fontSize: '0.85rem' }}>
+            Alert when Spendable drops below a floor — the card turns red and a
+            notification fires. Choose <strong>one</strong>: a dollar amount or
+            a percentage of your pay. Leave the chosen field empty or 0 to
+            disable the alert.
+          </p>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <Form.Check
+              type="radio"
+              name="threshold-mode"
+              id="threshold-mode-dollars"
+              label="Dollar amount"
+              checked={thresholdMode === 'dollars'}
+              onChange={() => setThresholdMode('dollars')}
+              style={{ minWidth: '8.5rem' }}
             />
-            <Form.Text className="text-muted">
-              When Spendable drops below this amount, the card turns red. Leave
-              empty or 0 to disable.
-            </Form.Text>
-          </Form.Group>
-          <Form.Group>
-            <Form.Label>Or below (% of pay amount)</Form.Label>
-            <Form.Control
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              placeholder="e.g. 50"
-              value={thresholdPctPay}
-              onChange={(e) => setThresholdPctPay(e.target.value)}
-              aria-label="Alert when Spendable is below this percent of pay amount"
+            <div className="input-group" style={{ maxWidth: '10rem' }}>
+              <span className="input-group-text">$</span>
+              <Form.Control
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="250.00"
+                value={thresholdDollars}
+                disabled={thresholdMode !== 'dollars'}
+                onChange={(e) => setThresholdDollars(e.target.value)}
+                aria-label="Alert when Spendable is below this dollar amount"
+              />
+            </div>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <Form.Check
+              type="radio"
+              name="threshold-mode"
+              id="threshold-mode-pct"
+              label="% of pay"
+              checked={thresholdMode === 'pct'}
+              disabled={payAmountCents == null}
+              onChange={() => setThresholdMode('pct')}
+              style={{ minWidth: '8.5rem' }}
             />
-            <Form.Text className="text-muted">
-              Requires Pay amount set in Settings. Card turns red when Spendable
-              is below this % of your pay. Leave empty or 0 to disable.
-            </Form.Text>
-          </Form.Group>
+            <div className="input-group" style={{ maxWidth: '10rem' }}>
+              <Form.Control
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                placeholder="50"
+                value={thresholdPctPay}
+                disabled={thresholdMode !== 'pct' || payAmountCents == null}
+                onChange={(e) => setThresholdPctPay(e.target.value)}
+                aria-label="Alert when Spendable is below this percent of pay amount"
+              />
+              <span className="input-group-text">%</span>
+            </div>
+          </div>
+          <Form.Text className="text-muted d-block mt-2">
+            {payAmountCents == null
+              ? 'Set a Pay amount in Settings to use “% of pay”.'
+              : 'The floor is your pay amount × this percentage.'}
+          </Form.Text>
         </Modal.Body>
         <Modal.Footer>
           <Button

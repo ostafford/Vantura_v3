@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(37)
+    expect(SCHEMA_VERSION).toBe(38)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -350,6 +350,128 @@ describe('v37 migration: computed colour system', () => {
   it('is a no-op on an already-current database (idempotent)', () => {
     const db = buildLegacyV36Database()
     runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v37-shaped fixture for the v38 migration, which touches only
+ * `app_settings`: it collapses the two-floor Spendable alert (a dollar amount
+ * plus a % of pay, reconciled with max()) to a single mode by zeroing whichever
+ * floor was NOT the effective (higher) one at migration time.
+ */
+function buildLegacyV37Database(settings: Record<string, string>): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '37')`
+  )
+  for (const [key, value] of Object.entries(settings)) {
+    db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [key, value])
+  }
+  return db
+}
+
+function readSetting(db: Database, key: string): string | null {
+  const res = db.exec(`SELECT value FROM app_settings WHERE key = ?`, [key])
+  const v = res[0]?.values?.[0]?.[0]
+  return v != null ? String(v) : null
+}
+
+describe('v38 migration: collapse the Spendable alert to a single floor', () => {
+  it('zeros the dollar floor when the % of pay floor was the higher (effective) one', () => {
+    // pay 5000.00, 50% => 2500.00 pct floor > 1000.00 dollar floor
+    const db = buildLegacyV37Database({
+      pay_amount_cents: '500000',
+      spendable_alert_below_cents: '100000',
+      spendable_alert_below_pct_pay: '50',
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('0')
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('50')
+
+    db.close()
+  })
+
+  it('zeros the % of pay floor when the dollar floor was the higher (effective) one', () => {
+    // pay 5000.00, 50% => 2500.00 pct floor < 3000.00 dollar floor
+    const db = buildLegacyV37Database({
+      pay_amount_cents: '500000',
+      spendable_alert_below_cents: '300000',
+      spendable_alert_below_pct_pay: '50',
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('300000')
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
+
+    db.close()
+  })
+
+  it('keeps the dollar floor on a tie', () => {
+    // pay 5000.00, 50% => 2500.00 pct floor == 2500.00 dollar floor
+    const db = buildLegacyV37Database({
+      pay_amount_cents: '500000',
+      spendable_alert_below_cents: '250000',
+      spendable_alert_below_pct_pay: '50',
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('250000')
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
+
+    db.close()
+  })
+
+  it('keeps the dollar floor when there is no pay amount to evaluate the % floor against', () => {
+    const db = buildLegacyV37Database({
+      spendable_alert_below_cents: '100000',
+      spendable_alert_below_pct_pay: '50',
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('100000')
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
+
+    db.close()
+  })
+
+  it('leaves a single configured floor untouched', () => {
+    const dollarsOnly = buildLegacyV37Database({
+      spendable_alert_below_cents: '150000',
+      spendable_alert_below_pct_pay: '0',
+    })
+    runMigrations(dollarsOnly)
+    expect(readSetting(dollarsOnly, 'spendable_alert_below_cents')).toBe(
+      '150000'
+    )
+    expect(readSetting(dollarsOnly, 'spendable_alert_below_pct_pay')).toBe('0')
+    dollarsOnly.close()
+
+    const pctOnly = buildLegacyV37Database({
+      pay_amount_cents: '500000',
+      spendable_alert_below_cents: '0',
+      spendable_alert_below_pct_pay: '25',
+    })
+    runMigrations(pctOnly)
+    expect(readSetting(pctOnly, 'spendable_alert_below_cents')).toBe('0')
+    expect(readSetting(pctOnly, 'spendable_alert_below_pct_pay')).toBe('25')
+    pctOnly.close()
+  })
+
+  it('is a no-op (beyond the version bump) when no alert is configured, and is idempotent', () => {
+    const db = buildLegacyV37Database({})
+    expect(() => runMigrations(db)).not.toThrow()
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })

@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 37
+const SCHEMA_VERSION = 38
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -964,6 +964,50 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['37']
+    )
+  }
+
+  // #14 — the Spendable low-balance alert collapses from two independent floors
+  // (a dollar amount and a % of pay, reconciled with max()) to a single mode: a
+  // dollar-amount alert OR a %-of-pay alert, never both. Where both legacy keys
+  // were set, keep whichever was the higher (effective) floor at migration time
+  // and zero the other; a tie, or no pay amount to evaluate the % floor against,
+  // keeps the dollar floor.
+  if (version < 38) {
+    const readSetting = (key: string): string | null => {
+      const res = database.exec(
+        `SELECT value FROM app_settings WHERE key = ?`,
+        [key]
+      )
+      const v = res[0]?.values?.[0]?.[0]
+      return v != null ? String(v) : null
+    }
+    const dollarCents = parseInt(
+      readSetting('spendable_alert_below_cents') ?? '',
+      10
+    )
+    const pct = parseInt(readSetting('spendable_alert_below_pct_pay') ?? '', 10)
+    const payCents = parseInt(readSetting('pay_amount_cents') ?? '', 10)
+    const hasDollar = !Number.isNaN(dollarCents) && dollarCents > 0
+    const hasPct = !Number.isNaN(pct) && pct > 0 && pct <= 100
+
+    if (hasDollar && hasPct) {
+      const pctCents =
+        !Number.isNaN(payCents) && payCents > 0
+          ? Math.round((payCents * pct) / 100)
+          : 0
+      const keyToZero =
+        pctCents > dollarCents
+          ? 'spendable_alert_below_cents'
+          : 'spendable_alert_below_pct_pay'
+      database.run(`UPDATE app_settings SET value = '0' WHERE key = ?`, [
+        keyToZero,
+      ])
+    }
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['38']
     )
   }
 }

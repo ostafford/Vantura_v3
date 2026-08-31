@@ -279,7 +279,7 @@ One of the five rearrangeable blocks below the balance cards: Month at a glance,
 _Avoid_: widget, panel, module, card (reserve "card" for the balance cards)
 
 **Spendable alert threshold**:
-The user-set floor below which Spendable counts as low — the Spendable card turns red and (conditionally) a notification fires. Expressed as a dollar amount, a percentage of Pay amount, or both; when both are set the higher floor applies. Set by tapping the Spendable card.
+The user-set floor below which Spendable counts as low — the Spendable card turns red and a notification fires. Set by tapping the Spendable card, as *either* a dollar amount *or* a percentage of Pay amount (never both — schema v38 collapsed the old two-floor `max()` model). A percentage alert is dormant while no Pay amount is set.
 _Avoid_: limit, cap, budget, minimum balance
 
 **Stale data**:
