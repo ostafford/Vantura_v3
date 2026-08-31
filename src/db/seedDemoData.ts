@@ -4,6 +4,7 @@
  */
 
 import { getDb, setAppSetting, schedulePersist } from '@/db'
+import { writeTrackerConfigVersion } from '@/services/trackers'
 
 const DEMO_ACCOUNT_ID = 'demo-account-main'
 const DEMO_SAVER_ID = 'demo-saver-1'
@@ -685,53 +686,31 @@ export function seedDemoData(): void {
     [tracker5Id, catTransport]
   )
 
-  // Genesis config-history row per tracker (#16), anchored at the period start,
-  // so "config as of day D" is defined for the split calc / history view.
-  const demoTrackerGenesis: {
-    id: number
-    budget: number
-    effectiveFrom: string
-    cat: string
-  }[] = [
-    {
-      id: tracker1Id,
-      budget: 80000,
-      effectiveFrom: lastResetStr,
-      cat: catGroceries,
-    },
-    {
-      id: tracker2Id,
-      budget: 30000,
-      effectiveFrom: lastResetStr,
-      cat: catDining,
-    },
-    { id: tracker3Id, budget: 8000, effectiveFrom: weeklyLast, cat: catCoffee },
-    {
-      id: tracker4Id,
-      budget: 20000,
-      effectiveFrom: fortLast,
-      cat: catEntertainment,
-    },
-    {
-      id: tracker5Id,
-      budget: 15000,
-      effectiveFrom: lastPaydayStr,
-      cat: catTransport,
-    },
-  ]
-  for (const g of demoTrackerGenesis) {
-    run(
-      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
-       VALUES (?, ?, ?, ?)`,
-      [g.id, g.effectiveFrom, g.budget, NOW]
-    )
-    const cfgId = (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] ??
-      0) as number
-    run(
-      `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
-      [cfgId, g.cat]
+  // Genesis config-history row per tracker (#16), anchored at the period start so
+  // "config as of day D" is defined for the split calc / history view. Derived
+  // from the rows just inserted rather than re-listing budgets/dates.
+  const seededTrackers = db.exec(
+    `SELECT id, last_reset_date, budget_amount FROM trackers
+     WHERE id IN (?, ?, ?, ?, ?)`,
+    [tracker1Id, tracker2Id, tracker3Id, tracker4Id, tracker5Id]
+  )
+  for (const r of seededTrackers[0]?.values ?? []) {
+    const tId = Number(r[0])
+    const cats = (
+      db.exec(
+        `SELECT category_id FROM tracker_categories WHERE tracker_id = ?`,
+        [tId]
+      )[0]?.values ?? []
+    ).map((c) => String(c[0]))
+    writeTrackerConfigVersion(
+      db,
+      tId,
+      String(r[1]).slice(0, 10),
+      Number(r[2]),
+      cats
     )
   }
+  schedulePersist()
 
   // Upcoming charges with bill reminders — covers all supported frequencies and
   // both subscription and non-subscription types so the full UI surface is populated.

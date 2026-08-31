@@ -4,9 +4,13 @@
  * than re-judging it whole. Each segment is judged against the config that
  * applied during it; the segment's budget is the config budget prorated by the
  * segment's share of the period's days.
+ *
+ * `splitPeriodIntoSegments` (the pure core) is tested array-in/array-out; the
+ * DB wrapper, the write path and profile round-trip need a real sql.js DB.
  */
 import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
+import type { TrackerConfigVersion } from './trackers'
 
 let SQL: SqlJsStatic
 let db: Database
@@ -21,6 +25,7 @@ vi.mock('@/db', () => ({
 const {
   createTracker,
   updateTracker,
+  splitPeriodIntoSegments,
   computeCurrentPeriodSegments,
   getTrackerConfigHistory,
   getTrackersWithProgress,
@@ -42,6 +47,259 @@ beforeEach(async () => {
     `INSERT INTO categories (id, name) VALUES ('groceries', 'Groceries'), ('dining', 'Dining')`
   )
 })
+
+// ─── pure core: splitPeriodIntoSegments ──────────────────────────────────────
+
+type Cfg = Pick<TrackerConfigVersion, 'budget_amount' | 'category_ids'>
+
+function version(
+  id: number,
+  effectiveFrom: string,
+  budget: number,
+  cats: string[]
+): TrackerConfigVersion {
+  return {
+    id,
+    effective_from: effectiveFrom,
+    budget_amount: budget,
+    category_ids: cats,
+  }
+}
+
+/** A spend-lookup over an in-memory transaction list: sum where category ∈ set and start ≤ date < end. */
+function fakeSpend(txns: { cat: string; cents: number; date: string }[]) {
+  return (cats: string[], start: string, end: string): number =>
+    txns
+      .filter((t) => cats.includes(t.cat) && t.date >= start && t.date < end)
+      .reduce((s, t) => s + t.cents, 0)
+}
+
+describe('splitPeriodIntoSegments (pure core)', () => {
+  const genesis = version(1, '2026-03-01', 30000, ['groceries'])
+  const fallback: Cfg = { budget_amount: 30000, category_ids: ['groceries'] }
+
+  it('is one full-budget segment when nothing changed', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis],
+      fallback,
+      fakeSpend([
+        { cat: 'groceries', cents: 1000, date: '2026-03-02' },
+        { cat: 'groceries', cents: 2500, date: '2026-03-06' },
+      ])
+    )
+    expect(segs).toHaveLength(1)
+    expect(segs[0]).toMatchObject({
+      start: '2026-03-01',
+      end: '2026-03-08',
+      budget: 30000,
+      spent: 3500,
+    })
+  })
+
+  it('splits at a mid-period budget change and prorates each segment by days', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08', // 7 days
+      [genesis, version(2, '2026-03-05', 40000, ['groceries'])],
+      fallback,
+      fakeSpend([
+        { cat: 'groceries', cents: 1000, date: '2026-03-02' },
+        { cat: 'groceries', cents: 2000, date: '2026-03-06' },
+      ])
+    )
+    expect(segs).toHaveLength(2)
+    expect(segs[0]).toMatchObject({
+      start: '2026-03-01',
+      end: '2026-03-05',
+      budget: Math.round((30000 * 4) / 7),
+      spent: 1000,
+    })
+    expect(segs[1]).toMatchObject({
+      start: '2026-03-05',
+      end: '2026-03-08',
+      budget: Math.round((40000 * 3) / 7),
+      spent: 2000,
+    })
+  })
+
+  it('prorated segments of an unchanged budget sum back to the full budget', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis, version(2, '2026-03-05', 30000, ['groceries', 'dining'])],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs.reduce((s, seg) => s + seg.budget, 0)).toBe(30000)
+  })
+
+  it('counts a category only while it was part of the tracker (add mid-period)', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis, version(2, '2026-03-05', 30000, ['groceries', 'dining'])],
+      fallback,
+      fakeSpend([
+        { cat: 'groceries', cents: 1000, date: '2026-03-02' },
+        { cat: 'dining', cents: 5000, date: '2026-03-02' }, // pre-boundary, dining not yet tracked
+        { cat: 'dining', cents: 3000, date: '2026-03-06' }, // post-boundary, counted
+      ])
+    )
+    expect(segs.reduce((s, seg) => s + seg.spent, 0)).toBe(4000)
+  })
+
+  it('counts a category only while it was part of the tracker (remove mid-period)', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [
+        version(1, '2026-03-01', 30000, ['groceries', 'dining']),
+        version(2, '2026-03-05', 30000, ['groceries']),
+      ],
+      { budget_amount: 30000, category_ids: ['groceries'] },
+      fakeSpend([
+        { cat: 'dining', cents: 5000, date: '2026-03-02' }, // still tracked
+        { cat: 'dining', cents: 3000, date: '2026-03-06' }, // removed from day 5
+      ])
+    )
+    expect(segs.reduce((s, seg) => s + seg.spent, 0)).toBe(5000)
+  })
+
+  it('handles N changes → N+1 segments', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [
+        genesis,
+        version(2, '2026-03-03', 20000, ['groceries']),
+        version(3, '2026-03-06', 25000, ['groceries']),
+      ],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs.map((s) => [s.start, s.end])).toEqual([
+      ['2026-03-01', '2026-03-03'],
+      ['2026-03-03', '2026-03-06'],
+      ['2026-03-06', '2026-03-08'],
+    ])
+  })
+
+  it('prorates against the actual period length for a variable-length (PAYDAY) period', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-15', // 14 days
+      [genesis, version(2, '2026-03-08', 42000, ['groceries'])],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs[0].budget).toBe(Math.round((30000 * 7) / 14))
+    expect(segs[1].budget).toBe(Math.round((42000 * 7) / 14))
+  })
+
+  it('does not split when a change is effective on or after the period end', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis, version(2, '2026-03-08', 40000, ['groceries'])],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs).toHaveLength(1)
+    expect(segs[0].budget).toBe(30000)
+  })
+
+  it('does not split when a change is effective exactly on the period start; that config wins the whole period', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis, version(2, '2026-03-01', 45000, ['groceries'])],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs).toHaveLength(1)
+    expect(segs[0].budget).toBe(45000)
+  })
+
+  it('dedups two changes landing on the same day', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [
+        genesis,
+        version(2, '2026-03-04', 20000, ['groceries']),
+        version(3, '2026-03-04', 25000, ['groceries']),
+      ],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs).toHaveLength(2)
+    expect(segs.map((s) => [s.start, s.end])).toEqual([
+      ['2026-03-01', '2026-03-04'],
+      ['2026-03-04', '2026-03-08'],
+    ])
+  })
+
+  it('uses the fallback for any day no history row covers', () => {
+    // History is entirely empty → the whole period is the fallback config.
+    const empty = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [],
+      { budget_amount: 12345, category_ids: ['groceries'] },
+      fakeSpend([{ cat: 'groceries', cents: 900, date: '2026-03-03' }])
+    )
+    expect(empty).toEqual([
+      {
+        start: '2026-03-01',
+        end: '2026-03-08',
+        budget: 12345,
+        spent: 900,
+        category_ids: ['groceries'],
+      },
+    ])
+
+    // History exists but starts AFTER the period start → the first segment
+    // falls back; the second uses the in-period version.
+    const partial = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [version(9, '2026-03-05', 70000, ['groceries', 'dining'])],
+      { budget_amount: 30000, category_ids: ['groceries'] },
+      fakeSpend([])
+    )
+    expect(partial.map((s) => s.budget)).toEqual([
+      Math.round((30000 * 4) / 7),
+      Math.round((70000 * 3) / 7),
+    ])
+  })
+
+  it('ADVERSARIAL: front-loaded spend against a mid-period raise — the early segment blows its prorated budget even though total spend is far under the new head budget', () => {
+    const headBudget = 70000
+    const genesisBudget = 10000
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08', // 7 days
+      [
+        version(1, '2026-03-01', genesisBudget, ['groceries']),
+        version(2, '2026-03-04', headBudget, ['groceries']), // day 4 raise
+      ],
+      { budget_amount: headBudget, category_ids: ['groceries'] },
+      fakeSpend([{ cat: 'groceries', cents: 5000, date: '2026-03-02' }]) // all in segment 1
+    )
+    const effectiveBudget = segs.reduce((s, seg) => s + seg.budget, 0)
+    // A naive whole-period-at-new-budget calc would read 5000 / 70000 = under.
+    expect(5000).toBeLessThan(headBudget)
+    // The split exposes it: segment 1 spent 5000 against round(10000·3/7)=4286.
+    expect(segs[0].spent).toBeGreaterThan(segs[0].budget)
+    // And the effective budget sits strictly between the old and new head.
+    expect(effectiveBudget).toBeGreaterThan(genesisBudget)
+    expect(effectiveBudget).toBeLessThan(headBudget)
+  })
+})
+
+// ─── DB wrapper + write path (need a real DB) ────────────────────────────────
 
 function insertTx(
   id: string,
@@ -90,155 +348,25 @@ function addConfigVersion(
   }
 }
 
-describe('computeCurrentPeriodSegments', () => {
-  it('is a single full-budget segment when nothing changed this period', () => {
+describe('computeCurrentPeriodSegments (DB wrapper)', () => {
+  it('wires history, per-segment spend and the fallback together end-to-end', () => {
     const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
     setPeriod(id, '2026-03-01', '2026-03-08')
-    insertTx('t1', 'groceries', -1000, '2026-03-02')
-    insertTx('t2', 'groceries', -2500, '2026-03-06')
+    addConfigVersion(id, '2026-03-05', 40000, ['groceries', 'dining'])
+    insertTx('g1', 'groceries', -1000, '2026-03-02')
+    insertTx('d1', 'dining', -5000, '2026-03-02') // pre-boundary, dining untracked → excluded
+    insertTx('d2', 'dining', -3000, '2026-03-06') // post-boundary → counted
 
-    const segments = computeCurrentPeriodSegments(
+    const segs = computeCurrentPeriodSegments({
       id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments).toHaveLength(1)
-    expect(segments[0]).toMatchObject({
-      start: '2026-03-01',
-      end: '2026-03-08',
-      budget: 30000,
-      spent: 3500,
+      last_reset_date: '2026-03-01',
+      next_reset_date: '2026-03-08',
+      budget_amount: 40000,
     })
-  })
-
-  it('splits at a mid-period budget change and prorates each segment by days', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-08') // 7 days
-    addConfigVersion(id, '2026-03-05', 40000, ['groceries']) // day 5
-    insertTx('t1', 'groceries', -1000, '2026-03-02') // segment 1
-    insertTx('t2', 'groceries', -2000, '2026-03-06') // segment 2
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      40000
-    )
-    expect(segments).toHaveLength(2)
-    // $300 × 4/7, $400 × 3/7
-    expect(segments[0]).toMatchObject({
-      start: '2026-03-01',
-      end: '2026-03-05',
-      budget: Math.round((30000 * 4) / 7),
-      spent: 1000,
-    })
-    expect(segments[1]).toMatchObject({
-      start: '2026-03-05',
-      end: '2026-03-08',
-      budget: Math.round((40000 * 3) / 7),
-      spent: 2000,
-    })
-  })
-
-  it('prorated segments of an unchanged budget sum back to the full budget', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-08')
-    // Only the category set changes; budget stays 30000.
-    addConfigVersion(id, '2026-03-05', 30000, ['groceries', 'dining'])
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments.reduce((s, seg) => s + seg.budget, 0)).toBe(30000)
-  })
-
-  it('counts a category only while it was part of the tracker (add mid-period)', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-08')
-    addConfigVersion(id, '2026-03-05', 30000, ['groceries', 'dining'])
-    insertTx('g1', 'groceries', -1000, '2026-03-02') // counted (both segments have groceries)
-    insertTx('d1', 'dining', -5000, '2026-03-02') // NOT counted — dining not yet tracked
-    insertTx('d2', 'dining', -3000, '2026-03-06') // counted — dining added from day 5
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments.reduce((s, seg) => s + seg.spent, 0)).toBe(4000)
-  })
-
-  it('counts a category only while it was part of the tracker (remove mid-period)', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, [
-      'groceries',
-      'dining',
-    ])
-    setPeriod(id, '2026-03-01', '2026-03-08')
-    addConfigVersion(id, '2026-03-05', 30000, ['groceries'])
-    insertTx('d1', 'dining', -5000, '2026-03-02') // counted — dining still tracked
-    insertTx('d2', 'dining', -3000, '2026-03-06') // NOT counted — dining removed from day 5
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments.reduce((s, seg) => s + seg.spent, 0)).toBe(5000)
-  })
-
-  it('handles N changes → N+1 segments', () => {
-    const id = createTracker('Food', 10000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-08')
-    addConfigVersion(id, '2026-03-03', 20000, ['groceries'])
-    addConfigVersion(id, '2026-03-06', 30000, ['groceries'])
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments.map((s) => [s.start, s.end])).toEqual([
-      ['2026-03-01', '2026-03-03'],
-      ['2026-03-03', '2026-03-06'],
-      ['2026-03-06', '2026-03-08'],
-    ])
-  })
-
-  it('prorates against the actual period length for a variable-length (PAYDAY) period', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-15') // 14 days
-    addConfigVersion(id, '2026-03-08', 42000, ['groceries'])
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-15',
-      42000
-    )
-    expect(segments[0].budget).toBe(Math.round((30000 * 7) / 14))
-    expect(segments[1].budget).toBe(Math.round((42000 * 7) / 14))
-  })
-
-  it('does not split when a change is effective on or after the period end', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    setPeriod(id, '2026-03-01', '2026-03-08')
-    addConfigVersion(id, '2026-03-08', 40000, ['groceries']) // == period end
-
-    const segments = computeCurrentPeriodSegments(
-      id,
-      '2026-03-01',
-      '2026-03-08',
-      30000
-    )
-    expect(segments).toHaveLength(1)
-    expect(segments[0].budget).toBe(30000)
+    expect(segs).toHaveLength(2)
+    expect(segs.reduce((s, seg) => s + seg.spent, 0)).toBe(4000)
+    expect(segs[0].budget).toBe(Math.round((30000 * 4) / 7))
+    expect(segs[1].budget).toBe(Math.round((40000 * 3) / 7))
   })
 })
 
@@ -280,8 +408,7 @@ describe('getTrackerTransactionsInPeriod (current period, split)', () => {
     insertTx('d2', 'dining', -3000, '2026-03-06') // included
 
     const { list } = getTrackerTransactionsInPeriod(id, 0)
-    const ids = list.map((r) => r.id).sort()
-    expect(ids).toEqual(['d2', 'g1'])
+    expect(list.map((r) => r.id).sort()).toEqual(['d2', 'g1'])
   })
 })
 
@@ -337,13 +464,35 @@ describe('updateTracker records config versions', () => {
 
   it('a frequency change resets history to a fresh genesis row', () => {
     const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    updateTracker(id, 'Food', 45000, 'WEEKLY', 1, ['groceries']) // adds a version
+    updateTracker(id, 'Food', 45000, 'WEEKLY', 1, ['groceries'])
     expect(getTrackerConfigHistory(id)).toHaveLength(2)
 
     updateTracker(id, 'Food', 45000, 'MONTHLY', 1, ['groceries'])
     const history = getTrackerConfigHistory(id)
     expect(history).toHaveLength(1)
     expect(history[0].budget_amount).toBe(45000)
+  })
+
+  it('synthesises the OLD-config baseline when a tracker has no covering row', () => {
+    // Simulate legacy/demo data: a tracker whose only history row is after its
+    // period start. An edit must add the pre-change baseline, not just the
+    // next-day version, so the pre-boundary segment keeps the old budget.
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    db.run(`DELETE FROM tracker_config_history WHERE tracker_id = ?`, [id])
+    db.run(
+      `UPDATE trackers SET last_reset_date = '2026-03-01', next_reset_date = '2026-03-08' WHERE id = ?`,
+      [id]
+    )
+
+    updateTracker(id, 'Food', 45000, 'WEEKLY', 1, ['groceries'])
+
+    const history = getTrackerConfigHistory(id)
+    expect(history).toHaveLength(2)
+    expect(history[0]).toMatchObject({
+      effective_from: '2026-03-01',
+      budget_amount: 30000,
+    })
+    expect(history[1].budget_amount).toBe(45000)
   })
 })
 
@@ -377,7 +526,7 @@ describe('profile export / import round-trip', () => {
   })
 
   it('synthesises a genesis row when the import carries no config history (pre-v4)', () => {
-    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
     const payload = buildExportPayload()
 
     replaceTrackers(payload.trackers, payload.trackerCategories, [])
@@ -387,7 +536,6 @@ describe('profile export / import round-trip', () => {
     expect(history).toHaveLength(1)
     expect(history[0].budget_amount).toBe(30000)
     expect(history[0].category_ids).toEqual(['groceries'])
-    expect(id).toBeGreaterThan(0)
   })
 })
 

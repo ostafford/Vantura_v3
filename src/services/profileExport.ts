@@ -13,6 +13,7 @@ import {
   PBKDF2_ITERATIONS,
 } from '@/lib/crypto'
 import { SCHEMA_VERSION } from '@/db/schema'
+import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
 const EXPORT_PAYLOAD_VERSION = 4
@@ -688,21 +689,16 @@ export function replaceTrackers(
     }
     const newTrackerId = trackerIdMap.get(ch.tracker_id)
     if (newTrackerId == null) continue
-    db.run(
-      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
-       VALUES (?, ?, ?, ?)`,
-      [newTrackerId, ch.effective_from.slice(0, 10), ch.budget_amount, now]
+    const catIds = (
+      Array.isArray(ch.category_ids) ? ch.category_ids : []
+    ).filter((c): c is string => typeof c === 'string' && categoryExists(db, c))
+    writeTrackerConfigVersion(
+      db,
+      newTrackerId,
+      ch.effective_from.slice(0, 10),
+      ch.budget_amount,
+      catIds
     )
-    const configId =
-      (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ??
-      0
-    for (const catId of Array.isArray(ch.category_ids) ? ch.category_ids : []) {
-      if (typeof catId !== 'string' || !categoryExists(db, catId)) continue
-      db.run(
-        `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
-        [configId, catId]
-      )
-    }
     trackersWithHistory.add(newTrackerId)
   }
   for (const newId of trackerIdMap.values()) {
@@ -715,24 +711,12 @@ export function replaceTrackers(
       trackerRow[0]?.values?.[0]?.[0] ?? now.slice(0, 10)
     ).slice(0, 10)
     const budgetAmount = Number(trackerRow[0]?.values?.[0]?.[1] ?? 0)
-    db.run(
-      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
-       VALUES (?, ?, ?, ?)`,
-      [newId, effectiveFrom, budgetAmount, now]
-    )
-    const configId =
-      (db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] as number) ??
-      0
     const catRows = db.exec(
       `SELECT category_id FROM tracker_categories WHERE tracker_id = ?`,
       [newId]
     )
-    for (const c of catRows[0]?.values ?? []) {
-      db.run(
-        `INSERT OR IGNORE INTO tracker_config_history_categories (config_id, category_id) VALUES (?, ?)`,
-        [configId, String(c[0])]
-      )
-    }
+    const cats = (catRows[0]?.values ?? []).map((c) => String(c[0]))
+    writeTrackerConfigVersion(db, newId, effectiveFrom, budgetAmount, cats)
   }
 }
 

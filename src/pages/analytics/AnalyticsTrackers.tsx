@@ -126,6 +126,7 @@ export function AnalyticsTrackers() {
         budget: number
         progress: number
         dateRangeLabel: string
+        wasAdjusted: boolean
       }
     > = {}
     for (const t of trackers) {
@@ -135,10 +136,12 @@ export function AnalyticsTrackers() {
       let spent: number
       let budget: number
       let dateRangeLabel: string
+      let wasAdjusted = false
       if (nativeMatch) {
         spent = t.spent
         // Effective budget accounts for a mid-period config change (#16).
         budget = t.effectiveBudget
+        wasAdjusted = t.wasAdjustedThisPeriod
         dateRangeLabel =
           t.period_start && t.period_end
             ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
@@ -154,7 +157,7 @@ export function AnalyticsTrackers() {
         dateRangeLabel = bounds.label
       }
       const progress = budget > 0 ? (spent / budget) * 100 : 0
-      map[t.id] = { spent, budget, progress, dateRangeLabel }
+      map[t.id] = { spent, budget, progress, dateRangeLabel, wasAdjusted }
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,6 +221,7 @@ export function AnalyticsTrackers() {
                   budget: t.effectiveBudget,
                   progress: t.progress,
                   dateRangeLabel: '',
+                  wasAdjusted: t.wasAdjustedThisPeriod,
                 }
                 return (
                   <Link
@@ -249,6 +253,17 @@ export function AnalyticsTrackers() {
                                 ${formatMoney(effectiveData.spent)} of $
                                 {formatMoney(effectiveData.budget)} spent
                               </span>
+                              {effectiveData.wasAdjusted && (
+                                <span
+                                  className="small text-muted"
+                                  title="Budget or categories changed during this period. Each part of the period is judged against the settings that applied then."
+                                >
+                                  <i
+                                    className="mdi mdi-tune-variant"
+                                    aria-label="adjusted mid-period"
+                                  />
+                                </span>
+                              )}
                               {effectiveData.dateRangeLabel && (
                                 <span className="small text-muted">
                                   · {effectiveData.dateRangeLabel}
