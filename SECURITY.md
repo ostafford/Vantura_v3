@@ -21,6 +21,8 @@ The following data never leaves your device and is invisible to the hosting prov
 
 All Up Bank API requests are made directly from your browser to `https://api.up.com.au` — they do not pass through Cloudflare or any intermediate server.
 
+Two presentation-only assets load from external CDNs rather than the Cloudflare bundle: the Material Design Icons stylesheet from jsDelivr (`cdn.jsdelivr.net`, version-pinned and protected by a Subresource Integrity hash, so a tampered response is rejected by your browser rather than loaded) and its webfonts from Google Fonts. No application data passes through either. The Content-Security-Policy restricts all network requests (`connect-src`) to `api.up.com.au` and `cdn.jsdelivr.net` only.
+
 Previous hosting providers (GitHub Pages, then Netlify) offered the same privacy guarantee. The consolidation to Cloudflare Pages was made to unify domain management, CDN, and hosting under a single provider. The data model and URL (`myvantura.xyz`) are unchanged.
 
 ## Reporting a vulnerability

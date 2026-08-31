@@ -65,9 +65,9 @@ API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2
 
 ## Documentation map
 
-Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo) — one folder per feature under `docs/features/`, plus `docs/DATABASE.md` for the schema and `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
+Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `CONTEXT.md` glossary plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
 
-**Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — it's a short router that points to `OVERVIEW.md` (how the feature works, always present), `CONTEXT.md` (why it's built this way, if that folder has one), and `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
+**Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — a short router pointing to `OVERVIEW.md` (how the feature works, always present) and out to the relevant entries in the repo-root `CONTEXT.md` glossary and `docs/adr/` for *why*. It may also point to a `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature). Folders not yet migrated to this model still carry their own `CONTEXT.md`; where both exist, the root glossary + ADRs are canonical.
 
 Feature folders live under `docs/features/` — list that directory rather than a name here that can drift out of sync with it.
 
@@ -84,4 +84,4 @@ Issues live in GitHub Issues (`ostafford/Vantura_v3`, via the `gh` CLI). See `do
 
 ### Domain docs
 
-Single-context layout: `CONTEXT.md` + `docs/adr/` at the repo root (created lazily as terms/decisions are resolved). See `docs/agents/domain.md`.
+Single-context layout: a repo-root `CONTEXT.md` glossary + `docs/adr/`. These are the canonical home for domain "why" — per-feature `docs/features/*/CONTEXT.md` files are being retired into them as each feature's docs are rebuilt (9 done so far; see issue #13). See `docs/agents/domain.md`.
