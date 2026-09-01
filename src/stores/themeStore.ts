@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
-import { getAppSetting, setAppSetting } from '@/db'
+import { setAppSetting } from '@/db'
+import { loadValidatedSetting } from '@/lib/loadValidatedSetting'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -39,16 +40,19 @@ export const themeStore = createStore<ThemeStore>((set) => ({
   },
 
   hydrateFromDb() {
+    const mode = loadValidatedSetting(
+      THEME_SETTINGS_KEY,
+      (raw) => (isValidTheme(raw) ? raw : null),
+      DEFAULT_THEME
+    )
+    set({ mode, hydrated: true })
     try {
-      const value = getAppSetting(THEME_SETTINGS_KEY)
-      if (value && isValidTheme(value)) {
-        set({ mode: value, hydrated: true })
-        localStorage.setItem(THEME_LOCALSTORAGE_KEY, value)
-        return
-      }
-      set({ mode: DEFAULT_THEME, hydrated: true })
+      localStorage.setItem(THEME_LOCALSTORAGE_KEY, mode)
     } catch {
-      set({ mode: DEFAULT_THEME, hydrated: true })
+      // Storage unavailable (private mode / quota / disabled). App.tsx's theme
+      // effect re-mirrors this on its next run and index.html's pre-paint
+      // script falls back to its own default — a failed write must not wedge
+      // the boot sequence, which calls hydrateFromDb() outside any try/catch.
     }
   },
 }))

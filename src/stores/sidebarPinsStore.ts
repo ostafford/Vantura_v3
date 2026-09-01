@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
-import { getAppSetting, setAppSetting } from '@/db'
+import { setAppSetting } from '@/db'
+import { loadValidatedSetting } from '@/lib/loadValidatedSetting'
 
 export interface PinnedNavItem {
   path: string
@@ -33,23 +34,27 @@ interface SidebarPinsState {
 
 const PINS_KEY = 'sidebar_pins'
 
+function isPinnedNavItem(value: unknown): value is PinnedNavItem {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).path === 'string' &&
+    typeof (value as Record<string, unknown>).label === 'string' &&
+    typeof (value as Record<string, unknown>).icon === 'string'
+  )
+}
+
 function loadPins(): PinnedNavItem[] {
-  try {
-    const raw = getAppSetting(PINS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (p): p is PinnedNavItem =>
-        typeof p === 'object' &&
-        p !== null &&
-        typeof (p as Record<string, unknown>).path === 'string' &&
-        typeof (p as Record<string, unknown>).label === 'string' &&
-        typeof (p as Record<string, unknown>).icon === 'string'
-    )
-  } catch {
-    return []
-  }
+  return loadValidatedSetting(
+    PINS_KEY,
+    (raw) => {
+      const parsed = JSON.parse(raw) as unknown
+      // Keep the valid entries and drop only the malformed ones — a single
+      // bad pin (e.g. from a future required field) must not wipe the list.
+      return Array.isArray(parsed) ? parsed.filter(isPinnedNavItem) : null
+    },
+    []
+  )
 }
 
 function savePins(pins: PinnedNavItem[]): void {
