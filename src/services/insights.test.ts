@@ -84,6 +84,17 @@ describe('getYearComparisonPeriods', () => {
     expect(r.previous.from).toBe('2025-01-01')
     expect(r.previous.to).toBe('2025-04-15')
   })
+
+  it('clamps the prior-year YTD end to Feb 28 on a leap-year Feb 29', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2028, 1, 29)) // Feb 29, 2028 — a leap year
+    const r = getYearComparisonPeriods(2028)
+    expect(r.current.to).toBe('2028-02-29')
+    // setFullYear(2027) on a Feb-29 Date normalises to 2027-03-01, which would
+    // make the prior-year window a day longer than the current YTD. It must
+    // clamp to Feb 28 so both windows span the same elapsed days.
+    expect(r.previous.to).toBe('2027-02-28')
+  })
 })
 
 describe('getYearComparison periodNote', () => {
@@ -234,6 +245,82 @@ describe('getWeekComparison', () => {
     expectedPrevEnd.setDate(expectedPrevEnd.getDate() + 6)
     expectedPrevEnd.setHours(23, 59, 59, 999)
     const expectedPrevEndIso = expectedPrevEnd.toISOString()
+
+    const previousBoundCalls = bindCalls.filter(
+      (args) => args[0] === expectedPrevStartIso
+    )
+    expect(previousBoundCalls.length).toBeGreaterThan(0)
+    for (const args of previousBoundCalls) {
+      expect(args[1]).toBe(expectedPrevEndIso)
+    }
+  })
+})
+
+describe('elapsed-day maths across a DST transition', () => {
+  // Between two local midnights that straddle a spring-forward, real elapsed
+  // time is N*24h - 1h, so a flat `msDiff / 86_400_000` floor lands one day
+  // short. Africa/Cairo springs forward at 00:00 on Fri 2026-04-24 (a weekday,
+  // so the transition sits inside a Mon–today window); America/New_York springs
+  // forward at 02:00 on 2026-03-08.
+  const ORIGINAL_TZ = process.env.TZ
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    if (ORIGINAL_TZ === undefined) delete process.env.TZ
+    else process.env.TZ = ORIGINAL_TZ
+    vi.useRealTimers()
+  })
+
+  function mockEmptyDb() {
+    const stmt = {
+      bind: () => {},
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+  }
+
+  it('getMonthComparison counts full elapsed days when a spring-forward falls inside the month', () => {
+    process.env.TZ = 'America/New_York'
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 2, 20, 12)) // Mar 20, 2026 — after the Mar 8 transition
+    mockEmptyDb()
+
+    const result = getMonthComparison('2026-03-01', '2026-03-31')
+    // 20 elapsed days (Mar 1–20) -> previous month capped to Feb 1–20.
+    // A flat 24h divide would floor to 19 and cap to Feb 1–19.
+    expect(result.periodNote).toBe('Mar 1–Mar 20 vs Feb 1–Feb 20')
+  })
+
+  it('getWeekComparison caps the previous week to the true elapsed-day count when a spring-forward falls inside the week', () => {
+    process.env.TZ = 'Africa/Cairo'
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 3, 25, 12)) // Sat Apr 25, 2026 — day after the Apr 24 00:00 transition
+
+    const bindCalls: unknown[][] = []
+    const stmt = {
+      bind: (args: unknown[]) => bindCalls.push(args),
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+
+    getWeekComparison(0)
+
+    // Current week Mon Apr 20 – today Sat Apr 25 = 6 elapsed days, so the
+    // previous week (Mon Apr 13 –) is capped to 6 days -> ends Apr 18.
+    // A flat 24h divide floors elapsed to 5 and would cap to Apr 17.
+    const prevMonday = new Date(2026, 3, 13)
+    prevMonday.setHours(0, 0, 0, 0)
+    const expectedPrevStartIso = prevMonday.toISOString()
+    const cappedEnd = new Date(2026, 3, 18)
+    cappedEnd.setHours(23, 59, 59, 999)
+    const expectedPrevEndIso = cappedEnd.toISOString()
 
     const previousBoundCalls = bindCalls.filter(
       (args) => args[0] === expectedPrevStartIso
