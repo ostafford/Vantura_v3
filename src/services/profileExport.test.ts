@@ -947,4 +947,94 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       )
     })
   })
+
+  // ── #35: importPayloadWithOptions is wrapped in one transaction ─────────
+
+  describe('importPayloadWithOptions: transactional rollback (#35)', () => {
+    /**
+     * A corrupted export could carry a non-scalar where a scalar is expected;
+     * sql.js throws when it tries to bind one. Here `reset_day` is an object,
+     * so `replaceTrackers` throws mid-import — after `replaceBudgetPlan` has
+     * already deleted and rewritten `budget_buckets`.
+     */
+    function payloadThatThrowsInTrackers(): ExportPayload {
+      return emptyPayload({
+        budgetBuckets: [
+          { id: 1, name: 'Imported', icon: 'mdi-wallet', sort_order: 0 },
+        ],
+        trackers: [
+          {
+            ...trackerExport({ id: 1, name: 'Bad' }),
+            reset_day: {} as unknown as number,
+          },
+        ],
+      })
+    }
+
+    it('rolls the DB back to its pre-import state when a section throws partway', () => {
+      realDb.run(
+        `INSERT INTO budget_buckets (name, icon, sort_order, created_at)
+         VALUES ('Existing', 'mdi-wallet', 0, '2026-01-01')`
+      )
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
+         VALUES ('Existing charge', 1000, 'MONTHLY', '2026-01-01', 1, '2026-01-01')`
+      )
+
+      expect(() =>
+        importPayloadWithOptions(payloadThatThrowsInTrackers(), ALL_ON)
+      ).toThrow()
+
+      // replaceBudgetPlan's DELETE + reinsert was undone.
+      const bucketNames = (
+        realDb.exec(`SELECT name FROM budget_buckets`)[0]?.values ?? []
+      ).map((r) => r[0])
+      expect(bucketNames).toEqual(['Existing'])
+      // The section that never ran is untouched.
+      expect(readCharges().map((c) => c.name)).toEqual(['Existing charge'])
+      // No partial tracker rows.
+      expect(readTrackers()).toEqual([])
+    })
+
+    it('leaves no transaction open after a rollback', () => {
+      expect(() =>
+        importPayloadWithOptions(payloadThatThrowsInTrackers(), ALL_ON)
+      ).toThrow()
+
+      // A still-open transaction would make this BEGIN throw
+      // ("cannot start a transaction within a transaction").
+      expect(() => realDb.run('BEGIN')).not.toThrow()
+      realDb.run('ROLLBACK')
+    })
+
+    it('commits every section when the import completes without error', () => {
+      insertCategory('groceries')
+      realDb.run(
+        `INSERT INTO budget_buckets (name, icon, sort_order, created_at)
+         VALUES ('Stale', 'mdi-wallet', 0, '2026-01-01')`
+      )
+
+      importPayloadWithOptions(
+        emptyPayload({
+          budgetBuckets: [
+            { id: 1, name: 'Fresh', icon: 'mdi-wallet', sort_order: 0 },
+          ],
+          trackers: [trackerExport({ id: 1, name: 'T', bucket_id: 1 })],
+          trackerCategories: [{ tracker_id: 1, category_id: 'groceries' }],
+          upcomingCharges: [chargeExport({ name: 'C' })],
+        }),
+        ALL_ON
+      )
+
+      const bucketNames = realDb
+        .exec(`SELECT name FROM budget_buckets`)[0]
+        .values.map((r) => r[0])
+      expect(bucketNames).toEqual(['Fresh'])
+      expect(readTrackers().map((t) => t.name)).toEqual(['T'])
+      expect(readCharges().map((c) => c.name)).toEqual(['C'])
+      // Transaction was closed by COMMIT, not left dangling.
+      expect(() => realDb.run('BEGIN')).not.toThrow()
+      realDb.run('ROLLBACK')
+    })
+  })
 })
