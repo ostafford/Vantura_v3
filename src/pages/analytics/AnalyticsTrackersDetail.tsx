@@ -18,6 +18,7 @@ import {
   getTrackerTransactionsForTable,
   getTrackerTransactionsCount,
   getTrackerCategoryIds,
+  getTrackerConfigHistory,
   type TrackerResetFrequency,
   type TrackerPeriodHistoryRow,
 } from '@/services/trackers'
@@ -26,7 +27,12 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
-import { formatMoney, formatDate, formatShortDate } from '@/lib/format'
+import {
+  formatMoney,
+  formatDate,
+  formatShortDate,
+  formatShortDateWithYear,
+} from '@/lib/format'
 import {
   addDaysToDateStr,
   calendarPeriodBounds,
@@ -241,6 +247,19 @@ export function AnalyticsTrackersDetail() {
     .map((cid) => categories.find((c) => c.id === cid)?.name)
     .filter(Boolean)
     .join(', ')
+
+  // #16 Phase 2 — read-only config timeline, newest first. A single genesis
+  // row means the tracker has never been reconfigured, so there's nothing to
+  // show; the card only appears once there's real history.
+  const configHistory = useMemo(() => {
+    if (!tracker) return []
+    return [...getTrackerConfigHistory(id)].reverse()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracker, id, lastSyncCompletedAt])
+
+  // `categories` is re-fetched unmemoized each render, so a useMemo keyed on it
+  // would rebuild every time anyway — just build the lookup inline.
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]))
 
   const maxDomainPeriod = useMemo(() => {
     if (effectivePeriodHistory.length === 0) return undefined
@@ -474,6 +493,60 @@ export function AnalyticsTrackersDetail() {
           </Card>
         </Col>
       </Row>
+
+      {/* Configuration history (#16 Phase 2) */}
+      {configHistory.length > 1 && (
+        <Row className="grid-margin">
+          <Col xs={12}>
+            <Card>
+              <Card.Header>
+                <Card.Title className="mb-0">Configuration history</Card.Title>
+                <Card.Text as="div" className="small text-muted mt-1">
+                  How this tracker&rsquo;s budget and categories have changed
+                  over time, newest first.
+                </Card.Text>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <div className="table-responsive">
+                  <table className="table table-striped mb-0">
+                    <thead>
+                      <tr>
+                        <th>Effective from</th>
+                        <th className="text-end">Budget</th>
+                        <th>Categories</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {configHistory.map((v, i) => (
+                        <tr key={v.id}>
+                          <td>
+                            {formatShortDateWithYear(v.effective_from)}
+                            {i === configHistory.length - 1 && (
+                              <Badge bg="secondary" className="text-dark ms-2">
+                                Initial
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="text-end">
+                            ${formatMoney(v.budget_amount)}
+                          </td>
+                          <td className="small">
+                            {v.category_ids
+                              .map((cid) => categoryNameById.get(cid))
+                              .filter((n): n is string => n != null)
+                              .sort((a, b) => a.localeCompare(b))
+                              .join(', ') || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Spending Pace */}
       <Row className="grid-margin">
