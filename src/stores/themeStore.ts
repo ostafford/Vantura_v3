@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
-import { getAppSetting, setAppSetting } from '@/db'
+import { setAppSetting } from '@/db'
+import { loadValidatedSetting } from '@/lib/loadValidatedSetting'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -39,16 +40,12 @@ export const themeStore = createStore<ThemeStore>((set) => ({
   },
 
   hydrateFromDb() {
-    try {
-      const value = getAppSetting(THEME_SETTINGS_KEY)
-      if (value && isValidTheme(value)) {
-        set({ mode: value, hydrated: true })
-        localStorage.setItem(THEME_LOCALSTORAGE_KEY, value)
-        return
-      }
-      set({ mode: DEFAULT_THEME, hydrated: true })
-    } catch {
-      set({ mode: DEFAULT_THEME, hydrated: true })
-    }
+    const mode = loadValidatedSetting(
+      THEME_SETTINGS_KEY,
+      isValidTheme,
+      DEFAULT_THEME
+    )
+    set({ mode, hydrated: true })
+    localStorage.setItem(THEME_LOCALSTORAGE_KEY, mode)
   },
 }))

@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
-import { getAppSetting, setAppSetting } from '@/db'
+import { setAppSetting } from '@/db'
+import { loadValidatedSetting } from '@/lib/loadValidatedSetting'
 
 export interface PinnedNavItem {
   path: string
@@ -33,23 +34,22 @@ interface SidebarPinsState {
 
 const PINS_KEY = 'sidebar_pins'
 
+function isPinnedNavItem(value: unknown): value is PinnedNavItem {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).path === 'string' &&
+    typeof (value as Record<string, unknown>).label === 'string' &&
+    typeof (value as Record<string, unknown>).icon === 'string'
+  )
+}
+
+function isPinnedNavItemArray(value: unknown): value is PinnedNavItem[] {
+  return Array.isArray(value) && value.every(isPinnedNavItem)
+}
+
 function loadPins(): PinnedNavItem[] {
-  try {
-    const raw = getAppSetting(PINS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (p): p is PinnedNavItem =>
-        typeof p === 'object' &&
-        p !== null &&
-        typeof (p as Record<string, unknown>).path === 'string' &&
-        typeof (p as Record<string, unknown>).label === 'string' &&
-        typeof (p as Record<string, unknown>).icon === 'string'
-    )
-  } catch {
-    return []
-  }
+  return loadValidatedSetting(PINS_KEY, isPinnedNavItemArray, [])
 }
 
 function savePins(pins: PinnedNavItem[]): void {
