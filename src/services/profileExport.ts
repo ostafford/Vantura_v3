@@ -1,7 +1,10 @@
 /**
- * Profile export/import: encrypted file-based transfer of non-sensitive
- * settings, trackers, upcoming charges, and budget plan between devices.
- * Never exports transactions, accounts, API tokens, or keys.
+ * Profile export/import: encrypted file-based transfer of settings, trackers,
+ * upcoming charges, budget plan, and Net Worth manual accounts + snapshot
+ * history between devices. Never exports Up Bank transactions or accounts, the
+ * API token, or encryption keys. The manual-account balances / institution
+ * names / notes that #34 added are only ever written to the passphrase-encrypted
+ * bundle and stay on-device — nothing here makes a network call.
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
@@ -16,7 +19,7 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 4
+const EXPORT_PAYLOAD_VERSION = 5
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -73,6 +76,10 @@ export interface ExportPayload {
   upcomingCharges: UpcomingChargeExportRow[]
   budgetBuckets: BudgetBucketExportRow[]
   budgetHypotheticals: BudgetHypotheticalExportRow[]
+  /** #34 — Net Worth manual accounts. Absent in payloads from before v5. */
+  manualAccounts?: ManualAccountExportRow[]
+  /** #34 — Net Worth daily snapshot history. Absent in payloads from before v5. */
+  netWorthSnapshots?: NetWorthSnapshotExportRow[]
 }
 
 export interface TrackerExportRow {
@@ -120,6 +127,37 @@ export interface BudgetHypotheticalExportRow {
   amount_cents: number
   frequency: string
   is_hypothetical: number
+}
+
+/**
+ * #34 — a `manual_accounts` row minus its local AUTOINCREMENT `id` (no
+ * cross-database identity, same as `upcoming_charges`). `last_updated_at` and
+ * `created_at` are carried through as-exported rather than reset on import — a
+ * restored account should report when its balance was actually last confirmed.
+ */
+export interface ManualAccountExportRow {
+  name: string
+  institution: string | null
+  account_type: string
+  kind: string
+  balance_cents: number
+  credit_limit_cents: number | null
+  interest_rate_bps: number | null
+  rate_type: string | null
+  fixed_rate_expiry_date: string | null
+  notes: string | null
+  sort_order: number
+  last_updated_at: string
+  created_at: string
+}
+
+/** #34 — a `net_worth_snapshots` row verbatim; `snapshot_date` is the PK and is
+ * itself cross-database stable, so no id remap is needed. */
+export interface NetWorthSnapshotExportRow {
+  snapshot_date: string
+  up_bank_cents: number
+  manual_assets_cents: number
+  manual_liabilities_cents: number
 }
 
 export interface ExportFileWrapper {
@@ -322,6 +360,73 @@ function collectBudgetHypotheticals(): BudgetHypotheticalExportRow[] {
   return rows
 }
 
+function collectManualAccounts(): ManualAccountExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT name, institution, account_type, kind, balance_cents,
+            credit_limit_cents, interest_rate_bps, rate_type,
+            fixed_rate_expiry_date, notes, sort_order, last_updated_at, created_at
+     FROM manual_accounts ORDER BY sort_order, id`
+  )
+  const rows: ManualAccountExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      string | null,
+      string,
+      string,
+      number,
+      number | null,
+      number | null,
+      string | null,
+      string | null,
+      string | null,
+      number,
+      string,
+      string,
+    ]
+    rows.push({
+      name: r[0],
+      institution: r[1],
+      account_type: r[2],
+      kind: r[3],
+      balance_cents: r[4],
+      credit_limit_cents: r[5],
+      interest_rate_bps: r[6],
+      rate_type: r[7],
+      fixed_rate_expiry_date: r[8],
+      notes: r[9],
+      sort_order: r[10],
+      last_updated_at: r[11],
+      created_at: r[12],
+    })
+  }
+  stmt.free()
+  return rows
+}
+
+function collectNetWorthSnapshots(): NetWorthSnapshotExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents
+     FROM net_worth_snapshots ORDER BY snapshot_date`
+  )
+  const rows: NetWorthSnapshotExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [string, number, number, number]
+    rows.push({
+      snapshot_date: r[0],
+      up_bank_cents: r[1],
+      manual_assets_cents: r[2],
+      manual_liabilities_cents: r[3],
+    })
+  }
+  stmt.free()
+  return rows
+}
+
 /**
  * Build the plain-text export payload (before encryption).
  */
@@ -333,6 +438,8 @@ export function buildExportPayload(): ExportPayload {
   const upcomingCharges = collectUpcomingCharges()
   const budgetBuckets = collectBudgetBuckets()
   const budgetHypotheticals = collectBudgetHypotheticals()
+  const manualAccounts = collectManualAccounts()
+  const netWorthSnapshots = collectNetWorthSnapshots()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -345,6 +452,8 @@ export function buildExportPayload(): ExportPayload {
     upcomingCharges,
     budgetBuckets,
     budgetHypotheticals,
+    manualAccounts,
+    netWorthSnapshots,
   }
 }
 
@@ -487,6 +596,8 @@ export interface ImportOptions {
   trackers: boolean
   upcomingCharges: boolean
   budgetPlan: boolean
+  /** #34 — manual_accounts + net_worth_snapshots (Net Worth). */
+  netWorth: boolean
 }
 
 /** Apply whitelisted settings from payload. */
@@ -784,6 +895,94 @@ export function replaceUpcomingCharges(
 }
 
 /**
+ * #34 — Replace manual_accounts and net_worth_snapshots with imported data.
+ * Both are full delete-then-reinsert (ADR-0013). manual_accounts.id is local
+ * AUTOINCREMENT so it is dropped on export and regenerated here; nothing
+ * references it across the export boundary. net_worth_snapshots carry no
+ * manual-account foreign keys — they are pre-aggregated daily totals keyed by
+ * date — so they just copy across.
+ */
+export function replaceNetWorth(
+  manualAccounts: ManualAccountExportRow[] = [],
+  netWorthSnapshots: NetWorthSnapshotExportRow[] = []
+): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM net_worth_snapshots`)
+  db.run(`DELETE FROM manual_accounts`)
+
+  const now = new Date().toISOString()
+  const accounts = Array.isArray(manualAccounts) ? manualAccounts : []
+  for (const a of accounts) {
+    if (
+      typeof a.name !== 'string' ||
+      a.name === '' ||
+      typeof a.account_type !== 'string' ||
+      (a.kind !== 'asset' && a.kind !== 'liability') ||
+      typeof a.balance_cents !== 'number'
+    ) {
+      continue
+    }
+    const str = (v: unknown): string | null =>
+      typeof v === 'string' && v !== '' ? v : null
+    const num = (v: unknown): number | null =>
+      typeof v === 'number' ? v : null
+    const lastUpdatedAt =
+      typeof a.last_updated_at === 'string' && a.last_updated_at
+        ? a.last_updated_at
+        : now
+    const createdAt =
+      typeof a.created_at === 'string' && a.created_at ? a.created_at : now
+    db.run(
+      `INSERT INTO manual_accounts
+         (name, institution, account_type, kind, balance_cents, credit_limit_cents,
+          interest_rate_bps, rate_type, fixed_rate_expiry_date, notes, sort_order,
+          last_updated_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        a.name,
+        str(a.institution),
+        a.account_type,
+        a.kind,
+        a.balance_cents,
+        num(a.credit_limit_cents),
+        num(a.interest_rate_bps),
+        str(a.rate_type),
+        str(a.fixed_rate_expiry_date),
+        str(a.notes),
+        typeof a.sort_order === 'number' ? a.sort_order : 0,
+        lastUpdatedAt,
+        createdAt,
+      ]
+    )
+  }
+
+  const snapshots = Array.isArray(netWorthSnapshots) ? netWorthSnapshots : []
+  for (const s of snapshots) {
+    if (
+      typeof s.snapshot_date !== 'string' ||
+      s.snapshot_date.length < 10 ||
+      typeof s.up_bank_cents !== 'number' ||
+      typeof s.manual_assets_cents !== 'number' ||
+      typeof s.manual_liabilities_cents !== 'number'
+    ) {
+      continue
+    }
+    db.run(
+      `INSERT OR REPLACE INTO net_worth_snapshots
+         (snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents)
+       VALUES (?, ?, ?, ?)`,
+      [
+        s.snapshot_date.slice(0, 10),
+        s.up_bank_cents,
+        s.manual_assets_cents,
+        s.manual_liabilities_cents,
+      ]
+    )
+  }
+}
+
+/**
  * Import payload into the database with optional section selection.
  * Budget plan is applied first so bucket IDs can be remapped for trackers
  * and upcoming charges.
@@ -831,6 +1030,12 @@ export function importPayloadWithOptions(
     }
     if (options.upcomingCharges) {
       replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
+    }
+    if (options.netWorth) {
+      replaceNetWorth(
+        payload.manualAccounts ?? [],
+        payload.netWorthSnapshots ?? []
+      )
     }
 
     db.run('COMMIT')
