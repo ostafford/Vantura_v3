@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 42
+const SCHEMA_VERSION = 43
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -142,7 +142,6 @@ const DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS transaction_user_data (
     transaction_id TEXT PRIMARY KEY,
     user_notes TEXT,
-    user_category_override TEXT,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
@@ -1145,6 +1144,29 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['42']
+    )
+  }
+
+  // #27 — transaction_user_data.user_category_override was a local re-categorise
+  // slot, but nothing in src/ ever wrote it (no UI), only demo seed data and a
+  // now-removed "clear on Up PATCH" line. It never flowed through filtering or
+  // category analytics. The real recategorise path is a PATCH to Up
+  // (updateTransactionCategoryLocal). Drop the column.
+  if (version < 43) {
+    const tudCols = database.exec(`PRAGMA table_info(transaction_user_data)`)
+    const tudHasOverride = (tudCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'user_category_override'
+    )
+    if (tudHasOverride) {
+      database.run(
+        `ALTER TABLE transaction_user_data DROP COLUMN user_category_override`
+      )
+      // A row that only held an override (no note) is now empty noise — clear it.
+      database.run(`DELETE FROM transaction_user_data WHERE user_notes IS NULL`)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['43']
     )
   }
 }

@@ -23,7 +23,6 @@ import {
   type TransactionRow,
 } from '@/services/transactions'
 import { getCategories } from '@/services/categories'
-import { getTransactionUserDataMap } from '@/services/transactionUserData'
 import { updateTransactionCategoryLocal } from '@/services/transactions'
 import {
   getAllTags,
@@ -200,11 +199,6 @@ export function Transactions() {
     [parentIdsByDate]
   )
 
-  const userDataMap = useMemo(
-    () => getTransactionUserDataMap(parentIdsByDate),
-    [parentIdsByDate]
-  )
-
   const [editTxId, setEditTxId] = useState<string | null>(null)
   const editTxRow = useMemo(() => {
     if (!editTxId) return null
@@ -221,15 +215,7 @@ export function Transactions() {
     [editTxId, lastSyncCompletedAt]
   )
 
-  const editEffectiveCategory = useMemo(() => {
-    if (!editTxRow) return null
-    const savedOverride = userDataMap[editTxRow.id]?.user_category_override
-    if (savedOverride)
-      return (
-        categories.find((c) => c.id === savedOverride)?.name ?? savedOverride
-      )
-    return editTxRow.category_name
-  }, [editTxRow, userDataMap, categories])
+  const editCategoryName = editTxRow?.category_name ?? null
 
   const [categoryUpdating, setCategoryUpdating] = useState(false)
   const [categoryError, setCategoryError] = useState<string | null>(null)
@@ -904,15 +890,7 @@ export function Transactions() {
                         </div>
                         <div className="small text-muted">
                           {displayDate}
-                          {(() => {
-                            const ud = userDataMap[row.id]
-                            const overrideCat = ud?.user_category_override
-                            const effective = overrideCat
-                              ? (categories.find((c) => c.id === overrideCat)
-                                  ?.name ?? overrideCat)
-                              : row.category_name
-                            return effective ? ` · ${effective}` : ''
-                          })()}
+                          {row.category_name ? ` · ${row.category_name}` : ''}
                         </div>
                         <span
                           className={`badge mt-1 ${
@@ -1011,19 +989,7 @@ export function Transactions() {
                           <td>
                             {row.description || row.raw_text || 'Unknown'}
                           </td>
-                          <td>
-                            {(() => {
-                              const ud = userDataMap[row.id]
-                              const overrideCat = ud?.user_category_override
-                              if (overrideCat) {
-                                return (
-                                  categories.find((c) => c.id === overrideCat)
-                                    ?.name ?? overrideCat
-                                )
-                              }
-                              return row.category_name ?? ''
-                            })()}
-                          </td>
+                          <td>{row.category_name ?? ''}</td>
                           <td
                             className={`text-end ${isDebit ? '' : 'text-success'}`}
                           >
@@ -1159,10 +1125,10 @@ export function Transactions() {
                       )}
                     </dd>
                   </>
-                ) : editEffectiveCategory ? (
+                ) : editCategoryName ? (
                   <>
                     <dt className="col-sm-4 text-muted">Category</dt>
-                    <dd className="col-sm-8">{editEffectiveCategory}</dd>
+                    <dd className="col-sm-8">{editCategoryName}</dd>
                   </>
                 ) : null}
 

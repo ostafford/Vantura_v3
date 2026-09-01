@@ -816,48 +816,42 @@ export function seedDemoData(): void {
     ]
   )
 
-  // Transaction user data: notes and category overrides showcasing both features.
+  // Transaction user data: local notes on a handful of transactions.
   // demo-tx-0  = Woolworths (today)
   // demo-tx-5  = Uber Eats (5 days ago) — dinner note
   // demo-tx-7  = McDonald's (7 days ago)
   // demo-tx-10 = Caltex (10 days ago) — work expense note
-  // demo-tx-15 = Kmart (15 days ago) — category overridden to Groceries
   // demo-tx-22 = Starbucks (22 days ago) — coffee note
   // demo-income-0-0 = Salary credit — labelled for clarity
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-0', 'Weekly grocery run', null]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-tx-0', 'Weekly grocery run']
   )
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-5', 'Birthday dinner with Sarah', null]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-tx-5', 'Birthday dinner with Sarah']
   )
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-7', 'Quick lunch on the go', null]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-tx-7', 'Quick lunch on the go']
   )
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-10', 'Work trip — reimbursable', null]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-tx-10', 'Work trip — reimbursable']
   )
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-15', null, catGroceries]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-tx-22', 'Morning coffee before the meeting']
   )
   run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-tx-22', 'Morning coffee before the meeting', null]
-  )
-  run(
-    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes, user_category_override)
-     VALUES (?, ?, ?)`,
-    ['demo-income-0-0', 'Monthly salary', null]
+    `INSERT OR REPLACE INTO transaction_user_data (transaction_id, user_notes)
+     VALUES (?, ?)`,
+    ['demo-income-0-0', 'Monthly salary']
   )
 
   // Tags: 3 demo tags attached to representative transactions.
