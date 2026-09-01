@@ -13,7 +13,6 @@ import {
 import {
   getTracker,
   getTrackerPeriodHistory,
-  getTrackerSpentInPeriod,
   getTrackerTransactionTimeline,
   getTrackerTransactionsForTable,
   getTrackerTransactionsCount,
@@ -22,22 +21,17 @@ import {
   type TrackerResetFrequency,
   type TrackerPeriodHistoryRow,
 } from '@/services/trackers'
-import {
-  toPeriodCents,
-  type BudgetDisplayPeriod,
-} from '@/lib/monthlyEquivalent'
+import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
 import {
   formatMoney,
   formatDate,
   formatShortDate,
   formatShortDateWithYear,
+  localDateString,
 } from '@/lib/format'
-import {
-  addDaysToDateStr,
-  calendarPeriodBounds,
-  daysBetweenDateStr,
-} from '@/lib/dateStr'
+import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
+import { buildCalendarPeriodHistory } from './trackerPeriodHistory'
 import { TrackerHistoryChart } from '@/components/charts/TrackerHistoryChart'
 import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -65,61 +59,6 @@ function displayPeriodEnd(isoDate: string): string {
   return addDaysToDateStr(isoDate, -1)
 }
 
-function buildCalendarPeriodHistory(
-  trackerId: number,
-  displayPeriod: BudgetDisplayPeriod,
-  periodsBack: number,
-  trackerBudget: number,
-  trackerFrequency: TrackerResetFrequency
-): TrackerPeriodHistoryRow[] {
-  const today = new Date()
-  const normalizedBudget = toPeriodCents(
-    trackerBudget,
-    trackerFrequency,
-    displayPeriod
-  )
-  const result: TrackerPeriodHistoryRow[] = []
-
-  for (let offset = -periodsBack + 1; offset <= 0; offset++) {
-    const { from, to } = calendarPeriodBounds(displayPeriod, offset, today)
-    let label: string
-
-    if (displayPeriod === 'WEEKLY') {
-      label =
-        offset === 0
-          ? 'This week'
-          : offset === -1
-            ? 'Last week'
-            : `${-offset} weeks ago`
-    } else if (displayPeriod === 'MONTHLY') {
-      label =
-        offset === 0
-          ? 'Current'
-          : offset === -1
-            ? 'Previous'
-            : `${-offset} months ago`
-    } else {
-      // YEARLY
-      label = offset === 0 ? 'Current' : from.slice(0, 4)
-    }
-
-    const spent = getTrackerSpentInPeriod(trackerId, from, to)
-    const remaining = Math.max(0, normalizedBudget - spent)
-    const progress = normalizedBudget > 0 ? (spent / normalizedBudget) * 100 : 0
-    result.push({
-      periodOffset: offset,
-      periodLabel: label,
-      periodStart: from,
-      periodEnd: to,
-      budget: normalizedBudget,
-      spent,
-      remaining,
-      progress,
-    })
-  }
-  return result
-}
-
 export function AnalyticsTrackersDetail() {
   const { trackerId } = useParams<{ trackerId: string }>()
   const [displayPeriod, setDisplayPeriod] =
@@ -133,7 +72,10 @@ export function AnalyticsTrackersDetail() {
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Local calendar date — feeds the pace math (`daysElapsed` / `daysLeft`) and
+  // the `today` marker on the pace chart. UTC here reads a day stale for
+  // UTC+10/+11 users in the early-morning-local window (#56).
+  const today = localDateString()
 
   const id = trackerId != null ? parseInt(trackerId, 10) : NaN
   const tracker = useMemo(
