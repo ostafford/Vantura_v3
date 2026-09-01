@@ -334,7 +334,33 @@ describe('getTrackersDisplayPeriodData', () => {
     const t = makeProgressRow({ reset_frequency: 'MONTHLY' })
     const d = getTrackersDisplayPeriodData([t], 'YEARLY')[1]
     expect(d.isNativePeriod).toBe(false)
-    expect(d.dateRangeLabel).toBe(String(new Date().getUTCFullYear()))
+    // the non-native branch anchors on the local calendar date
+    expect(d.dateRangeLabel).toBe(String(new Date().getFullYear()))
+  })
+
+  it('threads one consistent local "today" through non-native bounds and daysLeft (#52)', () => {
+    const originalTz = process.env.TZ
+    // UTC+11 in March (Australian daylight saving) — every Up Bank customer is
+    // on an AU offset.
+    process.env.TZ = 'Australia/Sydney'
+    vi.useFakeTimers()
+    // 2026-03-31 14:00 UTC == 2026-04-01 01:00 in Sydney: UTC is still on
+    // March, the local calendar has already rolled into April.
+    vi.setSystemTime(new Date('2026-03-31T14:00:00Z'))
+    try {
+      const t = makeProgressRow({ reset_frequency: 'WEEKLY' })
+      const d = getTrackersDisplayPeriodData([t], 'MONTHLY')[1]
+      // Local "today" is 1 Apr, so the display period is the whole of April:
+      // 30 days left and an April label — not the "1 Mar – 31 Mar · 0 days
+      // left" mismatch a UTC "today" against local-derived bounds produces.
+      expect(d.daysLeft).toBe(30)
+      expect(d.dateRangeLabel).toBe(
+        `${formatShortDate('2026-04-01')} – ${formatShortDate('2026-04-30')}`
+      )
+    } finally {
+      vi.useRealTimers()
+      process.env.TZ = originalTz
+    }
   })
 
   it('guards against a zero budget', () => {

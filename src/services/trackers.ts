@@ -531,6 +531,17 @@ export function getTrackersDisplayPeriodData(
 ): Record<number, TrackerDisplayPeriodData> {
   const out: Record<number, TrackerDisplayPeriodData> = {}
 
+  // One consistent "today" for the whole pass. `localDateString()` is this
+  // file's convention; `calendarPeriodBounds` reads a Date's *UTC* calendar
+  // fields, so it's handed the local date anchored at noon UTC. That keeps the
+  // non-native branch's period bounds and its `daysLeft` count in agreement at
+  // the UTC/local day boundary — an AU user (UTC+10/+11) opening the app before
+  // ~10am local is already on the next local day while UTC still shows the
+  // previous one, which otherwise skewed `daysLeft` and could mismatch the
+  // period label (#52).
+  const todayLocal = localDateString()
+  const todayLocalAtUtcNoon = new Date(`${todayLocal}T12:00:00Z`)
+
   for (const t of trackers) {
     const isNativePeriod =
       (displayPeriod === 'WEEKLY' && t.reset_frequency === 'WEEKLY') ||
@@ -551,16 +562,10 @@ export function getTrackersDisplayPeriodData(
       from = t.period_start ?? ''
       to = t.period_end ?? ''
     } else {
-      const bounds = calendarPeriodBounds(displayPeriod)
+      const bounds = calendarPeriodBounds(displayPeriod, 0, todayLocalAtUtcNoon)
       spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
       budget = toPeriodCents(t.budget_amount, t.reset_frequency, displayPeriod)
-      // NOTE: the pre-extraction component used UTC `new Date().toISOString()`
-      // for "today" here, unlike this file's `localDateString()` convention.
-      // Kept as-is so the extraction changes no behaviour; worth reconciling.
-      daysLeft = Math.max(
-        0,
-        daysBetweenDateStr(new Date().toISOString().slice(0, 10), bounds.to)
-      )
+      daysLeft = Math.max(0, daysBetweenDateStr(todayLocal, bounds.to))
       from = bounds.from
       to = bounds.to
     }
