@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
-import { __test__, type UpcomingChargeRow } from './upcoming'
+import {
+  __test__,
+  nextChargeDateFromAnchor,
+  type UpcomingChargeRow,
+} from './upcoming'
 
 let SQL: SqlJsStatic
 let db: Database
@@ -119,6 +123,82 @@ describe('upcoming recurrence projection', () => {
       null
     )
     expect(occurrence).toBe('2026-03-15')
+  })
+})
+
+describe('nextChargeDateFromAnchor (#47)', () => {
+  it('clamps a Jan 31 monthly anchor to end of February, not March 3', () => {
+    expect(
+      nextChargeDateFromAnchor('2026-01-31', 'MONTHLY', '2026-02-15')
+    ).toBe('2026-02-28')
+  })
+
+  it('clamps to Feb 29 in a leap year', () => {
+    expect(
+      nextChargeDateFromAnchor('2024-01-31', 'MONTHLY', '2024-02-10')
+    ).toBe('2024-02-29')
+  })
+
+  it('steps monthly across a year boundary', () => {
+    expect(
+      nextChargeDateFromAnchor('2025-12-31', 'MONTHLY', '2026-01-15')
+    ).toBe('2026-01-31')
+  })
+
+  it('steps yearly with leap-day clamping', () => {
+    expect(nextChargeDateFromAnchor('2024-02-29', 'YEARLY', '2024-06-01')).toBe(
+      '2025-02-28'
+    )
+  })
+
+  it('steps weekly and fortnightly past today', () => {
+    expect(nextChargeDateFromAnchor('2026-02-02', 'WEEKLY', '2026-02-15')).toBe(
+      '2026-02-16'
+    )
+    expect(
+      nextChargeDateFromAnchor('2026-01-01', 'FORTNIGHTLY', '2026-02-01')
+    ).toBe('2026-02-12')
+  })
+
+  it('keeps steps until the occurrence is strictly past today', () => {
+    // Jan 31 → Feb 28 → Mar 28 → Apr 28 (clamp-drift, matching stepOccurrence)
+    expect(
+      nextChargeDateFromAnchor('2026-01-31', 'MONTHLY', '2026-04-10')
+    ).toBe('2026-04-28')
+  })
+
+  it('returns an already-future anchor unchanged', () => {
+    expect(
+      nextChargeDateFromAnchor('2026-12-25', 'MONTHLY', '2026-03-10')
+    ).toBe('2026-12-25')
+  })
+
+  it('normalizes a datetime anchor to its date part', () => {
+    expect(
+      nextChargeDateFromAnchor('2026-01-31T09:00:00Z', 'MONTHLY', '2026-02-15')
+    ).toBe('2026-02-28')
+  })
+
+  it('falls back to today for ONCE and for an unrecognised frequency', () => {
+    expect(nextChargeDateFromAnchor('2020-01-01', 'ONCE', '2026-03-10')).toBe(
+      '2026-03-10'
+    )
+    expect(nextChargeDateFromAnchor('2020-01-01', 'BOGUS', '2026-03-10')).toBe(
+      '2026-03-10'
+    )
+  })
+
+  it('defaults the "today" argument to the local date', () => {
+    expect(nextChargeDateFromAnchor('2020-01-01', 'ONCE')).toBe(
+      localDateString()
+    )
+  })
+
+  it('falls back to today when the anchor is too far past to resolve in 1000 steps', () => {
+    // ~21 years of weekly steps exceeds the guard; return today, not a past date.
+    expect(nextChargeDateFromAnchor('2005-01-01', 'WEEKLY', '2026-03-10')).toBe(
+      '2026-03-10'
+    )
   })
 })
 

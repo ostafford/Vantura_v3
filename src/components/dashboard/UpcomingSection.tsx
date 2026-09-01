@@ -16,6 +16,7 @@ import {
   deleteUpcomingCharge,
   getUpcomingChargesForMonth,
   daysUntilCharge,
+  nextChargeDateFromAnchor,
   type UpcomingChargeRow,
 } from '@/services/upcoming'
 import { getReservedAmount } from '@/services/balance'
@@ -51,44 +52,6 @@ const FREQUENCIES = [
 
 /** Default number of rows shown before the "Show all" toggle appears. */
 const DEFAULT_VISIBLE_COUNT = 5
-
-/** Given an anchor date (from a past transaction) and a frequency, returns the
- *  next future occurrence as a YYYY-MM-DD string. */
-function calcNextChargeDate(anchorDateStr: string, frequency: string): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  if (frequency === 'ONCE') {
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  }
-
-  const [y, m, d] = anchorDateStr.slice(0, 10).split('-').map(Number)
-  const next = new Date(y, m - 1, d)
-
-  while (next <= today) {
-    switch (frequency) {
-      case 'WEEKLY':
-        next.setDate(next.getDate() + 7)
-        break
-      case 'FORTNIGHTLY':
-        next.setDate(next.getDate() + 14)
-        break
-      case 'MONTHLY':
-        next.setMonth(next.getMonth() + 1)
-        break
-      case 'QUARTERLY':
-        next.setMonth(next.getMonth() + 3)
-        break
-      case 'YEARLY':
-        next.setFullYear(next.getFullYear() + 1)
-        break
-      default:
-        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    }
-  }
-
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
-}
 
 function UpcomingCalendar({
   year,
@@ -436,7 +399,7 @@ export function UpcomingSection({
     setName(tx.description)
     setAmount((tx.amount / 100).toFixed(2))
     setCategoryId(tx.category_id ?? '')
-    setNextChargeDate(calcNextChargeDate(tx.date, frequency))
+    setNextChargeDate(nextChargeDateFromAnchor(tx.date, frequency))
     setImportedFromTx(tx)
     if (tx.raw_text) {
       setMatchRawText(tx.raw_text)
@@ -1051,7 +1014,7 @@ export function UpcomingSection({
                         setFrequency(f)
                         if (importedFromTx) {
                           setNextChargeDate(
-                            calcNextChargeDate(importedFromTx.date, f)
+                            nextChargeDateFromAnchor(importedFromTx.date, f)
                           )
                         }
                       }}
