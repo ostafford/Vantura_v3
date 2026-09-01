@@ -33,6 +33,11 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
+import {
+  addDaysToDateStr,
+  calendarPeriodBounds,
+  daysBetweenDateStr,
+} from '@/lib/dateStr'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { HelpPopover } from '@/components/HelpPopover'
@@ -55,9 +60,7 @@ const FREQUENCY_ORDER: TrackerResetFrequency[] = [
 // period_end is exclusive (the reset date / first day of next period), so subtract
 // one day to get the last inclusive day for display purposes.
 function displayPeriodEnd(isoDate: string): string {
-  const d = new Date(isoDate + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
+  return addDaysToDateStr(isoDate, -1)
 }
 
 function getTrackerProgressStyle(progress: number): {
@@ -88,46 +91,22 @@ function getCalendarPeriodBounds(period: BudgetDisplayPeriod): {
   to: string
   label: string
 } {
-  const today = new Date()
-  if (period === 'WEEKLY') {
-    const day = today.getUTCDay()
-    const daysFromMonday = (day + 6) % 7
-    const monday = new Date(today)
-    monday.setUTCDate(today.getUTCDate() - daysFromMonday)
-    const nextMonday = new Date(monday)
-    nextMonday.setUTCDate(monday.getUTCDate() + 7)
-    return {
-      from: monday.toISOString().slice(0, 10),
-      to: nextMonday.toISOString().slice(0, 10),
-      label: `${formatShortDate(monday.toISOString().slice(0, 10))} – ${formatShortDate(new Date(nextMonday.getTime() - 86400000).toISOString().slice(0, 10))}`,
-    }
-  }
+  const { from, to } = calendarPeriodBounds(period)
   if (period === 'YEARLY') {
-    const year = today.getUTCFullYear()
-    return {
-      from: `${year}-01-01`,
-      to: `${year + 1}-01-01`,
-      label: String(year),
-    }
+    return { from, to, label: from.slice(0, 4) }
   }
-  // MONTHLY: calendar month
-  const year = today.getUTCFullYear()
-  const month = today.getUTCMonth()
-  const from = new Date(Date.UTC(year, month, 1))
-  const to = new Date(Date.UTC(year, month + 1, 1))
-  const toDisplay = new Date(to.getTime() - 86400000)
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-    label: `${formatShortDate(from.toISOString().slice(0, 10))} – ${formatShortDate(toDisplay.toISOString().slice(0, 10))}`,
+    from,
+    to,
+    label: `${formatShortDate(from)} – ${formatShortDate(addDaysToDateStr(to, -1))}`,
   }
 }
 
 function calendarDaysLeft(toExclusive: string): number {
-  const today = new Date().toISOString().slice(0, 10)
-  const a = new Date(today + 'T12:00:00Z').getTime()
-  const b = new Date(toExclusive + 'T12:00:00Z').getTime()
-  return Math.max(0, Math.round((b - a) / 86400000))
+  return Math.max(
+    0,
+    daysBetweenDateStr(new Date().toISOString().slice(0, 10), toExclusive)
+  )
 }
 
 export function TrackersSection({
