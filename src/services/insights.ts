@@ -26,6 +26,7 @@
 
 import { getDb } from '@/db'
 import { formatMoney, localDateStartUtc, localDateEndUtc } from '@/lib/format'
+import { daysBetweenDateStr } from '@/lib/dateStr'
 import {
   buildMonthSpendingSeries,
   type MonthSpendingSeries,
@@ -920,9 +921,10 @@ export function getMonthComparison(
 
   if (todayStr < currentTo) {
     // Month is in progress — cap previous period to the same elapsed-day count.
-    const fromMs = new Date(currentFrom + 'T00:00:00').getTime()
-    const todayMs = new Date(todayStr + 'T00:00:00').getTime()
-    const daysElapsed = Math.floor((todayMs - fromMs) / 86400000) + 1
+    // daysBetweenDateStr anchors both dates at noon UTC, so a DST transition
+    // inside the window can't floor the day count one short (a flat 86_400_000
+    // ms divide would).
+    const daysElapsed = daysBetweenDateStr(currentFrom, todayStr) + 1
 
     effectivePreviousTo = capPreviousPeriodEnd(prev.from, daysElapsed, prev.to)
 
@@ -971,12 +973,16 @@ export function getYearComparisonPeriods(year: number): {
     const day = now.getDate()
     const currentTo = `${y}-${pad(m)}-${pad(day)}`
 
-    const endPrev = new Date(now)
-    endPrev.setFullYear(endPrev.getFullYear() - 1)
-    const py = endPrev.getFullYear()
-    const pm = endPrev.getMonth() + 1
-    const pd = endPrev.getDate()
-    const previousTo = `${py}-${pad(pm)}-${pad(pd)}`
+    // Same month + day one year back. On Feb 29, the prior year has no Feb 29,
+    // so clamp to that month's last valid day (Feb 28) — letting JS Date
+    // normalise `setFullYear(y - 1)` would instead roll it to Mar 1 and make
+    // the prior-year YTD window a day longer than the current one.
+    const py = y - 1
+    const prevMonthLastDay = new Date(
+      Date.UTC(py, now.getMonth() + 1, 0)
+    ).getUTCDate()
+    const pd = Math.min(day, prevMonthLastDay)
+    const previousTo = `${py}-${pad(m)}-${pad(pd)}`
 
     return {
       current: { from: `${year}-01-01`, to: currentTo },
@@ -1171,11 +1177,10 @@ function getDaysElapsedInWeek(
   weekOffset: number
 ): number {
   if (weekOffset !== 0) return 7
-  const monday = new Date(week.start)
-  monday.setHours(0, 0, 0, 0)
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-  const diff = Math.floor((today.getTime() - monday.getTime()) / 86400000)
+  // Whole calendar days from Monday to today. daysBetweenDateStr anchors both
+  // ends at noon UTC, so a DST transition inside the week can't floor this one
+  // short (a flat 86_400_000 ms divide would).
+  const diff = daysBetweenDateStr(week.startStr, toDateOnly(now))
   return Math.min(7, Math.max(1, diff + 1))
 }
 
