@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(40)
+    expect(SCHEMA_VERSION).toBe(42)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -659,6 +659,131 @@ describe('v40 migration: tracker config-history', () => {
       db.exec(`SELECT COUNT(*) FROM tracker_config_history`)[0].values[0][0]
     )
     expect(countAfterSecond).toBe(countAfterFirst)
+    db.close()
+  })
+})
+
+/**
+ * Minimal v40-shaped fixture for the v41 migration, which drops the dead
+ * `transaction_user_data.is_income` column (#26 — no "mark as income" UI ever
+ * read or wrote it). Carries the soon-to-be-dropped column and one populated row.
+ */
+function buildLegacyV40Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '40')`
+  )
+  db.run(`
+    CREATE TABLE transaction_user_data (
+      transaction_id TEXT PRIMARY KEY,
+      user_notes TEXT,
+      user_category_override TEXT,
+      is_income INTEGER DEFAULT 0
+    )
+  `)
+  db.run(
+    `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override, is_income)
+     VALUES ('tx-1', 'note here', 'groceries', 1)`
+  )
+  return db
+}
+
+describe('v41 migration: drop dead transaction_user_data.is_income column', () => {
+  it('drops the column and preserves every other value on existing rows', () => {
+    const db = buildLegacyV40Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const cols = db.exec(`PRAGMA table_info(transaction_user_data)`)
+    const colNames = cols[0].values.map((r) => String(r[1]))
+    expect(colNames).not.toContain('is_income')
+    expect(colNames).toEqual(
+      expect.arrayContaining([
+        'transaction_id',
+        'user_notes',
+        'user_category_override',
+      ])
+    )
+
+    const row = db.exec(
+      `SELECT transaction_id, user_notes, user_category_override FROM transaction_user_data`
+    )
+    expect(row[0].values[0]).toEqual(['tx-1', 'note here', 'groceries'])
+
+    db.close()
+  })
+
+  it('is a no-op when the column is already gone, and is idempotent', () => {
+    const db = buildLegacyV40Database()
+    runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v41-shaped fixture for the v42 migration, which drops the dead
+ * `accounts.monthly_deposit_target_cents` column (#28 — read into AccountRow but
+ * sync never wrote it and no UI surfaced it). Carries the column and one row.
+ */
+function buildLegacyV41Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '41')`
+  )
+  db.run(`
+    CREATE TABLE accounts (
+      id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      account_type TEXT NOT NULL,
+      balance INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      is_closed INTEGER NOT NULL DEFAULT 0,
+      target_amount_cents INTEGER,
+      monthly_deposit_target_cents INTEGER
+    )
+  `)
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, target_amount_cents, monthly_deposit_target_cents)
+     VALUES ('sav-1', 'Holiday', 'SAVER', 500000, '2026-01-01', '2026-01-01', 1000000, 20000)`
+  )
+  return db
+}
+
+describe('v42 migration: drop dead accounts.monthly_deposit_target_cents column', () => {
+  it('drops the column and preserves every other value on existing rows', () => {
+    const db = buildLegacyV41Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const cols = db.exec(`PRAGMA table_info(accounts)`)
+    const colNames = cols[0].values.map((r) => String(r[1]))
+    expect(colNames).not.toContain('monthly_deposit_target_cents')
+    expect(colNames).toContain('target_amount_cents')
+
+    const row = db.exec(
+      `SELECT id, display_name, balance, target_amount_cents FROM accounts`
+    )
+    expect(row[0].values[0]).toEqual(['sav-1', 'Holiday', 500000, 1000000])
+
+    db.close()
+  })
+
+  it('is a no-op when the column is already gone, and is idempotent', () => {
+    const db = buildLegacyV41Database()
+    runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
 })

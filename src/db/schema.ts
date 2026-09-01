@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 40
+const SCHEMA_VERSION = 42
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -29,7 +29,6 @@ const DDL_STATEMENTS = [
     synced_at TEXT,
     is_closed INTEGER NOT NULL DEFAULT 0,
     target_amount_cents INTEGER,
-    monthly_deposit_target_cents INTEGER,
     opening_balance_cents INTEGER,
     opening_balance_date TEXT
   )`,
@@ -144,7 +143,6 @@ const DDL_STATEMENTS = [
     transaction_id TEXT PRIMARY KEY,
     user_notes TEXT,
     user_category_override TEXT,
-    is_income INTEGER DEFAULT 0,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
   `CREATE TABLE IF NOT EXISTS future_items (
@@ -1111,6 +1109,42 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['40']
+    )
+  }
+
+  // #26 — transaction_user_data.is_income was added by an early migration but
+  // nothing in src/ ever read or wrote it: no "mark as income" UI, and the
+  // TransactionUserRow interface never carried it. Drop it.
+  if (version < 41) {
+    const tudCols = database.exec(`PRAGMA table_info(transaction_user_data)`)
+    const tudHasIsIncome = (tudCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'is_income'
+    )
+    if (tudHasIsIncome) {
+      database.run(`ALTER TABLE transaction_user_data DROP COLUMN is_income`)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['41']
+    )
+  }
+
+  // #28 — accounts.monthly_deposit_target_cents was added by an early migration
+  // and read into AccountRow, but sync never wrote it and no UI surfaced it. Any
+  // "how much am I saving" figure is derived from real transaction history. Drop it.
+  if (version < 42) {
+    const accCols = database.exec(`PRAGMA table_info(accounts)`)
+    const accHasMonthlyTarget = (accCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'monthly_deposit_target_cents'
+    )
+    if (accHasMonthlyTarget) {
+      database.run(
+        `ALTER TABLE accounts DROP COLUMN monthly_deposit_target_cents`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['42']
     )
   }
 }

@@ -12,7 +12,6 @@ export interface AccountRow {
   ownership_type: string | null
   is_closed: number
   target_amount_cents: number | null
-  monthly_deposit_target_cents: number | null
 }
 
 /**
@@ -29,7 +28,7 @@ export function getAccountsByTypes(
   const closedFilter = includeClosed ? '' : ' AND is_closed = 0'
   const stmt = db.prepare(
     `SELECT id, display_name, account_type, balance, ownership_type, is_closed,
-            target_amount_cents, monthly_deposit_target_cents
+            target_amount_cents
      FROM accounts WHERE account_type IN (${placeholders})${closedFilter}
      ORDER BY display_name COLLATE NOCASE`
   )
@@ -44,7 +43,6 @@ export function getAccountsByTypes(
       string | null,
       number,
       number | null,
-      number | null,
     ]
     out.push({
       id: r[0],
@@ -54,7 +52,6 @@ export function getAccountsByTypes(
       ownership_type: r[4],
       is_closed: r[5],
       target_amount_cents: r[6] ?? null,
-      monthly_deposit_target_cents: r[7] ?? null,
     })
   }
   stmt.free()
@@ -70,7 +67,7 @@ export function getAccountById(id: string): AccountRow | null {
   if (!db) return null
   const stmt = db.prepare(
     `SELECT id, display_name, account_type, balance, ownership_type, is_closed,
-            target_amount_cents, monthly_deposit_target_cents
+            target_amount_cents
      FROM accounts WHERE id = ?`
   )
   stmt.bind([id])
@@ -86,7 +83,6 @@ export function getAccountById(id: string): AccountRow | null {
     string | null,
     number,
     number | null,
-    number | null,
   ]
   stmt.free()
   return {
@@ -97,7 +93,6 @@ export function getAccountById(id: string): AccountRow | null {
     ownership_type: r[4],
     is_closed: r[5],
     target_amount_cents: r[6] ?? null,
-    monthly_deposit_target_cents: r[7] ?? null,
   }
 }
 
