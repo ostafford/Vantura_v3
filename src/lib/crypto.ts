@@ -4,29 +4,13 @@
  * Salt and IV are stored with ciphertext; passphrase and raw key are never stored.
  */
 
+import { bufferToBase64, base64ToBuffer } from './base64'
+
 const PBKDF2_ITERATIONS = 100_000
 const KEY_LENGTH_BITS = 256
 const SALT_LENGTH_BYTES = 16
 const IV_LENGTH_BYTES = 12
 const AES_GCM_TAG_LENGTH_BITS = 128
-
-function bufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-function base64ToBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes.buffer
-}
 
 /**
  * Generate a random salt for key derivation. Store in app_settings.encryption_salt (e.g. base64).
