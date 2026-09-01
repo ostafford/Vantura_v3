@@ -787,6 +787,17 @@ export function replaceUpcomingCharges(
  * Import payload into the database with optional section selection.
  * Budget plan is applied first so bucket IDs can be remapped for trackers
  * and upcoming charges.
+ *
+ * The whole import runs inside a single SQLite transaction: each `replace*`
+ * helper does its own DELETE-then-reinsert, so without this a throw partway
+ * through (a malformed row sql.js refuses to bind, say) would leave the DB
+ * half-rewritten and the next page load would quietly treat that as the new
+ * state. On any error we ROLLBACK to the pre-import state and rethrow.
+ *
+ * This is the only sql.js write path that wraps itself in an explicit
+ * transaction. The `replace*` / `applySettings` helpers must stay
+ * non-transactional so this outer BEGIN/COMMIT is never nested (SQLite has no
+ * nested transactions).
  */
 export function importPayloadWithOptions(
   payload: ExportPayload,
@@ -795,29 +806,38 @@ export function importPayloadWithOptions(
   const db = getDb()
   if (!db) throw new Error('Database not ready')
 
-  if (options.settings) {
-    applySettings(payload.settings ?? {})
+  db.run('BEGIN')
+  try {
+    if (options.settings) {
+      applySettings(payload.settings ?? {})
+    }
+
+    // Budget plan must be imported before trackers/charges so the ID map is ready.
+    let bucketIdMap = new Map<number, number>()
+    if (options.budgetPlan) {
+      bucketIdMap = replaceBudgetPlan(
+        payload.budgetBuckets ?? [],
+        payload.budgetHypotheticals ?? []
+      )
+    }
+
+    if (options.trackers) {
+      replaceTrackers(
+        payload.trackers ?? [],
+        payload.trackerCategories ?? [],
+        payload.trackerConfigHistory ?? [],
+        bucketIdMap
+      )
+    }
+    if (options.upcomingCharges) {
+      replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
+    }
+
+    db.run('COMMIT')
+  } catch (err) {
+    db.run('ROLLBACK')
+    throw err
   }
 
-  // Budget plan must be imported before trackers/charges so the ID map is ready.
-  let bucketIdMap = new Map<number, number>()
-  if (options.budgetPlan) {
-    bucketIdMap = replaceBudgetPlan(
-      payload.budgetBuckets ?? [],
-      payload.budgetHypotheticals ?? []
-    )
-  }
-
-  if (options.trackers) {
-    replaceTrackers(
-      payload.trackers ?? [],
-      payload.trackerCategories ?? [],
-      payload.trackerConfigHistory ?? [],
-      bucketIdMap
-    )
-  }
-  if (options.upcomingCharges) {
-    replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
-  }
   schedulePersist()
 }
