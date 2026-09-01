@@ -330,6 +330,21 @@ describe('getTrackersDisplayPeriodData', () => {
     expect(d.dateRangeLabel.startsWith(formatShortDate(bounds.from))).toBe(true)
   })
 
+  it('counts non-native daysLeft from the local date, not UTC (#52)', () => {
+    vi.useFakeTimers()
+    // noon UTC → the calendar date is the same in every timezone, so this
+    // pins the value; the point is that "today" comes from localDateString().
+    vi.setSystemTime(new Date('2026-03-15T12:00:00Z'))
+    try {
+      const t = makeProgressRow({ reset_frequency: 'WEEKLY' })
+      const d = getTrackersDisplayPeriodData([t], 'MONTHLY')[1]
+      // 2026-03-15 → 2026-04-01 (exclusive end of the calendar month)
+      expect(d.daysLeft).toBe(17)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('labels a non-native YEARLY period with the bare year', () => {
     const t = makeProgressRow({ reset_frequency: 'MONTHLY' })
     const d = getTrackersDisplayPeriodData([t], 'YEARLY')[1]

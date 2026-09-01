@@ -554,13 +554,7 @@ export function getTrackersDisplayPeriodData(
       const bounds = calendarPeriodBounds(displayPeriod)
       spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
       budget = toPeriodCents(t.budget_amount, t.reset_frequency, displayPeriod)
-      // NOTE: the pre-extraction component used UTC `new Date().toISOString()`
-      // for "today" here, unlike this file's `localDateString()` convention.
-      // Kept as-is so the extraction changes no behaviour; worth reconciling.
-      daysLeft = Math.max(
-        0,
-        daysBetweenDateStr(new Date().toISOString().slice(0, 10), bounds.to)
-      )
+      daysLeft = Math.max(0, daysBetweenDateStr(localDateString(), bounds.to))
       from = bounds.from
       to = bounds.to
     }
