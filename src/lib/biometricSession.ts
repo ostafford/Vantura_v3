@@ -1,13 +1,7 @@
+import { bufferToBase64, base64ToBuffer } from './base64'
+
 const KEY_LS = 'vantura_bio_key'
 const TOKEN_SS = 'vantura_bio_token'
-
-function b64(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
-}
-
-function fromb64(s: string): Uint8Array {
-  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
-}
 
 export async function storeBiometricSession(apiToken: string): Promise<void> {
   const key = await crypto.subtle.generateKey(
@@ -22,10 +16,10 @@ export async function storeBiometricSession(apiToken: string): Promise<void> {
     key,
     new TextEncoder().encode(apiToken)
   )
-  localStorage.setItem(KEY_LS, b64(rawKey))
+  localStorage.setItem(KEY_LS, bufferToBase64(rawKey))
   sessionStorage.setItem(
     TOKEN_SS,
-    JSON.stringify({ iv: b64(iv.buffer), ct: b64(ciphertext) })
+    JSON.stringify({ iv: bufferToBase64(iv), ct: bufferToBase64(ciphertext) })
   )
 }
 
@@ -40,15 +34,15 @@ export async function retrieveBiometricSession(): Promise<string | null> {
     }
     const key = await crypto.subtle.importKey(
       'raw',
-      fromb64(keyB64),
+      base64ToBuffer(keyB64),
       { name: 'AES-GCM' },
       false,
       ['decrypt']
     )
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromb64(ivB64) },
+      { name: 'AES-GCM', iv: base64ToBuffer(ivB64) },
       key,
-      fromb64(ctB64)
+      base64ToBuffer(ctB64)
     )
     return new TextDecoder().decode(decrypted)
   } catch {

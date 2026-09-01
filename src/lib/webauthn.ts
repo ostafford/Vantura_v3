@@ -1,3 +1,5 @@
+import { bufferToBase64, base64ToBuffer } from './base64'
+
 export async function isBiometricAvailable(): Promise<boolean> {
   if (!window.PublicKeyCredential) return false
   try {
@@ -34,7 +36,7 @@ export async function registerBiometric(): Promise<string> {
     throw new Error('Biometric registration failed')
   }
 
-  return btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+  return bufferToBase64(credential.rawId)
 }
 
 export async function verifyBiometric(
@@ -42,7 +44,7 @@ export async function verifyBiometric(
 ): Promise<boolean> {
   const challenge = crypto.getRandomValues(new Uint8Array(32))
   const rpId = window.location.hostname
-  const credId = Uint8Array.from(atob(credentialIdB64), (c) => c.charCodeAt(0))
+  const credId = base64ToBuffer(credentialIdB64)
 
   const assertion = await navigator.credentials.get({
     publicKey: {
