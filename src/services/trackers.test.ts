@@ -8,8 +8,39 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { __test__, getPeriodBoundsForOffset, calculatePaydayBudgetTotal } =
-  await import('./trackers')
+const {
+  __test__,
+  getPeriodBoundsForOffset,
+  calculatePaydayBudgetTotal,
+  getTrackersDisplayPeriodData,
+} = await import('./trackers')
+const { toPeriodCents } = await import('@/lib/monthlyEquivalent')
+const { formatShortDate } = await import('@/lib/format')
+const { calendarPeriodBounds } = await import('@/lib/dateStr')
+
+type ProgressRow = import('./trackers').TrackerWithProgress
+
+function makeProgressRow(overrides: Partial<ProgressRow> = {}): ProgressRow {
+  return {
+    id: 1,
+    name: 'Groceries',
+    budget_amount: 40000,
+    reset_frequency: 'MONTHLY',
+    reset_day: 1,
+    last_reset_date: '2026-03-01',
+    next_reset_date: '2026-04-01',
+    bucket_id: null,
+    spent: 10000,
+    effectiveBudget: 40000,
+    remaining: 30000,
+    daysLeft: 12,
+    progress: 25,
+    wasAdjustedThisPeriod: false,
+    period_start: '2026-03-01',
+    period_end: '2026-04-01',
+    ...overrides,
+  }
+}
 const {
   daysBetween,
   stepBackOnePeriod,
@@ -248,5 +279,94 @@ describe('calculatePaydayBudgetTotal', () => {
       { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
     ]
     expect(calculatePaydayBudgetTotal(trackers, 999)).toBe(10000)
+  })
+})
+
+describe('getTrackersDisplayPeriodData', () => {
+  it('passes a native-period tracker through with its own figures (#16-aware)', () => {
+    const t = makeProgressRow({
+      reset_frequency: 'MONTHLY',
+      spent: 12000,
+      effectiveBudget: 36000, // prorated by a mid-period config change
+      daysLeft: 9,
+      wasAdjustedThisPeriod: true,
+      period_start: '2026-03-01',
+      period_end: '2026-04-01',
+    })
+    const d = getTrackersDisplayPeriodData([t], 'MONTHLY')[1]
+    expect(d).toEqual({
+      spent: 12000,
+      budget: 36000,
+      remaining: 24000,
+      progress: (12000 / 36000) * 100,
+      daysLeft: 9,
+      dateRangeLabel: `${formatShortDate('2026-03-01')} – ${formatShortDate('2026-03-31')}`,
+      wasAdjusted: true,
+      isNativePeriod: true,
+    })
+  })
+
+  it('treats WEEKLY display + WEEKLY tracker as native', () => {
+    const t = makeProgressRow({ reset_frequency: 'WEEKLY' })
+    expect(getTrackersDisplayPeriodData([t], 'WEEKLY')[1].isNativePeriod).toBe(
+      true
+    )
+  })
+
+  it('re-scales the budget with toPeriodCents when the period is non-native', () => {
+    const t = makeProgressRow({
+      reset_frequency: 'WEEKLY',
+      budget_amount: 20000,
+    })
+    const d = getTrackersDisplayPeriodData([t], 'MONTHLY')[1]
+    expect(d.isNativePeriod).toBe(false)
+    expect(d.budget).toBe(toPeriodCents(20000, 'WEEKLY', 'MONTHLY'))
+    // no DB in this suite → spent re-sums to 0 for the non-native branch
+    expect(d.spent).toBe(0)
+    expect(d.remaining).toBe(d.budget)
+    expect(d.progress).toBe(0)
+    const bounds = calendarPeriodBounds('MONTHLY')
+    expect(d.dateRangeLabel).toContain(' – ')
+    expect(d.dateRangeLabel.startsWith(formatShortDate(bounds.from))).toBe(true)
+  })
+
+  it('labels a non-native YEARLY period with the bare year', () => {
+    const t = makeProgressRow({ reset_frequency: 'MONTHLY' })
+    const d = getTrackersDisplayPeriodData([t], 'YEARLY')[1]
+    expect(d.isNativePeriod).toBe(false)
+    expect(d.dateRangeLabel).toBe(String(new Date().getUTCFullYear()))
+  })
+
+  it('guards against a zero budget', () => {
+    const t = makeProgressRow({
+      reset_frequency: 'MONTHLY',
+      effectiveBudget: 0,
+      spent: 5000,
+    })
+    const d = getTrackersDisplayPeriodData([t], 'MONTHLY')[1]
+    expect(d.progress).toBe(0)
+    expect(d.remaining).toBe(0)
+  })
+
+  it('yields an empty label for a native period with no period bounds', () => {
+    const t = makeProgressRow({
+      reset_frequency: 'MONTHLY',
+      period_start: undefined,
+      period_end: undefined,
+    })
+    expect(getTrackersDisplayPeriodData([t], 'MONTHLY')[1].dateRangeLabel).toBe(
+      ''
+    )
+  })
+
+  it('keys the result by tracker id', () => {
+    const rows = [
+      makeProgressRow({ id: 7, reset_frequency: 'WEEKLY' }),
+      makeProgressRow({ id: 9, reset_frequency: 'MONTHLY' }),
+    ]
+    const out = getTrackersDisplayPeriodData(rows, 'MONTHLY')
+    expect(Object.keys(out).sort()).toEqual(['7', '9'])
+    expect(out[7].isNativePeriod).toBe(false)
+    expect(out[9].isNativePeriod).toBe(true)
   })
 })

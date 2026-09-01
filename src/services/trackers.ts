@@ -4,12 +4,17 @@
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
 import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
-import { localDateString } from '@/lib/format'
+import { localDateString, formatShortDate } from '@/lib/format'
 import {
   addDaysToDateStr,
   daysBetweenDateStr,
   normalizeDateStr,
+  calendarPeriodBounds,
 } from '@/lib/dateStr'
+import {
+  toPeriodCents,
+  type BudgetDisplayPeriod,
+} from '@/lib/monthlyEquivalent'
 
 export type TrackerResetFrequency =
   | 'WEEKLY'
@@ -488,6 +493,108 @@ export function calculatePaydayBudgetTotal(
   return trackers
     .filter((t) => t.reset_frequency === 'PAYDAY' && t.id !== excludeId)
     .reduce((sum, t) => sum + t.budget_amount, 0)
+}
+
+export interface TrackerDisplayPeriodData {
+  /** cents spent in the period */
+  spent: number
+  /** effective budget for the period, cents */
+  budget: number
+  /** max(0, budget - spent) */
+  remaining: number
+  /** spent / budget as a percentage (0 when budget is 0) */
+  progress: number
+  /** whole days left in the period (0 when past) */
+  daysLeft: number
+  /** e.g. "1 Mar – 31 Mar"; the bare year for a non-native YEARLY period; "" when unknown */
+  dateRangeLabel: string
+  /** #16 — a mid-period config change split the tracker's current native period */
+  wasAdjusted: boolean
+  /** true when `displayPeriod` is the tracker's own reset frequency */
+  isNativePeriod: boolean
+}
+
+/**
+ * Normalise each tracker's current spend / budget / progress to `displayPeriod`,
+ * keyed by tracker id. Shared by the dashboard Trackers section and the
+ * analytics Trackers overview.
+ *
+ * When the display period already is the tracker's reset frequency (WEEKLY or
+ * MONTHLY), the tracker's own current-period figures are used as-is — including
+ * the #16 prorated effective budget and the real days-left. Otherwise spend is
+ * re-summed over the calendar period and the budget is scaled with
+ * `toPeriodCents`.
+ */
+export function getTrackersDisplayPeriodData(
+  trackers: TrackerWithProgress[],
+  displayPeriod: BudgetDisplayPeriod
+): Record<number, TrackerDisplayPeriodData> {
+  const out: Record<number, TrackerDisplayPeriodData> = {}
+
+  for (const t of trackers) {
+    const isNativePeriod =
+      (displayPeriod === 'WEEKLY' && t.reset_frequency === 'WEEKLY') ||
+      (displayPeriod === 'MONTHLY' && t.reset_frequency === 'MONTHLY')
+
+    let spent: number
+    let budget: number
+    let daysLeft: number
+    let from: string
+    let to: string
+    let wasAdjusted = false
+
+    if (isNativePeriod) {
+      spent = t.spent
+      budget = t.effectiveBudget
+      daysLeft = t.daysLeft
+      wasAdjusted = t.wasAdjustedThisPeriod
+      from = t.period_start ?? ''
+      to = t.period_end ?? ''
+    } else {
+      const bounds = calendarPeriodBounds(displayPeriod)
+      spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
+      budget = toPeriodCents(t.budget_amount, t.reset_frequency, displayPeriod)
+      // NOTE: the pre-extraction component used UTC `new Date().toISOString()`
+      // for "today" here, unlike this file's `localDateString()` convention.
+      // Kept as-is so the extraction changes no behaviour; worth reconciling.
+      daysLeft = Math.max(
+        0,
+        daysBetweenDateStr(new Date().toISOString().slice(0, 10), bounds.to)
+      )
+      from = bounds.from
+      to = bounds.to
+    }
+
+    out[t.id] = {
+      spent,
+      budget,
+      remaining: Math.max(0, budget - spent),
+      progress: budget > 0 ? (spent / budget) * 100 : 0,
+      daysLeft,
+      dateRangeLabel: formatPeriodRangeLabel(
+        displayPeriod,
+        isNativePeriod,
+        from,
+        to
+      ),
+      wasAdjusted,
+      isNativePeriod,
+    }
+  }
+
+  return out
+}
+
+/** "1 Mar – 31 Mar", or the bare year for a non-native YEARLY period. */
+function formatPeriodRangeLabel(
+  displayPeriod: BudgetDisplayPeriod,
+  isNativePeriod: boolean,
+  from: string,
+  to: string
+): string {
+  if (!from || !to) return ''
+  if (!isNativePeriod && displayPeriod === 'YEARLY') return from.slice(0, 4)
+  return `${formatShortDate(from)} – ${formatShortDate(addDaysToDateStr(to, -1))}`
 }
 
 /**

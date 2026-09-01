@@ -16,28 +16,20 @@ import {
   getTracker,
   getTrackersWithProgressForPeriod,
   getTrackerTransactionsInPeriod,
-  getTrackerSpentInPeriod,
   getTrackerCategoryIds,
   getTrackerCategoryUsage,
   createTracker,
   updateTracker,
   deleteTracker,
   calculatePaydayBudgetTotal,
+  getTrackersDisplayPeriodData,
   type TrackerResetFrequency,
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
 import { getPayAmountCents } from '@/services/balance'
 import { getAppSetting } from '@/db'
-import {
-  toPeriodCents,
-  type BudgetDisplayPeriod,
-} from '@/lib/monthlyEquivalent'
+import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
-import {
-  addDaysToDateStr,
-  calendarPeriodBounds,
-  daysBetweenDateStr,
-} from '@/lib/dateStr'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { HelpPopover } from '@/components/HelpPopover'
@@ -56,12 +48,6 @@ const FREQUENCY_ORDER: TrackerResetFrequency[] = [
   'FORTNIGHTLY',
   'MONTHLY',
 ]
-
-// period_end is exclusive (the reset date / first day of next period), so subtract
-// one day to get the last inclusive day for display purposes.
-function displayPeriodEnd(isoDate: string): string {
-  return addDaysToDateStr(isoDate, -1)
-}
 
 function getTrackerProgressStyle(progress: number): {
   variant: 'primary' | 'warning' | 'danger' | 'success'
@@ -85,29 +71,6 @@ const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
   { value: 'MONTHLY', label: 'Monthly' },
   { value: 'YEARLY', label: 'Yearly' },
 ]
-
-function getCalendarPeriodBounds(period: BudgetDisplayPeriod): {
-  from: string
-  to: string
-  label: string
-} {
-  const { from, to } = calendarPeriodBounds(period)
-  if (period === 'YEARLY') {
-    return { from, to, label: from.slice(0, 4) }
-  }
-  return {
-    from,
-    to,
-    label: `${formatShortDate(from)} – ${formatShortDate(addDaysToDateStr(to, -1))}`,
-  }
-}
-
-function calendarDaysLeft(toExclusive: string): number {
-  return Math.max(
-    0,
-    daysBetweenDateStr(new Date().toISOString().slice(0, 10), toExclusive)
-  )
-}
 
 export function TrackersSection({
   dragHandleProps,
@@ -174,65 +137,11 @@ export function TrackersSection({
     totalPaydayBudgetCents > payAmountCents
 
   // Effective budget/spend per display period (normalized when display period differs from native)
-  const effectiveDataByTrackerId = useMemo(() => {
-    const map: Record<
-      number,
-      {
-        spent: number
-        budget: number
-        remaining: number
-        progress: number
-        daysLeft: number
-        dateRangeLabel: string
-        wasAdjusted: boolean
-      }
-    > = {}
-    for (const t of trackers) {
-      const nativeMatch =
-        (displayPeriod === 'WEEKLY' && t.reset_frequency === 'WEEKLY') ||
-        (displayPeriod === 'MONTHLY' && t.reset_frequency === 'MONTHLY')
-      let spent: number
-      let budget: number
-      let daysLeft: number
-      let dateRangeLabel: string
-      let wasAdjusted = false
-      if (nativeMatch) {
-        spent = t.spent
-        // Effective budget: the sum of the prorated per-segment budgets when a
-        // config change split the current period (#16); otherwise = budget_amount.
-        budget = t.effectiveBudget
-        wasAdjusted = t.wasAdjustedThisPeriod
-        daysLeft = t.daysLeft
-        dateRangeLabel =
-          t.period_start && t.period_end
-            ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
-            : ''
-      } else {
-        const bounds = getCalendarPeriodBounds(displayPeriod)
-        spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
-        budget = toPeriodCents(
-          t.budget_amount,
-          t.reset_frequency,
-          displayPeriod
-        )
-        daysLeft = calendarDaysLeft(bounds.to)
-        dateRangeLabel = bounds.label
-      }
-      const remaining = Math.max(0, budget - spent)
-      const progress = budget > 0 ? (spent / budget) * 100 : 0
-      map[t.id] = {
-        spent,
-        budget,
-        remaining,
-        progress,
-        daysLeft,
-        dateRangeLabel,
-        wasAdjusted,
-      }
-    }
-    return map
+  const effectiveDataByTrackerId = useMemo(
+    () => getTrackersDisplayPeriodData(trackers, displayPeriod),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackers, displayPeriod, refresh, lastSyncCompletedAt])
+    [trackers, displayPeriod, refresh, lastSyncCompletedAt]
+  )
 
   function openCreate() {
     setEditingId(null)
@@ -464,6 +373,7 @@ export function TrackersSection({
                     daysLeft: t.daysLeft,
                     dateRangeLabel: '',
                     wasAdjusted: t.wasAdjustedThisPeriod,
+                    isNativePeriod: false,
                   }
                   const progressStyle = getTrackerProgressStyle(
                     effectiveData.progress
