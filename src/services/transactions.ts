@@ -38,8 +38,8 @@ export interface TransactionRow {
 }
 
 /**
- * Write a category change directly to the transaction row and clear any
- * local override. Called immediately after a successful PATCH to Up Bank.
+ * Write a category change directly to the transaction row. Called immediately
+ * after a successful PATCH to Up Bank.
  */
 export function updateTransactionCategoryLocal(
   transactionId: string,
@@ -50,10 +50,6 @@ export function updateTransactionCategoryLocal(
   db.run(
     `UPDATE transactions SET category_id = ?, parent_category_id = NULL WHERE id = ?`,
     [categoryId, transactionId]
-  )
-  db.run(
-    `UPDATE transaction_user_data SET user_category_override = NULL WHERE transaction_id = ?`,
-    [transactionId]
   )
   schedulePersist()
 }

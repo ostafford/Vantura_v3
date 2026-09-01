@@ -1,7 +1,7 @@
 /**
- * Local-only user data for transactions: notes, category override, and
- * transfer-account override. Sync does not touch this; upstream category is
- * preserved in transactions table.
+ * Local-only user notes for transactions. Sync does not touch this table — the
+ * upstream `transactions` row always mirrors Up Bank exactly
+ * (see docs/adr/0008-transaction-user-data-is-a-separate-overlay.md).
  */
 
 import { getDb, schedulePersist } from '@/db'
@@ -9,7 +9,6 @@ import { getDb, schedulePersist } from '@/db'
 export interface TransactionUserRow {
   transaction_id: string
   user_notes: string | null
-  user_category_override: string | null
 }
 
 export function getTransactionUserData(
@@ -18,7 +17,7 @@ export function getTransactionUserData(
   const db = getDb()
   if (!db) return null
   const stmt = db.prepare(
-    `SELECT transaction_id, user_notes, user_category_override
+    `SELECT transaction_id, user_notes
      FROM transaction_user_data WHERE transaction_id = ?`
   )
   stmt.bind([transactionId])
@@ -26,12 +25,11 @@ export function getTransactionUserData(
     stmt.free()
     return null
   }
-  const row = stmt.get() as [string, string | null, string | null]
+  const row = stmt.get() as [string, string | null]
   stmt.free()
   return {
     transaction_id: row[0],
     user_notes: row[1],
-    user_category_override: row[2],
   }
 }
 
@@ -44,95 +42,52 @@ export function getTransactionUserDataMap(
   if (!db || transactionIds.length === 0) return out
   const placeholders = transactionIds.map(() => '?').join(',')
   const stmt = db.prepare(
-    `SELECT transaction_id, user_notes, user_category_override
+    `SELECT transaction_id, user_notes
      FROM transaction_user_data WHERE transaction_id IN (${placeholders})`
   )
   stmt.bind(transactionIds)
   while (stmt.step()) {
-    const row = stmt.get() as [string, string | null, string | null]
+    const row = stmt.get() as [string, string | null]
     out[row[0]] = {
       transaction_id: row[0],
       user_notes: row[1],
-      user_category_override: row[2],
     }
   }
   stmt.free()
   return out
 }
 
-/** The two nullable user-owned columns on transaction_user_data. */
-type UserDataField = 'user_notes' | 'user_category_override'
-
-const SIBLING_FIELD: Record<UserDataField, UserDataField> = {
-  user_notes: 'user_category_override',
-  user_category_override: 'user_notes',
-}
-
 /**
- * Set (or clear) one user-owned field on a transaction's row, keeping the row
- * a pure overlay: a `null` value clears the field, and the row is deleted once
- * both fields are empty so an untouched transaction has no row at all.
- * `value` must already be normalised by the caller (trimmed, `''` → `null`).
- * Field names come from the `UserDataField` union, never caller input, so the
- * interpolation into the SQL is safe.
+ * Set (or clear) a transaction's local note, keeping the row a pure overlay:
+ * an empty/`null` value deletes the row, so an untouched transaction has no row
+ * at all. `user_notes` is the only user-owned column on the table.
  */
-function upsertUserDataField(
-  transactionId: string,
-  field: UserDataField,
-  value: string | null
-): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  const existing = getTransactionUserData(transactionId)
-
-  if (value === null) {
-    if (existing?.[SIBLING_FIELD[field]]) {
-      db.run(
-        `UPDATE transaction_user_data SET ${field} = NULL WHERE transaction_id = ?`,
-        [transactionId]
-      )
-    } else if (existing) {
-      db.run(`DELETE FROM transaction_user_data WHERE transaction_id = ?`, [
-        transactionId,
-      ])
-    }
-  } else if (existing) {
-    db.run(
-      `UPDATE transaction_user_data SET ${field} = ? WHERE transaction_id = ?`,
-      [value, transactionId]
-    )
-  } else {
-    db.run(
-      `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override) VALUES (?, ?, ?)`,
-      [
-        transactionId,
-        field === 'user_notes' ? value : null,
-        field === 'user_category_override' ? value : null,
-      ]
-    )
-  }
-  schedulePersist()
-}
-
 export function setTransactionUserNote(
   transactionId: string,
   userNotes: string | null
 ): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
   const trimmed = userNotes?.trim() ?? ''
-  upsertUserDataField(
-    transactionId,
-    'user_notes',
-    trimmed === '' ? null : trimmed
-  )
-}
+  const value = trimmed === '' ? null : trimmed
+  const exists = getTransactionUserData(transactionId) !== null
 
-export function setTransactionUserCategoryOverride(
-  transactionId: string,
-  categoryId: string | null
-): void {
-  upsertUserDataField(
-    transactionId,
-    'user_category_override',
-    categoryId === null || categoryId === '' ? null : categoryId
-  )
+  if (value === null) {
+    if (exists) {
+      db.run(`DELETE FROM transaction_user_data WHERE transaction_id = ?`, [
+        transactionId,
+      ])
+    }
+  } else if (exists) {
+    db.run(
+      `UPDATE transaction_user_data SET user_notes = ? WHERE transaction_id = ?`,
+      [value, transactionId]
+    )
+  } else {
+    db.run(
+      `INSERT INTO transaction_user_data (transaction_id, user_notes) VALUES (?, ?)`,
+      [transactionId, value]
+    )
+  }
+  schedulePersist()
 }

@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(42)
+    expect(SCHEMA_VERSION).toBe(43)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -214,16 +214,14 @@ describe('v36 migration: bank-statement-import removal', () => {
       expect(exists.length).toBe(0)
     }
 
-    // The transfer-override column itself is dropped from transaction_user_data.
+    // The transfer-override column itself is dropped from transaction_user_data
+    // (as is user_category_override, later, by v43).
     const cols = db.exec(`PRAGMA table_info(transaction_user_data)`)
     const colNames = cols[0].values.map((r) => String(r[1]))
     expect(colNames).not.toContain('user_transfer_account_override')
+    expect(colNames).not.toContain('user_category_override')
     expect(colNames).toEqual(
-      expect.arrayContaining([
-        'transaction_id',
-        'user_notes',
-        'user_category_override',
-      ])
+      expect.arrayContaining(['transaction_id', 'user_notes'])
     )
 
     db.close()
@@ -702,18 +700,16 @@ describe('v41 migration: drop dead transaction_user_data.is_income column', () =
     const cols = db.exec(`PRAGMA table_info(transaction_user_data)`)
     const colNames = cols[0].values.map((r) => String(r[1]))
     expect(colNames).not.toContain('is_income')
+    // user_category_override is also gone by the time migrations finish (v43).
+    expect(colNames).not.toContain('user_category_override')
     expect(colNames).toEqual(
-      expect.arrayContaining([
-        'transaction_id',
-        'user_notes',
-        'user_category_override',
-      ])
+      expect.arrayContaining(['transaction_id', 'user_notes'])
     )
 
     const row = db.exec(
-      `SELECT transaction_id, user_notes, user_category_override FROM transaction_user_data`
+      `SELECT transaction_id, user_notes FROM transaction_user_data`
     )
-    expect(row[0].values[0]).toEqual(['tx-1', 'note here', 'groceries'])
+    expect(row[0].values[0]).toEqual(['tx-1', 'note here'])
 
     db.close()
   })
@@ -782,6 +778,70 @@ describe('v42 migration: drop dead accounts.monthly_deposit_target_cents column'
 
   it('is a no-op when the column is already gone, and is idempotent', () => {
     const db = buildLegacyV41Database()
+    runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v42-shaped fixture for the v43 migration, which drops the dead
+ * `transaction_user_data.user_category_override` column (#27 — displayed but
+ * never written by the app and never flowed through any category-keyed query).
+ * Carries the column plus a note-bearing row and an override-only row.
+ */
+function buildLegacyV42Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '42')`
+  )
+  db.run(`
+    CREATE TABLE transaction_user_data (
+      transaction_id TEXT PRIMARY KEY,
+      user_notes TEXT,
+      user_category_override TEXT
+    )
+  `)
+  db.run(
+    `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES ('tx-note', 'keep this note', 'groceries')`
+  )
+  db.run(
+    `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override)
+     VALUES ('tx-override-only', NULL, 'rent')`
+  )
+  return db
+}
+
+describe('v43 migration: drop dead transaction_user_data.user_category_override column', () => {
+  it('drops the column, keeps note-bearing rows, and clears rows that only held an override', () => {
+    const db = buildLegacyV42Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const cols = db.exec(`PRAGMA table_info(transaction_user_data)`)
+    const colNames = cols[0].values.map((r) => String(r[1]))
+    expect(colNames).not.toContain('user_category_override')
+    expect(colNames).toEqual(
+      expect.arrayContaining(['transaction_id', 'user_notes'])
+    )
+
+    // The note row survives with its note intact.
+    const kept = db.exec(
+      `SELECT transaction_id, user_notes FROM transaction_user_data`
+    )
+    expect(kept[0].values).toEqual([['tx-note', 'keep this note']])
+
+    db.close()
+  })
+
+  it('is a no-op when the column is already gone, and is idempotent', () => {
+    const db = buildLegacyV42Database()
     runMigrations(db)
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
