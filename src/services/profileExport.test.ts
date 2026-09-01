@@ -10,10 +10,17 @@ import {
   previewImportProfile,
   applySettings,
   replaceBudgetPlan,
+  replaceTrackers,
+  replaceUpcomingCharges,
+  importPayloadWithOptions,
   IMPORT_ERROR_INVALID_FILE,
   IMPORT_ERROR_WRONG_PASSPHRASE,
   type ExportPayload,
+  type ImportOptions,
   type BudgetBucketExportRow,
+  type TrackerExportRow,
+  type TrackerConfigHistoryExportRow,
+  type UpcomingChargeExportRow,
 } from './profileExport'
 
 vi.mock('@/db', () => ({
@@ -417,5 +424,527 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
     const newBillsId = bucketIdMap.get(1)
 
     expect(anchorBucketIds()).toEqual([newBillsId])
+  })
+})
+
+/**
+ * #36 — real-DB coverage for the import writers that had none:
+ * replaceTrackers, replaceUpcomingCharges, and the importPayloadWithOptions
+ * orchestrator. Each runs delete-then-reinsert against a live in-memory
+ * sql.js DB (matching the replaceBudgetPlan block above), so id remapping,
+ * category-existence filtering, config-history synthesis and per-section
+ * option gating are exercised for real rather than mocked.
+ */
+describe('profile import writers: real-DB coverage (#36)', () => {
+  let SQL: SqlJsStatic
+  let realDb: Database
+
+  beforeEach(async () => {
+    SQL = await initSqlJs()
+    const { runSchema } = await import('@/db/schema')
+    realDb = new SQL.Database()
+    runSchema(realDb)
+
+    const db = await import('@/db')
+    vi.mocked(db.getDb).mockReturnValue(realDb as never)
+    vi.mocked(db.schedulePersist).mockImplementation(() => {})
+  })
+
+  // ── fixtures & readback helpers ─────────────────────────────────────────
+
+  function insertCategory(id: string, name = id): void {
+    realDb.run(
+      `INSERT INTO categories (id, name, parent_id) VALUES (?, ?, NULL)`,
+      [id, name]
+    )
+  }
+
+  function trackerExport(
+    over: Partial<TrackerExportRow> = {}
+  ): TrackerExportRow {
+    return {
+      id: 1,
+      name: 'Food',
+      budget_amount: 30000,
+      reset_frequency: 'MONTHLY',
+      reset_day: 1,
+      start_date: '2026-01-01',
+      last_reset_date: '2026-02-01',
+      next_reset_date: '2026-03-01',
+      is_active: 1,
+      bucket_id: null,
+      ...over,
+    }
+  }
+
+  function chargeExport(
+    over: Partial<UpcomingChargeExportRow> = {}
+  ): UpcomingChargeExportRow {
+    return {
+      name: 'Rent',
+      amount: 180000,
+      frequency: 'MONTHLY',
+      next_charge_date: '2026-03-01',
+      category_id: null,
+      is_reserved: 1,
+      ...over,
+    }
+  }
+
+  function emptyPayload(over: Partial<ExportPayload> = {}): ExportPayload {
+    return {
+      version: 1,
+      exportedAt: '2026-02-15T00:00:00.000Z',
+      appSchemaVersion: 2,
+      settings: {},
+      trackers: [],
+      trackerCategories: [],
+      upcomingCharges: [],
+      budgetBuckets: [],
+      budgetHypotheticals: [],
+      ...over,
+    }
+  }
+
+  const ALL_ON: ImportOptions = {
+    settings: true,
+    trackers: true,
+    upcomingCharges: true,
+    budgetPlan: true,
+  }
+
+  function readTrackers(): Array<{
+    id: number
+    name: string
+    budget_amount: number
+    bucket_id: number | null
+    last_reset_date: string
+  }> {
+    const stmt = realDb.prepare(
+      `SELECT id, name, budget_amount, bucket_id, last_reset_date FROM trackers ORDER BY id`
+    )
+    const out: Array<{
+      id: number
+      name: string
+      budget_amount: number
+      bucket_id: number | null
+      last_reset_date: string
+    }> = []
+    while (stmt.step()) {
+      const r = stmt.get() as [number, string, number, number | null, string]
+      out.push({
+        id: r[0],
+        name: r[1],
+        budget_amount: r[2],
+        bucket_id: r[3],
+        last_reset_date: r[4],
+      })
+    }
+    stmt.free()
+    return out
+  }
+
+  function trackerCategoryIds(trackerId: number): string[] {
+    const stmt = realDb.prepare(
+      `SELECT category_id FROM tracker_categories WHERE tracker_id = ? ORDER BY category_id`
+    )
+    stmt.bind([trackerId])
+    const out: string[] = []
+    while (stmt.step()) out.push(stmt.get()[0] as string)
+    stmt.free()
+    return out
+  }
+
+  function configHistory(
+    trackerId: number
+  ): Array<{ id: number; effective_from: string; budget_amount: number }> {
+    const stmt = realDb.prepare(
+      `SELECT id, effective_from, budget_amount FROM tracker_config_history
+       WHERE tracker_id = ? ORDER BY effective_from`
+    )
+    stmt.bind([trackerId])
+    const out: Array<{
+      id: number
+      effective_from: string
+      budget_amount: number
+    }> = []
+    while (stmt.step()) {
+      const r = stmt.get() as [number, string, number]
+      out.push({ id: r[0], effective_from: r[1], budget_amount: r[2] })
+    }
+    stmt.free()
+    return out
+  }
+
+  function configHistoryCategoryIds(configId: number): string[] {
+    const stmt = realDb.prepare(
+      `SELECT category_id FROM tracker_config_history_categories
+       WHERE config_id = ? ORDER BY category_id`
+    )
+    stmt.bind([configId])
+    const out: string[] = []
+    while (stmt.step()) out.push(stmt.get()[0] as string)
+    stmt.free()
+    return out
+  }
+
+  function readCharges(): Array<{
+    name: string
+    category_id: string | null
+    is_reserved: number
+    reminder_days_before: number | null
+    cancel_by_date: string | null
+    bucket_id: number | null
+    next_charge_date: string
+  }> {
+    const stmt = realDb.prepare(
+      `SELECT name, category_id, is_reserved, reminder_days_before, cancel_by_date, bucket_id, next_charge_date
+       FROM upcoming_charges ORDER BY id`
+    )
+    const out: Array<{
+      name: string
+      category_id: string | null
+      is_reserved: number
+      reminder_days_before: number | null
+      cancel_by_date: string | null
+      bucket_id: number | null
+      next_charge_date: string
+    }> = []
+    while (stmt.step()) {
+      const r = stmt.get() as [
+        string,
+        string | null,
+        number,
+        number | null,
+        string | null,
+        number | null,
+        string,
+      ]
+      out.push({
+        name: r[0],
+        category_id: r[1],
+        is_reserved: r[2],
+        reminder_days_before: r[3],
+        cancel_by_date: r[4],
+        bucket_id: r[5],
+        next_charge_date: r[6],
+      })
+    }
+    stmt.free()
+    return out
+  }
+
+  // ── replaceTrackers ────────────────────────────────────────────────────
+
+  describe('replaceTrackers', () => {
+    it('wipes existing trackers, categories and config-history, then inserts the imported set with fresh ids', () => {
+      insertCategory('groceries')
+      realDb.run(
+        `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+         VALUES ('Old', 5000, 'WEEKLY', 1, '2026-01-01', '2026-02-01', '2026-02-08', 1, '2026-01-01')`
+      )
+      const oldId = realDb.exec('SELECT last_insert_rowid()')[0]
+        .values[0][0] as number
+      realDb.run(
+        `INSERT INTO tracker_categories (tracker_id, category_id) VALUES (?, 'groceries')`,
+        [oldId]
+      )
+      realDb.run(
+        `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+         VALUES (?, '2026-02-01', 5000, '2026-01-01')`,
+        [oldId]
+      )
+
+      replaceTrackers([trackerExport({ id: 5, name: 'Imported' })], [])
+
+      const rows = readTrackers()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].name).toBe('Imported')
+      expect(rows[0].id).not.toBe(oldId)
+      expect(trackerCategoryIds(oldId)).toEqual([])
+      expect(configHistory(oldId)).toEqual([])
+    })
+
+    it('remaps bucket_id through the provided map and nulls references the map does not cover', () => {
+      replaceTrackers(
+        [
+          trackerExport({ id: 1, name: 'Mapped', bucket_id: 10 }),
+          trackerExport({ id: 2, name: 'Unmapped', bucket_id: 99 }),
+          trackerExport({ id: 3, name: 'NoBucket', bucket_id: null }),
+        ],
+        [],
+        [],
+        new Map([[10, 777]])
+      )
+
+      const byName = Object.fromEntries(
+        readTrackers().map((t) => [t.name, t.bucket_id])
+      )
+      expect(byName).toEqual({ Mapped: 777, Unmapped: null, NoBucket: null })
+    })
+
+    it('remaps tracker_categories onto new tracker ids and drops categories that do not exist locally', () => {
+      insertCategory('groceries')
+
+      replaceTrackers(
+        [trackerExport({ id: 1 })],
+        [
+          { tracker_id: 1, category_id: 'groceries' },
+          { tracker_id: 1, category_id: 'ghost' },
+          { tracker_id: 999, category_id: 'groceries' },
+        ]
+      )
+
+      const newId = readTrackers()[0].id
+      expect(trackerCategoryIds(newId)).toEqual(['groceries'])
+    })
+
+    it('imports config-history rows, remapping tracker ids and filtering unknown categories', () => {
+      insertCategory('groceries')
+
+      const history: TrackerConfigHistoryExportRow[] = [
+        {
+          tracker_id: 1,
+          effective_from: '2026-01-20',
+          budget_amount: 22000,
+          category_ids: ['groceries', 'ghost'],
+        },
+      ]
+      replaceTrackers(
+        [trackerExport({ id: 1, budget_amount: 30000 })],
+        [{ tracker_id: 1, category_id: 'groceries' }],
+        history
+      )
+
+      const newId = readTrackers()[0].id
+      const rows = configHistory(newId)
+      expect(rows).toEqual([
+        expect.objectContaining({
+          effective_from: '2026-01-20',
+          budget_amount: 22000,
+        }),
+      ])
+      expect(configHistoryCategoryIds(rows[0].id)).toEqual(['groceries'])
+    })
+
+    it('synthesises one genesis config row per tracker when the payload carries no history (pre-v4 export)', () => {
+      insertCategory('groceries')
+
+      replaceTrackers(
+        [
+          trackerExport({
+            id: 1,
+            budget_amount: 30000,
+            last_reset_date: '2026-02-01',
+          }),
+        ],
+        [{ tracker_id: 1, category_id: 'groceries' }]
+      )
+
+      const newId = readTrackers()[0].id
+      const rows = configHistory(newId)
+      expect(rows).toEqual([
+        expect.objectContaining({
+          effective_from: '2026-02-01',
+          budget_amount: 30000,
+        }),
+      ])
+      expect(configHistoryCategoryIds(rows[0].id)).toEqual(['groceries'])
+    })
+
+    it('skips structurally invalid tracker rows without aborting the rest', () => {
+      replaceTrackers(
+        [
+          { id: 1, name: 'Valid' } as unknown as TrackerExportRow,
+          { ...trackerExport({ id: 2, name: 'AlsoValid' }) },
+          {
+            ...trackerExport({ id: 3 }),
+            budget_amount: 'nope' as unknown as number,
+          },
+        ],
+        []
+      )
+
+      // id:1 is missing budget_amount/reset_frequency; id:3 has a non-number
+      // budget — both dropped, id:2 survives.
+      expect(readTrackers().map((t) => t.name)).toEqual(['AlsoValid'])
+    })
+  })
+
+  // ── replaceUpcomingCharges ─────────────────────────────────────────────
+
+  describe('replaceUpcomingCharges', () => {
+    it('wipes existing charges and inserts the imported set', () => {
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
+         VALUES ('Stale', 100, 'MONTHLY', '2026-01-01', 1, '2026-01-01')`
+      )
+
+      replaceUpcomingCharges([chargeExport({ name: 'Fresh' })])
+
+      expect(readCharges().map((c) => c.name)).toEqual(['Fresh'])
+    })
+
+    it('remaps bucket_id through the map and nulls references the map does not cover', () => {
+      replaceUpcomingCharges(
+        [
+          chargeExport({ name: 'Mapped', bucket_id: 3 }),
+          chargeExport({ name: 'Unmapped', bucket_id: 42 }),
+          chargeExport({ name: 'NoBucket' }),
+        ],
+        new Map([[3, 555]])
+      )
+
+      const byName = Object.fromEntries(
+        readCharges().map((c) => [c.name, c.bucket_id])
+      )
+      expect(byName).toEqual({ Mapped: 555, Unmapped: null, NoBucket: null })
+    })
+
+    it('keeps category_id only when the category exists locally, otherwise stores null', () => {
+      insertCategory('rent')
+
+      replaceUpcomingCharges([
+        chargeExport({ name: 'Real', category_id: 'rent' }),
+        chargeExport({ name: 'Ghost', category_id: 'does-not-exist' }),
+      ])
+
+      const byName = Object.fromEntries(
+        readCharges().map((c) => [c.name, c.category_id])
+      )
+      expect(byName).toEqual({ Real: 'rent', Ghost: null })
+    })
+
+    it('applies field defaults and trims next_charge_date to a plain date', () => {
+      replaceUpcomingCharges([
+        {
+          name: 'Minimal',
+          amount: 1200,
+          frequency: 'WEEKLY',
+          next_charge_date: '2026-05-01T12:34:56.000Z',
+        } as UpcomingChargeExportRow,
+      ])
+
+      expect(readCharges()[0]).toEqual(
+        expect.objectContaining({
+          name: 'Minimal',
+          is_reserved: 1,
+          reminder_days_before: null,
+          cancel_by_date: null,
+          next_charge_date: '2026-05-01',
+        })
+      )
+    })
+
+    it('skips structurally invalid charge rows', () => {
+      replaceUpcomingCharges([
+        {
+          name: 'NoAmount',
+          frequency: 'MONTHLY',
+          next_charge_date: '2026-01-01',
+        } as unknown as UpcomingChargeExportRow,
+        chargeExport({ name: 'Good' }),
+      ])
+
+      expect(readCharges().map((c) => c.name)).toEqual(['Good'])
+    })
+  })
+
+  // ── importPayloadWithOptions ──────────────────────────────────────────
+
+  describe('importPayloadWithOptions', () => {
+    it('applies the budget plan before trackers so payload bucket_ids remap onto the freshly-inserted local buckets', () => {
+      const payload = emptyPayload({
+        budgetBuckets: [
+          { id: 7, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
+        ],
+        trackers: [trackerExport({ id: 1, name: 'Rent watch', bucket_id: 7 })],
+      })
+
+      importPayloadWithOptions(payload, ALL_ON)
+
+      const newBucketId = realDb.exec(
+        `SELECT id FROM budget_buckets WHERE name = 'Bills'`
+      )[0].values[0][0] as number
+      expect(readTrackers()[0].bucket_id).toBe(newBucketId)
+    })
+
+    it('leaves existing data untouched for sections whose option is false', () => {
+      realDb.run(
+        `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+         VALUES ('Keep me', 9999, 'PAYDAY', NULL, '2026-01-01', '2026-02-01', '2026-03-01', 1, '2026-01-01')`
+      )
+
+      importPayloadWithOptions(
+        emptyPayload({
+          trackers: [trackerExport({ id: 1, name: 'Should not appear' })],
+          upcomingCharges: [chargeExport({ name: 'Should not appear' })],
+        }),
+        {
+          settings: false,
+          trackers: false,
+          upcomingCharges: false,
+          budgetPlan: false,
+        }
+      )
+
+      expect(readTrackers().map((t) => t.name)).toEqual(['Keep me'])
+      expect(readCharges()).toEqual([])
+    })
+
+    it('with budgetPlan disabled, tracker and charge bucket references resolve to null (empty id map)', () => {
+      importPayloadWithOptions(
+        emptyPayload({
+          trackers: [trackerExport({ id: 1, bucket_id: 7 })],
+          upcomingCharges: [chargeExport({ name: 'C', bucket_id: 7 })],
+        }),
+        {
+          settings: false,
+          trackers: true,
+          upcomingCharges: true,
+          budgetPlan: false,
+        }
+      )
+
+      expect(readTrackers()[0].bucket_id).toBeNull()
+      expect(readCharges()[0].bucket_id).toBeNull()
+    })
+
+    it('imports a full payload coherently, with cross-references intact', () => {
+      insertCategory('groceries')
+      insertCategory('rent')
+
+      const payload = emptyPayload({
+        budgetBuckets: [
+          { id: 2, name: 'Essentials', icon: 'mdi-wallet', sort_order: 0 },
+        ],
+        trackers: [trackerExport({ id: 1, name: 'Grocery run', bucket_id: 2 })],
+        trackerCategories: [{ tracker_id: 1, category_id: 'groceries' }],
+        upcomingCharges: [
+          chargeExport({ name: 'Rent', category_id: 'rent', bucket_id: 2 }),
+        ],
+      })
+
+      importPayloadWithOptions(payload, ALL_ON)
+
+      const bucketId = realDb.exec(
+        `SELECT id FROM budget_buckets WHERE name = 'Essentials'`
+      )[0].values[0][0] as number
+      const tracker = readTrackers()[0]
+      expect(tracker.name).toBe('Grocery run')
+      expect(tracker.bucket_id).toBe(bucketId)
+      expect(trackerCategoryIds(tracker.id)).toEqual(['groceries'])
+      // every tracker ends up with a config-history row (genesis synthesised here)
+      expect(configHistory(tracker.id)).toHaveLength(1)
+
+      const charge = readCharges()[0]
+      expect(charge).toEqual(
+        expect.objectContaining({
+          name: 'Rent',
+          category_id: 'rent',
+          bucket_id: bucketId,
+        })
+      )
+    })
   })
 })
