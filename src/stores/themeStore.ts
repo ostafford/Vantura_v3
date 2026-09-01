@@ -42,10 +42,17 @@ export const themeStore = createStore<ThemeStore>((set) => ({
   hydrateFromDb() {
     const mode = loadValidatedSetting(
       THEME_SETTINGS_KEY,
-      isValidTheme,
+      (raw) => (isValidTheme(raw) ? raw : null),
       DEFAULT_THEME
     )
     set({ mode, hydrated: true })
-    localStorage.setItem(THEME_LOCALSTORAGE_KEY, mode)
+    try {
+      localStorage.setItem(THEME_LOCALSTORAGE_KEY, mode)
+    } catch {
+      // Storage unavailable (private mode / quota / disabled). App.tsx's theme
+      // effect re-mirrors this on its next run and index.html's pre-paint
+      // script falls back to its own default — a failed write must not wedge
+      // the boot sequence, which calls hydrateFromDb() outside any try/catch.
+    }
   },
 }))

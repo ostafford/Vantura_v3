@@ -44,12 +44,17 @@ function isPinnedNavItem(value: unknown): value is PinnedNavItem {
   )
 }
 
-function isPinnedNavItemArray(value: unknown): value is PinnedNavItem[] {
-  return Array.isArray(value) && value.every(isPinnedNavItem)
-}
-
 function loadPins(): PinnedNavItem[] {
-  return loadValidatedSetting(PINS_KEY, isPinnedNavItemArray, [])
+  return loadValidatedSetting(
+    PINS_KEY,
+    (raw) => {
+      const parsed = JSON.parse(raw) as unknown
+      // Keep the valid entries and drop only the malformed ones — a single
+      // bad pin (e.g. from a future required field) must not wipe the list.
+      return Array.isArray(parsed) ? parsed.filter(isPinnedNavItem) : null
+    },
+    []
+  )
 }
 
 function savePins(pins: PinnedNavItem[]): void {
