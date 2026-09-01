@@ -3,6 +3,7 @@ import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
+import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import {
   themeStore,
   resolveTheme,
@@ -105,6 +106,8 @@ function AppContent() {
       advanceNextPaydayIfNeeded()
       if (cancelled) return
       recalculateTrackers()
+      if (cancelled) return
+      reconcileSaverGoalAchievement()
       if (!cancelled) setReady(true)
     }
     boot()

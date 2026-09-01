@@ -22,6 +22,7 @@ import {
   type PaydayFrequency,
 } from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
+import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'
 
 /**
@@ -441,6 +442,7 @@ export async function performInitialSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  reconcileSaverGoalAchievement()
   writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
@@ -478,6 +480,7 @@ export async function performSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  reconcileSaverGoalAchievement()
   writeNetWorthSnapshot()
   const sinceDate = getAppSetting('last_sync')
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
@@ -519,6 +522,7 @@ export async function performFullSync(
   for (const a of accounts) upsertAccount(a)
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
+  reconcileSaverGoalAchievement()
   writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
