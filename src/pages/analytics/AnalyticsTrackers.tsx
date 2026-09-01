@@ -4,15 +4,11 @@ import { Link } from 'react-router-dom'
 import { Card, Col, Form, ProgressBar } from 'react-bootstrap'
 import {
   getTrackersWithProgressForPeriod,
-  getTrackerSpentInPeriod,
+  getTrackersDisplayPeriodData,
   type TrackerResetFrequency,
 } from '@/services/trackers'
-import {
-  toPeriodCents,
-  type BudgetDisplayPeriod,
-} from '@/lib/monthlyEquivalent'
-import { formatMoney, formatShortDate } from '@/lib/format'
-import { addDaysToDateStr, calendarPeriodBounds } from '@/lib/dateStr'
+import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
+import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 
 const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
@@ -34,27 +30,6 @@ const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
   { value: 'MONTHLY', label: 'Monthly' },
   { value: 'YEARLY', label: 'Yearly' },
 ]
-
-function getCalendarPeriodBounds(period: BudgetDisplayPeriod): {
-  from: string
-  to: string
-  label: string
-} {
-  const { from, to } = calendarPeriodBounds(period)
-  if (period === 'YEARLY') {
-    return { from, to, label: from.slice(0, 4) }
-  }
-  return {
-    from,
-    to,
-    label: `${formatShortDate(from)} – ${formatShortDate(addDaysToDateStr(to, -1))}`,
-  }
-}
-
-// period_end from tracker is exclusive — subtract one day for display.
-function displayPeriodEnd(isoDate: string): string {
-  return addDaysToDateStr(isoDate, -1)
-}
 
 function getTrackerProgressStyle(progress: number): {
   variant: 'success' | 'warning' | 'danger'
@@ -93,50 +68,11 @@ export function AnalyticsTrackers() {
     )
   }, [trackers, frequencyFilter])
 
-  const effectiveDataByTrackerId = useMemo(() => {
-    const map: Record<
-      number,
-      {
-        spent: number
-        budget: number
-        progress: number
-        dateRangeLabel: string
-        wasAdjusted: boolean
-      }
-    > = {}
-    for (const t of trackers) {
-      const nativeMatch =
-        (displayPeriod === 'WEEKLY' && t.reset_frequency === 'WEEKLY') ||
-        (displayPeriod === 'MONTHLY' && t.reset_frequency === 'MONTHLY')
-      let spent: number
-      let budget: number
-      let dateRangeLabel: string
-      let wasAdjusted = false
-      if (nativeMatch) {
-        spent = t.spent
-        // Effective budget accounts for a mid-period config change (#16).
-        budget = t.effectiveBudget
-        wasAdjusted = t.wasAdjustedThisPeriod
-        dateRangeLabel =
-          t.period_start && t.period_end
-            ? `${formatShortDate(t.period_start)} – ${formatShortDate(displayPeriodEnd(t.period_end))}`
-            : ''
-      } else {
-        const bounds = getCalendarPeriodBounds(displayPeriod)
-        spent = getTrackerSpentInPeriod(t.id, bounds.from, bounds.to)
-        budget = toPeriodCents(
-          t.budget_amount,
-          t.reset_frequency,
-          displayPeriod
-        )
-        dateRangeLabel = bounds.label
-      }
-      const progress = budget > 0 ? (spent / budget) * 100 : 0
-      map[t.id] = { spent, budget, progress, dateRangeLabel, wasAdjusted }
-    }
-    return map
+  const effectiveDataByTrackerId = useMemo(
+    () => getTrackersDisplayPeriodData(trackers, displayPeriod),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackers, displayPeriod, lastSyncCompletedAt])
+    [trackers, displayPeriod, lastSyncCompletedAt]
+  )
 
   return (
     <>
@@ -194,9 +130,12 @@ export function AnalyticsTrackers() {
                 const effectiveData = effectiveDataByTrackerId[t.id] ?? {
                   spent: t.spent,
                   budget: t.effectiveBudget,
+                  remaining: t.remaining,
                   progress: t.progress,
+                  daysLeft: t.daysLeft,
                   dateRangeLabel: '',
                   wasAdjusted: t.wasAdjustedThisPeriod,
+                  isNativePeriod: false,
                 }
                 return (
                   <Link
