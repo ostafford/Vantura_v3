@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 43
+const SCHEMA_VERSION = 44
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -187,6 +187,17 @@ const DDL_STATEMENTS = [
     balance_cents INTEGER NOT NULL,
     PRIMARY KEY (saver_id, snapshot_date)
   )`,
+  `CREATE TABLE IF NOT EXISTS saver_goal_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    saver_id TEXT NOT NULL,
+    goal_amount_cents INTEGER NOT NULL,
+    goal_date TEXT,
+    created_at TEXT NOT NULL,
+    achieved_at TEXT,
+    archived_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_saver_goal_history_saver
+     ON saver_goal_history(saver_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS budget_transaction_anchors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bucket_id INTEGER NOT NULL,
@@ -1167,6 +1178,68 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['43']
+    )
+  }
+
+  // #29 — saver goal history. A saver's goal used to be a single overwritable
+  // number (accounts.target_amount_cents) plus a saver_goal_date_<id> setting,
+  // with no record once reached. saver_goal_history is now the source of truth
+  // for current + past goals; target_amount_cents stays as a denormalised mirror
+  // of the open row so AccountRow consumers (checkSaverMilestones) are unchanged.
+  // Backfill one genesis row per saver that has a goal today, folding in its
+  // goal-date setting, then drop the now-defunct saver_goal_date_* keys.
+  if (version < 44) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS saver_goal_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        saver_id TEXT NOT NULL,
+        goal_amount_cents INTEGER NOT NULL,
+        goal_date TEXT,
+        created_at TEXT NOT NULL,
+        achieved_at TEXT,
+        archived_at TEXT
+      )
+    `)
+    database.run(`
+      CREATE INDEX IF NOT EXISTS idx_saver_goal_history_saver
+        ON saver_goal_history(saver_id, created_at)
+    `)
+
+    const accCols = database.exec(`PRAGMA table_info(accounts)`)
+    const accHasTarget = (accCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'target_amount_cents'
+    )
+    if (tableExists(database, 'accounts') && accHasTarget) {
+      const now = new Date().toISOString()
+      const goalRows = database.exec(
+        `SELECT id, balance, target_amount_cents FROM accounts
+         WHERE account_type = 'SAVER'
+           AND target_amount_cents IS NOT NULL AND target_amount_cents > 0`
+      )
+      for (const r of goalRows[0]?.values ?? []) {
+        const saverId = String(r[0])
+        const balance = Number(r[1])
+        const goalCents = Number(r[2])
+        const dateRow = database.exec(
+          `SELECT value FROM app_settings WHERE key = ?`,
+          [`saver_goal_date_${saverId}`]
+        )
+        const rawDate = String(dateRow[0]?.values?.[0]?.[0] ?? '')
+        const goalDate = rawDate.length > 0 ? rawDate : null
+        const achievedAt = balance >= goalCents ? now : null
+        database.run(
+          `INSERT INTO saver_goal_history
+             (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+           VALUES (?, ?, ?, ?, ?, NULL)`,
+          [saverId, goalCents, goalDate, now, achievedAt]
+        )
+      }
+    }
+    database.run(`DELETE FROM app_settings WHERE key LIKE 'saver_goal_date_%'`)
+
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['44']
     )
   }
 }

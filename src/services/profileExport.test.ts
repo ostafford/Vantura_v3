@@ -13,6 +13,7 @@ import {
   replaceTrackers,
   replaceUpcomingCharges,
   replaceNetWorth,
+  replaceSaverGoals,
   importPayloadWithOptions,
   IMPORT_ERROR_INVALID_FILE,
   IMPORT_ERROR_WRONG_PASSPHRASE,
@@ -309,13 +310,13 @@ describe('profileExport', () => {
       )
     })
 
-    it('applySettings passes through saver_goal_date_* dynamic keys', async () => {
+    it('applySettings ignores retired saver_goal_date_* keys (moved to saverGoals in v6)', async () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)
       applySettings({ saver_goal_date_abc123: '2027-06-01' })
-      expect(setAppSettingMock).toHaveBeenCalledWith(
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
         'saver_goal_date_abc123',
-        '2027-06-01'
+        expect.anything()
       )
     })
 
@@ -1160,7 +1161,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(5)
+      expect(payload.version).toBe(6)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1400,6 +1401,172 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       expect(readManualAccounts()).toEqual([])
       expect(readSnapshots()).toEqual([])
+    })
+  })
+
+  describe('Saver goal history export/import (#29)', () => {
+    function insertSaver(id: string, balance: number, target: number | null) {
+      realDb.run(
+        `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, target_amount_cents)
+         VALUES (?, ?, 'SAVER', ?, '2026-01-01', '2026-01-01', ?)`,
+        [id, id, balance, target]
+      )
+    }
+    function insertGoal(
+      saverId: string,
+      amount: number,
+      opts: {
+        date?: string | null
+        achieved?: string | null
+        archived?: string | null
+      } = {}
+    ) {
+      realDb.run(
+        `INSERT INTO saver_goal_history
+           (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+         VALUES (?, ?, ?, '2026-01-01T00:00:00.000Z', ?, ?)`,
+        [
+          saverId,
+          amount,
+          opts.date ?? null,
+          opts.achieved ?? null,
+          opts.archived ?? null,
+        ]
+      )
+    }
+    function readGoals() {
+      const stmt = realDb.prepare(
+        `SELECT saver_id, goal_amount_cents, goal_date, achieved_at, archived_at
+         FROM saver_goal_history ORDER BY saver_id, goal_amount_cents`
+      )
+      const out: unknown[][] = []
+      while (stmt.step()) out.push(stmt.get() as unknown[])
+      stmt.free()
+      return out
+    }
+
+    it('buildExportPayload carries every saver_goal_history row minus the local id', () => {
+      insertSaver('sav-1', 500000, 400000)
+      insertGoal('sav-1', 300000, {
+        achieved: '2026-03-01',
+        archived: '2026-04-01',
+      })
+      insertGoal('sav-1', 400000, { date: '2026-12-01' })
+
+      const payload = buildExportPayload()
+      expect(payload.version).toBe(6)
+      expect(payload.saverGoals).toEqual([
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 300000,
+          goal_date: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+          achieved_at: '2026-03-01',
+          archived_at: '2026-04-01',
+        },
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 400000,
+          goal_date: '2026-12-01',
+          created_at: '2026-01-01T00:00:00.000Z',
+          achieved_at: null,
+          archived_at: null,
+        },
+      ])
+      expect(payload.saverGoals?.[0]).not.toHaveProperty('id')
+    })
+
+    it('replaceSaverGoals wipes and reinserts, re-mirroring target_amount_cents from the open row', () => {
+      insertSaver('sav-1', 500000, 999999) // stale mirror
+      insertSaver('sav-2', 10000, 111111)
+      insertGoal('sav-1', 111, {}) // pre-existing junk to be wiped
+
+      replaceSaverGoals([
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 300000,
+          goal_date: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+          achieved_at: '2026-03-01',
+          archived_at: '2026-04-01',
+        },
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 400000,
+          goal_date: '2026-12-01',
+          created_at: '2026-05-01T00:00:00.000Z',
+          achieved_at: null,
+          archived_at: null,
+        },
+      ])
+
+      expect(readGoals()).toEqual([
+        ['sav-1', 300000, null, '2026-03-01', '2026-04-01'],
+        ['sav-1', 400000, '2026-12-01', null, null],
+      ])
+      // sav-1's mirror follows its open goal; sav-2 (no goal in the import) is cleared.
+      const t = realDb.exec(
+        `SELECT id, target_amount_cents FROM accounts WHERE account_type = 'SAVER' ORDER BY id`
+      )
+      expect(t[0].values).toEqual([
+        ['sav-1', 400000],
+        ['sav-2', null],
+      ])
+    })
+
+    it('skips structurally invalid rows', () => {
+      insertSaver('sav-1', 1, null)
+      replaceSaverGoals([
+        {
+          saver_id: '',
+          goal_amount_cents: 100,
+          goal_date: null,
+          created_at: 'x',
+          achieved_at: null,
+          archived_at: null,
+        },
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 0,
+          goal_date: null,
+          created_at: 'x',
+          achieved_at: null,
+          archived_at: null,
+        },
+        {
+          saver_id: 'sav-1',
+          goal_amount_cents: 500,
+          goal_date: null,
+          created_at: '',
+          achieved_at: null,
+          archived_at: null,
+        },
+      ])
+      expect(readGoals()).toEqual([])
+    })
+
+    it('a pre-v6 payload (no saverGoals section) leaves local goals untouched', () => {
+      insertSaver('sav-1', 500000, 400000)
+      insertGoal('sav-1', 400000, { date: '2026-12-01' })
+
+      const v5Payload = emptyPayload()
+      expect(v5Payload.saverGoals).toBeUndefined()
+      importPayloadWithOptions(v5Payload, ALL_ON)
+
+      expect(readGoals()).toEqual([['sav-1', 400000, '2026-12-01', null, null]])
+    })
+
+    it('settings: true with an explicit empty saverGoals clears local goals', () => {
+      insertSaver('sav-1', 500000, 400000)
+      insertGoal('sav-1', 400000, {})
+
+      importPayloadWithOptions(emptyPayload({ saverGoals: [] }), ALL_ON)
+
+      expect(readGoals()).toEqual([])
+      const t = realDb.exec(
+        `SELECT target_amount_cents FROM accounts WHERE id = 'sav-1'`
+      )
+      expect(t[0].values[0][0]).toBeNull()
     })
   })
 })

@@ -1,10 +1,11 @@
 /**
  * Profile export/import: encrypted file-based transfer of settings, trackers,
- * upcoming charges, budget plan, and Net Worth manual accounts + snapshot
- * history between devices. Never exports Up Bank transactions or accounts, the
- * API token, or encryption keys. The manual-account balances / institution
- * names / notes that #34 added are only ever written to the passphrase-encrypted
- * bundle and stay on-device — nothing here makes a network call.
+ * upcoming charges, budget plan, Net Worth manual accounts + snapshot history,
+ * and per-saver goal history between devices. Never exports Up Bank transactions
+ * or accounts, the API token, or encryption keys. The manual-account balances /
+ * institution names / notes that #34 added are only ever written to the
+ * passphrase-encrypted bundle and stay on-device — nothing here makes a network
+ * call.
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
@@ -19,14 +20,15 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 5
+const EXPORT_PAYLOAD_VERSION = 6
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
 
 /**
  * Strict whitelist of app_settings keys allowed in export.
- * Any key not in this list is NEVER exported (except saver_goal_date_* prefix).
+ * Any key not in this list is NEVER exported. (Per-saver goals moved out of
+ * app_settings into the `saverGoals` payload section in v6 / #29.)
  */
 export const SETTINGS_WHITELIST: readonly string[] = [
   'theme_mode',
@@ -80,6 +82,21 @@ export interface ExportPayload {
   manualAccounts?: ManualAccountExportRow[]
   /** #34 — Net Worth daily snapshot history. Absent in payloads from before v5. */
   netWorthSnapshots?: NetWorthSnapshotExportRow[]
+  /** #29 — per-saver goal history. Absent in payloads from before v6. */
+  saverGoals?: SaverGoalExportRow[]
+}
+
+/**
+ * #29 — a `saver_goal_history` row minus its local AUTOINCREMENT `id`.
+ * `saver_id` is the Up account id, which is cross-database stable, so no remap.
+ */
+export interface SaverGoalExportRow {
+  saver_id: string
+  goal_amount_cents: number
+  goal_date: string | null
+  created_at: string
+  achieved_at: string | null
+  archived_at: string | null
 }
 
 export interface TrackerExportRow {
@@ -176,19 +193,38 @@ function collectWhitelistedSettings(): Record<string, string> {
       settings[key] = value
     }
   }
-  // Dynamic per-saver goal dates (key: saver_goal_date_<accountId>)
-  const db = getDb()
-  if (db) {
-    const stmt = db.prepare(
-      `SELECT key, value FROM app_settings WHERE key LIKE 'saver_goal_date_%'`
-    )
-    while (stmt.step()) {
-      const [k, v] = stmt.get() as [string, string]
-      if (v != null && v !== '') settings[k] = v
-    }
-    stmt.free()
-  }
   return settings
+}
+
+/** #29 — every `saver_goal_history` row, oldest cycle first, minus the local id. */
+function collectSaverGoals(): SaverGoalExportRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at
+     FROM saver_goal_history ORDER BY saver_id, created_at, id`
+  )
+  const rows: SaverGoalExportRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      number,
+      string | null,
+      string,
+      string | null,
+      string | null,
+    ]
+    rows.push({
+      saver_id: r[0],
+      goal_amount_cents: r[1],
+      goal_date: r[2],
+      created_at: r[3],
+      achieved_at: r[4],
+      archived_at: r[5],
+    })
+  }
+  stmt.free()
+  return rows
 }
 
 function collectTrackers(): TrackerExportRow[] {
@@ -440,6 +476,7 @@ export function buildExportPayload(): ExportPayload {
   const budgetHypotheticals = collectBudgetHypotheticals()
   const manualAccounts = collectManualAccounts()
   const netWorthSnapshots = collectNetWorthSnapshots()
+  const saverGoals = collectSaverGoals()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -454,6 +491,7 @@ export function buildExportPayload(): ExportPayload {
     budgetHypotheticals,
     manualAccounts,
     netWorthSnapshots,
+    saverGoals,
   }
 }
 
@@ -605,10 +643,7 @@ export function applySettings(settings: Record<string, string>): void {
   const whitelist = new Set(SETTINGS_WHITELIST)
   for (const [key, value] of Object.entries(settings ?? {})) {
     if (typeof value !== 'string') continue
-    if (
-      whitelist.has(key as (typeof SETTINGS_WHITELIST)[number]) ||
-      key.startsWith('saver_goal_date_')
-    ) {
+    if (whitelist.has(key as (typeof SETTINGS_WHITELIST)[number])) {
       setAppSetting(key, value)
     }
   }
@@ -983,6 +1018,61 @@ export function replaceNetWorth(
 }
 
 /**
+ * #29 — Replace saver_goal_history with imported data (full delete-then-reinsert).
+ * Rows are keyed by the Up account id (`saver_id`), stable across the export
+ * boundary, so no remap. After reinserting, re-mirror `accounts.target_amount_cents`
+ * from each saver's open (non-archived) goal so AccountRow consumers stay correct.
+ */
+export function replaceSaverGoals(saverGoals: SaverGoalExportRow[] = []): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM saver_goal_history`)
+
+  const str = (v: unknown): string | null =>
+    typeof v === 'string' && v !== '' ? v : null
+  const rows = Array.isArray(saverGoals) ? saverGoals : []
+  const openAmountBySaver = new Map<string, number>()
+  for (const g of rows) {
+    if (
+      typeof g.saver_id !== 'string' ||
+      g.saver_id === '' ||
+      typeof g.goal_amount_cents !== 'number' ||
+      g.goal_amount_cents <= 0 ||
+      typeof g.created_at !== 'string' ||
+      g.created_at === ''
+    ) {
+      continue
+    }
+    db.run(
+      `INSERT INTO saver_goal_history
+         (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        g.saver_id,
+        g.goal_amount_cents,
+        str(g.goal_date),
+        g.created_at,
+        str(g.achieved_at),
+        str(g.archived_at),
+      ]
+    )
+    if (str(g.archived_at) == null) {
+      openAmountBySaver.set(g.saver_id, g.goal_amount_cents)
+    }
+  }
+
+  db.run(
+    `UPDATE accounts SET target_amount_cents = NULL WHERE account_type = 'SAVER'`
+  )
+  for (const [saverId, cents] of openAmountBySaver) {
+    db.run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
+      cents,
+      saverId,
+    ])
+  }
+}
+
+/**
  * Import payload into the database with optional section selection.
  * Budget plan is applied first so bucket IDs can be remapped for trackers
  * and upcoming charges.
@@ -1009,6 +1099,13 @@ export function importPayloadWithOptions(
   try {
     if (options.settings) {
       applySettings(payload.settings ?? {})
+      // Pre-v6 payloads have no saverGoals section. Guard like replaceNetWorth
+      // does — an unconditional replace with `[]` would wipe this device's
+      // saver goals. (Pre-v6 files only ever carried a goal *date*, never the
+      // amount, so there is nothing to reconstruct from them.)
+      if (payload.saverGoals !== undefined) {
+        replaceSaverGoals(payload.saverGoals)
+      }
     }
 
     // Budget plan must be imported before trackers/charges so the ID map is ready.

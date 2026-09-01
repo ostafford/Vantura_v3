@@ -14,10 +14,14 @@ import {
 import {
   getAccountsByTypes,
   getSaverMonthlyFlow,
-  getSaverGoalDate,
+  getCurrentSaverGoal,
+  getSaverGoalHistory,
+  getSaverInterestBetween,
+  setSaverGoal,
+  startNewSaverGoal,
+  removeSaverGoal,
+  reconcileSaverGoalAchievement,
   sumAccountBalancesCents,
-  updateSaverGoal,
-  updateSaverGoalDate,
   type SaverBalanceSnapshot,
   type SaverMonthlyFlowPoint,
 } from '@/services/accounts'
@@ -124,6 +128,15 @@ function formatGoalDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
+function formatFullDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 function KpiCell({
   label,
   value,
@@ -222,6 +235,10 @@ export function AnalyticsSavers() {
     [prev.year, prev.month, lastSyncCompletedAt]
   )
 
+  // Bumped after every goal mutation so saverData's goal reads refresh without
+  // waiting for the next sync.
+  const [goalVersion, setGoalVersion] = useState(0)
+
   const saverData = useMemo(
     () =>
       savers.map((s) => {
@@ -231,11 +248,34 @@ export function AnalyticsSavers() {
           s.id,
           s.balance
         )
-        const goalDate = getSaverGoalDate(s.id)
-        return { account: s, monthlyFlow, derivedBalances, goalDate }
+        const currentGoal = getCurrentSaverGoal(s.id)
+        const goalHistory = getSaverGoalHistory(s.id)
+        const interestAllTime = getSaverInterestBetween(s.id, null, null)
+        const interestSinceGoal = currentGoal
+          ? getSaverInterestBetween(s.id, currentGoal.created_at, null)
+          : 0
+        // Interest earned within each goal cycle: [row.created_at, next-newer row's start).
+        const interestByGoalId: Record<number, number> = {}
+        goalHistory.forEach((row, i) => {
+          interestByGoalId[row.id] = getSaverInterestBetween(
+            s.id,
+            row.created_at,
+            i > 0 ? goalHistory[i - 1].created_at : null
+          )
+        })
+        return {
+          account: s,
+          monthlyFlow,
+          derivedBalances,
+          currentGoal,
+          goalHistory,
+          interestAllTime,
+          interestSinceGoal,
+          interestByGoalId,
+        }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [savers.map((s) => s.id).join(','), lastSyncCompletedAt]
+    [savers.map((s) => s.id).join(','), lastSyncCompletedAt, goalVersion]
   )
 
   // Round-ups (Loose Change) — always a deposit into savers
@@ -375,25 +415,8 @@ export function AnalyticsSavers() {
   const [editingGoalFor, setEditingGoalFor] = useState<string | null>(null)
   const [goalDraft, setGoalDraft] = useState('')
   const [goalDateDraft, setGoalDateDraft] = useState('')
-  // Local overrides so UI updates instantly without re-fetching DB
-  const [goalOverrides, setGoalOverrides] = useState<
-    Record<string, number | null>
-  >({})
-  const [goalDateOverrides, setGoalDateOverrides] = useState<
-    Record<string, string | null>
-  >({})
-
-  function getGoal(id: string, dbGoal: number | null): number | null {
-    return Object.prototype.hasOwnProperty.call(goalOverrides, id)
-      ? goalOverrides[id]
-      : dbGoal
-  }
-
-  function getGoalDate(id: string, dbDate: string | null): string | null {
-    return Object.prototype.hasOwnProperty.call(goalDateOverrides, id)
-      ? goalDateOverrides[id]
-      : dbDate
-  }
+  // When true, saving starts a fresh goal cycle rather than editing in place.
+  const [startingNewGoal, setStartingNewGoal] = useState(false)
 
   function startEditGoal(
     id: string,
@@ -401,35 +424,47 @@ export function AnalyticsSavers() {
     currentDate: string | null
   ) {
     setEditingGoalFor(id)
+    setStartingNewGoal(false)
     setGoalDraft(currentGoal ? (currentGoal / 100).toFixed(2) : '')
     setGoalDateDraft(currentDate ?? '')
+  }
+
+  function startNextGoal(id: string) {
+    setEditingGoalFor(id)
+    setStartingNewGoal(true)
+    setGoalDraft('')
+    setGoalDateDraft('')
   }
 
   function saveGoal(id: string) {
     const dollars = parseFloat(goalDraft.replace(/[^0-9.]/g, ''))
     const cents =
       isNaN(dollars) || dollars <= 0 ? null : Math.round(dollars * 100)
-    updateSaverGoal(id, cents)
-    setGoalOverrides((prev) => ({ ...prev, [id]: cents }))
-    const dateTrimmed = goalDateDraft.trim()
-    updateSaverGoalDate(id, dateTrimmed || null)
-    setGoalDateOverrides((prev) => ({ ...prev, [id]: dateTrimmed || null }))
+    const dateTrimmed = goalDateDraft.trim() || null
+    if (startingNewGoal && cents != null) {
+      startNewSaverGoal(id, cents, dateTrimmed)
+    } else {
+      setSaverGoal(id, cents, dateTrimmed)
+    }
+    // Stamp achieved_at immediately if the balance already meets a just-set goal.
+    reconcileSaverGoalAchievement()
+    setGoalVersion((v) => v + 1)
     setEditingGoalFor(null)
+    setStartingNewGoal(false)
     setGoalDraft('')
     setGoalDateDraft('')
   }
 
   function cancelEdit() {
     setEditingGoalFor(null)
+    setStartingNewGoal(false)
     setGoalDraft('')
     setGoalDateDraft('')
   }
 
   function removeGoal(id: string) {
-    updateSaverGoal(id, null)
-    setGoalOverrides((prev) => ({ ...prev, [id]: null }))
-    updateSaverGoalDate(id, null)
-    setGoalDateOverrides((prev) => ({ ...prev, [id]: null }))
+    removeSaverGoal(id)
+    setGoalVersion((v) => v + 1)
   }
 
   return (
@@ -520,17 +555,25 @@ export function AnalyticsSavers() {
         </Card>
       )}
       {sortedSaverData.map(
-        ({ account, monthlyFlow, derivedBalances, goalDate: dbGoalDate }) => {
+        ({
+          account,
+          monthlyFlow,
+          derivedBalances,
+          currentGoal,
+          goalHistory,
+          interestAllTime,
+          interestSinceGoal,
+          interestByGoalId,
+        }) => {
           const hasMonthlyActivity = monthlyFlow.some((p) => p.flowCents !== 0)
           const hasBalance = derivedBalances.some((b) => b.balance_cents > 0)
-          const goalCents = getGoal(account.id, account.target_amount_cents)
+          const goalCents = currentGoal?.goal_amount_cents ?? null
           const goalPct =
             goalCents && goalCents > 0
               ? Math.min(100, (account.balance / goalCents) * 100)
               : 0
-          const goalReached =
-            goalCents != null && goalCents > 0 && account.balance >= goalCents
-          const activeGoalDate = getGoalDate(account.id, dbGoalDate)
+          const goalReached = currentGoal?.achieved_at != null
+          const activeGoalDate = currentGoal?.goal_date ?? null
           const projection =
             goalCents && goalCents > 0 && activeGoalDate
               ? computeProjection(
@@ -635,9 +678,9 @@ export function AnalyticsSavers() {
                         className={`mt-1 text-end small fw-semibold ${goalReached ? 'text-success' : 'text-muted'}`}
                       >
                         {goalReached
-                          ? 'Goal reached!'
+                          ? `🎉 Reached${currentGoal?.achieved_at ? ` ${formatFullDate(currentGoal.achieved_at)}` : ''}`
                           : `$${formatMoney(goalCents - account.balance)} to go`}
-                        {activeGoalDate && (
+                        {activeGoalDate && !goalReached && (
                           <span className="fw-normal ms-1">
                             · by {formatGoalDate(activeGoalDate)}
                           </span>
@@ -658,6 +701,15 @@ export function AnalyticsSavers() {
                           {formatMoney(goalCents)}
                         </small>
                         <div className="d-flex gap-2">
+                          {goalReached && (
+                            <button
+                              className="btn btn-link p-0 text-success fw-semibold"
+                              style={{ fontSize: '0.75rem' }}
+                              onClick={() => startNextGoal(account.id)}
+                            >
+                              Set next goal
+                            </button>
+                          )}
                           <button
                             className="btn btn-link p-0 text-muted"
                             style={{ fontSize: '0.75rem' }}
@@ -779,6 +831,29 @@ export function AnalyticsSavers() {
                     </button>
                   )}
 
+                  {/* Interest earned (Up 'Interest' credits into this saver) */}
+                  {interestAllTime > 0 && (
+                    <div className="mt-2 small text-muted">
+                      <i className="mdi mdi-cash-plus me-1" aria-hidden />
+                      Interest earned{' '}
+                      {currentGoal ? (
+                        <>
+                          <span className="fw-semibold text-success">
+                            ${formatMoney(interestSinceGoal)}
+                          </span>{' '}
+                          since {formatGoalDate(currentGoal.created_at)}
+                          <span className="ms-1">
+                            · ${formatMoney(interestAllTime)} all-time
+                          </span>
+                        </>
+                      ) : (
+                        <span className="fw-semibold text-success">
+                          ${formatMoney(interestAllTime)} all-time
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Charts toggle — mirrors Trackers expand row */}
                   <div
                     className="d-flex justify-content-between align-items-center mt-2"
@@ -810,6 +885,34 @@ export function AnalyticsSavers() {
                 <Collapse in={expandedCharts.has(account.id)}>
                   <div>
                     <Card.Body>
+                      {goalHistory.length > 0 && (
+                        <div className="mb-4">
+                          <p className="small text-muted mb-2">Goal history</p>
+                          <ul className="list-unstyled small mb-0">
+                            {goalHistory.map((g) => (
+                              <li key={g.id} className="mb-2">
+                                <div>
+                                  ${formatMoney(g.goal_amount_cents)}
+                                  {g.goal_date &&
+                                    ` by ${formatGoalDate(g.goal_date)}`}
+                                  {g.achieved_at
+                                    ? ` — reached ${formatFullDate(g.achieved_at)}`
+                                    : g.archived_at
+                                      ? ' — removed before reaching'
+                                      : ' — in progress'}
+                                </div>
+                                {interestByGoalId[g.id] > 0 && (
+                                  <div className="text-success">
+                                    ${formatMoney(interestByGoalId[g.id])}{' '}
+                                    interest earned during this goal
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
                       {hasMonthlyActivity ? (
                         <>
                           <p className="small text-muted mb-2">

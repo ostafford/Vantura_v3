@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(43)
+    expect(SCHEMA_VERSION).toBe(44)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -843,6 +843,109 @@ describe('v43 migration: drop dead transaction_user_data.user_category_override 
   it('is a no-op when the column is already gone, and is idempotent', () => {
     const db = buildLegacyV42Database()
     runMigrations(db)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v43-shaped fixture for the v44 migration (#29 — saver goal history).
+ * Carries an accounts table with target_amount_cents, three savers (one goal
+ * already met, one goal not met, one with no goal) and a saver_goal_date_* key.
+ */
+function buildLegacyV43Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '43')`
+  )
+  db.run(`
+    CREATE TABLE accounts (
+      id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      account_type TEXT NOT NULL,
+      balance INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      is_closed INTEGER NOT NULL DEFAULT 0,
+      target_amount_cents INTEGER
+    )
+  `)
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, target_amount_cents) VALUES
+      ('sav-met', 'Annual bills', 'SAVER', 500000, '2026-01-01', '2026-01-01', 400000),
+      ('sav-open', 'Holiday', 'SAVER', 100000, '2026-01-01', '2026-01-01', 800000),
+      ('sav-none', 'Buffer', 'SAVER', 20000, '2026-01-01', '2026-01-01', NULL),
+      ('txn-1', 'Everyday', 'TRANSACTIONAL', 300000, '2026-01-01', '2026-01-01', NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('saver_goal_date_sav-met', '2026-06-01')`
+  )
+  return db
+}
+
+describe('v44 migration: saver goal history', () => {
+  it('backfills a genesis row per goal, stamps achieved_at, folds in the goal date, and drops saver_goal_date_*', () => {
+    const db = buildLegacyV43Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+
+    const rows = db.exec(
+      `SELECT saver_id, goal_amount_cents, goal_date, achieved_at, archived_at
+       FROM saver_goal_history ORDER BY saver_id`
+    )
+    // Only the two savers with a goal get a row; the transactional account never does.
+    expect(rows[0].values.map((r) => r[0])).toEqual(['sav-met', 'sav-open'])
+
+    const met = rows[0].values[0]
+    expect(met[1]).toBe(400000)
+    expect(met[2]).toBe('2026-06-01') // goal date folded in
+    expect(met[3]).not.toBeNull() // achieved_at stamped — balance 500k >= 400k
+    expect(met[4]).toBeNull()
+
+    const open = rows[0].values[1]
+    expect(open[1]).toBe(800000)
+    expect(open[2]).toBeNull()
+    expect(open[3]).toBeNull() // balance 100k < 800k
+    expect(open[4]).toBeNull()
+
+    // The retired dynamic key is gone; target_amount_cents stays as the mirror.
+    expect(readSetting(db, 'saver_goal_date_sav-met')).toBeNull()
+    const acct = db.exec(
+      `SELECT target_amount_cents FROM accounts WHERE id = 'sav-met'`
+    )
+    expect(acct[0].values[0][0]).toBe(400000)
+
+    db.close()
+  })
+
+  it('is a no-op when no saver has a goal, and is idempotent', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '43')`
+    )
+    db.run(`
+      CREATE TABLE accounts (
+        id TEXT PRIMARY KEY, display_name TEXT NOT NULL, account_type TEXT NOT NULL,
+        balance INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        is_closed INTEGER NOT NULL DEFAULT 0, target_amount_cents INTEGER
+      )
+    `)
+    db.run(
+      `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+       VALUES ('sav-none', 'Buffer', 'SAVER', 20000, '2026-01-01', '2026-01-01')`
+    )
+
+    runMigrations(db)
+    const rows = db.exec(`SELECT COUNT(*) FROM saver_goal_history`)
+    expect(rows[0].values[0][0]).toBe(0)
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })

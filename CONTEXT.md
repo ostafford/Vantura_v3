@@ -175,8 +175,16 @@ _Avoid_: outdated account, unsynced account
 ### Savers
 
 **Saver**:
-An Up Bank account with `account_type = 'SAVER'`. No separate table — it's an `accounts` row. Optionally carries a Vantura-side goal amount (`target_amount_cents`) and goal date (`saver_goal_date_<id>`), both independent of anything configured in Up.
+An Up Bank account with `account_type = 'SAVER'`. No separate table — it's an `accounts` row. Optionally carries Vantura-side goals (see *Saver goal cycle*), independent of anything configured in Up.
 _Avoid_: savings account, sub-account, pot, goal account
+
+**Saver goal cycle**:
+One goal a saver has had — amount, optional target date, when it started, when it was reached (`achieved_at`, sticky), when it was superseded. Stored as a row in `saver_goal_history` (`docs/adr/0015`); the current cycle is the row not yet archived. `accounts.target_amount_cents` mirrors the current cycle's amount. Reaching a goal doesn't end the cycle — setting the next one does.
+_Avoid_: goal, target (ambiguous), goal history (that's the table)
+
+**Interest (saver)**:
+An Up interest payment into a saver — `transaction_type = 'Interest'`, a positive credit with no transfer and no round-up. Summed per goal cycle and all-time; kept separate from contributions (which are transfers / round-ups).
+_Avoid_: bonus, yield, earnings
 
 **Pace projection**:
 A saver's on-track / behind-pace status: `currentBalance + lastCompleteMonthRate × monthsRemaining` vs. the goal. Derived from real contribution history, not a configured contribution. The in-progress month is excluded.

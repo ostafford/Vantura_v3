@@ -142,30 +142,89 @@ export function seedDemoData(): void {
     [DEMO_SAVER_2_ID, 'Holiday Fund', 'SAVER', 200000, NOW, NOW, NOW]
   )
 
-  // Saver goals: Rainy Day is on-track (rate > required), Holiday Fund is behind pace
+  // Saver goals (#29): the live goal lives in saver_goal_history;
+  // accounts.target_amount_cents mirrors the open row's amount. Rainy Day is
+  // on-track and already has one finished goal in its history; Holiday Fund is
+  // behind pace on its first goal.
+  const daysAgoIso = (n: number) =>
+    new Date(Date.now() - n * 86_400_000).toISOString()
+  const monthsOutDate = (n: number) => {
+    const d = new Date()
+    d.setUTCMonth(d.getUTCMonth() + n)
+    d.setUTCDate(1)
+    return d.toISOString().slice(0, 10)
+  }
+
   run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
     300000,
     DEMO_SAVER_ID,
-  ]) // $3,000 goal
+  ])
   run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
     500000,
     DEMO_SAVER_2_ID,
-  ]) // $5,000 goal
-  // Goal target dates stored as app_settings (6 months for Rainy Day, 3 months for Holiday Fund)
-  const sixMonthsOut = new Date()
-  sixMonthsOut.setUTCMonth(sixMonthsOut.getUTCMonth() + 6)
-  sixMonthsOut.setUTCDate(1)
-  const threeMonthsOut = new Date()
-  threeMonthsOut.setUTCMonth(threeMonthsOut.getUTCMonth() + 3)
-  threeMonthsOut.setUTCDate(1)
-  setAppSetting(
-    `saver_goal_date_${DEMO_SAVER_ID}`,
-    sixMonthsOut.toISOString().slice(0, 10)
+  ])
+  // Rainy Day: a $1,000 goal reached ~120 days ago and archived when the $3,000
+  // goal was set ~90 days ago.
+  run(
+    `INSERT INTO saver_goal_history
+       (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+     VALUES (?, ?, NULL, ?, ?, ?)`,
+    [DEMO_SAVER_ID, 100000, daysAgoIso(160), daysAgoIso(120), daysAgoIso(90)]
   )
-  setAppSetting(
-    `saver_goal_date_${DEMO_SAVER_2_ID}`,
-    threeMonthsOut.toISOString().slice(0, 10)
+  run(
+    `INSERT INTO saver_goal_history
+       (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+     VALUES (?, ?, ?, ?, NULL, NULL)`,
+    [DEMO_SAVER_ID, 300000, monthsOutDate(6), daysAgoIso(90)]
   )
+  run(
+    `INSERT INTO saver_goal_history
+       (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+     VALUES (?, ?, ?, ?, NULL, NULL)`,
+    [DEMO_SAVER_2_ID, 500000, monthsOutDate(3), daysAgoIso(75)]
+  )
+
+  // A few monthly interest credits (transaction_type = 'Interest') per saver.
+  const seedInterest = (
+    saverId: string,
+    cents: number[],
+    startDaysAgo: number
+  ) => {
+    cents.forEach((amount, i) => {
+      const iso = daysAgoIso(startDaysAgo - i * 30)
+      run(
+        `INSERT OR REPLACE INTO transactions (
+          id, account_id, status, raw_text, description, message, is_categorizable,
+          category_id, parent_category_id, amount, currency, settled_at, created_at,
+          is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at,
+          transaction_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `demo-interest-${saverId}-${i}`,
+          saverId,
+          'SETTLED',
+          null,
+          'Interest',
+          null,
+          0,
+          null,
+          null,
+          amount,
+          'AUD',
+          iso,
+          iso,
+          0,
+          null,
+          null,
+          null,
+          NOW,
+          'Interest',
+        ]
+      )
+    })
+  }
+  seedInterest(DEMO_SAVER_ID, [95, 110, 128], 75)
+  seedInterest(DEMO_SAVER_2_ID, [140, 165], 60)
 
   // Categories: parent + children (expanded)
   const catGroceries = 'demo-cat-groceries'

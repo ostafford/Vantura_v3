@@ -2,7 +2,7 @@
  * Local account rows synced from Up Bank (see sync upsertAccount).
  */
 
-import { getDb, schedulePersist, getAppSetting, setAppSetting } from '@/db'
+import { getDb, schedulePersist } from '@/db'
 
 export interface AccountRow {
   id: string
@@ -216,29 +216,235 @@ export function getSaverRoundUpDiagnostic(
   }
 }
 
-export function updateSaverGoal(
+// ─── Saver goals (history table + interest) ──────────────────────────────────
+//
+// saver_goal_history is the source of truth for a saver's current + past goals
+// (#29, ADR-0015). accounts.target_amount_cents is kept as a denormalised mirror
+// of the open row's amount so AccountRow consumers (checkSaverMilestones) are
+// unchanged.
+
+export interface SaverGoalRow {
+  id: number
+  saver_id: string
+  goal_amount_cents: number
+  /** 'YYYY-MM-DD' target date, optional. */
+  goal_date: string | null
+  /** When this goal cycle started. */
+  created_at: string
+  /** First time the balance reached the goal — sticky, never cleared. */
+  achieved_at: string | null
+  /** Set when the goal is superseded by a new one or removed. */
+  archived_at: string | null
+}
+
+const GOAL_COLS =
+  'id, saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at'
+
+type GoalTuple = [
+  number,
+  string,
+  number,
+  string | null,
+  string,
+  string | null,
+  string | null,
+]
+
+function mapGoalRow(r: GoalTuple): SaverGoalRow {
+  return {
+    id: r[0],
+    saver_id: r[1],
+    goal_amount_cents: r[2],
+    goal_date: r[3],
+    created_at: r[4],
+    achieved_at: r[5],
+    archived_at: r[6],
+  }
+}
+
+function normGoalDate(date: string | null): string | null {
+  return date && date.length > 0 ? date : null
+}
+
+function mirrorTargetAmount(
+  db: NonNullable<ReturnType<typeof getDb>>,
   saverId: string,
-  targetAmountCents: number | null
+  cents: number | null
+): void {
+  db.run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
+    cents,
+    saverId,
+  ])
+}
+
+/** The saver's live goal (`archived_at IS NULL`), or null. At most one exists. */
+export function getCurrentSaverGoal(saverId: string): SaverGoalRow | null {
+  const db = getDb()
+  if (!db) return null
+  const stmt = db.prepare(
+    `SELECT ${GOAL_COLS} FROM saver_goal_history
+     WHERE saver_id = ? AND archived_at IS NULL
+     ORDER BY created_at DESC, id DESC LIMIT 1`
+  )
+  stmt.bind([saverId])
+  const row = stmt.step() ? (stmt.get() as GoalTuple) : null
+  stmt.free()
+  return row ? mapGoalRow(row) : null
+}
+
+/** Every goal for a saver — current and archived — newest cycle first. */
+export function getSaverGoalHistory(saverId: string): SaverGoalRow[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT ${GOAL_COLS} FROM saver_goal_history
+     WHERE saver_id = ?
+     ORDER BY created_at DESC, id DESC`
+  )
+  stmt.bind([saverId])
+  const out: SaverGoalRow[] = []
+  while (stmt.step()) out.push(mapGoalRow(stmt.get() as GoalTuple))
+  stmt.free()
+  return out
+}
+
+/**
+ * Create or edit a saver's goal. While the open goal has not been achieved,
+ * editing updates it in place (a correction, not a new cycle). Once achieved —
+ * or when there is no open goal — a fresh cycle row is inserted, archiving any
+ * open one. A null / non-positive amount removes the goal.
+ */
+export function setSaverGoal(
+  saverId: string,
+  amountCents: number | null,
+  goalDate: string | null
 ): void {
   const db = getDb()
   if (!db) return
-  db.run(`UPDATE accounts SET target_amount_cents = ? WHERE id = ?`, [
-    targetAmountCents,
-    saverId,
-  ])
+  if (amountCents == null || amountCents <= 0) {
+    removeSaverGoal(saverId)
+    return
+  }
+  const now = new Date().toISOString()
+  const date = normGoalDate(goalDate)
+  const current = getCurrentSaverGoal(saverId)
+  if (current && current.achieved_at == null) {
+    db.run(
+      `UPDATE saver_goal_history SET goal_amount_cents = ?, goal_date = ? WHERE id = ?`,
+      [amountCents, date, current.id]
+    )
+  } else {
+    if (current) {
+      db.run(`UPDATE saver_goal_history SET archived_at = ? WHERE id = ?`, [
+        now,
+        current.id,
+      ])
+    }
+    db.run(
+      `INSERT INTO saver_goal_history
+         (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+       VALUES (?, ?, ?, ?, NULL, NULL)`,
+      [saverId, amountCents, date, now]
+    )
+  }
+  mirrorTargetAmount(db, saverId, amountCents)
   schedulePersist()
 }
 
-export function getSaverGoalDate(saverId: string): string | null {
-  const raw = getAppSetting(`saver_goal_date_${saverId}`)
-  return raw && raw.length > 0 ? raw : null
+/**
+ * Explicitly archive the open goal and begin a new cycle — the "Set next goal"
+ * action offered once a goal has been reached.
+ */
+export function startNewSaverGoal(
+  saverId: string,
+  amountCents: number,
+  goalDate: string | null
+): void {
+  const db = getDb()
+  if (!db || amountCents <= 0) return
+  const now = new Date().toISOString()
+  const current = getCurrentSaverGoal(saverId)
+  if (current) {
+    db.run(`UPDATE saver_goal_history SET archived_at = ? WHERE id = ?`, [
+      now,
+      current.id,
+    ])
+  }
+  db.run(
+    `INSERT INTO saver_goal_history
+       (saver_id, goal_amount_cents, goal_date, created_at, achieved_at, archived_at)
+     VALUES (?, ?, ?, ?, NULL, NULL)`,
+    [saverId, amountCents, normGoalDate(goalDate), now]
+  )
+  mirrorTargetAmount(db, saverId, amountCents)
+  schedulePersist()
 }
 
-export function updateSaverGoalDate(
+/** Archive the open goal (history preserved) and clear the mirrored amount. */
+export function removeSaverGoal(saverId: string): void {
+  const db = getDb()
+  if (!db) return
+  const current = getCurrentSaverGoal(saverId)
+  if (current) {
+    db.run(`UPDATE saver_goal_history SET archived_at = ? WHERE id = ?`, [
+      new Date().toISOString(),
+      current.id,
+    ])
+  }
+  mirrorTargetAmount(db, saverId, null)
+  schedulePersist()
+}
+
+/**
+ * Stamp `achieved_at` on any open goal whose saver balance has reached it.
+ * Sticky — a later drawdown never clears it. Idempotent; safe to run every sync.
+ */
+export function reconcileSaverGoalAchievement(): void {
+  const db = getDb()
+  if (!db) return
+  db.run(
+    `UPDATE saver_goal_history
+       SET achieved_at = ?
+     WHERE archived_at IS NULL
+       AND achieved_at IS NULL
+       AND goal_amount_cents <= (
+         SELECT balance FROM accounts WHERE accounts.id = saver_goal_history.saver_id
+       )`,
+    [new Date().toISOString()]
+  )
+  if (db.getRowsModified() > 0) schedulePersist()
+}
+
+/**
+ * Sum of Up "Interest" credits into a saver, optionally windowed.
+ * `fromIso` inclusive lower bound, `toIso` exclusive upper bound; either may be
+ * null for open-ended. Interest is a positive credit tagged
+ * `transaction_type = 'Interest'` (no transfer, no round-up).
+ */
+export function getSaverInterestBetween(
   saverId: string,
-  date: string | null
-): void {
-  setAppSetting(`saver_goal_date_${saverId}`, date ?? '')
+  fromIso: string | null,
+  toIso: string | null
+): number {
+  const db = getDb()
+  if (!db) return 0
+  const params: string[] = [saverId]
+  let sql = `SELECT COALESCE(SUM(amount), 0) FROM transactions
+     WHERE account_id = ? AND transaction_type = 'Interest' AND amount > 0`
+  if (fromIso) {
+    sql += ` AND COALESCE(created_at, settled_at) >= ?`
+    params.push(fromIso)
+  }
+  if (toIso) {
+    sql += ` AND COALESCE(created_at, settled_at) < ?`
+    params.push(toIso)
+  }
+  const stmt = db.prepare(sql)
+  stmt.bind(params)
+  stmt.step()
+  const v = stmt.get()
+  stmt.free()
+  return v ? Number(v[0]) : 0
 }
 
 export interface SaverMonthlyFlowPoint {
