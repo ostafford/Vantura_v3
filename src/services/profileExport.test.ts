@@ -12,6 +12,7 @@ import {
   replaceBudgetPlan,
   replaceTrackers,
   replaceUpcomingCharges,
+  replaceNetWorth,
   importPayloadWithOptions,
   IMPORT_ERROR_INVALID_FILE,
   IMPORT_ERROR_WRONG_PASSPHRASE,
@@ -21,6 +22,8 @@ import {
   type TrackerExportRow,
   type TrackerConfigHistoryExportRow,
   type UpcomingChargeExportRow,
+  type ManualAccountExportRow,
+  type NetWorthSnapshotExportRow,
 } from './profileExport'
 
 vi.mock('@/db', () => ({
@@ -511,6 +514,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     trackers: true,
     upcomingCharges: true,
     budgetPlan: true,
+    netWorth: true,
   }
 
   function readTrackers(): Array<{
@@ -885,6 +889,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
           trackers: false,
           upcomingCharges: false,
           budgetPlan: false,
+          netWorth: false,
         }
       )
 
@@ -903,6 +908,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
           trackers: true,
           upcomingCharges: true,
           budgetPlan: false,
+          netWorth: false,
         }
       )
 
@@ -1035,6 +1041,365 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       // Transaction was closed by COMMIT, not left dangling.
       expect(() => realDb.run('BEGIN')).not.toThrow()
       realDb.run('ROLLBACK')
+    })
+  })
+
+  // ── #34: Net Worth (manual_accounts + net_worth_snapshots) ─────────────
+
+  describe('Net Worth export/import (#34)', () => {
+    function insertManualAccount(over: Partial<Record<string, unknown>> = {}) {
+      const row = {
+        name: 'Mortgage',
+        institution: 'Big Bank',
+        account_type: 'MORTGAGE',
+        kind: 'liability',
+        balance_cents: 45000000,
+        credit_limit_cents: null,
+        interest_rate_bps: 599,
+        rate_type: 'variable',
+        fixed_rate_expiry_date: null,
+        notes: 'offset linked',
+        sort_order: 0,
+        last_updated_at: '2026-02-10T00:00:00.000Z',
+        created_at: '2026-01-01T00:00:00.000Z',
+        ...over,
+      }
+      realDb.run(
+        `INSERT INTO manual_accounts
+           (name, institution, account_type, kind, balance_cents, credit_limit_cents,
+            interest_rate_bps, rate_type, fixed_rate_expiry_date, notes, sort_order,
+            last_updated_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.name,
+          row.institution,
+          row.account_type,
+          row.kind,
+          row.balance_cents,
+          row.credit_limit_cents,
+          row.interest_rate_bps,
+          row.rate_type,
+          row.fixed_rate_expiry_date,
+          row.notes,
+          row.sort_order,
+          row.last_updated_at,
+          row.created_at,
+        ] as never[]
+      )
+    }
+
+    function insertSnapshot(
+      date: string,
+      up = 100000,
+      assets = 0,
+      liabilities = 0
+    ) {
+      realDb.run(
+        `INSERT INTO net_worth_snapshots (snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents)
+         VALUES (?, ?, ?, ?)`,
+        [date, up, assets, liabilities]
+      )
+    }
+
+    function readManualAccounts() {
+      const stmt = realDb.prepare(
+        `SELECT name, account_type, kind, balance_cents, interest_rate_bps, notes,
+                sort_order, last_updated_at, created_at
+         FROM manual_accounts ORDER BY sort_order, id`
+      )
+      const out: Array<Record<string, unknown>> = []
+      while (stmt.step()) {
+        const r = stmt.get() as [
+          string,
+          string,
+          string,
+          number,
+          number | null,
+          string | null,
+          number,
+          string,
+          string,
+        ]
+        out.push({
+          name: r[0],
+          account_type: r[1],
+          kind: r[2],
+          balance_cents: r[3],
+          interest_rate_bps: r[4],
+          notes: r[5],
+          sort_order: r[6],
+          last_updated_at: r[7],
+          created_at: r[8],
+        })
+      }
+      stmt.free()
+      return out
+    }
+
+    function readSnapshots() {
+      const stmt = realDb.prepare(
+        `SELECT snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents
+         FROM net_worth_snapshots ORDER BY snapshot_date`
+      )
+      const out: Array<[string, number, number, number]> = []
+      while (stmt.step())
+        out.push(stmt.get() as [string, number, number, number])
+      stmt.free()
+      return out
+    }
+
+    it('buildExportPayload carries manual_accounts (minus id) and net_worth_snapshots', () => {
+      insertManualAccount({ name: 'Mortgage' })
+      insertManualAccount({
+        name: 'Shares',
+        account_type: 'INVESTMENT',
+        kind: 'asset',
+        sort_order: 1,
+      })
+      insertSnapshot('2026-02-01', 500000, 10000, 45000000)
+
+      const payload = buildExportPayload()
+
+      expect(payload.version).toBe(5)
+      expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
+        'Mortgage',
+        'Shares',
+      ])
+      expect(payload.manualAccounts?.[0]).not.toHaveProperty('id')
+      expect(payload.manualAccounts?.[0]).toMatchObject({
+        account_type: 'MORTGAGE',
+        kind: 'liability',
+        balance_cents: 45000000,
+        interest_rate_bps: 599,
+        last_updated_at: '2026-02-10T00:00:00.000Z',
+        created_at: '2026-01-01T00:00:00.000Z',
+      })
+      expect(payload.netWorthSnapshots).toEqual([
+        {
+          snapshot_date: '2026-02-01',
+          up_bank_cents: 500000,
+          manual_assets_cents: 10000,
+          manual_liabilities_cents: 45000000,
+        },
+      ])
+    })
+
+    it('replaceNetWorth wipes both tables and reinserts, preserving exported timestamps', () => {
+      insertManualAccount({ name: 'Stale local account' })
+      insertSnapshot('2025-12-31')
+
+      const accounts: ManualAccountExportRow[] = [
+        {
+          name: 'Imported Mortgage',
+          institution: null,
+          account_type: 'MORTGAGE',
+          kind: 'liability',
+          balance_cents: 30000000,
+          credit_limit_cents: null,
+          interest_rate_bps: 610,
+          rate_type: 'fixed',
+          fixed_rate_expiry_date: '2027-06-30',
+          notes: null,
+          sort_order: 0,
+          last_updated_at: '2026-02-14T00:00:00.000Z',
+          created_at: '2025-08-01T00:00:00.000Z',
+        },
+      ]
+      replaceNetWorth(accounts, [
+        {
+          snapshot_date: '2026-02-14',
+          up_bank_cents: 1234,
+          manual_assets_cents: 0,
+          manual_liabilities_cents: 30000000,
+        },
+      ])
+
+      expect(readManualAccounts()).toEqual([
+        {
+          name: 'Imported Mortgage',
+          account_type: 'MORTGAGE',
+          kind: 'liability',
+          balance_cents: 30000000,
+          interest_rate_bps: 610,
+          notes: null,
+          sort_order: 0,
+          last_updated_at: '2026-02-14T00:00:00.000Z',
+          created_at: '2025-08-01T00:00:00.000Z',
+        },
+      ])
+      expect(readSnapshots()).toEqual([['2026-02-14', 1234, 0, 30000000]])
+    })
+
+    it('replaceNetWorth with empty arrays clears both tables', () => {
+      insertManualAccount()
+      insertSnapshot('2026-01-15')
+
+      replaceNetWorth([], [])
+
+      expect(readManualAccounts()).toEqual([])
+      expect(readSnapshots()).toEqual([])
+    })
+
+    it('replaceNetWorth skips structurally invalid account and snapshot rows', () => {
+      replaceNetWorth(
+        [
+          {
+            name: '',
+            account_type: 'X',
+            kind: 'asset',
+            balance_cents: 1,
+          } as ManualAccountExportRow,
+          {
+            name: 'NoBalance',
+            account_type: 'X',
+            kind: 'asset',
+          } as unknown as ManualAccountExportRow,
+          {
+            name: 'BadKind',
+            institution: null,
+            account_type: 'SAVINGS',
+            kind: 'wealth' as unknown as 'asset',
+            balance_cents: 100,
+            credit_limit_cents: null,
+            interest_rate_bps: null,
+            rate_type: null,
+            fixed_rate_expiry_date: null,
+            notes: null,
+            sort_order: 0,
+            last_updated_at: '2026-02-01T00:00:00.000Z',
+            created_at: '2026-02-01T00:00:00.000Z',
+          },
+          {
+            name: 'Good',
+            institution: null,
+            account_type: 'SAVINGS',
+            kind: 'asset',
+            balance_cents: 5000,
+            credit_limit_cents: null,
+            interest_rate_bps: null,
+            rate_type: null,
+            fixed_rate_expiry_date: null,
+            notes: null,
+            sort_order: 0,
+            last_updated_at: '2026-02-01T00:00:00.000Z',
+            created_at: '2026-02-01T00:00:00.000Z',
+          },
+        ],
+        [
+          {
+            snapshot_date: 'bad',
+            up_bank_cents: 1,
+            manual_assets_cents: 0,
+            manual_liabilities_cents: 0,
+          } as NetWorthSnapshotExportRow,
+          {
+            snapshot_date: '2026-02-01',
+            up_bank_cents: 9,
+            manual_assets_cents: 0,
+            manual_liabilities_cents: 0,
+          },
+        ]
+      )
+
+      expect(readManualAccounts().map((a) => a.name)).toEqual(['Good'])
+      expect(readSnapshots()).toEqual([['2026-02-01', 9, 0, 0]])
+    })
+
+    it('importPayloadWithOptions honours the netWorth toggle', () => {
+      insertManualAccount({ name: 'Keep when off' })
+
+      // netWorth: false → existing manual account untouched
+      importPayloadWithOptions(
+        emptyPayload({
+          manualAccounts: [
+            {
+              name: 'Should not appear',
+              institution: null,
+              account_type: 'SAVINGS',
+              kind: 'asset',
+              balance_cents: 1,
+              credit_limit_cents: null,
+              interest_rate_bps: null,
+              rate_type: null,
+              fixed_rate_expiry_date: null,
+              notes: null,
+              sort_order: 0,
+              last_updated_at: '2026-02-01T00:00:00.000Z',
+              created_at: '2026-02-01T00:00:00.000Z',
+            },
+          ],
+        }),
+        { ...ALL_ON, netWorth: false }
+      )
+      expect(readManualAccounts().map((a) => a.name)).toEqual(['Keep when off'])
+
+      // netWorth: true → replaced
+      importPayloadWithOptions(
+        emptyPayload({
+          manualAccounts: [
+            {
+              name: 'Imported',
+              institution: null,
+              account_type: 'SAVINGS',
+              kind: 'asset',
+              balance_cents: 2,
+              credit_limit_cents: null,
+              interest_rate_bps: null,
+              rate_type: null,
+              fixed_rate_expiry_date: null,
+              notes: null,
+              sort_order: 0,
+              last_updated_at: '2026-02-01T00:00:00.000Z',
+              created_at: '2026-02-01T00:00:00.000Z',
+            },
+          ],
+          netWorthSnapshots: [
+            {
+              snapshot_date: '2026-02-01',
+              up_bank_cents: 3,
+              manual_assets_cents: 2,
+              manual_liabilities_cents: 0,
+            },
+          ],
+        }),
+        ALL_ON
+      )
+      expect(readManualAccounts().map((a) => a.name)).toEqual(['Imported'])
+      expect(readSnapshots()).toEqual([['2026-02-01', 3, 2, 0]])
+    })
+
+    it('netWorth: true on a pre-v5 payload (no Net Worth section) is a no-op, not a wipe', () => {
+      insertManualAccount({ name: 'Pre-existing' })
+      insertSnapshot('2026-01-01')
+
+      // A v4 payload has no manualAccounts / netWorthSnapshots key at all.
+      // Without the `manualAccounts !== undefined` guard in
+      // importPayloadWithOptions, `netWorth: true` would run
+      // replaceNetWorth([], []) and DELETE both tables with nothing to
+      // reinsert. The guard makes an absent section a skip regardless of
+      // caller — the wizard no longer has to be the only thing stopping it.
+      const v4Payload = emptyPayload()
+      expect(v4Payload.manualAccounts).toBeUndefined()
+
+      importPayloadWithOptions(v4Payload, { ...ALL_ON, netWorth: true })
+
+      expect(readManualAccounts().map((a) => a.name)).toEqual(['Pre-existing'])
+      expect(readSnapshots()).toEqual([['2026-01-01', 100000, 0, 0]])
+    })
+
+    it('netWorth: true with an explicitly empty manualAccounts still clears both tables', () => {
+      insertManualAccount({ name: 'Wiped' })
+      insertSnapshot('2026-01-01')
+
+      // `manualAccounts: []` is a present-but-empty section: a real replace-all
+      // that intentionally clears the device, distinct from an absent section.
+      importPayloadWithOptions(emptyPayload({ manualAccounts: [] }), {
+        ...ALL_ON,
+        netWorth: true,
+      })
+
+      expect(readManualAccounts()).toEqual([])
+      expect(readSnapshots()).toEqual([])
     })
   })
 })
