@@ -27,7 +27,12 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
-import { formatMoney, formatDate, formatShortDate } from '@/lib/format'
+import {
+  formatMoney,
+  formatDate,
+  formatShortDate,
+  formatShortDateWithYear,
+} from '@/lib/format'
 import {
   addDaysToDateStr,
   calendarPeriodBounds,
@@ -252,10 +257,9 @@ export function AnalyticsTrackersDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracker, id, lastSyncCompletedAt])
 
-  const categoryNameById = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.name])),
-    [categories]
-  )
+  // `categories` is re-fetched unmemoized each render, so a useMemo keyed on it
+  // would rebuild every time anyway — just build the lookup inline.
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]))
 
   const maxDomainPeriod = useMemo(() => {
     if (effectivePeriodHistory.length === 0) return undefined
@@ -516,7 +520,7 @@ export function AnalyticsTrackersDetail() {
                       {configHistory.map((v, i) => (
                         <tr key={v.id}>
                           <td>
-                            {formatShortDate(v.effective_from)}
+                            {formatShortDateWithYear(v.effective_from)}
                             {i === configHistory.length - 1 && (
                               <Badge bg="secondary" className="text-dark ms-2">
                                 Initial
@@ -528,7 +532,8 @@ export function AnalyticsTrackersDetail() {
                           </td>
                           <td className="small">
                             {v.category_ids
-                              .map((cid) => categoryNameById.get(cid) ?? cid)
+                              .map((cid) => categoryNameById.get(cid))
+                              .filter((n): n is string => n != null)
                               .sort((a, b) => a.localeCompare(b))
                               .join(', ') || '—'}
                           </td>
