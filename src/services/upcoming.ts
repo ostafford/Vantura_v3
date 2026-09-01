@@ -102,14 +102,17 @@ export function nextChargeDateFromAnchor(
   if (frequency === 'ONCE') return today
 
   let occurrence = anchorDateStr.slice(0, 10)
-  let guard = 0
-  while (occurrence <= today && guard < 1000) {
+  // Every real frequency advances `occurrence` monotonically and stepOccurrence
+  // returns null for anything else, so this terminates; the counter is only a
+  // stop against a pathological anchor (decades in the past). If it ever trips
+  // we fall back to `today` rather than return the still-past `occurrence`.
+  for (let guard = 0; guard < 1000; guard++) {
+    if (occurrence > today) return occurrence
     const next = stepOccurrence(occurrence, frequency)
     if (!next) return today // unrecognised frequency
     occurrence = next
-    guard += 1
   }
-  return occurrence
+  return today
 }
 
 export function firstOccurrenceOnOrAfter(

@@ -193,6 +193,13 @@ describe('nextChargeDateFromAnchor (#47)', () => {
       localDateString()
     )
   })
+
+  it('falls back to today when the anchor is too far past to resolve in 1000 steps', () => {
+    // ~21 years of weekly steps exceeds the guard; return today, not a past date.
+    expect(nextChargeDateFromAnchor('2005-01-01', 'WEEKLY', '2026-03-10')).toBe(
+      '2026-03-10'
+    )
+  })
 })
 
 describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
