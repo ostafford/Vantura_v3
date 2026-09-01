@@ -60,17 +60,35 @@ export function getTransactionUserDataMap(
   return out
 }
 
-export function setTransactionUserNote(
+/** The two nullable user-owned columns on transaction_user_data. */
+type UserDataField = 'user_notes' | 'user_category_override'
+
+const SIBLING_FIELD: Record<UserDataField, UserDataField> = {
+  user_notes: 'user_category_override',
+  user_category_override: 'user_notes',
+}
+
+/**
+ * Set (or clear) one user-owned field on a transaction's row, keeping the row
+ * a pure overlay: a `null` value clears the field, and the row is deleted once
+ * both fields are empty so an untouched transaction has no row at all.
+ * `value` must already be normalised by the caller (trimmed, `''` → `null`).
+ * Field names come from the `UserDataField` union, never caller input, so the
+ * interpolation into the SQL is safe.
+ */
+function upsertUserDataField(
   transactionId: string,
-  userNotes: string | null
+  field: UserDataField,
+  value: string | null
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   const existing = getTransactionUserData(transactionId)
-  if (userNotes === null || userNotes.trim() === '') {
-    if (existing?.user_category_override) {
+
+  if (value === null) {
+    if (existing?.[SIBLING_FIELD[field]]) {
       db.run(
-        `UPDATE transaction_user_data SET user_notes = NULL WHERE transaction_id = ?`,
+        `UPDATE transaction_user_data SET ${field} = NULL WHERE transaction_id = ?`,
         [transactionId]
       )
     } else if (existing) {
@@ -78,52 +96,43 @@ export function setTransactionUserNote(
         transactionId,
       ])
     }
+  } else if (existing) {
+    db.run(
+      `UPDATE transaction_user_data SET ${field} = ? WHERE transaction_id = ?`,
+      [value, transactionId]
+    )
   } else {
-    if (existing) {
-      db.run(
-        `UPDATE transaction_user_data SET user_notes = ? WHERE transaction_id = ?`,
-        [userNotes.trim(), transactionId]
-      )
-    } else {
-      db.run(
-        `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override) VALUES (?, ?, NULL)`,
-        [transactionId, userNotes.trim()]
-      )
-    }
+    db.run(
+      `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override) VALUES (?, ?, ?)`,
+      [
+        transactionId,
+        field === 'user_notes' ? value : null,
+        field === 'user_category_override' ? value : null,
+      ]
+    )
   }
   schedulePersist()
+}
+
+export function setTransactionUserNote(
+  transactionId: string,
+  userNotes: string | null
+): void {
+  const trimmed = userNotes?.trim() ?? ''
+  upsertUserDataField(
+    transactionId,
+    'user_notes',
+    trimmed === '' ? null : trimmed
+  )
 }
 
 export function setTransactionUserCategoryOverride(
   transactionId: string,
   categoryId: string | null
 ): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  const existing = getTransactionUserData(transactionId)
-  if (categoryId === null || categoryId === '') {
-    if (existing?.user_notes) {
-      db.run(
-        `UPDATE transaction_user_data SET user_category_override = NULL WHERE transaction_id = ?`,
-        [transactionId]
-      )
-    } else if (existing) {
-      db.run(`DELETE FROM transaction_user_data WHERE transaction_id = ?`, [
-        transactionId,
-      ])
-    }
-  } else {
-    if (existing) {
-      db.run(
-        `UPDATE transaction_user_data SET user_category_override = ? WHERE transaction_id = ?`,
-        [categoryId, transactionId]
-      )
-    } else {
-      db.run(
-        `INSERT INTO transaction_user_data (transaction_id, user_notes, user_category_override) VALUES (?, NULL, ?)`,
-        [transactionId, categoryId]
-      )
-    }
-  }
-  schedulePersist()
+  upsertUserDataField(
+    transactionId,
+    'user_category_override',
+    categoryId === null || categoryId === '' ? null : categoryId
+  )
 }
