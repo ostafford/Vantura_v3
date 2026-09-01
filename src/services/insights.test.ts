@@ -10,6 +10,7 @@ import {
   getWeekComparison,
   getYearComparison,
   getMonthComparison,
+  getCustomRangeComparison,
 } from './insights'
 import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
@@ -176,6 +177,75 @@ describe('getMonthComparison', () => {
 
     const result = getMonthComparison('2026-04-01', '2026-04-30')
     expect(result.periodNote).toBeUndefined()
+  })
+})
+
+describe('getCustomRangeComparison', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  /** Captures every `[startUtc, endUtc]` pair the comparison queries bind. */
+  function mockCapturingDb() {
+    const bindCalls: unknown[][] = []
+    const stmt = {
+      bind: (args: unknown[]) => bindCalls.push(args),
+      step: () => false,
+      get: () => undefined,
+      free: () => {},
+    }
+    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
+    return bindCalls
+  }
+
+  const boundTo = (from: string, to: string) => (args: unknown[]) =>
+    args[0] === localDateStartUtc(from) && args[1] === localDateEndUtc(to)
+
+  it('compares a fully-past range against the equal-length window immediately before it', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 1)) // Aug 1, 2026 — range is over
+    const bindCalls = mockCapturingDb()
+
+    const result = getCustomRangeComparison('2026-06-01', '2026-06-14')
+
+    // 14-day range -> previous window is May 18–31 (the 14 days before Jun 1).
+    expect(bindCalls.some(boundTo('2026-05-18', '2026-05-31'))).toBe(true)
+    expect(result.periodNote).toBeUndefined()
+  })
+
+  it('collapses a single-day range to the single preceding day', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 1))
+    const bindCalls = mockCapturingDb()
+
+    getCustomRangeComparison('2026-06-15', '2026-06-15')
+
+    expect(bindCalls.some(boundTo('2026-06-14', '2026-06-14'))).toBe(true)
+  })
+
+  it('caps the previous window to the elapsed-day count for a range that runs past today', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 10)) // Jun 10, 2026 — inside the range
+    const bindCalls = mockCapturingDb()
+
+    const result = getCustomRangeComparison('2026-06-01', '2026-06-30')
+
+    // 10 elapsed days (Jun 1–10) -> previous window capped to May 22–31.
+    expect(result.periodNote).toBe('Jun 1–Jun 10 vs May 22–May 31')
+    expect(bindCalls.some(boundTo('2026-05-22', '2026-05-31'))).toBe(true)
+  })
+
+  it('does not cap (or note) a range that lies entirely in the future', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 1)) // Jun 1, 2026 — range starts Jul 1
+    const bindCalls = mockCapturingDb()
+
+    const result = getCustomRangeComparison('2026-07-01', '2026-07-10')
+
+    expect(result.periodNote).toBeUndefined()
+    // Full 10-day previous window, Jun 21–30.
+    expect(bindCalls.some(boundTo('2026-06-21', '2026-06-30'))).toBe(true)
   })
 })
 

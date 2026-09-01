@@ -26,7 +26,7 @@
 
 import { getDb } from '@/db'
 import { formatMoney, localDateStartUtc, localDateEndUtc } from '@/lib/format'
-import { daysBetweenDateStr } from '@/lib/dateStr'
+import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
 import {
   buildMonthSpendingSeries,
   type MonthSpendingSeries,
@@ -698,8 +698,8 @@ function fmtDayMonth(dateStr: string): string {
   return `${MONTH_ABBR[monthIdx]} ${day}`
 }
 
-/** Labels for period-over-period narratives (vs last month/year/week). */
-export type NarrativePeriod = 'month' | 'year' | 'week'
+/** Labels for period-over-period narratives (vs last month/year/week/range). */
+export type NarrativePeriod = 'month' | 'year' | 'week' | 'custom'
 
 function narrativePriorLabel(
   p: NarrativePeriod,
@@ -713,6 +713,12 @@ function narrativePriorLabel(
       return yearNarrativePriorLabel(previousFrom)
     case 'week':
       return weekNarrativePriorLabel(previousFrom)
+    case 'custom': {
+      // The preceding equal-length window has no calendar name — describe it
+      // by its span instead ("the preceding 14 days").
+      const n = daysBetweenDateStr(previousFrom, currentFrom)
+      return `the preceding ${n} day${n === 1 ? '' : 's'}`
+    }
     default:
       return monthNarrativePriorLabel(previousFrom, currentFrom)
   }
@@ -1054,6 +1060,46 @@ export function getWeekComparison(weekOffset: number): MonthComparisonData {
     effectivePreviousEndIso,
     'week'
   )
+}
+
+/**
+ * KPI comparison for an arbitrary custom date range (the Reports page's
+ * custom-range mode). "Previous" is the equal-length window immediately
+ * preceding `from` — the fourth caller anticipated by ADR-0007.
+ *
+ * Both dates are local "YYYY-MM-DD". If the range runs past today it is only
+ * partially elapsed, so — mirroring getMonthComparison — the preceding window
+ * is capped to the elapsed-day count (from..today) and a periodNote spells the
+ * two windows out. A fully-past range compares against a full equal-length
+ * window with no note.
+ */
+export function getCustomRangeComparison(
+  from: string,
+  to: string
+): MonthComparisonData {
+  const todayStr = toDateOnly(new Date())
+
+  // Cap only when the range has started but not finished (today in [from, to)).
+  const isInProgress = todayStr >= from && todayStr < to
+  const effectiveTo = isInProgress ? todayStr : to
+
+  const lengthDays = daysBetweenDateStr(from, effectiveTo) + 1
+  const previousTo = addDaysToDateStr(from, -1)
+  const previousFrom = addDaysToDateStr(from, -lengthDays)
+
+  const result = getPeriodComparison(
+    from,
+    to,
+    previousFrom,
+    previousTo,
+    'custom'
+  )
+
+  const periodNote = isInProgress
+    ? `${fmtDayMonth(from)}–${fmtDayMonth(effectiveTo)} vs ${fmtDayMonth(previousFrom)}–${fmtDayMonth(previousTo)}`
+    : undefined
+
+  return { ...result, periodNote }
 }
 
 // ---------------------------------------------------------------------------
