@@ -85,6 +85,33 @@ function stepOccurrence(dateStr: string, frequency: string): string | null {
   }
 }
 
+/**
+ * Next charge date to prefill when creating a recurring charge from a past
+ * transaction: step the anchor forward by `frequency` until it lands past
+ * `today` (default: local today). `ONCE` and any unrecognised frequency fall
+ * back to `today`. Returns `YYYY-MM-DD`.
+ *
+ * Steps via `stepOccurrence`, so month-end anchors clamp correctly — a Jan 31
+ * monthly anchor advances to Feb 28/29, not Mar 3.
+ */
+export function nextChargeDateFromAnchor(
+  anchorDateStr: string,
+  frequency: string,
+  today: string = localDateString()
+): string {
+  if (frequency === 'ONCE') return today
+
+  let occurrence = anchorDateStr.slice(0, 10)
+  let guard = 0
+  while (occurrence <= today && guard < 1000) {
+    const next = stepOccurrence(occurrence, frequency)
+    if (!next) return today // unrecognised frequency
+    occurrence = next
+    guard += 1
+  }
+  return occurrence
+}
+
 export function firstOccurrenceOnOrAfter(
   nextChargeDate: string,
   frequency: string,
