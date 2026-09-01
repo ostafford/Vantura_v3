@@ -2,6 +2,9 @@
  * Global toast notifications. Use toast.success(), toast.error(), toast.info()
  * from anywhere. ToastProvider renders the toast and auto-dismisses unless
  * info(..., { persistent: true }) is used (e.g. long-running sync progress).
+ *
+ * `persistent` is an info()-only option — success and error toasts always
+ * auto-dismiss, so they take no options rather than a silently-ignored one.
  */
 
 import { createStore } from 'zustand/vanilla'
@@ -20,8 +23,8 @@ type ToastState = {
 }
 
 type ToastActions = {
-  success: (message: string, options?: ToastShowOptions) => void
-  error: (message: string, options?: ToastShowOptions) => void
+  success: (message: string) => void
+  error: (message: string) => void
   info: (message: string, options?: ToastShowOptions) => void
   hide: () => void
 }
@@ -34,11 +37,11 @@ export const toastStore = createStore<ToastStore>((set) => ({
   variant: 'success',
   persistent: false,
 
-  success(message: string, _options?: ToastShowOptions) {
+  success(message: string) {
     set({ show: true, message, variant: 'success', persistent: false })
   },
 
-  error(message: string, _options?: ToastShowOptions) {
+  error(message: string) {
     set({ show: true, message, variant: 'error', persistent: false })
   },
 
@@ -58,10 +61,8 @@ export const toastStore = createStore<ToastStore>((set) => ({
 
 /** Convenience API: toast.success('Done.') */
 export const toast = {
-  success: (message: string, options?: ToastShowOptions) =>
-    toastStore.getState().success(message, options),
-  error: (message: string, options?: ToastShowOptions) =>
-    toastStore.getState().error(message, options),
+  success: (message: string) => toastStore.getState().success(message),
+  error: (message: string) => toastStore.getState().error(message),
   info: (message: string, options?: ToastShowOptions) =>
     toastStore.getState().info(message, options),
   hide: () => toastStore.getState().hide(),
