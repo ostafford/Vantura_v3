@@ -1031,11 +1031,15 @@ export function importPayloadWithOptions(
     if (options.upcomingCharges) {
       replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
     }
-    if (options.netWorth) {
-      replaceNetWorth(
-        payload.manualAccounts ?? [],
-        payload.netWorthSnapshots ?? []
-      )
+    // A pre-v5 payload has no Net Worth section at all. Running replaceNetWorth
+    // then would DELETE both tables with nothing to reinsert, silently wiping
+    // this device's manual accounts and history. The wizard already only sets
+    // `netWorth` when the file contains the section, but gate it here too so no
+    // other caller (batch restore, tests, a future CLI) can trip the same
+    // footgun. `manualAccounts: []` — present but empty — is still a real
+    // replace-all and is left to run.
+    if (options.netWorth && payload.manualAccounts !== undefined) {
+      replaceNetWorth(payload.manualAccounts, payload.netWorthSnapshots ?? [])
     }
 
     db.run('COMMIT')

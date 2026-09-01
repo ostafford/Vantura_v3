@@ -1368,25 +1368,38 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       expect(readSnapshots()).toEqual([['2026-02-01', 3, 2, 0]])
     })
 
-    it('the wizard gate (netWorth = manualAccounts !== undefined) spares Net Worth data on a pre-v5 file', () => {
+    it('netWorth: true on a pre-v5 payload (no Net Worth section) is a no-op, not a wipe', () => {
       insertManualAccount({ name: 'Pre-existing' })
       insertSnapshot('2026-01-01')
 
       // A v4 payload has no manualAccounts / netWorthSnapshots key at all.
-      // `netWorth: true` would then run replaceNetWorth([], []) and wipe both
-      // tables — same "selected section replaces with what the file has"
-      // contract as every other section. The wizard's gate is what stops that:
-      // it only sets netWorth when the file actually contains the section.
+      // Without the `manualAccounts !== undefined` guard in
+      // importPayloadWithOptions, `netWorth: true` would run
+      // replaceNetWorth([], []) and DELETE both tables with nothing to
+      // reinsert. The guard makes an absent section a skip regardless of
+      // caller — the wizard no longer has to be the only thing stopping it.
       const v4Payload = emptyPayload()
       expect(v4Payload.manualAccounts).toBeUndefined()
 
-      importPayloadWithOptions(v4Payload, {
-        ...ALL_ON,
-        netWorth: v4Payload.manualAccounts !== undefined,
-      })
+      importPayloadWithOptions(v4Payload, { ...ALL_ON, netWorth: true })
 
       expect(readManualAccounts().map((a) => a.name)).toEqual(['Pre-existing'])
       expect(readSnapshots()).toEqual([['2026-01-01', 100000, 0, 0]])
+    })
+
+    it('netWorth: true with an explicitly empty manualAccounts still clears both tables', () => {
+      insertManualAccount({ name: 'Wiped' })
+      insertSnapshot('2026-01-01')
+
+      // `manualAccounts: []` is a present-but-empty section: a real replace-all
+      // that intentionally clears the device, distinct from an absent section.
+      importPayloadWithOptions(emptyPayload({ manualAccounts: [] }), {
+        ...ALL_ON,
+        netWorth: true,
+      })
+
+      expect(readManualAccounts()).toEqual([])
+      expect(readSnapshots()).toEqual([])
     })
   })
 })
