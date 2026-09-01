@@ -13,6 +13,7 @@ import {
 } from 'react-bootstrap'
 import {
   getMonthComparison,
+  getCustomRangeComparison,
   getCategoryBreakdownForDateRange,
   getInsightsForDateRange,
   type MonthDelta,
@@ -440,6 +441,15 @@ export function AnalyticsReports() {
     () => comparisonMonthPairLabels(year, month),
     [year, month]
   )
+  // Labels for the comparison card / KPI deltas. Custom range has no calendar
+  // month name, so it names the two windows generically.
+  const comparisonLabels = isCustomRange
+    ? {
+        currentLabel: 'Selected range',
+        previousLabel: 'the preceding period',
+        vsPriorShort: 'prev. period',
+      }
+    : monthPairLabels
 
   // --- Store ---
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
@@ -447,11 +457,22 @@ export function AnalyticsReports() {
   const mode = resolveTheme(themeMode)
 
   // --- Data ---
-  const comparison = useMemo(
+  const monthComparison = useMemo(
     () => (!isCustomRange ? getMonthComparison(from, to) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [from, to, isCustomRange, lastSyncCompletedAt]
   )
+  const customComparison = useMemo(
+    () =>
+      isCustomRange && !isInvalidRange && !!dateFrom && !!dateTo
+        ? getCustomRangeComparison(dateFrom, dateTo)
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isCustomRange, isInvalidRange, dateFrom, dateTo, lastSyncCompletedAt]
+  )
+  // The active comparison for whichever mode is showing — both are the same
+  // MonthComparisonData shape (see ADR-0007's per-period callers).
+  const comparison = isCustomRange ? customComparison : monthComparison
   const rangeInsights = useMemo(
     () => (isCustomRange ? getInsightsForDateRange(dateFrom, dateTo) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -810,7 +831,7 @@ export function AnalyticsReports() {
                   delta={
                     comparison?.hasPreviousData ? comparison.moneyIn : undefined
                   }
-                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                  vsPriorLabel={comparisonLabels.vsPriorShort}
                 />
                 <KpiCell
                   label="Money out"
@@ -821,7 +842,7 @@ export function AnalyticsReports() {
                       ? comparison.moneyOut
                       : undefined
                   }
-                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                  vsPriorLabel={comparisonLabels.vsPriorShort}
                   invert
                   detail={
                     chargesCount > 0
@@ -838,7 +859,7 @@ export function AnalyticsReports() {
                       ? netDelta
                       : undefined
                   }
-                  vsPriorLabel={monthPairLabels.vsPriorShort}
+                  vsPriorLabel={comparisonLabels.vsPriorShort}
                 />
                 {!isCustomRange && chargeGroups.length > 0 && (
                   <KpiCell
@@ -857,11 +878,11 @@ export function AnalyticsReports() {
           </Card>
 
           {/* ─── Block 1b: What changed ───────────────────────────────────────── */}
-          {!isCustomRange && comparison?.hasPreviousData && (
+          {comparison?.hasPreviousData && (
             <Card className="grid-margin">
               <Card.Header>
                 <Card.Title className="mb-0">
-                  What changed vs {monthPairLabels.previousLabel}
+                  What changed vs {comparisonLabels.previousLabel}
                 </Card.Title>
                 {comparison.periodNote && (
                   <Card.Text as="div" className="small text-muted mt-1">
@@ -872,8 +893,8 @@ export function AnalyticsReports() {
               <Card.Body>
                 <ComparisonVisual
                   comparison={comparison}
-                  currentLabel={monthPairLabels.currentLabel}
-                  priorLabel={monthPairLabels.previousLabel}
+                  currentLabel={comparisonLabels.currentLabel}
+                  priorLabel={comparisonLabels.previousLabel}
                 />
               </Card.Body>
             </Card>
