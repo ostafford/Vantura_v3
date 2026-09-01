@@ -27,6 +27,11 @@ import {
 } from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
 import { formatMoney, formatDate, formatShortDate } from '@/lib/format'
+import {
+  addDaysToDateStr,
+  calendarPeriodBounds,
+  daysBetweenDateStr,
+} from '@/lib/dateStr'
 import { TrackerHistoryChart } from '@/components/charts/TrackerHistoryChart'
 import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -47,19 +52,11 @@ const PERIOD_OPTIONS = [
 
 const PAGE_SIZE = 20
 
-function daysBetween(a: string, b: string): number {
-  return Math.round(
-    (new Date(b.slice(0, 10) + 'T12:00:00Z').getTime() -
-      new Date(a.slice(0, 10) + 'T12:00:00Z').getTime()) /
-      86400000
-  )
-}
+const daysBetween = daysBetweenDateStr
 
 // period_end is exclusive (first day of next period) — subtract one day for display.
 function displayPeriodEnd(isoDate: string): string {
-  const d = new Date(isoDate + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
+  return addDaysToDateStr(isoDate, -1)
 }
 
 function buildCalendarPeriodHistory(
@@ -78,19 +75,10 @@ function buildCalendarPeriodHistory(
   const result: TrackerPeriodHistoryRow[] = []
 
   for (let offset = -periodsBack + 1; offset <= 0; offset++) {
-    let from: string
-    let to: string // exclusive
+    const { from, to } = calendarPeriodBounds(displayPeriod, offset, today)
     let label: string
 
     if (displayPeriod === 'WEEKLY') {
-      const day = today.getUTCDay()
-      const daysFromMonday = (day + 6) % 7
-      const mon = new Date(today)
-      mon.setUTCDate(today.getUTCDate() - daysFromMonday + offset * 7)
-      const nextMon = new Date(mon)
-      nextMon.setUTCDate(mon.getUTCDate() + 7)
-      from = mon.toISOString().slice(0, 10)
-      to = nextMon.toISOString().slice(0, 10)
       label =
         offset === 0
           ? 'This week'
@@ -98,12 +86,6 @@ function buildCalendarPeriodHistory(
             ? 'Last week'
             : `${-offset} weeks ago`
     } else if (displayPeriod === 'MONTHLY') {
-      const baseYear = today.getUTCFullYear()
-      const baseMonth = today.getUTCMonth() + offset
-      const fromDate = new Date(Date.UTC(baseYear, baseMonth, 1))
-      const toDate = new Date(Date.UTC(baseYear, baseMonth + 1, 1))
-      from = fromDate.toISOString().slice(0, 10)
-      to = toDate.toISOString().slice(0, 10)
       label =
         offset === 0
           ? 'Current'
@@ -112,10 +94,7 @@ function buildCalendarPeriodHistory(
             : `${-offset} months ago`
     } else {
       // YEARLY
-      const year = today.getUTCFullYear() + offset
-      from = `${year}-01-01`
-      to = `${year + 1}-01-01`
-      label = offset === 0 ? 'Current' : String(year)
+      label = offset === 0 ? 'Current' : from.slice(0, 4)
     }
 
     const spent = getTrackerSpentInPeriod(trackerId, from, to)

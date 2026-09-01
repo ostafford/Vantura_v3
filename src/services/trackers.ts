@@ -5,6 +5,11 @@
 import { getDb, getAppSetting, schedulePersist } from '@/db'
 import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
+import {
+  addDaysToDateStr,
+  daysBetweenDateStr,
+  normalizeDateStr,
+} from '@/lib/dateStr'
 
 export type TrackerResetFrequency =
   | 'WEEKLY'
@@ -70,22 +75,10 @@ export function getTrackersList(): TrackerListRow[] {
   return list
 }
 
-function daysBetween(dateStrA: string, dateStrB: string): number {
-  const norm = (s: string) => (s.length >= 10 ? s.slice(0, 10) : s)
-  const a = new Date(norm(dateStrA) + 'T12:00:00Z').getTime()
-  const b = new Date(norm(dateStrB) + 'T12:00:00Z').getTime()
-  if (Number.isNaN(a) || Number.isNaN(b)) return 0
-  return Math.round((b - a) / (24 * 60 * 60 * 1000))
-}
-
-const normDate = (s: string) => (s.length >= 10 ? s.slice(0, 10) : s)
-
-/** Add `days` (may be negative) to a 'YYYY-MM-DD' string, returning the same form. */
-function addDaysToDateStr(dateStr: string, days: number): string {
-  const d = new Date(normDate(dateStr) + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
+// Calendar date-string arithmetic lives in @/lib/dateStr; these aliases keep
+// the call sites (and the __test__ export) in this file unchanged.
+const daysBetween = daysBetweenDateStr
+const normDate = normalizeDateStr
 
 /** Same category set, order-insensitive. */
 function sameCategorySet(a: string[], b: string[]): boolean {
