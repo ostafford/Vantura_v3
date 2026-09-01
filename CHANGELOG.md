@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **Net Worth's projected balance undercounted recurring charges.** The "upcoming expense" figure on the Net Worth card only counted the first occurrence of a WEEKLY/FORTNIGHTLY reserved charge before payday, while Spendable's Reserved amount correctly summed every occurrence in the window — the two cards could disagree by the charge's amount times its occurrence count. `getProjectedNetWorth()` now shares Reserved's occurrence-counting logic. See `src/services/netWorth.ts`, `src/services/netWorth.test.ts` (new).
+- **Tracker day-counts and period history were counted from UTC, not your local date.** The "N days left" figure on tracker cards (Dashboard and Analytics overview) and the period-history rows and "today" marker on a tracker's detail page took "today" from UTC instead of the local calendar date used everywhere else — so for AU users (UTC+10/+11) opening the app before ~10am, a card could show one day too many and the detail page could treat the previous month/week as the current period. See `src/services/trackers.ts`, `src/pages/analytics/trackerPeriodHistory.ts` (extracted from `AnalyticsTrackersDetail.tsx` so it's unit-testable), and their tests.
 
 ## [0.8.1] - 2026-07-30
 
