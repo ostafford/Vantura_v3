@@ -73,12 +73,8 @@ _Avoid_: audit log, revision history, effective budget (that is the derived `eff
 _Avoid_: transaction date (ambiguous), posted date, settled date
 
 **Transaction user data**:
-The local overlay of things a user adds to a synced transaction — a note, a category override — stored in its own table, never on the transaction row, never touched by sync. A row exists only while it carries a note or an override (`docs/adr/0008`).
+The local overlay of things a user adds to a synced transaction — currently just a note — stored in its own table, never on the transaction row, never touched by sync. A row exists only while it carries a note (`docs/adr/0008`). A `user_category_override` field was tried and dropped in schema v43 / `#27` (never written, never consulted by any query); category changes go through an Up PATCH instead.
 _Avoid_: transaction metadata, annotations, custom fields
-
-**Category override**:
-A user's local re-categorisation of a transaction. It does not change the category in Up Bank and, today, is display-only — filtering and category analytics still use Up's category (`#27`). Distinct from changing a category *through* Vantura, which PATCHes Up and clears any override.
-_Avoid_: recategorisation, manual category, local category
 
 ### Budget Plan
 
