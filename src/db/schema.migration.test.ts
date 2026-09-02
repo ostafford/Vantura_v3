@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(45)
+    expect(SCHEMA_VERSION).toBe(46)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -996,6 +996,35 @@ describe('v45 migration: tracker_config_history.reset_frequency', () => {
     expect(row[0].values[0]).toEqual([30000, null])
 
     expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+describe('v46 migration: dismissed_charge_suggestions', () => {
+  it('creates the table and is idempotent', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '45')`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    const exists = db.exec(
+      `SELECT 1 FROM sqlite_master WHERE type='table' AND name='dismissed_charge_suggestions'`
+    )
+    expect(exists.length).toBe(1)
+    db.run(
+      `INSERT INTO dismissed_charge_suggestions (suggestion_key, dismissed_at) VALUES ('X', '2026-01-01')`
+    )
+
+    expect(() => runMigrations(db)).not.toThrow()
+    const rows = db.exec(`SELECT COUNT(*) FROM dismissed_charge_suggestions`)
+    expect(rows[0].values[0][0]).toBe(1) // untouched by a second run
+
     db.close()
   })
 })

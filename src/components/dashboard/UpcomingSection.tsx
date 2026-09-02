@@ -25,6 +25,8 @@ import {
   searchRecentDebits,
   type AnchorDebitRow,
 } from '@/services/budgetTransactionAnchors'
+import { RecurringChargeSuggestions } from './RecurringChargeSuggestions'
+import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetection'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import {
@@ -201,6 +203,7 @@ export function UpcomingSection({
     number | null
   >(null)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
   const [txSearch, setTxSearch] = useState('')
@@ -410,6 +413,31 @@ export function UpcomingSection({
     setTxSearch('')
   }
 
+  // #20 — "Edit & add" from a recurring-charge suggestion: prefill the create
+  // form (skipping the search step) with the detected values.
+  function prefillFromSuggestion(s: RecurringChargeSuggestion) {
+    setEditingCharge(null)
+    setName(s.name)
+    setAmount((s.amountCents / 100).toFixed(2))
+    setFrequency(s.frequency)
+    setNextChargeDate(s.nextChargeDate)
+    setCategoryId(s.categoryId ?? '')
+    setIsReserved(true)
+    setReminderDaysBefore('')
+    setCancelByDate('')
+    setUpcomingBucketId(null)
+    setChargeType('EXPENSE')
+    setLinkedManualAccountId(null)
+    setImportedFromTx(null)
+    setMatchRawText(s.matchRawText)
+    setMatchDescription(s.matchRawText ? s.name : '')
+    setShowSettlementPicker(false)
+    setSettlementSearch('')
+    setMoreOptionsOpen(!!(s.categoryId || s.matchRawText))
+    setCreateStep('form')
+    setShowModal(true)
+  }
+
   const nextPayTotal = nextPay.reduce((s, c) => s + c.amount, 0)
   const laterTotal = later.reduce((s, c) => s + c.amount, 0)
   const hasScheduled = nextPay.length > 0 || later.length > 0
@@ -582,21 +610,40 @@ export function UpcomingSection({
               ariaLabel="What are upcoming charges?"
             />
           </div>
-          <OverlayTrigger
-            placement="top"
-            overlay={
-              <Tooltip id="upcoming-add-tooltip">Add upcoming charge</Tooltip>
-            }
-          >
-            <button
-              type="button"
-              className="btn-icon btn-icon-primary"
-              onClick={openCreate}
-              aria-label="Add upcoming charge"
+          <div className="d-flex align-items-center gap-1">
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="upcoming-detect-tooltip">
+                  Find recurring charges in your transactions
+                </Tooltip>
+              }
             >
-              <i className="mdi mdi-plus" aria-hidden />
-            </button>
-          </OverlayTrigger>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setShowSuggestions(true)}
+                aria-label="Find recurring charges"
+              >
+                <i className="mdi mdi-radar" aria-hidden />
+              </button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="upcoming-add-tooltip">Add upcoming charge</Tooltip>
+              }
+            >
+              <button
+                type="button"
+                className="btn-icon btn-icon-primary"
+                onClick={openCreate}
+                aria-label="Add upcoming charge"
+              >
+                <i className="mdi mdi-plus" aria-hidden />
+              </button>
+            </OverlayTrigger>
+          </div>
         </Card.Header>
         <Card.Body>
           {nextPayday && viewMode === 'list' && (
@@ -1416,6 +1463,16 @@ export function UpcomingSection({
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <RecurringChargeSuggestions
+        show={showSuggestions}
+        onClose={() => setShowSuggestions(false)}
+        onChange={() => {
+          setRefresh((r) => r + 1)
+          onUpcomingChange?.()
+        }}
+        onEditAndAdd={prefillFromSuggestion}
+      />
     </>
   )
 }
