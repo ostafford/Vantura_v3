@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(44)
+    expect(SCHEMA_VERSION).toBe(45)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -946,6 +946,55 @@ describe('v44 migration: saver goal history', () => {
     runMigrations(db)
     const rows = db.exec(`SELECT COUNT(*) FROM saver_goal_history`)
     expect(rows[0].values[0][0]).toBe(0)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+/**
+ * Minimal v44-shaped fixture for the v45 migration (#38 — frequency-through-history):
+ * `tracker_config_history` without the new `reset_frequency` column, one row.
+ */
+function buildLegacyV44Database(): Database {
+  const db = new SQL.Database()
+  db.run(
+    `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  )
+  db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('schema_version', '44')`
+  )
+  db.run(`
+    CREATE TABLE tracker_config_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tracker_id INTEGER NOT NULL,
+      effective_from TEXT NOT NULL,
+      budget_amount INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `)
+  db.run(
+    `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
+     VALUES (1, '2026-03-01', 30000, '2026-03-01T00:00:00.000Z')`
+  )
+  return db
+}
+
+describe('v45 migration: tracker_config_history.reset_frequency', () => {
+  it('adds the nullable column, leaves existing rows NULL, and is idempotent', () => {
+    const db = buildLegacyV44Database()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    const cols = db.exec(`PRAGMA table_info(tracker_config_history)`)
+    const colNames = cols[0].values.map((r) => String(r[1]))
+    expect(colNames).toContain('reset_frequency')
+
+    const row = db.exec(
+      `SELECT budget_amount, reset_frequency FROM tracker_config_history`
+    )
+    expect(row[0].values[0]).toEqual([30000, null])
+
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })

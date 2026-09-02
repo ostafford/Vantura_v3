@@ -33,6 +33,7 @@ const {
 } = await import('./trackers')
 const { buildExportPayload, replaceTrackers } = await import('./profileExport')
 const { localDateString } = await import('@/lib/format')
+const { toDailyRateCents } = await import('@/lib/monthlyEquivalent')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -50,19 +51,24 @@ beforeEach(async () => {
 
 // ─── pure core: splitPeriodIntoSegments ──────────────────────────────────────
 
-type Cfg = Pick<TrackerConfigVersion, 'budget_amount' | 'category_ids'>
+type Cfg = Pick<
+  TrackerConfigVersion,
+  'budget_amount' | 'category_ids' | 'reset_frequency'
+>
 
 function version(
   id: number,
   effectiveFrom: string,
   budget: number,
-  cats: string[]
+  cats: string[],
+  resetFrequency: string | null = null
 ): TrackerConfigVersion {
   return {
     id,
     effective_from: effectiveFrom,
     budget_amount: budget,
     category_ids: cats,
+    reset_frequency: resetFrequency,
   }
 }
 
@@ -76,7 +82,11 @@ function fakeSpend(txns: { cat: string; cents: number; date: string }[]) {
 
 describe('splitPeriodIntoSegments (pure core)', () => {
   const genesis = version(1, '2026-03-01', 30000, ['groceries'])
-  const fallback: Cfg = { budget_amount: 30000, category_ids: ['groceries'] }
+  const fallback: Cfg = {
+    budget_amount: 30000,
+    category_ids: ['groceries'],
+    reset_frequency: null,
+  }
 
   it('is one full-budget segment when nothing changed', () => {
     const segs = splitPeriodIntoSegments(
@@ -133,6 +143,52 @@ describe('splitPeriodIntoSegments (pure core)', () => {
       fakeSpend([])
     )
     expect(segs.reduce((s, seg) => s + seg.budget, 0)).toBe(30000)
+  })
+
+  it('#38 — a partial segment whose config carries a reset_frequency is priced at that cadence daily rate', () => {
+    // Transitional period after a WEEKLY→MONTHLY change: 19-day window, split at
+    // the "tomorrow" boundary. Seg 1 = 4 days old WEEKLY, seg 2 = 15 days new MONTHLY.
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-20', // 19 days
+      [
+        version(1, '2026-03-01', 30000, ['groceries'], 'WEEKLY'),
+        version(2, '2026-03-05', 120000, ['groceries'], 'MONTHLY'),
+      ],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs).toHaveLength(2)
+    expect(segs[0].budget).toBe(
+      Math.round(toDailyRateCents(30000, 'WEEKLY') * 4)
+    )
+    expect(segs[1].budget).toBe(
+      Math.round(toDailyRateCents(120000, 'MONTHLY') * 15)
+    )
+  })
+
+  it('#38 — a reset_frequency tag is ignored for a full-period single segment', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-31',
+      [version(1, '2026-03-01', 120000, ['groceries'], 'MONTHLY')],
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs).toHaveLength(1)
+    expect(segs[0].budget).toBe(120000) // budget_amount verbatim, not daily-rate
+  })
+
+  it('#38 — a NULL reset_frequency still prorates by period days (regression guard)', () => {
+    const segs = splitPeriodIntoSegments(
+      '2026-03-01',
+      '2026-03-08',
+      [genesis, version(2, '2026-03-05', 40000, ['groceries'])], // reset_frequency null
+      fallback,
+      fakeSpend([])
+    )
+    expect(segs[0].budget).toBe(Math.round((30000 * 4) / 7))
+    expect(segs[1].budget).toBe(Math.round((40000 * 3) / 7))
   })
 
   it('counts a category only while it was part of the tracker (add mid-period)', () => {
@@ -462,12 +518,61 @@ describe('updateTracker records config versions', () => {
     expect(history[1].category_ids.sort()).toEqual(['dining', 'groceries'])
   })
 
-  it('a frequency change resets history to a fresh genesis row', () => {
+  it('a frequency change keeps the timeline: old cadence stamped, new cadence effective tomorrow (#38)', () => {
     const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
-    updateTracker(id, 'Food', 45000, 'WEEKLY', 1, ['groceries'])
-    expect(getTrackerConfigHistory(id)).toHaveLength(2)
+    const before = db.exec(
+      `SELECT last_reset_date FROM trackers WHERE id = ?`,
+      [id]
+    )[0].values[0][0] as string
 
     updateTracker(id, 'Food', 45000, 'MONTHLY', 1, ['groceries'])
+
+    // Current period start is untouched; it now ends at the new-cadence boundary.
+    const after = db.exec(
+      `SELECT last_reset_date, next_reset_date FROM trackers WHERE id = ?`,
+      [id]
+    )[0].values[0]
+    expect(after[0]).toBe(before)
+    expect((after[1] as string) > localDateString()).toBe(true) // boundary is in the future
+
+    const history = getTrackerConfigHistory(id)
+    expect(history.length).toBeGreaterThanOrEqual(2) // NOT wiped
+    // genesis (still at the period start) now records the OLD cadence
+    expect(history[0]).toMatchObject({
+      effective_from: before,
+      budget_amount: 30000,
+      reset_frequency: 'WEEKLY',
+    })
+    // new cadence + budget from tomorrow
+    expect(history[history.length - 1]).toMatchObject({
+      effective_from: tomorrow,
+      budget_amount: 45000,
+      reset_frequency: 'MONTHLY',
+    })
+  })
+
+  it('a reset-day-only change gets the same transitional treatment', () => {
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries']) // Monday
+    updateTracker(id, 'Food', 30000, 'WEEKLY', 4, ['groceries']) // Thursday
+
+    const history = getTrackerConfigHistory(id)
+    expect(history.length).toBeGreaterThanOrEqual(2)
+    expect(history[0].reset_frequency).toBe('WEEKLY')
+    expect(history[history.length - 1]).toMatchObject({
+      effective_from: tomorrow,
+      reset_frequency: 'WEEKLY',
+    })
+  })
+
+  it('a frequency change on broken data (future-dated period start) still wipes and re-anchors', () => {
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    db.run(
+      `UPDATE trackers SET last_reset_date = '2099-01-01', next_reset_date = '2099-01-08' WHERE id = ?`,
+      [id]
+    )
+
+    updateTracker(id, 'Food', 45000, 'MONTHLY', 1, ['groceries'])
+
     const history = getTrackerConfigHistory(id)
     expect(history).toHaveLength(1)
     expect(history[0].budget_amount).toBe(45000)
@@ -536,6 +641,44 @@ describe('profile export / import round-trip', () => {
     expect(history).toHaveLength(1)
     expect(history[0].budget_amount).toBe(30000)
     expect(history[0].category_ids).toEqual(['groceries'])
+  })
+
+  it('#38 — reset_frequency survives the export → import round-trip', () => {
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    updateTracker(id, 'Food', 120000, 'MONTHLY', 1, ['groceries'])
+
+    const payload = buildExportPayload()
+    const freqs = payload
+      .trackerConfigHistory!.map((r) => r.reset_frequency)
+      .sort()
+    expect(freqs).toEqual(['MONTHLY', 'WEEKLY'])
+
+    replaceTrackers(
+      payload.trackers,
+      payload.trackerCategories,
+      payload.trackerConfigHistory
+    )
+    const history = getTrackerConfigHistory(trackerIdByName('Food'))
+    expect(history[0].reset_frequency).toBe('WEEKLY')
+    expect(history[history.length - 1].reset_frequency).toBe('MONTHLY')
+  })
+
+  it('#38 — a pre-v7 config-history row (no reset_frequency) imports as NULL', () => {
+    createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    const payload = buildExportPayload()
+    const stripped = payload.trackerConfigHistory!.map(
+      ({ tracker_id, effective_from, budget_amount, category_ids }) => ({
+        tracker_id,
+        effective_from,
+        budget_amount,
+        category_ids,
+      })
+    )
+
+    replaceTrackers(payload.trackers, payload.trackerCategories, stripped)
+
+    const history = getTrackerConfigHistory(trackerIdByName('Food'))
+    expect(history[0].reset_frequency).toBeNull()
   })
 })
 

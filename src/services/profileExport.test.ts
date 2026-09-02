@@ -1161,7 +1161,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(6)
+      expect(payload.version).toBe(7)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1454,7 +1454,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(6)
+      expect(payload.version).toBe(7)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',

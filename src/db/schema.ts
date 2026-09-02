@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 44
+const SCHEMA_VERSION = 45
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -106,6 +106,7 @@ const DDL_STATEMENTS = [
     tracker_id INTEGER NOT NULL,
     effective_from TEXT NOT NULL,
     budget_amount INTEGER NOT NULL,
+    reset_frequency TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (tracker_id) REFERENCES trackers(id) ON DELETE CASCADE
   )`,
@@ -1240,6 +1241,27 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['44']
+    )
+  }
+
+  // #38 — tracker_config_history.reset_frequency. A frequency / reset-day change
+  // now writes a transitional period through the history table (like a budget
+  // edit) instead of wiping it. Each config row records the cadence its
+  // budget_amount is denominated in; NULL means "the period's own cadence" —
+  // correct for every existing row (cadence never varied), so no backfill.
+  if (version < 45) {
+    const tchCols = database.exec(`PRAGMA table_info(tracker_config_history)`)
+    const tchHasFreq = (tchCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'reset_frequency'
+    )
+    if (tableExists(database, 'tracker_config_history') && !tchHasFreq) {
+      database.run(
+        `ALTER TABLE tracker_config_history ADD COLUMN reset_frequency TEXT`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['45']
     )
   }
 }
