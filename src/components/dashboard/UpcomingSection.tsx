@@ -1203,8 +1203,10 @@ export function UpcomingSection({
                     </Col>
                   </Row>
                   <Form.Text className="text-muted d-block mb-2">
-                    Reminder shows &quot;Due in N days&quot; when within the set
-                    days. Stop date removes the charge after that date.
+                    Reminder shows &quot;Due in N days&quot; on the Dashboard
+                    when within the set days — plus a notification, if Bill
+                    reminders are on in Settings &rarr; Notifications. Stop date
+                    removes the charge after that date.
                   </Form.Text>
 
                   <Form.Group className="mb-2">

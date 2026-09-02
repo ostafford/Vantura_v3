@@ -518,6 +518,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 and reports.
               </p>
               <p className="text-muted small mb-3">
+                Vantura can remind you about upcoming bills and alert you when
+                Spendable runs low — turn those on in Settings &rarr;
+                Notifications.
+              </p>
+              <p className="text-muted small mb-3">
                 New to Vantura? You can take a short dashboard tour or read the
                 <a
                   href={`${import.meta.env.BASE_URL}help`}
