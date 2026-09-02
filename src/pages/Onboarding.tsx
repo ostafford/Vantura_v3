@@ -8,6 +8,7 @@ import {
   generateSalt,
   deriveKeyFromPassphrase,
   encryptToken,
+  PASSPHRASE_MIN_LENGTH,
 } from '@/lib/crypto'
 import { validateUpBankToken } from '@/api/upBank'
 import { performInitialSync, type SyncProgress } from '@/services/sync'
@@ -36,8 +37,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   async function handleStep2Submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (passphrase.length < 12) {
-      setError('Passphrase must be at least 12 characters.')
+    if (passphrase.length < PASSPHRASE_MIN_LENGTH) {
+      setError(
+        `Passphrase must be at least ${PASSPHRASE_MIN_LENGTH} characters.`
+      )
       return
     }
     if (passphrase !== passphraseConfirm) {
@@ -256,9 +259,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   type="password"
                   value={passphrase}
                   onChange={(e) => setPassphrase(e.target.value)}
-                  placeholder="At least 12 characters"
+                  placeholder={`At least ${PASSPHRASE_MIN_LENGTH} characters`}
                   autoComplete="new-password"
-                  minLength={12}
+                  minLength={PASSPHRASE_MIN_LENGTH}
                 />
               </Form.Group>
               <Form.Group className="mb-3">
