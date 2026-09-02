@@ -4,6 +4,8 @@ import {
   deriveKeyFromPassphrase,
   encryptToken,
   decryptToken,
+  reEncryptSecret,
+  PASSPHRASE_MIN_LENGTH,
 } from './crypto'
 
 describe('crypto', () => {
@@ -44,5 +46,48 @@ describe('crypto', () => {
     const salt = generateSalt()
     const key = await deriveKeyFromPassphrase('secret', salt, 1000)
     await expect(decryptToken(btoa('short'), key)).rejects.toThrow('too short')
+  })
+
+  describe('reEncryptSecret (#33)', () => {
+    const ITER = 1000
+    const CURRENT = 'current-passphrase-abc'
+    const NEXT = 'a-fresh-longer-passphrase'
+    const TOKEN = 'up:pat:secret-token-xyz'
+
+    async function seedCiphertext(): Promise<{ salt: string; ct: string }> {
+      const salt = generateSalt()
+      const key = await deriveKeyFromPassphrase(CURRENT, salt, ITER)
+      return { salt, ct: await encryptToken(TOKEN, key) }
+    }
+
+    it('re-encrypts under a new passphrase + fresh salt, recovering the plaintext', async () => {
+      const { salt, ct } = await seedCiphertext()
+      const res = await reEncryptSecret(ct, salt, CURRENT, NEXT, ITER)
+
+      expect(res.plaintext).toBe(TOKEN)
+      expect(res.salt).not.toBe(salt)
+
+      // New ciphertext opens with the new passphrase…
+      const newKey = await deriveKeyFromPassphrase(NEXT, res.salt, ITER)
+      expect(await decryptToken(res.ciphertext, newKey)).toBe(TOKEN)
+      // …and not with the old one.
+      const oldKey = await deriveKeyFromPassphrase(CURRENT, res.salt, ITER)
+      await expect(decryptToken(res.ciphertext, oldKey)).rejects.toThrow()
+    })
+
+    it('throws when the current passphrase is wrong', async () => {
+      const { salt, ct } = await seedCiphertext()
+      await expect(
+        reEncryptSecret(ct, salt, 'wrong-passphrase', NEXT, ITER)
+      ).rejects.toThrow()
+    })
+
+    it('throws when the new passphrase is shorter than the minimum', async () => {
+      const { salt, ct } = await seedCiphertext()
+      const short = 'x'.repeat(PASSPHRASE_MIN_LENGTH - 1)
+      await expect(
+        reEncryptSecret(ct, salt, CURRENT, short, ITER)
+      ).rejects.toThrow(/at least/)
+    })
   })
 })

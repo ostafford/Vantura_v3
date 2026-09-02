@@ -15,6 +15,7 @@ import {
   encryptToken,
   decryptToken,
   PBKDF2_ITERATIONS,
+  PASSPHRASE_MIN_LENGTH,
 } from '@/lib/crypto'
 import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
@@ -501,10 +502,16 @@ export function buildExportPayload(): ExportPayload {
 /**
  * Encrypt the payload with a passphrase and return the file wrapper.
  */
+/** User-facing error when the chosen export passphrase is too short (#32). */
+export const EXPORT_ERROR_PASSPHRASE_TOO_SHORT = `Passphrase must be at least ${PASSPHRASE_MIN_LENGTH} characters.`
+
 export async function encryptExportPayload(
   payload: ExportPayload,
   passphrase: string
 ): Promise<ExportFileWrapper> {
+  if (passphrase.length < PASSPHRASE_MIN_LENGTH) {
+    throw new Error(EXPORT_ERROR_PASSPHRASE_TOO_SHORT)
+  }
   const salt = generateSalt()
   const key = await deriveKeyFromPassphrase(passphrase, salt)
   const json = JSON.stringify(payload)

@@ -154,10 +154,16 @@ describe('profileExport', () => {
 
     it('decryptImportFile throws when appSchemaVersion exceeds current', async () => {
       const payload: ExportPayload = { ...EMPTY_PAYLOAD, appSchemaVersion: 99 }
-      const wrapper = await encryptExportPayload(payload, 'pass')
-      await expect(decryptImportFile(wrapper, 'pass')).rejects.toThrow(
-        /newer app version/
-      )
+      const wrapper = await encryptExportPayload(payload, 'pass-phrase-1234')
+      await expect(
+        decryptImportFile(wrapper, 'pass-phrase-1234')
+      ).rejects.toThrow(/newer app version/)
+    })
+
+    it('encryptExportPayload rejects a passphrase shorter than the minimum (#32)', async () => {
+      await expect(
+        encryptExportPayload(EMPTY_PAYLOAD, 'short')
+      ).rejects.toThrow(/at least/)
     })
   })
 
@@ -250,13 +256,13 @@ describe('profileExport', () => {
           },
         ],
       }
-      const wrapper = await encryptExportPayload(payload, 'secret')
+      const wrapper = await encryptExportPayload(payload, 'secret-phrase-123')
       const json = JSON.stringify(wrapper)
       const file = new File([json], 'test.json', {
         type: 'application/json',
       })
 
-      const result = await previewImportProfile(file, 'secret')
+      const result = await previewImportProfile(file, 'secret-phrase-123')
 
       expect(result.settings).toEqual(payload.settings)
       expect(result.trackers).toEqual([])
@@ -264,7 +270,10 @@ describe('profileExport', () => {
     })
 
     it('throws IMPORT_ERROR_WRONG_PASSPHRASE on wrong passphrase', async () => {
-      const wrapper = await encryptExportPayload(EMPTY_PAYLOAD, 'correct')
+      const wrapper = await encryptExportPayload(
+        EMPTY_PAYLOAD,
+        'correct-phrase-12'
+      )
       const file = new File([JSON.stringify(wrapper)], 'test.json', {
         type: 'application/json',
       })

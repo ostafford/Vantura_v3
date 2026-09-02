@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, Modal, Form, Spinner } from 'react-bootstrap'
 import { toast } from '@/stores/toastStore'
 import { exportProfile } from '@/services/profileExport'
+import { PASSPHRASE_MIN_LENGTH } from '@/lib/crypto'
 
 export function ExportProfileModal() {
   const [show, setShow] = useState(false)
@@ -26,6 +27,12 @@ export function ExportProfileModal() {
     const confirmVal = passphraseConfirm.trim()
     if (!trimmed) {
       setError('Please enter a passphrase.')
+      return
+    }
+    if (trimmed.length < PASSPHRASE_MIN_LENGTH) {
+      setError(
+        `Passphrase must be at least ${PASSPHRASE_MIN_LENGTH} characters.`
+      )
       return
     }
     if (trimmed !== confirmVal) {
@@ -96,8 +103,9 @@ export function ExportProfileModal() {
                 type="password"
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
-                placeholder="Enter passphrase"
+                placeholder={`At least ${PASSPHRASE_MIN_LENGTH} characters`}
                 autoComplete="new-password"
+                minLength={PASSPHRASE_MIN_LENGTH}
                 disabled={exporting}
               />
             </Form.Group>
