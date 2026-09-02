@@ -260,27 +260,51 @@ export function Dashboard() {
     notificationStore.getState().refreshUnreadCount()
   }, [dueSoon])
 
+  const scrollToUpcoming = useCallback(() => {
+    const el = document.getElementById('dashboard-section-upcoming')
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('dashboard-scroll-highlight')
+    setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
+  }, [])
+
   const dueSoonAlert = useMemo(() => {
     if (bannerDismissedToday || dueSoon.length === 0) return null
     return (
       <div
-        className="alert alert-warning d-flex align-items-center gap-2 py-2 mb-4"
+        className="alert alert-warning d-flex align-items-start gap-2 py-2 mb-4"
         role="alert"
       >
-        <i className="mdi mdi-bell-ring flex-shrink-0" aria-hidden />
-        <span className="flex-grow-1">
-          <strong>Due soon: </strong>
-          {dueSoon.map((c, i) => {
-            const days = daysUntilCharge(c.next_charge_date)
-            const dayText = days === 0 ? 'today' : `in ${days}d`
-            return (
-              <span key={c.id}>
-                {i > 0 && <span className="text-muted mx-2">·</span>}
-                {c.name} (${formatMoney(c.amount)}) — {dayText}
-              </span>
-            )
-          })}
-        </span>
+        <i
+          className="mdi mdi-bell-ring flex-shrink-0"
+          aria-hidden
+          style={{ lineHeight: 1.5 }}
+        />
+        <div className="flex-grow-1">
+          <div>
+            <strong>Due soon: </strong>
+            {dueSoon.map((c, i) => {
+              const days = daysUntilCharge(c.next_charge_date)
+              const dayText = days === 0 ? 'today' : `in ${days}d`
+              return (
+                <span key={c.id}>
+                  {i > 0 && <span className="text-muted mx-2">·</span>}
+                  {c.name} (${formatMoney(c.amount)}) — {dayText}
+                </span>
+              )
+            })}
+          </div>
+          <div className="small mt-1">
+            Reminders you set · each clears itself when the payment lands
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 ms-2 align-baseline"
+              onClick={scrollToUpcoming}
+            >
+              Manage in Upcoming →
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           className="btn-close btn-close-white ms-2 flex-shrink-0"
@@ -291,7 +315,7 @@ export function Dashboard() {
         />
       </div>
     )
-  }, [dueSoon, bannerDismissedToday, handleDismissBanner])
+  }, [dueSoon, bannerDismissedToday, handleDismissBanner, scrollToUpcoming])
 
   const openCustomiseModal = useCallback(() => {
     setDraftSizes(getDashboardSectionSizes())
