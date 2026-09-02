@@ -30,6 +30,7 @@ const {
   getTrackerConfigHistory,
   getTrackersWithProgress,
   getTrackerTransactionsInPeriod,
+  getTrackerPeriodHistory,
 } = await import('./trackers')
 const { buildExportPayload, replaceTrackers } = await import('./profileExport')
 const { localDateString } = await import('@/lib/format')
@@ -423,6 +424,37 @@ describe('computeCurrentPeriodSegments (DB wrapper)', () => {
     expect(segs.reduce((s, seg) => s + seg.spent, 0)).toBe(4000)
     expect(segs[0].budget).toBe(Math.round((30000 * 4) / 7))
     expect(segs[1].budget).toBe(Math.round((40000 * 3) / 7))
+  })
+})
+
+describe('getTrackerPeriodHistory — completed-period result (#17)', () => {
+  it('reports a previous period as under budget by budget − spent', () => {
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    // current week 9–16 Mar → previous week is 2–9 Mar
+    setPeriod(id, '2026-03-09', '2026-03-16')
+    insertTx('p1', 'groceries', -8000, '2026-03-03')
+    insertTx('p2', 'groceries', -4000, '2026-03-05')
+
+    const prev = getTrackerPeriodHistory(id, 3).find(
+      (p) => p.periodOffset === -1
+    )!
+    expect(prev.spent).toBe(12000)
+    expect(prev.budget).toBe(30000) // head budget, per ADR-0014 (past periods)
+    expect(prev.remaining).toBe(18000) // "came in $180 under"
+    expect(prev.spent < prev.budget).toBe(true)
+  })
+
+  it('reports a previous period as over budget (spent >= budget, remaining floored at 0)', () => {
+    const id = createTracker('Food', 10000, 'WEEKLY', 1, ['groceries'])
+    setPeriod(id, '2026-03-09', '2026-03-16')
+    insertTx('o1', 'groceries', -15000, '2026-03-04')
+
+    const prev = getTrackerPeriodHistory(id, 3).find(
+      (p) => p.periodOffset === -1
+    )!
+    expect(prev.spent).toBe(15000)
+    expect(prev.remaining).toBe(0)
+    expect(prev.spent > prev.budget).toBe(true)
   })
 })
 
