@@ -237,11 +237,11 @@ _Avoid_: release note, changelog entry, update alert
 ### Security
 
 **Unlock passphrase**:
-The passphrase that derives (via PBKDF2) the AES key protecting the stored Up Bank API token. Never persisted anywhere — it exists only transiently while the key is derived. 12-character minimum at onboarding, no composition rules.
+The passphrase that derives (via PBKDF2) the AES key protecting the stored Up Bank API token. Never persisted anywhere — it exists only transiently while the key is derived. 12-character minimum (`PASSPHRASE_MIN_LENGTH`), no composition rules. Changeable in Settings → Security without data loss (`reEncryptSecret` re-keys under a fresh salt); no forgot-passphrase recovery — Clear-all-data is the only way back.
 _Avoid_: password, PIN, master key
 
 **Export passphrase**:
-A separate, user-chosen passphrase encrypting a profile export file. Independent of the unlock passphrase, and has no minimum length today (`#32`). The export never contains the API token.
+A separate, user-chosen passphrase encrypting a profile export file. Independent of the unlock passphrase, but shares its 12-character floor (`PASSPHRASE_MIN_LENGTH`; `encryptExportPayload` rejects anything shorter, `#32`). The export never contains the API token.
 _Avoid_: backup password, import key
 
 **Biometric session**:
