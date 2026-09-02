@@ -187,7 +187,7 @@ An Up interest payment into a saver — `transaction_type = 'Interest'`, a posit
 _Avoid_: bonus, yield, earnings
 
 **Pace projection**:
-A saver's on-track / behind-pace status: `currentBalance + lastCompleteMonthRate × monthsRemaining` vs. the goal. Derived from real contribution history, not a configured contribution. The in-progress month is excluded.
+A saver's on-track / behind-pace status: `currentBalance + lastCompleteMonthRate × monthsRemaining` vs. the goal. Derived from real contribution history, not a configured contribution. The in-progress month is excluded. Also solves for *when* the goal is reached at that rate (`monthsToGoal`), so being ahead is framed concretely — "~N months early" — not just a green light. Math lives in `src/pages/analytics/saverProjection.ts`.
 _Avoid_: forecast, trajectory, savings rate
 
 **Loose Change**:
