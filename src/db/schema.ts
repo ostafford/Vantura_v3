@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 45
+const SCHEMA_VERSION = 46
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -139,6 +139,10 @@ const DDL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS dismissed_charge_suggestions (
+    suggestion_key TEXT PRIMARY KEY,
+    dismissed_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS transaction_user_data (
     transaction_id TEXT PRIMARY KEY,
@@ -1262,6 +1266,23 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['45']
+    )
+  }
+
+  // #20 — recurring-charge detection. `dismissed_charge_suggestions` records the
+  // grouping keys the user marked "not recurring" so a suggestion is never
+  // re-offered. Detection is on-demand and suggest-only (ADR-0016); nothing to
+  // backfill.
+  if (version < 46) {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS dismissed_charge_suggestions (
+        suggestion_key TEXT PRIMARY KEY,
+        dismissed_at TEXT NOT NULL
+      )
+    `)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['46']
     )
   }
 }
