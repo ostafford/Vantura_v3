@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Changing a tracker's frequency or reset day no longer throws away the in-flight period.** It used to re-anchor the period to today and wipe the tracker's whole config history. Now it writes a *transitional period*: the current period keeps its start and runs to the new cadence's next reset, the pre-change days stay judged against the old cadence, and the new cadence + budget take effect the next day — the same "next day, split the period" behaviour a budget change already had (#16 / ADR-0014). Historical period views are unchanged. New nullable `tracker_config_history.reset_frequency` column (schema v45), profile export payload v7.
 - **Weekly Insights groups by parent category:** spending categories are now grouped under their real Up Bank parent (Home, Transport, Good Life, Personal) in a fixed order, sorted by spend within each group, with the smallest categories folded into a single "Other" row once more than 7 categories have spend in a week. See `src/services/insights.ts`, `src/components/charts/InsightsBarChart.tsx`.
 
 ### Fixed

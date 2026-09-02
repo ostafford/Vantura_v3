@@ -47,7 +47,7 @@ export function toMonthlyEquivalentCents(
   return Math.round(Math.max(0, amountCents) * mult)
 }
 
-function toYearlyCents(amountCents: number, frequency: string): number {
+export function toYearlyCents(amountCents: number, frequency: string): number {
   const safe = Math.max(0, amountCents)
   switch (resolveFrequency(frequency)) {
     case 'WEEKLY':
@@ -63,6 +63,19 @@ function toYearlyCents(amountCents: number, frequency: string): number {
     default:
       return 0
   }
+}
+
+/**
+ * Per-day rate of a budget at a given frequency (`yearly / 365`). Used to price a
+ * partial period-segment whose cadence differs from the enclosing period's — e.g.
+ * the transitional period after a tracker frequency change (#38). Not exact for
+ * a whole calendar month, so callers only use it for sub-period spans.
+ */
+export function toDailyRateCents(
+  amountCents: number,
+  frequency: string
+): number {
+  return toYearlyCents(amountCents, frequency) / 365
 }
 
 /**

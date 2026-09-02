@@ -20,7 +20,7 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 6
+const EXPORT_PAYLOAD_VERSION = 7
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -117,6 +117,8 @@ export interface TrackerConfigHistoryExportRow {
   effective_from: string
   budget_amount: number
   category_ids: string[]
+  /** #38 — cadence this row's budget is denominated in; set only on a frequency-change row. Absent before payload v7. */
+  reset_frequency?: string | null
 }
 
 export interface UpcomingChargeExportRow {
@@ -288,18 +290,19 @@ function collectTrackerConfigHistory(): TrackerConfigHistoryExportRow[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, tracker_id, effective_from, budget_amount
+    `SELECT id, tracker_id, effective_from, budget_amount, reset_frequency
      FROM tracker_config_history ORDER BY tracker_id, effective_from, id`
   )
   const byConfigId = new Map<number, TrackerConfigHistoryExportRow>()
   const rows: TrackerConfigHistoryExportRow[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [number, number, string, number]
+    const r = stmt.get() as [number, number, string, number, string | null]
     const row: TrackerConfigHistoryExportRow = {
       tracker_id: r[1],
       effective_from: String(r[2]).slice(0, 10),
       budget_amount: r[3],
       category_ids: [],
+      reset_frequency: r[4] ?? null,
     }
     byConfigId.set(r[0], row)
     rows.push(row)
@@ -843,7 +846,8 @@ export function replaceTrackers(
       newTrackerId,
       ch.effective_from.slice(0, 10),
       ch.budget_amount,
-      catIds
+      catIds,
+      typeof ch.reset_frequency === 'string' ? ch.reset_frequency : null
     )
     trackersWithHistory.add(newTrackerId)
   }

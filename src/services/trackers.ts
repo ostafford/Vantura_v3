@@ -13,6 +13,7 @@ import {
 } from '@/lib/dateStr'
 import {
   toPeriodCents,
+  toDailyRateCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 
@@ -171,6 +172,11 @@ export interface TrackerConfigVersion {
   effective_from: string
   budget_amount: number
   category_ids: string[]
+  /**
+   * Cadence this row's `budget_amount` is denominated in. NULL = the enclosing
+   * period's own cadence (every row except those a frequency change wrote, #38).
+   */
+  reset_frequency: string | null
 }
 
 /**
@@ -184,7 +190,7 @@ export function getTrackerConfigHistory(
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT id, effective_from, budget_amount
+    `SELECT id, effective_from, budget_amount, reset_frequency
      FROM tracker_config_history
      WHERE tracker_id = ?
      ORDER BY effective_from ASC, id ASC`
@@ -192,12 +198,13 @@ export function getTrackerConfigHistory(
   stmt.bind([trackerId])
   const versions: TrackerConfigVersion[] = []
   while (stmt.step()) {
-    const r = stmt.get() as [number, string, number]
+    const r = stmt.get() as [number, string, number, string | null]
     versions.push({
       id: r[0],
       effective_from: normDate(r[1]),
       budget_amount: r[2],
       category_ids: [],
+      reset_frequency: r[3],
     })
   }
   stmt.free()
@@ -237,7 +244,7 @@ export type CurrentPeriodInput = Pick<
 
 type SegmentConfig = Pick<
   TrackerConfigVersion,
-  'budget_amount' | 'category_ids'
+  'budget_amount' | 'category_ids' | 'reset_frequency'
 >
 
 /**
@@ -249,6 +256,14 @@ type SegmentConfig = Pick<
  * from `spendLookup` over that config's category set. `fallback` is used for any
  * day no `history` row covers. No DB — `computeCurrentPeriodSegments` is the thin
  * wrapper that supplies `history`, `fallback`, and the lookup.
+ *
+ * Exception (#38): a **partial** segment (`segDays !== periodDays`) whose config
+ * carries a `reset_frequency` — written only by a frequency / reset-day change —
+ * is priced at that cadence's daily rate (`toDailyRateCents × segDays`) instead,
+ * because its `budget_amount` is denominated in a different cadence than the
+ * transitional period it sits in. A full-period single segment always uses
+ * `budget_amount` directly, cadence tag or not (daily-rate is not exact over a
+ * whole calendar month).
  *
  * `history` MUST be ordered oldest `effective_from` first (the `configAsOf` walk
  * short-circuits on that); `getTrackerConfigHistory` guarantees it.
@@ -289,10 +304,15 @@ export function splitPeriodIntoSegments(
     const e = cutEnds[i]
     const cfg = configAsOf(s)
     const segDays = daysBetween(s, e)
+    const isPartial = segDays !== periodDays
     const budget =
-      periodDays > 0
-        ? Math.round((cfg.budget_amount * segDays) / periodDays)
-        : cfg.budget_amount
+      isPartial && cfg.reset_frequency
+        ? Math.round(
+            toDailyRateCents(cfg.budget_amount, cfg.reset_frequency) * segDays
+          )
+        : periodDays > 0
+          ? Math.round((cfg.budget_amount * segDays) / periodDays)
+          : cfg.budget_amount
     segments.push({
       start: s,
       end: e,
@@ -328,6 +348,7 @@ export function computeCurrentPeriodSegments(
   const fallback: SegmentConfig = {
     budget_amount: tracker.budget_amount,
     category_ids: getTrackerCategoryIds(tracker.id),
+    reset_frequency: null,
   }
   return splitPeriodIntoSegments(
     tracker.last_reset_date,
@@ -925,13 +946,18 @@ function assertCategoriesAvailable(
  * version for a tracker (#16) and its category set. The caller owns
  * `schedulePersist()`. Shared by createTracker, updateTracker, the demo seed and
  * profile import so the genesis / version insert lives in one place.
+ *
+ * `resetFrequency` (#38) is recorded only for rows a frequency / reset-day change
+ * writes — it tells the split calc this row's `budget_amount` is denominated in
+ * that cadence, not the enclosing period's. Left `null` by every other caller.
  */
 export function writeTrackerConfigVersion(
   db: NonNullable<ReturnType<typeof getDb>>,
   trackerId: number,
   effectiveFrom: string,
   budgetAmountCents: number,
-  categoryIds: string[]
+  categoryIds: string[],
+  resetFrequency: string | null = null
 ): void {
   const now = new Date().toISOString()
   const existing = db.exec(
@@ -940,19 +966,19 @@ export function writeTrackerConfigVersion(
   )
   let configId = Number(existing[0]?.values?.[0]?.[0] ?? 0)
   if (configId > 0) {
-    db.run(`UPDATE tracker_config_history SET budget_amount = ? WHERE id = ?`, [
-      budgetAmountCents,
-      configId,
-    ])
+    db.run(
+      `UPDATE tracker_config_history SET budget_amount = ?, reset_frequency = ? WHERE id = ?`,
+      [budgetAmountCents, resetFrequency, configId]
+    )
     db.run(
       `DELETE FROM tracker_config_history_categories WHERE config_id = ?`,
       [configId]
     )
   } else {
     db.run(
-      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, created_at)
-       VALUES (?, ?, ?, ?)`,
-      [trackerId, effectiveFrom, budgetAmountCents, now]
+      `INSERT INTO tracker_config_history (tracker_id, effective_from, budget_amount, reset_frequency, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [trackerId, effectiveFrom, budgetAmountCents, resetFrequency, now]
     )
     configId = Number(
       db.exec(`SELECT last_insert_rowid()`)[0]?.values?.[0]?.[0] ?? 0
@@ -985,9 +1011,14 @@ export function deleteTrackerConfigHistory(
 }
 
 /**
- * Record the config-history effect of an `updateTracker` edit (#16):
- * - frequency / reset-day change → wipe history, write a fresh genesis at the
- *   new period start (frequency-through-history is a deferred follow-up);
+ * Record the config-history effect of an `updateTracker` edit (#16, #38):
+ * - frequency / reset-day change, transitional (the common case) → keep the
+ *   timeline; stamp every existing row (`effective_from <= today`) with the OLD
+ *   cadence so the split prices the pre-transition part of the transitional
+ *   period at that daily rate, then write a version effective tomorrow carrying
+ *   the NEW cadence + budget + categories;
+ * - frequency / reset-day change, non-transitional (no `existing`, or a broken
+ *   future-dated period start) → wipe history, write a fresh genesis;
  * - budget / category change → a version effective tomorrow so the current
  *   period splits at that boundary rather than being re-judged whole;
  * - pure rename → nothing.
@@ -1002,6 +1033,10 @@ function maintainConfigHistoryOnEdit(args: {
   newBudgetCents: number
   newCategoryIds: string[]
   needsPeriodReset: boolean
+  /** #38 — frequency/reset-day change that keeps the timeline (see updateTracker). */
+  transitionalFrequencyChange: boolean
+  /** The new tracker cadence (`resetFrequency`), stamped on the tomorrow row. */
+  newFreq: string
   newLastReset: string
   today: string
 }): void {
@@ -1013,17 +1048,49 @@ function maintainConfigHistoryOnEdit(args: {
     newBudgetCents,
     newCategoryIds,
     needsPeriodReset,
+    transitionalFrequencyChange,
+    newFreq,
     newLastReset,
     today,
   } = args
   if (needsPeriodReset) {
-    deleteTrackerConfigHistory(db, id)
+    if (!transitionalFrequencyChange || !existing) {
+      deleteTrackerConfigHistory(db, id)
+      writeTrackerConfigVersion(
+        db,
+        id,
+        newLastReset,
+        newBudgetCents,
+        newCategoryIds
+      )
+      return
+    }
+    // Transitional: the pre-transition part of the current period is priced
+    // against the old cadence's daily rate.
+    db.run(
+      `UPDATE tracker_config_history SET reset_frequency = ? WHERE tracker_id = ? AND effective_from <= ?`,
+      [existing.reset_frequency, id, today]
+    )
+    const hasBaseline = getTrackerConfigHistory(id).some(
+      (v) => v.effective_from <= newLastReset
+    )
+    if (!hasBaseline) {
+      writeTrackerConfigVersion(
+        db,
+        id,
+        newLastReset,
+        existing.budget_amount,
+        existingCats,
+        existing.reset_frequency
+      )
+    }
     writeTrackerConfigVersion(
       db,
       id,
-      newLastReset,
+      addDaysToDateStr(today, 1),
       newBudgetCents,
-      newCategoryIds
+      newCategoryIds,
+      newFreq
     )
     return
   }
@@ -1153,6 +1220,20 @@ export function updateTracker(
     lastReset = getLastResetDate(resetFrequency, resetDay, today)
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
   }
+
+  // #38 — a frequency / reset-day change normally becomes a *transitional
+  // period*: the current period keeps its start and ends at the new cadence's
+  // next reset, so no in-flight period is discarded and the config history
+  // survives. Skip it only for broken data — no `existing`, or a period start
+  // that isn't before the new boundary.
+  const transitionalFrequencyChange =
+    needsPeriodReset &&
+    !!existing &&
+    normalizeDateStr(existing.last_reset_date) < nextReset
+  if (transitionalFrequencyChange && existing) {
+    lastReset = normalizeDateStr(existing.last_reset_date)
+  }
+
   db.run(
     `UPDATE trackers SET name = ?, budget_amount = ?, reset_frequency = ?, reset_day = ?, last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
     [
@@ -1181,6 +1262,8 @@ export function updateTracker(
     newBudgetCents: budgetAmountCents,
     newCategoryIds: categoryIds,
     needsPeriodReset,
+    transitionalFrequencyChange,
+    newFreq: resetFrequency,
     newLastReset: lastReset,
     today,
   })
