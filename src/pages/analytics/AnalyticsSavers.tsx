@@ -22,8 +22,6 @@ import {
   removeSaverGoal,
   reconcileSaverGoalAchievement,
   sumAccountBalancesCents,
-  type SaverBalanceSnapshot,
-  type SaverMonthlyFlowPoint,
 } from '@/services/accounts'
 import { getMonthlyInsights } from '@/services/insights'
 import type { MonthDelta } from '@/services/insights'
@@ -36,92 +34,7 @@ import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
 import { getSaverOrder, setSaverOrder } from '@/lib/saverOrder'
 import { HelpPopover } from '@/components/HelpPopover'
-
-// Reconstruct end-of-month balances from flow data working backwards from current balance.
-// Both charts then share the same source and time window.
-const MONTH_MAP: Record<string, string> = {
-  Jan: '01',
-  Feb: '02',
-  Mar: '03',
-  Apr: '04',
-  May: '05',
-  Jun: '06',
-  Jul: '07',
-  Aug: '08',
-  Sep: '09',
-  Oct: '10',
-  Nov: '11',
-  Dec: '12',
-}
-
-function deriveMonthlyBalances(
-  flow: SaverMonthlyFlowPoint[],
-  saverId: string,
-  currentBalance: number
-): SaverBalanceSnapshot[] {
-  const result: SaverBalanceSnapshot[] = []
-  let b = currentBalance
-  for (let i = flow.length - 1; i >= 0; i--) {
-    const p = flow[i]
-    // "Jun '26" → "2026-06-01"
-    const [mon, yr] = p.monthLabel.split(' ')
-    const date = `20${yr.slice(1)}-${MONTH_MAP[mon]}-01`
-    result.unshift({
-      saver_id: saverId,
-      snapshot_date: date,
-      balance_cents: Math.max(0, b),
-    })
-    // balance at end of previous month = balance at end of this month + this month's flow
-    b += p.flowCents
-  }
-  return result
-}
-
-interface ProjectionResult {
-  onTrack: boolean
-  lastMonthCents: number
-  projectedBalanceCents: number
-  monthsRemaining: number
-  requiredMonthlyCents: number
-}
-
-function computeProjection(
-  currentBalanceCents: number,
-  goalCents: number,
-  monthlyFlow: SaverMonthlyFlowPoint[],
-  goalDate: string
-): ProjectionResult {
-  // Use the most recent complete month as the projected rate — matches Up Bank's
-  // payday-split behaviour where each month's contribution is consistent and
-  // the latest month is the most representative of the ongoing rate.
-  const complete = monthlyFlow.slice(0, -1)
-  const lastMonth = complete[complete.length - 1]
-  // flowCents is negative for savings; negate to get positive = monthly saving rate
-  const lastMonthCents = lastMonth ? -lastMonth.flowCents : 0
-
-  const today = new Date()
-  const target = new Date(goalDate)
-  const monthsRemaining = Math.max(
-    0,
-    (target.getFullYear() - today.getFullYear()) * 12 +
-      (target.getMonth() - today.getMonth())
-  )
-
-  const projectedBalanceCents =
-    currentBalanceCents + lastMonthCents * monthsRemaining
-  const requiredMonthlyCents =
-    monthsRemaining > 0
-      ? (goalCents - currentBalanceCents) / monthsRemaining
-      : Infinity
-
-  return {
-    onTrack: projectedBalanceCents >= goalCents,
-    lastMonthCents,
-    projectedBalanceCents,
-    monthsRemaining,
-    requiredMonthlyCents,
-  }
-}
+import { deriveMonthlyBalances, computeProjection } from './saverProjection'
 
 function formatGoalDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -732,95 +645,104 @@ export function AnalyticsSavers() {
                           </button>
                         </div>
                       </div>
-                      {/* Row 5: on-track projection badge (only when a target date is set) */}
-                      {projection && projection.monthsRemaining > 0 && (
-                        <div
-                          className="d-flex justify-content-end mt-2 pt-2"
-                          style={{
-                            borderTop:
-                              '1px solid var(--bs-border-color, var(--vantura-border))',
-                          }}
-                        >
-                          {projection.lastMonthCents <= 0 ? (
-                            <span className="badge bg-secondary">
-                              No history
-                            </span>
-                          ) : projection.onTrack &&
-                            Number.isFinite(projection.requiredMonthlyCents) ? (
-                            <OverlayTrigger
-                              placement="top"
-                              container={document.body}
-                              overlay={
-                                <Tooltip>
-                                  <div>
-                                    Need $
-                                    {formatMoney(
-                                      projection.requiredMonthlyCents
-                                    )}
-                                    /mo to reach goal by{' '}
-                                    {formatGoalDate(activeGoalDate!)}
-                                  </div>
-                                  <div style={{ opacity: 0.75 }}>
-                                    Last mo. $
-                                    {formatMoney(projection.lastMonthCents)} —
-                                    at that rate you're ahead of pace
-                                  </div>
-                                </Tooltip>
-                              }
-                            >
-                              <span
-                                className="badge bg-success"
-                                style={{ cursor: 'default' }}
-                              >
-                                On track
+                      {/* Row 5: on-track projection badge (target date set, goal not yet reached) */}
+                      {projection &&
+                        !goalReached &&
+                        projection.monthsRemaining > 0 && (
+                          <div
+                            className="d-flex justify-content-end mt-2 pt-2"
+                            style={{
+                              borderTop:
+                                '1px solid var(--bs-border-color, var(--vantura-border))',
+                            }}
+                          >
+                            {projection.lastMonthCents <= 0 ? (
+                              <span className="badge bg-secondary">
+                                No history
                               </span>
-                            </OverlayTrigger>
-                          ) : projection.onTrack ? (
-                            <span className="badge bg-success">On track</span>
-                          ) : (
-                            <OverlayTrigger
-                              placement="top"
-                              container={document.body}
-                              overlay={
-                                <Tooltip>
-                                  <div>
-                                    <span
-                                      style={{
-                                        color: 'var(--vantura-warning)',
-                                      }}
-                                    >
-                                      Need $
+                            ) : projection.onTrack &&
+                              Number.isFinite(
+                                projection.requiredMonthlyCents
+                              ) ? (
+                              <OverlayTrigger
+                                placement="top"
+                                container={document.body}
+                                overlay={
+                                  <Tooltip>
+                                    <div>
+                                      At $
+                                      {formatMoney(projection.lastMonthCents)}
+                                      /mo you&apos;ll reach $
+                                      {formatMoney(goalCents)}
+                                      {projection.projectedReachDate
+                                        ? ` around ${formatGoalDate(projection.projectedReachDate)}`
+                                        : ''}
+                                    </div>
+                                    <div style={{ opacity: 0.75 }}>
+                                      {projection.monthsEarly != null &&
+                                      projection.monthsEarly >= 1
+                                        ? `About ${projection.monthsEarly} month${projection.monthsEarly === 1 ? '' : 's'} before your ${formatGoalDate(activeGoalDate!)} target`
+                                        : `On pace for your ${formatGoalDate(activeGoalDate!)} target`}
+                                    </div>
+                                  </Tooltip>
+                                }
+                              >
+                                <span
+                                  className="badge bg-success"
+                                  style={{ cursor: 'default' }}
+                                >
+                                  {projection.monthsEarly != null &&
+                                  projection.monthsEarly >= 1
+                                    ? `~${projection.monthsEarly} mo early`
+                                    : 'On track'}
+                                </span>
+                              </OverlayTrigger>
+                            ) : projection.onTrack ? (
+                              <span className="badge bg-success">On track</span>
+                            ) : (
+                              <OverlayTrigger
+                                placement="top"
+                                container={document.body}
+                                overlay={
+                                  <Tooltip>
+                                    <div>
+                                      <span
+                                        style={{
+                                          color: 'var(--vantura-warning)',
+                                        }}
+                                      >
+                                        Need $
+                                        {formatMoney(
+                                          projection.requiredMonthlyCents
+                                        )}
+                                        /mo
+                                      </span>{' '}
+                                      to reach goal by{' '}
+                                      {formatGoalDate(activeGoalDate!)}
+                                    </div>
+                                    <div style={{ opacity: 0.75 }}>
+                                      Last mo. $
+                                      {formatMoney(projection.lastMonthCents)} ·
+                                      +$
                                       {formatMoney(
-                                        projection.requiredMonthlyCents
+                                        projection.requiredMonthlyCents -
+                                          projection.lastMonthCents
                                       )}
-                                      /mo
-                                    </span>{' '}
-                                    to reach goal by{' '}
-                                    {formatGoalDate(activeGoalDate!)}
-                                  </div>
-                                  <div style={{ opacity: 0.75 }}>
-                                    Last mo. $
-                                    {formatMoney(projection.lastMonthCents)} ·
-                                    +$
-                                    {formatMoney(
-                                      projection.requiredMonthlyCents -
-                                        projection.lastMonthCents
-                                    )}
-                                    /mo more needed
-                                  </div>
-                                </Tooltip>
-                              }
-                            >
-                              <span
-                                className="badge bg-warning text-dark"
-                                style={{ cursor: 'default' }}
+                                      /mo more needed
+                                    </div>
+                                  </Tooltip>
+                                }
                               >
-                                Behind pace
-                              </span>
-                            </OverlayTrigger>
-                          )}
-                        </div>
-                      )}
+                                <span
+                                  className="badge bg-warning text-dark"
+                                  style={{ cursor: 'default' }}
+                                >
+                                  Behind pace
+                                </span>
+                              </OverlayTrigger>
+                            )}
+                          </div>
+                        )}
                     </>
                   ) : (
                     <button
