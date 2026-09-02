@@ -8,6 +8,7 @@ import {
   clearBiometricSession,
   storeBiometricSession,
 } from '@/lib/biometricSession'
+import { PassphraseChangeModal } from './PassphraseChangeModal'
 
 export function SecuritySection() {
   const [bioAvailable, setBioAvailable] = useState<boolean | null>(null)
@@ -113,6 +114,8 @@ export function SecuritySection() {
           <option value="30">30 minutes</option>
         </Form.Select>
       </Form.Group>
+      <hr className="mb-4" />
+      <PassphraseChangeModal />
       <hr className="mb-4" />
       {bioAvailable === null && (
         <div
