@@ -125,6 +125,17 @@ export function AnalyticsTrackersDetail() {
     [effectivePeriodHistory]
   )
 
+  // #17 — informational "came in under / over budget" for the most recently
+  // completed period. Only when there was real spend, so a pre-creation
+  // fabricated period can't read as a $0-spend "win".
+  const lastCompletedPeriod = useMemo(
+    () =>
+      effectivePeriodHistory.find(
+        (p) => p.periodOffset === -1 && p.spent > 0
+      ) ?? null,
+    [effectivePeriodHistory]
+  )
+
   // Initialise date filter when period data loads; re-initialise when display period changes.
   useEffect(() => {
     if (currentPeriod && !periodInitialized.current) {
@@ -406,6 +417,37 @@ export function AnalyticsTrackersDetail() {
               <Card.Title className="mb-0">
                 Spend vs Budget by Period
               </Card.Title>
+              {lastCompletedPeriod && (
+                <Card.Text
+                  as="div"
+                  className={`small mt-1 ${
+                    lastCompletedPeriod.spent < lastCompletedPeriod.budget
+                      ? 'text-success'
+                      : 'text-muted'
+                  }`}
+                >
+                  {lastCompletedPeriod.spent < lastCompletedPeriod.budget ? (
+                    <>
+                      <i className="mdi mdi-trophy-outline me-1" aria-hidden />
+                      {lastCompletedPeriod.periodLabel}: came in $
+                      {formatMoney(
+                        lastCompletedPeriod.budget - lastCompletedPeriod.spent
+                      )}{' '}
+                      under budget
+                    </>
+                  ) : lastCompletedPeriod.spent > lastCompletedPeriod.budget ? (
+                    <>
+                      {lastCompletedPeriod.periodLabel}: $
+                      {formatMoney(
+                        lastCompletedPeriod.spent - lastCompletedPeriod.budget
+                      )}{' '}
+                      over budget
+                    </>
+                  ) : (
+                    <>{lastCompletedPeriod.periodLabel}: exactly on budget</>
+                  )}
+                </Card.Text>
+              )}
               <Form.Select
                 value={periodsBack}
                 onChange={(e) => setPeriodsBack(Number(e.target.value))}
