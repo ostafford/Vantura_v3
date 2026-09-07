@@ -263,7 +263,8 @@ export function Dashboard() {
   const scrollToUpcoming = useCallback(() => {
     const el = document.getElementById('dashboard-section-upcoming')
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
     el.classList.add('dashboard-scroll-highlight')
     setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
   }, [])
@@ -450,7 +451,13 @@ export function Dashboard() {
     const t = setTimeout(() => {
       const el = document.getElementById(elId)
       if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const reduce = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches
+      el.scrollIntoView({
+        behavior: reduce ? 'auto' : 'smooth',
+        block: 'center',
+      })
       el.classList.add('dashboard-scroll-highlight')
       setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
     }, 150)

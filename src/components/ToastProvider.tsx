@@ -3,7 +3,8 @@ import { useStore } from 'zustand'
 import { toastStore } from '@/stores/toastStore'
 
 const AUTO_HIDE_MS = 4000
-const EXIT_MS = 240
+// Keep in sync with --duration-base on `.vantura-toast--exit` (src/index.css).
+const EXIT_MS = 200
 
 export function ToastProvider() {
   const show = useStore(toastStore, (s) => s.show)
