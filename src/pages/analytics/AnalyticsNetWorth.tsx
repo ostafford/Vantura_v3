@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { Card, Row, Col, Modal, Button, Form, Badge } from 'react-bootstrap'
 import { syncStore } from '@/stores/syncStore'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { getAccountsByTypes } from '@/services/accounts'
 import {
   getNetWorthSummary,
@@ -808,8 +808,7 @@ export function AnalyticsNetWorth() {
               <div className="small text-muted mb-1">Net Worth</div>
               <div className="fw-semibold fs-4">
                 {hasApproximate ? '≈ ' : ''}
-                {summary.totalCents < 0 ? '−' : ''}$
-                {formatMoney(Math.abs(summary.totalCents))}
+                {formatSignedMoney(summary.totalCents)}
               </div>
               {deltaVsPrev !== null && (
                 <div className="small mt-1">

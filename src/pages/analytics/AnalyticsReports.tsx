@@ -45,7 +45,12 @@ import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadg
 import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
-import { formatMoney, formatDollars, formatDate } from '@/lib/format'
+import {
+  formatMoney,
+  formatDeltaMoney,
+  formatDollars,
+  formatDate,
+} from '@/lib/format'
 import {
   monthNameLong,
   previousCalendarMonth,
@@ -852,7 +857,7 @@ export function AnalyticsReports() {
                 />
                 <KpiCell
                   label="Net"
-                  value={`${net >= 0 ? '+' : '−'}$${formatMoney(Math.abs(net))}`}
+                  value={formatDeltaMoney(net)}
                   valueClass={net >= 0 ? 'text-success' : 'text-danger'}
                   delta={
                     comparison?.hasPreviousData && netDelta

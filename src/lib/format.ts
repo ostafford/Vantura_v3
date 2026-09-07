@@ -46,6 +46,18 @@ export function formatSignedMoney(cents: number): string {
     : `$${formatMoney(cents)}`
 }
 
+/**
+ * Like {@link formatSignedMoney} but also shows an explicit `+` on positives —
+ * `+$12.34` / `−$12.34` / `$0.00`. Use for *changes / deltas* where the
+ * direction is the point (net-worth movement, net flow, a period-over-period
+ * "Net" figure). A zero delta gets no sign.
+ */
+export function formatDeltaMoney(cents: number): string {
+  if (cents > 0) return `+$${formatMoney(cents)}`
+  if (cents < 0) return `−$${formatMoney(Math.abs(cents))}`
+  return `$${formatMoney(0)}`
+}
+
 /** Format dollars for display (e.g. tooltips, axis labels). Use when value is already in dollars. */
 export function formatDollars(dollars: number): string {
   return Number.isFinite(dollars)

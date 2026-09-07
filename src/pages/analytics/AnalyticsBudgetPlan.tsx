@@ -23,7 +23,7 @@ import {
   type BudgetBucketRow,
   type BucketCardSummary,
 } from '@/services/budgetBuckets'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { toast } from '@/stores/toastStore'
 import { BUCKET_ICONS, BUDGET_DISPLAY_PERIODS } from '@/lib/budgetBucketMeta'
@@ -739,8 +739,7 @@ export function AnalyticsBudgetPlan() {
                         : 'var(--vantura-danger)',
                   }}
                 >
-                  {freeSpendingCents < 0 ? '-' : ''}$
-                  {formatMoney(Math.abs(freeSpendingCents))}
+                  {formatSignedMoney(freeSpendingCents)}
                 </div>
               ) : (
                 <div className="text-muted small">Set income to calculate</div>
