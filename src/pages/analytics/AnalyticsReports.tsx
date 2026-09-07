@@ -262,7 +262,7 @@ function SpendingCategoryList({
                   borderRadius: 4,
                   background: d.fill,
                   opacity: 0.8,
-                  transition: 'width 0.3s ease',
+                  transition: 'width var(--duration-slow) var(--ease-out)',
                 }}
               />
             </div>
@@ -1467,7 +1467,8 @@ export function AnalyticsReports() {
                               borderRadius: 4,
                               background: 'var(--vantura-primary)',
                               opacity: 0.75,
-                              transition: 'width 0.3s ease',
+                              transition:
+                                'width var(--duration-slow) var(--ease-out)',
                             }}
                           />
                         </div>

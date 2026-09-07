@@ -122,7 +122,8 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
                     icon === opt.icon
                       ? 'var(--vantura-primary)'
                       : 'var(--bs-body-color)',
-                  transition: 'border-color 0.1s, background-color 0.1s',
+                  transition:
+                    'border-color var(--duration-fast) ease, background-color var(--duration-fast) ease',
                 }}
               >
                 <i className={`mdi ${opt.icon}`} aria-hidden />
@@ -532,7 +533,7 @@ export function AnalyticsBudgetPlan() {
                   style={{
                     borderLeft: `4px solid ${hex}`,
                     cursor: 'pointer',
-                    transition: 'box-shadow 0.15s ease',
+                    transition: 'box-shadow var(--duration-fast) ease',
                     opacity: dragOverId === b.id ? 0.6 : 1,
                   }}
                   onMouseEnter={(e) => {

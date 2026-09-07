@@ -103,7 +103,7 @@ export function AboutSection() {
           style={{
             background: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.09)',
-            transition: 'border-color 0.15s',
+            transition: 'border-color var(--duration-fast) ease',
           }}
           aria-label="Open user guide"
         >
@@ -137,7 +137,7 @@ export function AboutSection() {
           style={{
             background: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.09)',
-            transition: 'border-color 0.15s',
+            transition: 'border-color var(--duration-fast) ease',
           }}
           aria-label="See what's new"
         >

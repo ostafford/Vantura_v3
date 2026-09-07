@@ -154,7 +154,7 @@ function ProgressBarRow({
             height: '100%',
             borderRadius: 4,
             background: barColor,
-            transition: 'width 0.4s ease',
+            transition: 'width var(--duration-slow) var(--ease-out)',
             ...(striped && {
               backgroundImage:
                 'repeating-linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)',
