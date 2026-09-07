@@ -138,6 +138,16 @@ export function Dashboard() {
     nextPayday && nextPayday.trim() !== ''
       ? `$${formatMoney(reservedCents)} reserved until ${formatShortDate(nextPayday)}`
       : `$${formatMoney(reservedCents)} reserved for upcoming`
+  // The hero button's visible value/subtitle aren't part of its accessible
+  // name, so spell the whole picture out here — value, reserved line, and any
+  // alert state (mirrors the tooltip heading) — plus what activating it does.
+  const spendableStateNote =
+    spendableCents < 0
+      ? ' Spendable is negative.'
+      : isSpendableLow
+        ? ' Below your alert threshold.'
+        : ''
+  const spendableAriaLabel = `Spendable balance ${spendableDisplayValue}. ${spendableSubtitle}.${spendableStateNote} Activate to set a low-balance alert.`
   const availableProjectedSubtitle =
     payAmountCents != null
       ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}`
@@ -645,6 +655,7 @@ export function Dashboard() {
         spendableSubtitle={spendableSubtitle}
         spendableTone={spendableGradient}
         spendableTooltip={spendableTooltip}
+        spendableAriaLabel={spendableAriaLabel}
         onOpenAlert={openThresholdModal}
         availableValue={formatSignedMoney(availableCents)}
         availableSubtitle={availableProjectedSubtitle}
