@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatMoney,
+  formatSignedMoney,
   formatDollars,
   formatDate,
   formatShortDate,
@@ -15,6 +16,23 @@ describe('formatMoney', () => {
     expect(formatMoney(100)).toBe('1.00')
     expect(formatMoney(12345)).toBe('123.45')
     expect(formatMoney(-500)).toBe('-5.00')
+  })
+})
+
+describe('formatSignedMoney', () => {
+  it('formats non-negative cents as a plain dollar amount', () => {
+    expect(formatSignedMoney(0)).toBe('$0.00')
+    expect(formatSignedMoney(100)).toBe('$1.00')
+    expect(formatSignedMoney(12345)).toBe('$123.45')
+  })
+  it('puts the minus sign outside the dollar symbol for negatives', () => {
+    expect(formatSignedMoney(-500)).toBe('−$5.00')
+    expect(formatSignedMoney(-12345)).toBe('−$123.45')
+  })
+  it('uses U+2212 MINUS SIGN, not an ASCII hyphen, and never "$-"', () => {
+    const out = formatSignedMoney(-500)
+    expect(out.startsWith('−')).toBe(true)
+    expect(out).not.toContain('$-')
   })
 })
 

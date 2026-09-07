@@ -12,7 +12,7 @@ import {
   type SpendableAlertMode,
 } from '@/services/balance'
 import { getForecastSpendable } from '@/services/forecast'
-import { formatMoney, formatShortDate } from '@/lib/format'
+import { formatMoney, formatSignedMoney, formatShortDate } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
@@ -127,10 +127,7 @@ export function Dashboard() {
     spendableCents < effectiveThresholdCents
   const spendableGradient =
     spendableCents < 0 || isSpendableLow ? 'danger' : 'success'
-  const spendableDisplayValue =
-    spendableCents < 0
-      ? `−$${formatMoney(Math.abs(spendableCents))}`
-      : undefined
+  const spendableDisplayValue = formatSignedMoney(spendableCents)
   const isStale = lastSyncAgeMs != null && lastSyncAgeMs > 60 * 60 * 1000
   const staleHours =
     isStale && lastSyncAgeMs != null
@@ -147,8 +144,7 @@ export function Dashboard() {
       : 'Balance as reported by Up Bank'
 
   const forecastGradient = forecastCents < 0 ? 'danger' : 'info'
-  const forecastDisplayValue =
-    forecastCents < 0 ? `−$${formatMoney(Math.abs(forecastCents))}` : undefined
+  const forecastDisplayValue = formatSignedMoney(forecastCents)
   const forecastSubtitle =
     nextPayday && nextPayday.trim() !== ''
       ? `Projected for ${formatShortDate(nextPayday)}`
@@ -182,8 +178,6 @@ export function Dashboard() {
   )
 
   const spendableTooltip = (() => {
-    const fmtSigned = (c: number) =>
-      c < 0 ? `−$${formatMoney(Math.abs(c))}` : `$${formatMoney(c)}`
     const projected =
       payAmountCents != null ? spendableCents + payAmountCents : null
 
@@ -228,9 +222,9 @@ export function Dashboard() {
                 paddingTop: '0.3rem',
               }}
             >
-              After payday: {fmtSigned(spendableCents)} + $
+              After payday: {formatSignedMoney(spendableCents)} + $
               {formatMoney(payAmountCents!)} ={' '}
-              <strong>{fmtSigned(projected)}</strong>
+              <strong>{formatSignedMoney(projected)}</strong>
             </div>
           )}
         </div>
@@ -261,9 +255,9 @@ export function Dashboard() {
             paddingTop: '0.3rem',
           }}
         >
-          Post-payday: ${formatMoney(availableCents)} + $
+          Post-payday: {formatSignedMoney(availableCents)} + $
           {formatMoney(payAmountCents)} ={' '}
-          <strong>${formatMoney(availableCents + payAmountCents)}</strong>
+          <strong>{formatSignedMoney(availableCents + payAmountCents)}</strong>
         </div>
       )}
     </div>
@@ -647,17 +641,15 @@ export function Dashboard() {
         </div>
       </div>
       <BalanceCards
-        spendableValue={
-          spendableDisplayValue ?? `$${formatMoney(spendableCents)}`
-        }
+        spendableValue={spendableDisplayValue}
         spendableSubtitle={spendableSubtitle}
         spendableTone={spendableGradient}
         spendableTooltip={spendableTooltip}
         onOpenAlert={openThresholdModal}
-        availableValue={`$${formatMoney(availableCents)}`}
+        availableValue={formatSignedMoney(availableCents)}
         availableSubtitle={availableProjectedSubtitle}
         availableTooltip={availableTooltip}
-        forecastValue={forecastDisplayValue ?? `$${formatMoney(forecastCents)}`}
+        forecastValue={forecastDisplayValue}
         forecastSubtitle={forecastSubtitle}
         forecastTone={forecastGradient}
         forecastTooltip={forecastTooltip}
