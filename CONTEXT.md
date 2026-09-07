@@ -276,6 +276,28 @@ _Avoid_: assigned colour, colour setting, badge colour
 The single app-wide primary colour (`--vantura-primary`, Sky). Deliberately not selectable — it replaced an earlier 6-swatch picker.
 _Avoid_: theme colour, brand colour, accent setting
 
+### Motion
+
+**Frequency gate**:
+The rule that decides whether — and how much — an element animates, keyed to how often a user sees it: 100+ times/day (keyboard shortcuts, command toggles) → no animation ever; tens of times/day (hover, list nav) → near-imperceptible or none; occasional (modals, drawers, toasts) → standard; rare / first-run (onboarding, a goal hit) → the delight budget. From `docs/PRODUCT.md`'s *Motion & polish* section.
+_Avoid_: animation policy, motion rule, transition setting
+
+**Delight budget**:
+The small allowance for expressive, noticeable motion — reserved for rare, high-emotion moments and spent nowhere on the hot path. A finance tool's restraint principle applies to the interface, not just the number.
+_Avoid_: flourish, wow moment, polish budget
+
+**Interruptible motion**:
+Motion that retargets from its current position when re-triggered mid-flight instead of restarting — a CSS transition or spring, never a `@keyframes`. Required for anything rapidly triggered or reversible (a drawer spammed open/closed, a toggle). The notification drawer's `data-state` enter/exit is the reference (`docs/animation-plans/001-notification-drawer-enter-exit.md`).
+_Avoid_: reversible animation, cancellable transition
+
+**1:1 tracking**:
+During a drag or scrub, the element stays glued to the pointer and updates continuously through the whole gesture — never only on release, never snapping to the element's centre on grab.
+_Avoid_: drag follow, pointer lock, live drag
+
+**Response-on-press**:
+Interactive elements acknowledge input on pointer-down, not on click/release — a button highlights the instant it's pressed. Feedback during an interaction is continuous, not deferred to the end.
+_Avoid_: press feedback delay, active-state lag
+
 ### Dashboard
 
 **Balance card**:
