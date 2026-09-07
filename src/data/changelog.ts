@@ -24,6 +24,40 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '7 Sep 2026',
+    heading: 'Automatic Colour, Recurring Charges & Saver Goals',
+    icon: 'mdi-auto-fix',
+    primaryMonth: '2026-09',
+    version: '0.9.0',
+    color: '#a5d6a7',
+    items: [
+      {
+        icon: 'mdi-palette-outline',
+        text: 'Automatic colours — the colour picker for tracker badges, Budget Plan buckets, and Weekly Insights categories is gone. Every colour is now assigned for you and checked to stay distinguishable for colour-blind vision in both light and dark mode.',
+      },
+      {
+        icon: 'mdi-magnify-scan',
+        text: 'Find recurring charges — a new button in the Upcoming section scans your settled transactions for steady-amount, steady-interval patterns (Netflix, gym, insurance…) and offers them as upcoming charges. Nothing is added automatically, and a "Not recurring" dismissal is remembered.',
+      },
+      {
+        icon: 'mdi-flag-checkered',
+        text: 'Saver goal history — reaching a goal now records it and lets you set the next one, with past goals and the date each was reached listed on the card. Interest earned is shown per goal cycle and all-time.',
+      },
+      {
+        icon: 'mdi-calendar-sync-outline',
+        text: "Changing a tracker's frequency or reset day no longer throws away the current period — it keeps its start, runs to the new cadence's next reset, and the new setup takes effect the next day.",
+      },
+      {
+        icon: 'mdi-chart-timeline-variant',
+        text: 'Weekly Insights now groups spending categories under their real Up Bank parent (Home, Transport, Good Life, Personal) in a fixed order.',
+      },
+      {
+        icon: 'mdi-bug-check-outline',
+        text: "Fixes — the Net Worth card's projected balance no longer undercounts repeating charges, and tracker day-counts and period history now use your local date instead of UTC.",
+      },
+    ],
+  },
+  {
     date: '30 Jul 2026',
     heading: 'Stability & Accuracy Audit',
     icon: 'mdi-shield-check-outline',

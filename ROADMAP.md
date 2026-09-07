@@ -249,6 +249,21 @@ Small enhancements to existing features, surfaced during the feature-by-feature 
 
 ---
 
+### v0.9.0 — Automatic Colour, Recurring Charges & Saver Goals — September 2026
+
+First release since the July audit (`v0.8.1`). Bundles the September feature-polish batch above with three larger features and two accuracy fixes.
+
+| Date | Feature |
+|------|---------|
+| Sep 7 | **`v0.9.0` released** — see [CHANGELOG](CHANGELOG.md#090---2026-09-07) for the full list |
+| — | **Automatic colour system** — the six-swatch colour picker is gone; every tracker, bucket, and category colour is derived from the entity's id and validated for colour-vision-deficiency safety (`src/lib/colorSystem.ts`, schema v37) |
+| — | **Recurring-charge detection** — "Find recurring charges" scans settled debits for steady-amount / steady-interval patterns and offers them as upcoming charges; never auto-added (schema v46, ADR-0016) |
+| — | **Saver goal history + interest** — reaching a goal records it and prompts the next; per-cycle and all-time interest earned shown per card (schema v44, ADR-0015) |
+| — | **Tracker cadence changes keep the in-flight period** — a frequency / reset-day change now writes a transitional period instead of wiping config history (schema v45, ADR-0014) |
+| — | **Fixed** — Net Worth projected balance undercounted recurring charges; tracker day-counts / period history used UTC instead of the local date |
+
+---
+
 ## Under Consideration
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-07
+
+First tagged release since the July stability audit (74 commits). Colour is now fully automatic and CVD-validated, Vantura can spot recurring charges in your history, Savers keep a goal history with per-cycle interest, and changing a tracker's cadence no longer discards the in-flight period. Plus the feature-polish batch from the docs rebuild (#13) and two accuracy fixes.
+
 ### Removed
 
 - **Colour is no longer user-configurable.** The six-swatch colour picker for tracker badges, Budget Plan buckets, and Weekly Insights categories is gone — every colour is now assigned automatically. Removes `src/lib/accentPalettes.ts`, `src/components/ChartColorPicker.tsx`, `src/components/CategoryColorsSection.tsx` (and the "Category colours" section in Settings → Appearance), and their storage (`trackers.badge_color`, `budget_buckets.colour`, `insights_category_colors` — dropped in schema v37).
