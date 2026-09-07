@@ -21,6 +21,12 @@ interface BalanceCardsProps {
   spendableSubtitle: ReactNode
   spendableTone: HeroTone
   spendableTooltip: ReactNode
+  /**
+   * Accessible name for the hero button. Built in Dashboard.tsx so it can fold
+   * in the formatted value, the reserved-until line, and any alert state — the
+   * visible value/subtitle nodes are not part of the button's name.
+   */
+  spendableAriaLabel: string
   onOpenAlert: () => void
   availableValue: ReactNode
   availableSubtitle: ReactNode
@@ -86,6 +92,7 @@ export function BalanceCards({
   spendableSubtitle,
   spendableTone,
   spendableTooltip,
+  spendableAriaLabel,
   onOpenAlert,
   availableValue,
   availableSubtitle,
@@ -109,7 +116,7 @@ export function BalanceCards({
             onOpenAlert()
           }
         }}
-        aria-label="Spendable balance; click to set low balance alert"
+        aria-label={spendableAriaLabel}
       >
         <div className="balance-hero__label">
           Spendable
