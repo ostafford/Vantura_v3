@@ -264,50 +264,33 @@
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
 }
 /* Pastel fill backgrounds: dark-tinted → white-tinted in light mode */
-[data-theme='light'] .bg-pastel-success,
-[data-theme='light'] .stat-card-flat--success {
+[data-theme='light'] .bg-pastel-success {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--vantura-success) 48%, white) 0%,
     color-mix(in srgb, var(--vantura-success) 38%, white) 100%
   );
 }
-[data-theme='light'] .bg-pastel-danger,
-[data-theme='light'] .stat-card-flat--danger {
+[data-theme='light'] .bg-pastel-danger {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--vantura-danger) 48%, white) 0%,
     color-mix(in srgb, var(--vantura-danger) 38%, white) 100%
   );
 }
-[data-theme='light'] .bg-pastel-info,
-[data-theme='light'] .stat-card-flat--info {
+[data-theme='light'] .bg-pastel-info {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--vantura-info) 48%, white) 0%,
     color-mix(in srgb, var(--vantura-info) 38%, white) 100%
   );
 }
-[data-theme='light'] .bg-pastel-primary,
-[data-theme='light'] .stat-card-flat--primary {
+[data-theme='light'] .bg-pastel-primary {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--vantura-primary) 48%, white) 0%,
     color-mix(in srgb, var(--vantura-primary) 38%, white) 100%
   );
-}
-/* Stat card border-left: dark-mix → white-mix in light mode */
-[data-theme='light'] .stat-card-flat--success {
-  border-left-color: color-mix(in srgb, var(--vantura-success) 60%, white);
-}
-[data-theme='light'] .stat-card-flat--danger {
-  border-left-color: color-mix(in srgb, var(--vantura-danger) 60%, white);
-}
-[data-theme='light'] .stat-card-flat--info {
-  border-left-color: color-mix(in srgb, var(--vantura-info) 60%, white);
-}
-[data-theme='light'] .stat-card-flat--primary {
-  border-left-color: color-mix(in srgb, var(--vantura-primary) 60%, white);
 }
 /* Auth screen gradient — light bg tinted by accent */
 [data-theme='light'] .auth-full-bg {
@@ -1219,151 +1202,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 .balance-tile .balance-info {
   font-size: 0.8rem;
-}
-
-/* Flat stat card (Monarch-inspired) */
-.stat-card-flat {
-  border: 0;
-  border-left: 4px solid var(--vantura-primary);
-  border-radius: 6px;
-  background-color: var(--vantura-surface);
-  color: var(--vantura-text);
-  transition: box-shadow var(--duration-base) ease;
-}
-.stat-card-flat:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-.stat-card-flat--success {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-success) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-success) 82%, #13131c) 100%
-  );
-  border-left-color: color-mix(in srgb, var(--vantura-success) 60%, #13131c);
-}
-.stat-card-flat--danger {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-danger) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-danger) 82%, #13131c) 100%
-  );
-  border-left-color: color-mix(in srgb, var(--vantura-danger) 60%, #13131c);
-}
-.stat-card-flat--info {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-info) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-info) 82%, #13131c) 100%
-  );
-  border-left-color: color-mix(in srgb, var(--vantura-info) 60%, #13131c);
-}
-.stat-card-flat--primary {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-primary) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-primary) 82%, #13131c) 100%
-  );
-  border-left-color: color-mix(in srgb, var(--vantura-primary) 60%, #13131c);
-}
-/* Pastel gradient → soft dark text throughout */
-.stat-card-flat--success,
-.stat-card-flat--danger,
-.stat-card-flat--info,
-.stat-card-flat--primary {
-  color: rgba(26, 26, 46, 0.82);
-}
-.stat-card-flat--success .stat-card-flat__title,
-.stat-card-flat--danger .stat-card-flat__title,
-.stat-card-flat--info .stat-card-flat__title,
-.stat-card-flat--primary .stat-card-flat__title,
-.stat-card-flat--success .stat-card-flat__subtitle,
-.stat-card-flat--danger .stat-card-flat__subtitle,
-.stat-card-flat--info .stat-card-flat__subtitle,
-.stat-card-flat--primary .stat-card-flat__subtitle,
-.stat-card-flat--success .stat-card-flat__info,
-.stat-card-flat--danger .stat-card-flat__info,
-.stat-card-flat--info .stat-card-flat__info,
-.stat-card-flat--primary .stat-card-flat__info {
-  color: rgba(26, 26, 46, 0.58);
-}
-.stat-card-flat--success .stat-card-flat__value,
-.stat-card-flat--danger .stat-card-flat__value,
-.stat-card-flat--info .stat-card-flat__value,
-.stat-card-flat--primary .stat-card-flat__value {
-  color: rgba(26, 26, 46, 0.88);
-}
-/* Warning chip on a pastel card background — neutral dark tint instead of orange-on-pastel */
-.stat-card-flat--success .stat-card-flat__subtitle--warningChip,
-.stat-card-flat--danger .stat-card-flat__subtitle--warningChip,
-.stat-card-flat--info .stat-card-flat__subtitle--warningChip,
-.stat-card-flat--primary .stat-card-flat__subtitle--warningChip {
-  border-color: rgba(26, 26, 46, 0.25);
-  background: rgba(26, 26, 46, 0.12);
-  color: var(--vantura-text-on-pastel);
-}
-.stat-card-flat__body {
-  padding: 1.25rem 1.5rem !important;
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  justify-content: flex-start;
-  gap: 0.6rem;
-}
-.stat-card-flat__header {
-  display: flex;
-  align-items: flex-end;
-}
-.stat-card-flat__bottom-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: auto;
-}
-.stat-card-flat__title {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--vantura-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-}
-.stat-card-flat__info {
-  cursor: help;
-  font-size: 0.85rem;
-  color: var(--vantura-text-secondary);
-}
-.stat-card-flat__value {
-  font-size: 1.7rem;
-  font-weight: 700;
-  color: var(--vantura-text);
-  line-height: 1.2;
-  text-align: right;
-  margin-top: 0;
-}
-.stat-card-flat__subtitle {
-  font-size: 0.8rem;
-  color: var(--vantura-text-secondary);
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-align: right;
-  align-self: flex-end;
-}
-.stat-card-flat__subtitle--warning {
-  color: var(--vantura-warning);
-  font-weight: 500;
-}
-.stat-card-flat__subtitle--warningChip {
-  display: inline-block;
-  margin-left: auto;
-  padding: 0.22rem 0.5rem;
-  border-radius: 0.375rem;
-  border: 1px solid color-mix(in srgb, var(--vantura-warning) 40%, transparent);
-  background: color-mix(in srgb, var(--vantura-warning) 18%, transparent);
-  color: var(--vantura-warning);
-  font-weight: 500;
 }
 
 /* Phase 8: Purple React sidebar */
