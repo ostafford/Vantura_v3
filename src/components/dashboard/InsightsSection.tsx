@@ -240,7 +240,6 @@ export function InsightsSection({
               title="Money In"
               value={insights.moneyIn}
               gradient="success"
-              compact
             />
           </Col>
           <Col xs={6} md>
@@ -248,7 +247,6 @@ export function InsightsSection({
               title="Money Out"
               value={insights.moneyOut}
               gradient="danger"
-              compact
             />
           </Col>
           <Col xs={6} md>
@@ -261,7 +259,6 @@ export function InsightsSection({
                 formatMoney(Math.abs(insights.saverChanges))
               }
               gradient="success"
-              compact
             />
           </Col>
           <Col xs={6} md>
@@ -271,7 +268,6 @@ export function InsightsSection({
               displayValue={insights.charges}
               gradient="danger"
               tooltip="Count of spending transactions this week (excludes transfers)."
-              compact
             />
           </Col>
         </Row>
