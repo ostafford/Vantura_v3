@@ -333,6 +333,27 @@ export function NotificationDrawer() {
 
   const [items, setItems] = useState<NotificationHistoryItem[]>([])
 
+  // Keep the drawer mounted through its exit transition (--duration-slow, 300ms).
+  const [render, setRender] = useState(drawerOpen)
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    if (drawerOpen) {
+      setRender(true)
+      // two frames so the browser paints the closed state before we flip to open
+      let raf2 = 0
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setEntered(true))
+      })
+      return () => {
+        cancelAnimationFrame(raf1)
+        cancelAnimationFrame(raf2)
+      }
+    }
+    setEntered(false)
+    const t = setTimeout(() => setRender(false), 300)
+    return () => clearTimeout(t)
+  }, [drawerOpen])
+
   const reload = useCallback(() => {
     setItems(getNotificationHistory())
   }, [])
@@ -411,7 +432,9 @@ export function NotificationDrawer() {
     refreshUnreadCount()
   }, [refreshUnreadCount])
 
-  if (!drawerOpen) return null
+  if (!render) return null
+
+  const drawerState = entered ? 'open' : 'closed'
 
   const sections = SECTIONS.map((s) => ({
     ...s,
@@ -426,11 +449,13 @@ export function NotificationDrawer() {
     <>
       <div
         className="notif-drawer__backdrop"
+        data-state={drawerState}
         onClick={closeDrawer}
         aria-hidden
       />
       <aside
         className="notif-drawer"
+        data-state={drawerState}
         role="dialog"
         aria-label="Notifications"
         aria-modal="true"
