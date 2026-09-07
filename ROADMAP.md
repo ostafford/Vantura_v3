@@ -264,6 +264,20 @@ First release since the July audit (`v0.8.1`). Bundles the September feature-pol
 
 ---
 
+### v0.10.0 — Spendable-First Dashboard & Motion System — September 2026
+
+Builds on `v0.9.0` with a Dashboard balance-zone redesign, a shared motion / easing
+system adopted as the presentation-tier standard, and consistent negative-amount formatting.
+
+| Date | Feature |
+|------|---------|
+| Sep 8 | **`v0.10.0` released** — see [CHANGELOG](CHANGELOG.md#0100---2026-09-08) for the full list |
+| — | **Spendable-first balance zone** — the three equal Dashboard cards become a full-width Spendable hero with Available / Forecast as supporting mini-tiles; state colour on the hero's left edge ([#15](https://github.com/ostafford/Vantura_v3/issues/15)) |
+| — | **Motion token system** — shared `--ease-*` / `--duration-*` scale, app-wide `prefers-reduced-motion` baseline, ~40 ad-hoc transitions migrated; notification drawer gains real enter/exit + backdrop fade. Design-engineering adopted as the presentation-tier standard (ADR-0017) |
+| — | **Consistent `−$X`** — negative amounts render with the minus outside the `$` everywhere (Available, Net Worth, Budget Plan, Savers), via shared `formatSignedMoney` / `formatDeltaMoney` (#73, #75); Spendable card gains a screen-reader-complete accessible name (#74) |
+
+---
+
 ## Under Consideration
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.
