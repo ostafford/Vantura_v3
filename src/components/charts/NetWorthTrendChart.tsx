@@ -10,7 +10,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { NetWorthSnapshot } from '@/services/netWorth'
-import { formatMoney } from '@/lib/format'
+import { formatSignedMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -149,7 +149,7 @@ export function NetWorthTrendChart({
           year: 'numeric',
         })
         setTooltipContent(tooltipEl, dateLabel, [
-          `Net worth: ${point.total < 0 ? '−' : ''}$${formatMoney(Math.abs(point.total))}`,
+          `Net worth: ${formatSignedMoney(point.total)}`,
         ])
         tooltipEl.style.display = 'block'
         positionTooltip(tooltipEl, container, event, 160, 44)
@@ -174,10 +174,7 @@ export function NetWorthTrendChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(4)
-      .tickFormat((d: NumberValue) => {
-        const val = Number(d)
-        return `${val < 0 ? '−' : ''}$${formatMoney(Math.abs(val))}`
-      })
+      .tickFormat((d: NumberValue) => formatSignedMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g').call(yAxis).style('font-size', '11px')

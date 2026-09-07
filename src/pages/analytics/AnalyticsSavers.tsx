@@ -25,7 +25,7 @@ import {
 } from '@/services/accounts'
 import { getMonthlyInsights } from '@/services/insights'
 import type { MonthDelta } from '@/services/insights'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney, formatDeltaMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { SaverBalanceChart } from '@/components/charts/SaverBalanceChart'
 import { SaverMonthlyFlowChart } from '@/components/charts/SaverMonthlyFlowChart'
@@ -948,8 +948,7 @@ export function AnalyticsSavers() {
                                   <span
                                     className={`fw-semibold ${netChange >= 0 ? 'text-success' : 'text-danger'}`}
                                   >
-                                    {netChange >= 0 ? '+' : '−'}$
-                                    {formatMoney(Math.abs(netChange))}
+                                    {formatDeltaMoney(netChange)}
                                   </span>
                                 </div>
                                 <div>
@@ -1021,7 +1020,7 @@ export function AnalyticsSavers() {
               visibility.
             </p>
             <p className="mb-3 fw-semibold">
-              Combined balance: ${formatMoney(homeLoanTotal)}
+              Combined balance: {formatSignedMoney(homeLoanTotal)}
             </p>
             <Row className="g-3">
               {homeLoans.map((a) => (
@@ -1029,7 +1028,7 @@ export function AnalyticsSavers() {
                   <Card className="h-100">
                     <Card.Body>
                       <h6 className="mb-1">{a.display_name}</h6>
-                      <p className="mb-0 h5">${formatMoney(a.balance)}</p>
+                      <p className="mb-0 h5">{formatSignedMoney(a.balance)}</p>
                     </Card.Body>
                   </Card>
                 </Col>

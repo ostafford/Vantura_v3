@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   formatMoney,
   formatSignedMoney,
+  formatDeltaMoney,
   formatDollars,
   formatDate,
   formatShortDate,
@@ -33,6 +34,21 @@ describe('formatSignedMoney', () => {
     const out = formatSignedMoney(-500)
     expect(out.startsWith('−')).toBe(true)
     expect(out).not.toContain('$-')
+  })
+})
+
+describe('formatDeltaMoney', () => {
+  it('shows an explicit + on positive deltas', () => {
+    expect(formatDeltaMoney(100)).toBe('+$1.00')
+    expect(formatDeltaMoney(12345)).toBe('+$123.45')
+  })
+  it('puts the minus sign outside the dollar symbol on negative deltas', () => {
+    expect(formatDeltaMoney(-100)).toBe('−$1.00')
+    expect(formatDeltaMoney(-12345)).toBe('−$123.45')
+    expect(formatDeltaMoney(-100)).not.toContain('$-')
+  })
+  it('shows no sign for a zero delta', () => {
+    expect(formatDeltaMoney(0)).toBe('$0.00')
   })
 })
 

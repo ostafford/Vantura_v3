@@ -3,7 +3,7 @@ import { useStore } from 'zustand'
 import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
 import { syncStore } from '@/stores/syncStore'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney, formatDeltaMoney } from '@/lib/format'
 import { getNetWorthSummary, getNetWorthSnapshots } from '@/services/netWorth'
 import { getManualAccounts, isStale } from '@/services/manualAccounts'
 import type React from 'react'
@@ -62,8 +62,7 @@ export function NetWorthCard({ dragHandleProps }: NetWorthCardProps) {
         <div className="d-flex align-items-baseline gap-2 mb-1">
           <span className="fw-semibold fs-4">
             {hasApproximate ? '≈ ' : ''}
-            {summary.totalCents < 0 ? '−' : ''}$
-            {formatMoney(Math.abs(summary.totalCents))}
+            {formatSignedMoney(summary.totalCents)}
           </span>
           {deltaVsPrev !== null && (
             <span
@@ -71,8 +70,7 @@ export function NetWorthCard({ dragHandleProps }: NetWorthCardProps) {
                 deltaVsPrev >= 0 ? 'text-success small' : 'text-danger small'
               }
             >
-              {deltaVsPrev >= 0 ? '↑' : '↓'} {deltaVsPrev >= 0 ? '+' : '−'}$
-              {formatMoney(Math.abs(deltaVsPrev))}
+              {deltaVsPrev >= 0 ? '↑' : '↓'} {formatDeltaMoney(deltaVsPrev)}
             </span>
           )}
         </div>
