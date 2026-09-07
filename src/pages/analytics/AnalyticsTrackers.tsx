@@ -147,7 +147,7 @@ export function AnalyticsTrackers() {
                       style={{
                         cursor: 'pointer',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-                        transition: 'box-shadow 0.15s ease',
+                        transition: 'box-shadow var(--duration-fast) ease',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.boxShadow =
