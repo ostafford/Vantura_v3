@@ -2750,7 +2750,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
   padding: 12px 16px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  animation: pwa-banner-slide-up var(--duration-base) var(--ease-out);
+  animation: pwa-banner-slide-up var(--duration-slower) var(--ease-drawer);
 }
 
 @keyframes pwa-banner-slide-up {
