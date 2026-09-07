@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import type React from 'react'
-import { Row, Col, Modal, Button, Form } from 'react-bootstrap'
+import { Modal, Button, Form } from 'react-bootstrap'
 import { useLocation } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
@@ -23,7 +23,7 @@ import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
-import { StatCard } from '@/components/StatCard'
+import { BalanceCards } from '@/components/dashboard/BalanceCards'
 import {
   shouldShowDashboardTour,
   startDashboardTour,
@@ -242,6 +242,32 @@ export function Dashboard() {
       </div>
     )
   })()
+
+  const availableTooltip = (
+    <div style={{ fontSize: '0.82rem' }}>
+      <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
+        Your Up Bank balance
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div>• Sum of all transactional account balances</div>
+        <div>• Excludes saver accounts</div>
+        <div>• Pending/held transactions already reflected</div>
+      </div>
+      {payAmountCents != null && (
+        <div
+          style={{
+            marginTop: '0.45rem',
+            borderTop: '1px solid rgba(255,255,255,0.12)',
+            paddingTop: '0.3rem',
+          }}
+        >
+          Post-payday: ${formatMoney(availableCents)} + $
+          {formatMoney(payAmountCents)} ={' '}
+          <strong>${formatMoney(availableCents + payAmountCents)}</strong>
+        </div>
+      )}
+    </div>
+  )
 
   const now = new Date()
   const headerDate = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
@@ -620,83 +646,22 @@ export function Dashboard() {
           </button>
         </div>
       </div>
-      <Row className="g-3 mb-4" data-tour="balance-cards">
-        <Col md={4} className="stretch-card">
-          <StatCard
-            title="Available"
-            value={availableCents}
-            subtitle={availableProjectedSubtitle}
-            gradient="success"
-            tooltip={
-              <div style={{ fontSize: '0.82rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
-                  Your Up Bank balance
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem',
-                  }}
-                >
-                  <div>• Sum of all transactional account balances</div>
-                  <div>• Excludes saver accounts</div>
-                  <div>• Pending/held transactions already reflected</div>
-                </div>
-                {payAmountCents != null && (
-                  <div
-                    style={{
-                      marginTop: '0.45rem',
-                      borderTop: '1px solid rgba(255,255,255,0.12)',
-                      paddingTop: '0.3rem',
-                    }}
-                  >
-                    Post-payday: ${formatMoney(availableCents)} + $
-                    {formatMoney(payAmountCents)} ={' '}
-                    <strong>
-                      ${formatMoney(availableCents + payAmountCents)}
-                    </strong>
-                  </div>
-                )}
-              </div>
-            }
-          />
-        </Col>
-        <Col id="dashboard-spendable-card" md={4} className="stretch-card">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={openThresholdModal}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                openThresholdModal()
-              }
-            }}
-            style={{ cursor: 'pointer' }}
-            aria-label="Spendable balance; click to set low balance alert"
-          >
-            <StatCard
-              title="Spendable"
-              value={spendableCents}
-              displayValue={spendableDisplayValue}
-              subtitle={spendableSubtitle}
-              gradient={spendableGradient}
-              tooltip={spendableTooltip}
-            />
-          </div>
-        </Col>
-        <Col md={4} className="stretch-card">
-          <StatCard
-            title="Forecast"
-            value={forecastCents}
-            displayValue={forecastDisplayValue}
-            subtitle={forecastSubtitle}
-            gradient={forecastGradient}
-            tooltip={forecastTooltip}
-          />
-        </Col>
-      </Row>
+      <BalanceCards
+        spendableValue={
+          spendableDisplayValue ?? `$${formatMoney(spendableCents)}`
+        }
+        spendableSubtitle={spendableSubtitle}
+        spendableTone={spendableGradient}
+        spendableTooltip={spendableTooltip}
+        onOpenAlert={openThresholdModal}
+        availableValue={`$${formatMoney(availableCents)}`}
+        availableSubtitle={availableProjectedSubtitle}
+        availableTooltip={availableTooltip}
+        forecastValue={forecastDisplayValue ?? `$${formatMoney(forecastCents)}`}
+        forecastSubtitle={forecastSubtitle}
+        forecastTone={forecastGradient}
+        forecastTooltip={forecastTooltip}
+      />
       {dueSoonAlert}
 
       <Modal
