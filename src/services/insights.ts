@@ -424,11 +424,14 @@ const MAX_INDIVIDUAL_CATEGORIES = 7
  * categorical colour system was validated against (src/lib/colorSystem.ts —
  * the 6 category-family hues were CVD-safety-checked as a specific ordered
  * chain: Home, Transport, Good Life [split A/B], Personal [split A/B]).
- * Changing this order, or letting group order vary by spend, breaks that
- * validation — two families that were only checked as chain-neighbours could
- * end up directly adjacent with no colour-safety guarantee. Matched by name
- * (Up Bank's parent category names), not id, since real ids aren't yet
- * wired into this codebase — see colorSystem.ts's CATEGORY_ID_TO_SLOT.
+ * The CVD-adjacency guarantee depends on this *order* being preserved, not on
+ * every group being present: a section that renders always emits its own
+ * header before its bars, so the groups that do appear stay a subsequence of
+ * the validated chain with a header buffer between each. Letting group order
+ * vary by spend would break it — two families only checked as chain-neighbours
+ * could end up directly adjacent. Matched by name (Up Bank's parent category
+ * names), not id, since real ids aren't yet wired into this codebase — see
+ * colorSystem.ts's CATEGORY_ID_TO_SLOT.
  */
 const PARENT_DISPLAY_ORDER = ['Home', 'Transport', 'Good Life', 'Personal']
 
@@ -436,10 +439,10 @@ const PARENT_DISPLAY_ORDER = ['Home', 'Transport', 'Good Life', 'Personal']
  * Weekly category spend, grouped by real parent category in a fixed order,
  * sorted by spend within each group, with everything past the top
  * MAX_INDIVIDUAL_CATEGORIES individual categories (by spend, across all
- * parents) folded into a single "Other" row. Every real parent group always
- * renders (even with zero rows) so the chart's group dividers stay in a
- * fixed sequence — required for the colour system's adjacency guarantees;
- * see PARENT_DISPLAY_ORDER above.
+ * parents) folded into a single "Other" row. Real parent groups with zero
+ * spend that week are omitted (see #31 — the colour system's adjacency
+ * guarantee needs the fixed *order* of the groups that appear, not an empty
+ * header for every group); PARENT_DISPLAY_ORDER above has the reasoning.
  */
 export function getWeeklyCategoryBreakdownGrouped(
   weekRange?: WeekRange
@@ -503,12 +506,17 @@ export function getWeeklyCategoryBreakdownGrouped(
       orderIndex(a.name) - orderIndex(b.name) || a.name.localeCompare(b.name)
   )
 
-  const sections: CategoryGroupSection[] = orderedParents.map((p) => ({
-    parentId: p.id,
-    parentName: p.name,
-    rows: rowsByParentId.get(p.id) ?? [],
-    isOther: false,
-  }))
+  const sections: CategoryGroupSection[] = orderedParents
+    .map((p) => ({
+      parentId: p.id,
+      parentName: p.name,
+      rows: rowsByParentId.get(p.id) ?? [],
+      isOther: false,
+    }))
+    // Drop real-parent groups with no spend this week (#31). The CVD-adjacency
+    // guarantee needs the remaining groups to stay in PARENT_DISPLAY_ORDER,
+    // which the sort above already ensures — not an empty header per group.
+    .filter((s) => s.rows.length > 0)
 
   if (uncategorisedRows.length > 0) {
     sections.push({

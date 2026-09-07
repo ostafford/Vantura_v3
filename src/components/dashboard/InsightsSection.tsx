@@ -69,11 +69,11 @@ export function InsightsSection({
     [weekRange]
   )
 
-  // Every section (including the 4 real parent groups when they have zero
-  // spend, Uncategorised, and Other) gets a header row — this keeps the
-  // group order fixed and every group boundary a real visual divider,
-  // which the categorical colour system's adjacency validation depends on
-  // (see colorSystem.ts and getWeeklyCategoryBreakdownGrouped's doc comment).
+  // Every section the data layer returns (real parent groups with spend,
+  // Uncategorised, Other) gets a header row before its bars — so each group
+  // boundary is a real visual divider and the groups that appear stay in the
+  // colour system's validated order. Empty parent groups are dropped upstream
+  // (#31); see colorSystem.ts and getWeeklyCategoryBreakdownGrouped's doc.
   const rows: InsightsChartRow[] = useMemo(
     () =>
       sections.flatMap((section) => {

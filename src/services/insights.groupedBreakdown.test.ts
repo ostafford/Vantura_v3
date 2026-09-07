@@ -1,9 +1,9 @@
 /**
  * getWeeklyCategoryBreakdownGrouped is load-bearing for the categorical
  * colour system's validated adjacency guarantees (see colorSystem.ts): the
- * 4 real parent groups must always render in a fixed order, even when a
- * group has zero spend, and overflow past the individual-category cap must
- * fold into "Other" rather than growing the visible category count.
+ * real parent groups that have spend must render in a fixed order (empty
+ * groups are dropped — #31), and overflow past the individual-category cap
+ * must fold into "Other" rather than growing the visible category count.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
@@ -71,22 +71,34 @@ describe('getWeeklyCategoryBreakdownGrouped', () => {
     endIso: '2026-08-09T23:59:59.999Z',
   }
 
-  it('always returns all 4 real parent groups, in the fixed validated order, even with zero spend', () => {
-    // Only Home has any spend this week — Transport, Good Life, Personal
-    // must still appear as empty sections, not be omitted, since omitting
-    // a middle group would let its neighbours become directly adjacent
-    // without the CVD-safety guarantee that assumes this fixed chain order.
+  it('omits real parent groups with zero spend (#31), keeping the rest in the fixed validated order', () => {
+    // Only Home and Good Life have spend this week — Transport and Personal
+    // must NOT appear at all (no empty header). The groups that remain stay
+    // a subsequence of the CVD-validated chain order, each still preceded by
+    // its own header, so no cross-family bars become directly adjacent.
     insertSpend('groceries', 5000)
+    insertSpend('hobbies', 3000)
 
     const sections = getWeeklyCategoryBreakdownGrouped(weekRange)
     const parentNames = sections
       .filter((s) => !s.isOther && s.parentId !== null)
       .map((s) => s.parentName)
 
-    expect(parentNames).toEqual(['Home', 'Transport', 'Good Life', 'Personal'])
+    expect(parentNames).toEqual(['Home', 'Good Life'])
+  })
 
-    const transportSection = sections.find((s) => s.parentName === 'Transport')
-    expect(transportSection?.rows).toEqual([])
+  it('keeps present groups in PARENT_DISPLAY_ORDER regardless of which group has more spend', () => {
+    // Good Life outspends Home, but Home still sorts first — group order is
+    // fixed, never by spend.
+    insertSpend('groceries', 1000)
+    insertSpend('hobbies', 9000)
+
+    const sections = getWeeklyCategoryBreakdownGrouped(weekRange)
+    const parentNames = sections
+      .filter((s) => !s.isOther && s.parentId !== null)
+      .map((s) => s.parentName)
+
+    expect(parentNames).toEqual(['Home', 'Good Life'])
   })
 
   it('sorts rows by spend within each group', () => {
