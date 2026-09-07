@@ -651,7 +651,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 8px !important;
   color: var(--vantura-text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--duration-fast) ease;
 }
 .form-control:focus,
 .form-select:focus {
@@ -965,7 +965,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .breadcrumb-item a {
   color: var(--vantura-primary);
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition: color var(--duration-fast) ease;
 }
 .breadcrumb-item a:hover {
   color: var(--vantura-text);
@@ -1078,7 +1078,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 6px;
   background-color: var(--vantura-surface);
   color: var(--vantura-text);
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow var(--duration-base) ease;
 }
 .stat-card-flat:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -1222,8 +1222,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 0;
   z-index: 11;
   transition:
-    width 0.25s ease,
-    background 0.25s ease;
+    width var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
 }
 .sidebar .nav {
   overflow: hidden;
@@ -1235,7 +1235,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 .sidebar .nav-item {
   padding: 0 2.25rem;
-  transition: background 0.25s;
+  transition: background var(--duration-base) ease;
 }
 .sidebar .nav-link {
   display: flex;
@@ -1245,7 +1245,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
-  transition: color 0.45s;
+  transition: color var(--duration-base) ease;
 }
 .sidebar .nav-link:hover {
   color: inherit;
@@ -1319,8 +1319,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   flex-shrink: 0;
   padding: 0;
   transition:
-    background 0.2s,
-    color 0.2s;
+    background var(--duration-base) ease,
+    color var(--duration-base) ease;
 }
 .sidebar-collapse-btn:hover {
   background: var(--vantura-sidebar-hover-bg);
@@ -1349,7 +1349,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   cursor: pointer;
   border-radius: 8px;
   padding: 6px;
-  transition: background 0.2s;
+  transition: background var(--duration-base) ease;
 }
 .sidebar.collapsed .sidebar-brand .sidebar-brand-block:hover {
   background: var(--vantura-sidebar-hover-bg);
@@ -1422,8 +1422,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 0.875rem;
   cursor: pointer;
   transition:
-    background 0.25s,
-    color 0.45s;
+    background var(--duration-base) ease,
+    color var(--duration-base) ease;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -1534,8 +1534,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   white-space: nowrap;
   line-height: 1.5;
   transition:
-    color 0.15s ease,
-    background 0.15s ease;
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 
 .period-toggle .segment-btn:hover:not(.active) {
@@ -1569,9 +1569,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   cursor: pointer;
   text-decoration: none;
   transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease,
-    color 0.15s ease;
+    background var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 .btn-icon:hover,
@@ -1615,7 +1615,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .btn-light {
   border: none !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--duration-fast) ease;
 }
 
 .btn-primary:hover:not(:disabled),
@@ -1638,8 +1638,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border: none !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
   transition:
-    box-shadow 0.15s ease,
-    background-color 0.15s ease;
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
 }
 
 .btn-outline-primary:not(.month-summary-legend-toggle):hover:not(:disabled),
@@ -1676,8 +1676,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   justify-content: center;
   background: var(--vantura-sidebar-gradient);
   transition:
-    width 0.25s ease,
-    background 0.25s ease;
+    width var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
 }
 .vantura-navbar.collapsed .navbar-brand-wrapper {
   width: 70px;
@@ -1904,7 +1904,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   animation: progress-bar-stripes 1s linear infinite;
 }
 .progress .progress-bar {
-  transition: width 0.35s ease-out;
+  transition: width var(--duration-slow) var(--ease-out);
   font-size: 0.65rem;
   font-weight: 700;
   color: var(--vantura-progress-label);
@@ -2112,7 +2112,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 .vantura-toast--exit {
-  animation: toast-slide-up 0.24s ease-in forwards;
+  animation: toast-slide-up var(--duration-base) var(--ease-out) forwards;
 }
 
 @keyframes toast-slide-down {
@@ -2185,9 +2185,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 999px;
   border: 1px solid var(--bs-border-color);
   transition:
-    color 0.15s,
-    border-color 0.15s,
-    background 0.15s;
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 .onboarding-whats-new-chip:hover {
   color: var(--vantura-primary);
@@ -2210,9 +2210,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 50%;
   background: var(--vantura-border);
   transition:
-    background 0.25s ease,
-    transform 0.25s ease,
-    width 0.25s ease;
+    background var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out),
+    width var(--duration-base) var(--ease-out);
 }
 .onboarding-step-dot.completed {
   background: var(--vantura-primary);
@@ -2251,7 +2251,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 0.8rem;
   color: var(--bs-secondary-color);
   text-decoration: none;
-  transition: color 0.15s;
+  transition: color var(--duration-fast) ease;
 }
 .auth-whats-new-link:hover {
   color: var(--vantura-primary);
@@ -2410,7 +2410,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 6px;
   padding: 0.25rem 0.25rem;
   margin-left: -0.25rem;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) ease;
 }
 .changelog-upcoming-group-header:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -2422,7 +2422,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin-top: 0.1rem;
   margin-left: auto;
   opacity: 0.5;
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-base) ease;
 }
 .changelog-upcoming-group-chevron--closed {
   transform: rotate(-90deg);
@@ -2462,7 +2462,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 0.5rem 0.375rem;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) ease;
   user-select: none;
 }
 .changelog-upcoming-item:hover {
@@ -2532,7 +2532,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 1rem;
   color: var(--bs-secondary-color);
   flex-shrink: 0;
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-base) ease;
   opacity: 0.6;
 }
 .changelog-upcoming-chevron--open {
@@ -2564,9 +2564,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--bs-body-color);
   cursor: pointer;
   transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
   padding: 0;
   flex-shrink: 0;
 }
@@ -2593,8 +2593,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-primary);
   cursor: pointer;
   transition:
-    background 0.15s,
-    color 0.15s;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
   margin-left: 0.25rem;
 }
 .changelog-nav-latest:hover {
@@ -2665,7 +2665,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border-radius: 6px;
   padding: 0.1rem 0.25rem;
   margin: -0.1rem -0.25rem;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) ease;
 }
 .changelog-milestone-toggle:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -2675,7 +2675,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--bs-secondary-color);
   flex-shrink: 0;
   opacity: 0.5;
-  transition: transform 0.2s ease;
+  transition: transform var(--duration-base) ease;
 }
 .changelog-milestone-chevron--closed {
   transform: rotate(-90deg);
@@ -2750,7 +2750,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
   padding: 12px 16px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  animation: pwa-banner-slide-up 0.25s ease-out;
+  animation: pwa-banner-slide-up var(--duration-base) var(--ease-out);
 }
 
 @keyframes pwa-banner-slide-up {
@@ -2818,7 +2818,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) ease;
 }
 
 .pwa-update-banner__reload:hover {
@@ -2889,8 +2889,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 1.35rem;
   border-radius: 8px;
   transition:
-    color 0.15s,
-    background 0.15s;
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
   min-width: 36px;
   min-height: 36px;
 }
@@ -2939,7 +2939,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   display: flex;
   flex-direction: column;
   box-shadow: -6px 0 32px rgba(0, 0, 0, 0.45);
-  animation: notif-drawer-slide-in 0.22s ease-out;
+  animation: notif-drawer-slide-in var(--duration-base) var(--ease-out);
 }
 
 @keyframes notif-drawer-slide-in {
@@ -2985,8 +2985,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 4px 8px;
   border-radius: 6px;
   transition:
-    color 0.15s,
-    background 0.15s;
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 .notif-drawer__clear:hover {
   color: var(--vantura-text);
@@ -3007,8 +3007,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   min-width: 32px;
   min-height: 32px;
   transition:
-    color 0.15s,
-    background 0.15s;
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 .notif-drawer__close:hover {
   color: var(--vantura-text);
@@ -3068,7 +3068,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   cursor: pointer;
   text-align: left;
   position: relative;
-  transition: background 0.12s;
+  transition: background var(--duration-fast) ease;
 }
 .notif-drawer__item:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -3179,7 +3179,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 .dashboard-scroll-highlight {
-  animation: dashboard-scroll-pulse 1.8s ease-out;
+  animation: dashboard-scroll-pulse 1.8s var(--ease-out);
   border-radius: 10px;
 }
 
@@ -3223,9 +3223,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin-top: 1px;
   opacity: 0;
   transition:
-    opacity 0.15s,
-    color 0.15s,
-    background 0.15s;
+    opacity var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
 }
 .notif-drawer__item:hover .notif-drawer__item-dismiss,
 .notif-drawer__item:focus-within .notif-drawer__item-dismiss {
@@ -3266,7 +3266,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     border-left: none;
     border-top: 1px solid var(--vantura-border);
     border-radius: 16px 16px 0 0;
-    animation: notif-drawer-slide-up 0.22s ease-out;
+    animation: notif-drawer-slide-up var(--duration-base) var(--ease-out);
   }
 
   @keyframes notif-drawer-slide-up {
