@@ -3316,3 +3316,16 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* Notification drawer (plan 001): the gentler variant the blanket above defers
+   to — a short opacity fade with no slide, rather than a hard cut. */
+@media (prefers-reduced-motion: reduce) {
+  .notif-drawer,
+  .notif-drawer__backdrop {
+    transition-property: opacity !important;
+    transition-duration: 120ms !important;
+  }
+  .notif-drawer {
+    transform: none !important;
+  }
+}
