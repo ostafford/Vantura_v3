@@ -34,6 +34,18 @@ export function formatMoney(cents: number): string {
   })
 }
 
+/**
+ * Money for display with the sign *outside* the dollar symbol: `−$12.34`, not
+ * `$-12.34`. Use at any balance/amount call site that can go negative (Spendable,
+ * Forecast, Available). Non-negative values render as a plain `$12.34`; the minus
+ * is U+2212 (MINUS SIGN), matching the rest of the UI.
+ */
+export function formatSignedMoney(cents: number): string {
+  return cents < 0
+    ? `−$${formatMoney(Math.abs(cents))}`
+    : `$${formatMoney(cents)}`
+}
+
 /** Format dollars for display (e.g. tooltips, axis labels). Use when value is already in dollars. */
 export function formatDollars(dollars: number): string {
   return Number.isFinite(dollars)
