@@ -6,9 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-08
+
+The Dashboard's balance zone is rebuilt around Spendable as the headline figure, motion across the app moves onto one shared timing system with reduced-motion honoured throughout, and negative dollar amounts now render consistently as `−$X`.
+
 ### Changed
 
 - **The Dashboard leads with Spendable.** The three equal balance cards — Available, Spendable, Forecast — are replaced by a full-width Spendable hero: a large number with a colour that stays calm when the balance is healthy and turns red when it's negative or below your alert threshold, with Available and Forecast beside it as two smaller tiles. All three keep their own explanation tooltips, tapping Spendable still opens the low-balance alert settings, and the zone collapses to a single column on narrow screens.
+- **Motion is smoother and more consistent, and reduced-motion is respected everywhere.** The notification drawer now slides and fades both in and out (with its backdrop), transitions across the app share one timing scale, and when your device is set to reduce motion, animations are cut to a near-instant fade.
 
 ### Fixed
 

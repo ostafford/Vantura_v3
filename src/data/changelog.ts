@@ -24,6 +24,32 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '8 Sep 2026',
+    heading: 'Spendable-First Dashboard & Smoother Motion',
+    icon: 'mdi-view-dashboard-outline',
+    primaryMonth: '2026-09',
+    version: '0.10.0',
+    color: '#9fa8da',
+    items: [
+      {
+        icon: 'mdi-star-circle-outline',
+        text: "Your Dashboard now leads with Spendable — one full-width card with a large number and a colour that stays calm when your balance is healthy and turns red when it's low or negative. Available and Forecast sit alongside as smaller tiles.",
+      },
+      {
+        icon: 'mdi-motion-play-outline',
+        text: "Smoother, more consistent motion — the notification drawer slides and fades both in and out, animations across the app share one timing system, and if your device is set to reduce motion they're cut to a near-instant fade.",
+      },
+      {
+        icon: 'mdi-currency-usd',
+        text: 'Negative amounts now show consistently as −$X (minus before the dollar sign) everywhere — the Dashboard, Net Worth, Budget Plan and Savers.',
+      },
+      {
+        icon: 'mdi-account-eye-outline',
+        text: 'The Spendable card now reads its amount and status aloud to screen readers.',
+      },
+    ],
+  },
+  {
     date: '7 Sep 2026',
     heading: 'Automatic Colour, Recurring Charges & Saver Goals',
     icon: 'mdi-auto-fix',
