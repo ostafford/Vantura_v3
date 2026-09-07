@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The Dashboard leads with Spendable.** The three equal balance cards — Available, Spendable, Forecast — are replaced by a full-width Spendable hero: a large number with a colour that stays calm when the balance is healthy and turns red when it's negative or below your alert threshold, with Available and Forecast beside it as two smaller tiles. All three keep their own explanation tooltips, tapping Spendable still opens the low-balance alert settings, and the zone collapses to a single column on narrow screens.
+
+### Fixed
+
+- **Negative dollar amounts now display as `−$X` everywhere.** A few places still showed the malformed `$-123.45` — the Dashboard's Available card when a transactional account was overdrawn, plus the Net Worth figure and its trend chart, Budget Plan's free-spending total, and the Savers home-loan balance. The minus sign is now consistently placed before the `$`, and a `+` appears only where the direction of a change is the point.
+- **The Spendable card now works with screen readers.** It previously announced only a fixed label; it now reads out the current amount, how much is reserved until payday, and whether the balance is low.
+
 ## [0.9.0] - 2026-09-07
 
 First tagged release since the July stability audit (74 commits). Colour is now fully automatic and CVD-validated, Vantura can spot recurring charges in your history, Savers keep a goal history with per-cycle interest, and changing a tracker's cadence no longer discards the in-flight period. Plus the feature-polish batch from the docs rebuild (#13) and two accuracy fixes.
