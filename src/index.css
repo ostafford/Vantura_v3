@@ -2924,6 +2924,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   inset: 0;
   background: rgba(0, 0, 0, 0.52);
   z-index: 1035;
+  opacity: 0;
+  /* Only interactive while open — during the exit transition the fading
+     backdrop must not swallow clicks meant for the bell (rapid reopen). */
+  pointer-events: none;
+  transition: opacity var(--duration-slow) var(--ease-drawer);
+}
+.notif-drawer__backdrop[data-state='open'] {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .notif-drawer {
@@ -2939,18 +2948,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   display: flex;
   flex-direction: column;
   box-shadow: -6px 0 32px rgba(0, 0, 0, 0.45);
-  animation: notif-drawer-slide-in var(--duration-base) var(--ease-out);
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--duration-slow) var(--ease-drawer),
+    opacity var(--duration-slow) var(--ease-drawer);
 }
-
-@keyframes notif-drawer-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.notif-drawer[data-state='open'] {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .notif-drawer__header {
@@ -3266,18 +3274,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     border-left: none;
     border-top: 1px solid var(--vantura-border);
     border-radius: 16px 16px 0 0;
-    animation: notif-drawer-slide-up var(--duration-base) var(--ease-out);
+    transform: translateY(100%);
   }
-
-  @keyframes notif-drawer-slide-up {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  .notif-drawer[data-state='open'] {
+    transform: translateY(0);
   }
 
   body.notif-drawer-open {
