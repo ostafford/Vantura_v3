@@ -118,6 +118,24 @@
   --bs-progress-bg: var(--vantura-border);
   --bs-progress-bar-color: var(--vantura-text-on-pastel);
   --vantura-progress-label: rgba(26, 26, 46, 0.75);
+
+  /* ── Motion tokens ─────────────────────────────────────────────────────────
+     Shared easing + duration scale. Transitions and animations reference these;
+     bespoke curves or one-off ms values are a defect. Values from the `animate`
+     skill's canonical tables. See
+     docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md
+     For hover / colour / state toggles use the built-in `ease`; for progress
+     bars and marquees use `linear`. Never `ease-in` on UI. */
+  /* enter/exit — default UI curve */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* on-screen movement / morph */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* iOS-like drawer / sheet slide */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 120ms; /* press feedback, hover, colour change */
+  --duration-base: 200ms; /* dropdowns, selects, tooltips, most transitions */
+  --duration-slow: 300ms; /* modals, small drawers — the UI ceiling */
+  --duration-slower: 450ms; /* large drawers / sheets only */
 }
 
 /* ── Light theme overrides ─────────────────────────────────────────────────── */
@@ -3278,5 +3296,23 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 @media (max-width: 480px) {
   .tooltip-rich .tooltip-inner {
     max-width: min(280px, 90vw);
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────────
+   Global baseline for users who request less motion. Near-zero rather than
+   `animation: none` so JS animationend / transitionend handlers still fire, and
+   iteration-count 1 stops infinite loops (progress stripes, scroll pulse).
+   A surface that has been through the `animate` skill may override this with a
+   gentler variant (a fade in place of a slide) — preferred to this blanket.
+   See docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
