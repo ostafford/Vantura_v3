@@ -235,6 +235,20 @@ The initial build established the full technical foundation: local-first storage
 
 ---
 
+### Feature Polish — September 2026
+
+Small enhancements to existing features, surfaced during the feature-by-feature docs rebuild ([#13](https://github.com/ostafford/Vantura_v3/issues/13)).
+
+| Date | Feature |
+|------|---------|
+| Sep 2 | **Trackers — last completed period vs budget** ([#17](https://github.com/ostafford/Vantura_v3/issues/17)) — the tracker detail's "Spend vs Budget by Period" card now shows how the most recent finished period ended: `🏆 Previous: came in $X under budget` (green) or `Previous: $X over budget` (muted), only when that period had real spend. Informational only — no unused-budget rollover, no change to the Spendable calc |
+| Sep 2 | **Upcoming charges — recurring-debit detection** ([#20](https://github.com/ostafford/Vantura_v3/issues/20)) — a "Find recurring charges" action scans settled Up debits for steady-amount, steady-interval patterns and offers them as upcoming charges; nothing is added automatically and a "Not recurring" dismissal is remembered. New `dismissed_charge_suggestions` table (schema v46), `docs/adr/0016` ("suggest, never auto-create") |
+| Sep 2 | **Notifications — reminder ↔ due-soon-banner link legibility** ([#22](https://github.com/ostafford/Vantura_v3/issues/22)) — the Dashboard due-soon banner gains an explanatory second line and a "Manage in Upcoming →" button; the charge create-modal explains settlement, and every notification toggle names the screen it's configured on. Copy-only, no new logic |
+| Sep 2 | **Passphrase — export minimum + Change passphrase** ([#32](https://github.com/ostafford/Vantura_v3/issues/32), [#33](https://github.com/ostafford/Vantura_v3/issues/33)) — profile export/import now enforces the same 12-char minimum as onboarding (`encryptExportPayload` throws below it, so no caller can produce a weakly-encrypted file); Settings → Security gains a "Change passphrase" flow that re-keys the stored token via a pure, unit-tested `reEncryptSecret` and requires the current passphrase |
+| Sep 7 | **Weekly Insights — empty category-group headers removed** ([#31](https://github.com/ostafford/Vantura_v3/issues/31)) — the chart no longer renders a blank header row for parent categories with zero spend that week. A CVD pass confirmed the computed colour system's adjacency guarantee needs only the fixed *order* of the groups that appear, not an empty header for every group |
+
+---
+
 ## Under Consideration
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.
