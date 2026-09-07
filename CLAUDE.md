@@ -12,7 +12,7 @@ Vantura's product vision, target users, and non-negotiable design principles liv
 
 ## Engineering standards & working agreement
 
-- **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version.
+- **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
 - **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `CONTEXT.md` files specifically need an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
 
@@ -85,3 +85,7 @@ Issues live in GitHub Issues (`ostafford/Vantura_v3`, via the `gh` CLI). See `do
 ### Domain docs
 
 Single-context layout: a repo-root `CONTEXT.md` glossary + `docs/adr/`. These are the canonical home for domain "why" — per-feature `docs/features/*/CONTEXT.md` files are being retired into them as each feature's docs are rebuilt (9 done so far; see issue #13). See `docs/agents/domain.md`.
+
+### Design engineering
+
+Motion, interaction, and UI-polish work uses Emil Kowalski's design-engineering skills (`emil-design-eng`, `apple-design`, `animate`, `improve-animations`, vendored from `emilkowalski/skills`, pinned in `skills-lock.json`). Presentation tier only; domain/correctness/testing/docs stay with `mattpocock-skills:*` and the practice above. See `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`.
