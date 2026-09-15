@@ -4,6 +4,7 @@ import { isNotificationSupported } from '@/lib/notifications'
 import { AboutSection } from './settings/AboutSection'
 import { AppearanceSection } from './settings/AppearanceSection'
 import { PaydaySection } from './settings/PaydaySection'
+import { EssentialsSection } from './settings/EssentialsSection'
 import { DashboardSectionOrderForm } from './settings/DashboardSectionOrderForm'
 import { NotificationsSection } from './settings/NotificationsSection'
 import { SecuritySection } from './settings/SecuritySection'
@@ -17,6 +18,7 @@ function getSettingsSectionKeys(): string[] {
     'about',
     'appearance',
     'payday',
+    'essentials',
     'dashboard-sections',
     ...(isNotificationSupported() ? (['notifications'] as const) : []),
     'security',
@@ -28,6 +30,7 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   about: 'About',
   appearance: 'Appearance',
   payday: 'Payday',
+  essentials: 'Essentials',
   'dashboard-sections': 'Dashboard sections',
   notifications: 'Notifications',
   security: 'Security',
@@ -38,6 +41,7 @@ const SETTINGS_SECTION_ICONS: Record<string, string> = {
   about: 'mdi-information-outline',
   appearance: 'mdi-palette-outline',
   payday: 'mdi-calendar-today',
+  essentials: 'mdi-piggy-bank-outline',
   'dashboard-sections': 'mdi-view-dashboard-outline',
   notifications: 'mdi-bell-outline',
   security: 'mdi-shield-lock-outline',
@@ -144,6 +148,7 @@ export function Settings() {
               {activeSection === 'about' && <AboutSection />}
               {activeSection === 'appearance' && <AppearanceSection />}
               {activeSection === 'payday' && <PaydaySection />}
+              {activeSection === 'essentials' && <EssentialsSection />}
               {activeSection === 'dashboard-sections' && (
                 <>
                   <p className="small text-muted mb-3">
