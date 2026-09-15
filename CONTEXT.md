@@ -19,7 +19,7 @@ The sum of balances across the user's open Up Bank *transactional* accounts. Sav
 _Avoid_: balance, bank balance, total balance, current balance
 
 **Reserved**:
-The part of Available that must be held back to cover `is_reserved` upcoming charges falling due *strictly before* the next payday. A charge due *on* payday is not reserved — that day's incoming pay covers it. Weekly/fortnightly charges count once per occurrence before payday; infrequent charges (monthly and rarer) count their full amount once, never prorated. A safety-net floor, not a save-toward-a-future-bill fund (`docs/adr/0002`). An upcoming charge with `is_reserved` off is excluded from this entirely.
+The part of Available that must be held back to cover `is_reserved` Regulars falling due *strictly before* the next payday. A charge due *on* payday is not reserved — that day's incoming pay covers it. Weekly/fortnightly charges count once per occurrence before payday; infrequent charges (monthly and rarer) count their full amount once, never prorated. A safety-net floor, not a save-toward-a-future-bill fund (`docs/adr/0019`). For an Essentials user, a Regular funded from the nominated Essentials Saver is excluded from Reserved entirely — it's covered from there, not from Available. A Regular with `is_reserved` off is excluded from Reserved regardless of funding source.
 _Avoid_: allocated, committed, earmarked, set-aside, provisioned, sinking fund
 
 **Spendable**:
