@@ -24,6 +24,8 @@ import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { BalanceCards } from '@/components/dashboard/BalanceCards'
+import { EssentialsCoverageBlock } from '@/components/dashboard/EssentialsCoverageBlock'
+import { getEssentialsCoverage } from '@/services/essentialsCoverage'
 import {
   shouldShowDashboardTour,
   startDashboardTour,
@@ -101,6 +103,7 @@ export function Dashboard() {
     spendableAlert,
     nextPayday,
     reservedCents,
+    essentialsCoverage,
     lastSyncAgeMs,
   } = useMemo(
     () => ({
@@ -111,6 +114,7 @@ export function Dashboard() {
       spendableAlert: getSpendableAlert(),
       nextPayday: getAppSetting('next_payday'),
       reservedCents: getReservedAmount(),
+      essentialsCoverage: getEssentialsCoverage(),
       lastSyncAgeMs: (() => {
         const ls = getAppSetting('last_sync')
         return ls ? Date.now() - new Date(ls).getTime() : null
@@ -665,6 +669,9 @@ export function Dashboard() {
         forecastTone={forecastGradient}
         forecastTooltip={forecastTooltip}
       />
+      {essentialsCoverage && (
+        <EssentialsCoverageBlock coverage={essentialsCoverage} />
+      )}
       {dueSoonAlert}
 
       <Modal
