@@ -7,6 +7,7 @@
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
 import type { Database } from 'sql.js'
 import { formatMoney, localDateString } from '@/lib/format'
+import { hasMatchingSettledDebit } from '@/services/fundingSource'
 import {
   getNotificationsEnabled,
   getNotifTypeEnabled,
@@ -53,29 +54,6 @@ function settlementWindowStart(projectedDate: string): string {
   const d = new Date(projectedDate.slice(0, 10) + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() - 5)
   return d.toISOString().slice(0, 10)
-}
-
-/**
- * True when a synced transaction matching `rawText` (a `raw_text` fingerprint)
- * has settled on or after `windowStartStr` — a real, non-transfer debit. The
- * single settlement test behind both the bill-settled notification clear and the
- * liability-repayment prompt, so the two always agree on what counts as "paid".
- */
-function hasMatchingSettledDebit(
-  db: Database,
-  rawText: string,
-  windowStartStr: string
-): boolean {
-  const res = db.exec(
-    `SELECT id FROM transactions
-     WHERE raw_text = ?
-       AND amount < 0
-       AND transfer_account_id IS NULL
-       AND substr(COALESCE(settled_at, created_at), 1, 10) >= ?
-     LIMIT 1`,
-    [rawText, windowStartStr]
-  )
-  return !!res[0]?.values?.length
 }
 
 // ─── 0. Auto-clear settled bill notifications ────────────────────────────────
