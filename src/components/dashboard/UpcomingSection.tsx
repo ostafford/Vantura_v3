@@ -38,6 +38,7 @@ import {
   getManualAccounts,
   type ManualAccountRow,
 } from '@/services/manualAccounts'
+import { isEssentialsUser } from '@/services/essentials'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
@@ -256,6 +257,20 @@ export function UpcomingSection({
     (a: ManualAccountRow) => a.kind === 'liability'
   )
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
+  const essentialsUser = isEssentialsUser()
+
+  /**
+   * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding-
+   * source inference needs a match_raw_text link, so an unlinked Regular
+   * gets no Essentials benefit — it's always reserved regardless of which
+   * account actually pays it. Surfaced only for a nominated Essentials
+   * user; classic users get nothing here since linking has no effect on
+   * their Reserved figure.
+   */
+  function unlinkedEssentialsLabel(c: UpcomingChargeRow): string | null {
+    if (!essentialsUser || c.is_reserved !== 1) return null
+    return c.match_raw_text ? null : 'not linked to Essentials'
+  }
 
   function openCreate() {
     setEditingCharge(null)
@@ -492,11 +507,14 @@ export function UpcomingSection({
               <span className="badge badge-reminder ms-1">{dueLabel}</span>
             )}
           </div>
-          {(categoryName || c.is_reserved === 0) && (
+          {(categoryName ||
+            c.is_reserved === 0 ||
+            unlinkedEssentialsLabel(c)) && (
             <div className="small text-muted">
               {[
                 categoryName,
                 c.is_reserved === 0 ? 'excluded from Spendable' : null,
+                unlinkedEssentialsLabel(c),
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -728,6 +746,7 @@ export function UpcomingSection({
                                         c.is_reserved === 0
                                           ? 'excluded from Spendable'
                                           : null,
+                                        unlinkedEssentialsLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}
@@ -791,6 +810,7 @@ export function UpcomingSection({
                                         c.is_reserved === 0
                                           ? 'excluded from Spendable'
                                           : null,
+                                        unlinkedEssentialsLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}
