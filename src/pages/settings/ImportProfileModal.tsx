@@ -52,7 +52,7 @@ function formatTrackersSummary(trackers: TrackerExportRow[]): string {
 
 function formatUpcomingSummary(charges: UpcomingChargeExportRow[]): string {
   if (!Array.isArray(charges) || charges.length === 0) return 'None'
-  return `${charges.length} upcoming charge${charges.length !== 1 ? 's' : ''}`
+  return `${charges.length} Regular${charges.length !== 1 ? 's' : ''}`
 }
 
 function formatBudgetSummary(
@@ -220,9 +220,9 @@ export function ImportProfileModal() {
           <Form onSubmit={handleSubmit}>
             <Modal.Body id="import-modal-description">
               <p className="small text-muted mb-3">
-                Imports settings, trackers, upcoming charges, budget plan, and
-                Net Worth manual accounts into this device. Will not import
-                transactions or API tokens.
+                Imports settings, trackers, Regulars, budget plan, and Net Worth
+                manual accounts into this device. Will not import transactions
+                or API tokens.
               </p>
               <Form.Group className="mb-3">
                 <Form.Label>Settings file</Form.Label>
@@ -326,8 +326,8 @@ export function ImportProfileModal() {
                 replaces the existing data on this device — importing Net Worth
                 removes any manual account that isn't in the file — while
                 unselected sections are left unchanged. If you import Trackers
-                or Upcoming charges without importing Budget Plan, those items
-                will lose their bucket assignments.
+                or Regulars without importing Budget Plan, those items will lose
+                their bucket assignments.
               </p>
               {preview &&
                 (() => {
@@ -378,7 +378,7 @@ export function ImportProfileModal() {
                         <Form.Check
                           type="checkbox"
                           id="import-opt-upcoming"
-                          label="Upcoming charges"
+                          label="Regulars"
                           checked={options.upcomingCharges}
                           onChange={(e) =>
                             setOptions((o) => ({
@@ -386,7 +386,7 @@ export function ImportProfileModal() {
                               upcomingCharges: e.target.checked,
                             }))
                           }
-                          aria-label="Import upcoming charges"
+                          aria-label="Import Regulars"
                         />
                         <div className="small text-muted ms-4 mt-1">
                           Current:{' '}

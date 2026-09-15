@@ -170,12 +170,12 @@ function AssignModal({ show, buckets, onClose, onSaved }: AssignModalProps) {
   return (
     <Modal show={show} onHide={onClose} centered size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Assign upcoming charges to buckets</Modal.Title>
+        <Modal.Title>Assign Regulars to buckets</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {unassigned.length === 0 ? (
           <p className="text-muted mb-0">
-            All upcoming charges are assigned to a bucket.
+            All Regulars are assigned to a bucket.
           </p>
         ) : (
           <div className="d-flex flex-column gap-2">
@@ -242,7 +242,7 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
       </Modal.Header>
       <Modal.Body>
         <p>
-          Delete <strong>{bucket?.name}</strong>? Upcoming charges will become
+          Delete <strong>{bucket?.name}</strong>? Regulars will become
           unassigned. Variable budget lines, hypotheticals, and pinned
           transactions will be permanently removed.
         </p>
@@ -426,9 +426,9 @@ export function AnalyticsBudgetPlan() {
               className="text-muted mb-1"
               style={{ maxWidth: 480, margin: '0 auto' }}
             >
-              Each bucket holds your upcoming charges, pinned recurring
-              transactions, and any variable spending estimates you set — broken
-              down by week, month, or year.
+              Each bucket holds your Regulars, pinned recurring transactions,
+              and any variable spending estimates you set — broken down by week,
+              month, or year.
             </p>
             <p
               className="text-muted mb-4"
@@ -479,7 +479,7 @@ export function AnalyticsBudgetPlan() {
           <HelpPopover
             id="budget-plan-help"
             title="Budget Plan"
-            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds upcoming charges and optional hypothetical lines (for 'what if?' scenarios). The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
+            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and optional hypothetical lines (for 'what if?' scenarios). The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
             ariaLabel="How does Budget Plan work?"
           />
         </div>
@@ -647,7 +647,7 @@ export function AnalyticsBudgetPlan() {
                 aria-hidden
               />
               <span className="fw-semibold">
-                Unassigned upcoming charges ({unassignedUpcoming.length})
+                Unassigned Regulars ({unassignedUpcoming.length})
               </span>
             </div>
             <Button

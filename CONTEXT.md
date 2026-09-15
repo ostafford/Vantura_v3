@@ -4,7 +4,7 @@ Vantura is a local-first personal finance app for Up Bank customers. This is the
 project glossary: the canonical word for each domain concept, and the words to
 avoid. It is grown one feature at a time as the docs are rebuilt — right now it
 covers the **Dashboard**, the **payday cycle**, the balance figures,
-**trackers**, **transactions**, **upcoming charges**, **budget plan**,
+**trackers**, **transactions**, **Regulars**, **budget plan**,
 **savers**, the month/period **comparisons** and **reports**, the **weekly
 metrics**, **net worth**, **sync**, **notifications**, **appearance**, **security**,
 the **Settings** shell, and **profile export/import**. Implementation lives
@@ -83,7 +83,7 @@ The forward-looking organiser at `/analytics/budget` — buckets of recurring ex
 _Avoid_: budget, planner, forecast
 
 **Bucket**:
-A named group within Budget Plan (`name` + `icon`). Holds assigned upcoming charges, assigned trackers, and hypothetical lines side by side. A tracker or charge is claimed by the bucket, not assigned from its own side.
+A named group within Budget Plan (`name` + `icon`). Holds assigned Regulars, assigned trackers, and hypothetical lines side by side. A tracker or charge is claimed by the bucket, not assigned from its own side.
 _Avoid_: category, group, envelope, folder
 
 **Hypothetical line**:
@@ -94,14 +94,14 @@ _Avoid_: draft, scenario, placeholder expense
 Income minus Committed for the selected display period. `null` (and hidden) whenever the pay amount isn't set. One-time (`ONCE`) charges never reduce it (`docs/adr/0009`).
 _Avoid_: disposable income, spare, remaining, leftover
 
-### Upcoming charges
+### Regulars
 
-**Upcoming charge**:
-A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`), the due-soon banner, and the calendar view.
-_Avoid_: bill (bare), recurring transaction, scheduled payment
+**Regular**:
+A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`), the due-soon banner, and the calendar view. Named after Up's own term for the same concept (`docs/adr/0018`); internally still the `upcoming_charges` table.
+_Avoid_: upcoming charge, bill (bare), recurring transaction, scheduled payment
 
 **Overdue / Next pay / Later**:
-The three buckets the upcoming-charges list is split into. *Overdue* = a `ONCE` charge whose date has passed with no future occurrence — held out of the other two (so it can't inflate their totals) and shown in its own callout with a Paid / Reschedule / Remove resolution (#18). *Next pay* = the charge's next occurrence is strictly before `next_payday`. *Later* = everything else (and every non-overdue charge, when no payday is configured).
+The three buckets the Regulars list is split into. *Overdue* = a `ONCE` charge whose date has passed with no future occurrence — held out of the other two (so it can't inflate their totals) and shown in its own callout with a Paid / Reschedule / Remove resolution (#18). *Next pay* = the charge's next occurrence is strictly before `next_payday`. *Later* = everything else (and every non-overdue charge, when no payday is configured).
 _Avoid_: this pay period / future, urgent / non-urgent, upcoming / scheduled, arrears
 
 **Settlement detection**:
@@ -109,7 +109,7 @@ Auto-clearing a bill's due notification when a real synced transaction matches t
 _Avoid_: reconciliation, matching, clearing
 
 **Liability repayment charge**:
-An upcoming charge with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it also carries a `linked_manual_account_id` and a `match_raw_text`, a detected payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
+A Regular with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it also carries a `linked_manual_account_id` and a `match_raw_text`, a detected payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
 _Avoid_: loan payment, debt payment, transfer
 
 ### Comparisons
@@ -165,7 +165,7 @@ One `net_worth_snapshots` row per calendar day, last write wins, holding the thr
 _Avoid_: history entry, balance record, daily total
 
 **Projected net worth**:
-Net worth minus the reserved `EXPENSE` upcoming charges due before the next payday. Excludes liability-repayment charges — those don't reduce net worth (`docs/adr/0005`).
+Net worth minus the reserved `EXPENSE` Regulars due before the next payday. Excludes liability-repayment charges — those don't reduce net worth (`docs/adr/0005`).
 _Avoid_: forecast net worth, future net worth, adjusted net worth
 
 **Stale account**:
@@ -259,7 +259,7 @@ The state where `app_settings.demo_mode = '1'` — the DB holds seeded sample da
 _Avoid_: sample mode, test mode, preview mode
 
 **Profile export**:
-A passphrase-encrypted file holding a subset of the local data — whitelisted settings, trackers, upcoming charges, and budget plan. Never the API token, accounts (Up or manual), transactions, or net-worth history. The export passphrase is separate from the unlock passphrase.
+A passphrase-encrypted file holding a subset of the local data — whitelisted settings, trackers, Regulars, and budget plan. Never the API token, accounts (Up or manual), transactions, or net-worth history. The export passphrase is separate from the unlock passphrase.
 _Avoid_: backup, snapshot, dump
 
 **Profile import**:

@@ -365,7 +365,7 @@ export function UpcomingSection({
         matchRawText
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
-      toast.success('Upcoming charge updated.')
+      toast.success('Regular updated.')
     } else {
       const newId = createUpcomingCharge(
         name.trim(),
@@ -381,7 +381,7 @@ export function UpcomingSection({
         matchRawText
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
-      toast.success('Upcoming charge added.')
+      toast.success('Regular added.')
     }
     setShowModal(false)
     setRefresh((r) => r + 1)
@@ -623,9 +623,9 @@ export function UpcomingSection({
             </div>
             <HelpPopover
               id="upcoming-help"
-              title="Upcoming charges"
-              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into Next pay (before your next payday) and Later, each showing the face-value total of what's listed. Charges marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for upcoming charges' total below is just that subset, prorated to your pay cycle, so it won't match the group totals above."
-              ariaLabel="What are upcoming charges?"
+              title="Regulars"
+              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into Next pay (before your next payday) and Later, each showing the face-value total of what's listed. Regulars marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for Regulars' total below is just that subset: weekly/fortnightly ones count each occurrence before your next payday, monthly-or-rarer ones count once in full, so it won't match the group totals above."
+              ariaLabel="What are Regulars?"
             />
           </div>
           <div className="d-flex align-items-center gap-1">
@@ -648,15 +648,13 @@ export function UpcomingSection({
             </OverlayTrigger>
             <OverlayTrigger
               placement="top"
-              overlay={
-                <Tooltip id="upcoming-add-tooltip">Add upcoming charge</Tooltip>
-              }
+              overlay={<Tooltip id="upcoming-add-tooltip">Add Regular</Tooltip>}
             >
               <button
                 type="button"
                 className="btn-icon btn-icon-primary"
                 onClick={openCreate}
-                aria-label="Add upcoming charge"
+                aria-label="Add Regular"
               >
                 <i className="mdi mdi-plus" aria-hidden />
               </button>
@@ -690,7 +688,7 @@ export function UpcomingSection({
             />
           ) : !hasAny ? (
             <p className="text-muted small mb-0">
-              No upcoming charges. Add a regular charge to track.
+              No Regulars yet. Add one to track.
             </p>
           ) : (
             <>
@@ -884,7 +882,7 @@ export function UpcomingSection({
             </button>
           )}
           <div className="mt-2 small text-danger">
-            ${formatMoney(reserved)} reserved for upcoming charges
+            ${formatMoney(reserved)} reserved for Regulars
           </div>
         </Card.Body>
       </Card>
@@ -892,7 +890,7 @@ export function UpcomingSection({
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>
-            {editingCharge ? 'Edit upcoming charge' : 'Add upcoming charge'}
+            {editingCharge ? 'Edit Regular' : 'Add Regular'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -1465,7 +1463,7 @@ export function UpcomingSection({
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>Delete upcoming charge</Modal.Title>
+          <Modal.Title>Delete Regular</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">

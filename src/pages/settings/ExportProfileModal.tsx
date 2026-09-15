@@ -61,9 +61,9 @@ export function ExportProfileModal() {
       <p className="small fw-semibold text-body mb-1">Export profile</p>
       <p className="small text-muted mb-2">
         Exports appearance and configuration (theme, payday setup, notification
-        preferences, trackers, upcoming charges, and budget plan). Does not
-        export bank transactions, account numbers, or API tokens. The file is
-        encrypted with the passphrase you choose.
+        preferences, trackers, Regulars, and budget plan). Does not export bank
+        transactions, account numbers, or API tokens. The file is encrypted with
+        the passphrase you choose.
       </p>
       <Button
         variant="outline-primary"

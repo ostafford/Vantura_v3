@@ -66,7 +66,7 @@ export function RecurringChargeSuggestions({
       null,
       s.matchRawText
     )
-    toast.success(`"${s.name}" added to upcoming charges.`)
+    toast.success(`"${s.name}" added to Regulars.`)
     setTick((t) => t + 1)
     onChange()
   }
@@ -98,9 +98,9 @@ export function RecurringChargeSuggestions({
       <Modal.Body>
         <p className="small text-muted mb-3">
           Patterns spotted in your recent transactions — a steady amount at a
-          steady interval. Adding one creates an upcoming charge (and, where it
-          can, links it so it auto-clears when paid). Nothing is added until you
-          say so.
+          steady interval. Adding one creates a Regular (and, where it can,
+          links it so it auto-clears when paid). Nothing is added until you say
+          so.
         </p>
 
         {suggestions.length === 0 ? (

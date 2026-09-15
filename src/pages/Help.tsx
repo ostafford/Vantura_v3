@@ -43,7 +43,7 @@ const HELP_SECTION_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   'spendable-balance': 'Spendable balance',
   trackers: 'Trackers',
-  'upcoming-charges': 'Upcoming charges',
+  'upcoming-charges': 'Regulars',
   analytics: 'Analytics',
   'budget-plan': 'Budget Plan',
   savers: 'Savers',
@@ -234,7 +234,7 @@ export function Help() {
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
                       <strong>Dashboard</strong> — balance cards, Month at a
-                      glance, Weekly insights, Trackers, Upcoming charges
+                      glance, Weekly insights, Trackers, Regulars
                     </li>
                     <li className="mb-1">
                       <strong>Analytics</strong> — Trackers, Reports, Savers,
@@ -307,8 +307,8 @@ export function Help() {
                   <p className="mb-0">
                     Choose your pay frequency (weekly, fortnightly, or monthly)
                     and your next payday date. This drives the Spendable balance
-                    calculation, Payday tracker resets, and how Upcoming charges
-                    are grouped.
+                    calculation, Payday tracker resets, and how Regulars are
+                    grouped.
                   </p>
                   <Tip>
                     You can optionally set your pay amount in Settings → Payday.
@@ -350,8 +350,8 @@ export function Help() {
                       remaining per tracker
                     </li>
                     <li>
-                      <strong>Upcoming charges</strong> — bills and
-                      subscriptions grouped by Next pay and Later
+                      <strong>Regulars</strong> — bills and subscriptions
+                      grouped by Next pay and Later
                     </li>
                   </ul>
                   <Tip>
@@ -369,8 +369,8 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-2">
                     <strong>
-                      Spendable = Available − upcoming charges reserved before
-                      your next payday.
+                      Spendable = Available − Regulars reserved before your next
+                      payday.
                     </strong>
                   </p>
                   <p className="mb-2">
@@ -556,8 +556,8 @@ export function Help() {
                   </SectionHeading>
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
-                      <strong>Upcoming charges</strong> you&apos;ve already set
-                      up — assign them to a bucket so they count toward that
+                      <strong>Regulars</strong> you&apos;ve already set up —
+                      assign them to a bucket so they count toward that
                       bucket&apos;s total
                     </li>
                     <li>
@@ -589,11 +589,10 @@ export function Help() {
                     </li>
                   </ul>
                   <Tip>
-                    If any upcoming charges aren&apos;t assigned to a bucket, a
-                    warning will appear — assign them to keep your totals
-                    accurate. Set your pay amount in{' '}
-                    <strong>Settings → Payday</strong> to enable the Income
-                    figure.
+                    If any Regulars aren&apos;t assigned to a bucket, a warning
+                    will appear — assign them to keep your totals accurate. Set
+                    your pay amount in <strong>Settings → Payday</strong> to
+                    enable the Income figure.
                   </Tip>
                 </>
               )}
@@ -713,8 +712,7 @@ export function Help() {
                       payday
                     </li>
                     <li>
-                      <strong>Upcoming charges grouping</strong> — Next pay vs
-                      Later
+                      <strong>Regulars grouping</strong> — Next pay vs Later
                     </li>
                   </ul>
                   <Tip>
@@ -747,7 +745,7 @@ export function Help() {
                     Export your settings to an encrypted, passphrase-protected
                     file and import it on another device. Includes appearance,
                     payday schedule, notification preferences, lock timeout,
-                    trackers, upcoming charges, and Budget Plan buckets.{' '}
+                    trackers, Regulars, and Budget Plan buckets.{' '}
                     <em>
                       Transactions, account data, and API tokens are never
                       exported.
@@ -759,8 +757,8 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-2">
                     Enable browser notifications for bill reminders —
-                    you&apos;ll be notified when an upcoming charge is due soon
-                    (within its reminder window). Requires browser permission.
+                    you&apos;ll be notified when a Regular is due soon (within
+                    its reminder window). Requires browser permission.
                   </p>
 
                   <SectionHeading icon="mdi-shield-lock-outline">
