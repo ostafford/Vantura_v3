@@ -799,4 +799,6 @@ export const __test__ = {
   checkPaydayLanded,
   findFirstUnseenCredit,
   checkLiabilityRepayments,
+  checkBillsDue,
+  checkBillsSettled,
 }
