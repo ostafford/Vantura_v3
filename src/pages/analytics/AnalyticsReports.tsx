@@ -1393,10 +1393,10 @@ export function AnalyticsReports() {
                 <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
                   <div>
                     <Card.Title className="mb-0">
-                      Upcoming Charges — {monthNameLong(year, month)} {year}
+                      Regulars — {monthNameLong(year, month)} {year}
                     </Card.Title>
                     <Card.Text as="div" className="small text-muted mt-1">
-                      Upcoming charges for this month.
+                      Regulars for this month.
                     </Card.Text>
                   </div>
                   <Form.Select

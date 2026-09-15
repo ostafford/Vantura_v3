@@ -70,10 +70,10 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     align: 'start',
   },
   upcoming: {
-    title: 'Upcoming charges',
+    title: 'Regulars',
     description:
       'Add <strong>bills and subscriptions</strong> you know are coming — rent, Netflix, insurance, etc.<br><br>' +
-      'Each charge reduces <strong>Spendable</strong> until its due date. Toggle <strong>Include in Spendable</strong> per charge to control this.<br><br>' +
+      'Each Regular reduces <strong>Spendable</strong> until its due date. Toggle <strong>Include in Spendable</strong> per Regular to control this.<br><br>' +
       'Grouped into <strong>Next pay</strong> and <strong>Later</strong>.',
     side: 'top',
     align: 'center',
@@ -145,7 +145,7 @@ export function startDashboardTour(
         description:
           '<strong>Lock</strong> secures the app and clears the session — it also locks automatically after inactivity.<br><br>' +
           'Enable <strong>Touch ID / Face ID</strong> in Settings → Security if your device supports it.<br><br>' +
-          "Start by creating a <strong>tracker</strong>, adding <strong>upcoming charges</strong>, and explore <strong>Analytics</strong> when you're ready.",
+          "Start by creating a <strong>tracker</strong>, adding <strong>Regulars</strong>, and explore <strong>Analytics</strong> when you're ready.",
         side: 'right' as SideType,
         align: 'start' as AlignType,
       },

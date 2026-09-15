@@ -211,8 +211,7 @@ export function Dashboard() {
             • <strong>Available</strong> — your Up Bank balance
           </div>
           <div>
-            • minus <strong>Reserved</strong> — upcoming charges set aside
-            before payday
+            • minus <strong>Reserved</strong> — Regulars set aside before payday
           </div>
           {spendableCents < 0 && (
             <div
@@ -225,7 +224,7 @@ export function Dashboard() {
             <div
               style={{ marginTop: '0.3rem', color: 'var(--vantura-warning)' }}
             >
-              Check your upcoming charges or tap to adjust the threshold.
+              Check your Regulars or tap to adjust the threshold.
             </div>
           )}
           {projected != null && (

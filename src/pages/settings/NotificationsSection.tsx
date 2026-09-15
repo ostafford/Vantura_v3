@@ -67,7 +67,7 @@ const NOTIF_TYPES: {
   {
     key: 'bills',
     label: 'Bill reminders',
-    desc: 'Upcoming charges within their reminder window',
+    desc: 'Regulars within their reminder window',
     setup: {
       label: 'the Upcoming section on the Dashboard',
       to: '/?scroll=upcoming',
