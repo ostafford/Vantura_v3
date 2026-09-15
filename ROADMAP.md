@@ -278,6 +278,21 @@ system adopted as the presentation-tier standard, and consistent negative-amount
 
 ---
 
+### Essentials Saver Support — September 2026
+
+Up shipped **Essentials** (a dedicated Saver that pays your bills, funded by a per-payday set-aside) for all customers on September 1st. Vantura now understands it as a first-class part of the money model, alongside the classic behaviour every existing user keeps unchanged.
+
+| Date | Feature |
+|------|---------|
+| — | **Essentials Saver nomination** — Settings → Essentials; assist-only suggestion from a matching Saver name, never auto-set (ADR-0019) |
+| — | **Funding-source detection** — Vantura infers which Regulars are actually paid from the nominated Saver, from settled transaction history alone (the Up API exposes nothing Essentials-specific) |
+| — | **Reserved formula branch** — an Essentials-funded Regular is excluded from Reserved entirely; classic users see byte-identical behaviour, proven by the existing formula's test suite passing with zero edits |
+| — | **Dashboard bill-coverage block** — shows coverage status once at least one Regular is confirmed Essentials-funded, collapsing to a single line when everything's covered, with a shortfall warning if the Saver's balance looks short |
+| — | **Unlinked-Regulars nudge** — flags a Regular that can't benefit from Essentials detection yet because it has no linked settled transaction |
+| — | **"Upcoming charge" renamed to "Regular"** — matches Up's own terminology (ADR-0018) |
+
+---
+
 ## Under Consideration
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.

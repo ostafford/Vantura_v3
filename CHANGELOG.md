@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Essentials Saver support.** Vantura now recognises Up's Essentials feature — a dedicated Saver, funded by a per-payday set-aside, that pays your bills directly. Nominate yours in Settings → Essentials (a Saver named like "Essentials" is suggested, but nothing is set without you confirming). Vantura then infers which Regulars it actually pays from your settled transaction history — never assumed — and excludes a Regular funded from the nominated Saver from Reserved entirely, since it's already covered from there rather than Available. A Regular with no linked transaction gets a "not linked to Essentials" hint so you know it isn't getting the benefit yet. Classic (non-Essentials) users see byte-identical behaviour to before. New `essentials_saver_account_id` setting (no schema migration needed). See `docs/adr/0019`.
+- **Essentials bill-coverage block** on the Dashboard, shown once Vantura has confirmed at least one Regular is Essentials-funded: a single "All bills covered" line when everything's covered from the Saver, or a breakdown of what's still on your everyday account vs. what's set aside in Essentials — with a warning if the Saver's balance looks short for what's coming.
+
+### Changed
+
+- **"Upcoming charge(s)" is now "Regular(s)"** throughout the app — Up's own term for the same concept. The underlying `upcoming_charges` table and internal code are unchanged. See `docs/adr/0018`.
+
+### Fixed
+
+- **The Upcoming section's help tooltip claimed monthly-or-rarer bills are "prorated to your pay cycle."** They're not — Reserved counts them once in full, never prorated — the copy now says so.
+
 ## [0.10.0] - 2026-09-08
 
 The Dashboard's balance zone is rebuilt around Spendable as the headline figure, motion across the app moves onto one shared timing system with reduced-motion honoured throughout, and negative dollar amounts now render consistently as `−$X`.
