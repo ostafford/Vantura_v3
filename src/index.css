@@ -1204,6 +1204,57 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-size: 0.8rem;
 }
 
+/* Essentials bill-coverage block (docs/adr/0019 § Presentation, ticket #96):
+   sits below the balance-cards zone for an Essentials user only. Collapses
+   to a single status line when fully covered; the split shows otherwise. */
+.essentials-coverage {
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--vantura-border);
+  border-left: 3px solid var(--vantura-info);
+  border-radius: 12px;
+  background: var(--vantura-surface);
+  transition: border-color var(--duration-base) ease;
+}
+.essentials-coverage--covered {
+  border-left-color: var(--vantura-success);
+}
+.essentials-coverage--shortfall {
+  border-left-color: var(--vantura-warning);
+}
+.essentials-coverage__status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--vantura-text);
+}
+.essentials-coverage--covered .essentials-coverage__status {
+  color: var(--vantura-success);
+}
+.essentials-coverage--shortfall .essentials-coverage__status {
+  color: var(--vantura-warning);
+}
+.essentials-coverage__icon {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+.essentials-coverage__split {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--vantura-border);
+}
+.essentials-coverage__split-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--vantura-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Phase 8: Purple React sidebar */
 .sidebar {
   min-height: calc(100vh - 70px);
