@@ -3,10 +3,13 @@
  * Reserved calculation documented in docs/features/payday-spendable/OVERVIEW.md.
  */
 
+import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
 import { firstOccurrenceOnOrAfter } from './upcoming'
+import { getEssentialsSaverAccountId } from './essentials'
+import { getFundingSourceAccountId } from './fundingSource'
 
 export type { PaydayFrequency }
 
@@ -221,6 +224,27 @@ export function getAvailableBalance(): number {
 }
 
 /**
+ * Essentials-era funding-source filter (docs/adr/0019). Classic users (no
+ * nominated Essentials Saver) pass every charge through untouched — this is
+ * the null guard that keeps the classic Reserved formula byte-identical.
+ * For an Essentials user, drops any charge whose funding source — the
+ * account of its most recent matched settled debit, no window restriction —
+ * is the nominated Saver. A charge with no `match_raw_text`, or whose
+ * funding source hasn't been observed yet, is kept (resolves transactional)
+ * — never assumed Essentials-funded.
+ */
+function excludeEssentialsFundedCharges<
+  T extends { match_raw_text?: string | null },
+>(db: Database, charges: T[]): T[] {
+  const essentialsSaverId = getEssentialsSaverAccountId()
+  if (!essentialsSaverId) return charges
+  return charges.filter((c) => {
+    if (!c.match_raw_text) return true
+    return getFundingSourceAccountId(db, c.match_raw_text) !== essentialsSaverId
+  })
+}
+
+/**
  * Reserved amount (cents) from upcoming_charges due before next payday.
  */
 export function getReservedAmount(): number {
@@ -229,21 +253,34 @@ export function getReservedAmount(): number {
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   const stmt = db.prepare(
-    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date FROM upcoming_charges`
+    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date, match_raw_text FROM upcoming_charges`
   )
-  const charges: UpcomingChargeRow[] = []
+  const charges: Array<UpcomingChargeRow & { match_raw_text: string | null }> =
+    []
   while (stmt.step()) {
-    const row = stmt.get() as [string, string, number, number, string | null]
+    const row = stmt.get() as [
+      string,
+      string,
+      number,
+      number,
+      string | null,
+      string | null,
+    ]
     charges.push({
       next_charge_date: row[0],
       frequency: row[1],
       amount: row[2],
       is_reserved: row[3],
       cancel_by_date: row[4] ?? null,
+      match_raw_text: row[5] ?? null,
     })
   }
   stmt.free()
-  return calculateReservedAmount(charges, nextPayday, paydayFrequency)
+  return calculateReservedAmount(
+    excludeEssentialsFundedCharges(db, charges),
+    nextPayday,
+    paydayFrequency
+  )
 }
 
 /**
@@ -266,9 +303,11 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date FROM upcoming_charges`
+    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, match_raw_text FROM upcoming_charges`
   )
-  const rows: Array<UpcomingChargeRow & { name: string }> = []
+  const rows: Array<
+    UpcomingChargeRow & { name: string; match_raw_text: string | null }
+  > = []
   while (stmt.step()) {
     const r = stmt.get() as [
       string,
@@ -276,6 +315,7 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
       string,
       number,
       number,
+      string | null,
       string | null,
     ]
     rows.push({
@@ -285,8 +325,13 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
       amount: r[3],
       is_reserved: r[4],
       cancel_by_date: r[5],
+      match_raw_text: r[6] ?? null,
     })
   }
   stmt.free()
-  return calculateReservedBreakdown(rows, nextPayday, paydayFrequency)
+  return calculateReservedBreakdown(
+    excludeEssentialsFundedCharges(db, rows),
+    nextPayday,
+    paydayFrequency
+  )
 }
