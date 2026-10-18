@@ -77,7 +77,7 @@ export function getNetWorthSummary(): NetWorthSummary {
  * LIABILITY_REPAYMENT charges are excluded — paying down a loan is a transfer between
  * asset (cash) and liability (the loan balance), not a loss of net worth. This is a
  * deliberate difference from Spendable's Reserved amount, which reserves cash for *any*
- * upcoming payment regardless of type — see docs/features/net-worth/CONTEXT.md.
+ * upcoming payment regardless of type — see docs/adr/0005-liability-repayment-excluded-from-net-worth-projection.md.
  *
  * Occurrence-counting (how many WEEKLY/FORTNIGHTLY occurrences before payday count) is
  * shared with Spendable via calculateReservedAmount, so the two numbers agree on that axis.
