@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 46
+const SCHEMA_VERSION = 47
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -134,6 +134,7 @@ const DDL_STATEMENTS = [
     charge_type TEXT NOT NULL DEFAULT 'EXPENSE',
     linked_manual_account_id INTEGER,
     match_raw_text TEXT,
+    match_description TEXT,
     FOREIGN KEY (category_id) REFERENCES categories(id)
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
@@ -1283,6 +1284,42 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['46']
+    )
+  }
+
+  // #111 — a Regular's linked payments are identified by Up's `description`
+  // plus an amount band, not `raw_text` (ADR-0020). Backfill each existing link
+  // from the latest transaction carrying its `match_raw_text`; with none, the
+  // Regular stays unlinked. `match_raw_text` is kept, not dropped.
+  if (version < 47) {
+    const ucCols = database.exec(`PRAGMA table_info(upcoming_charges)`)
+    const ucHasDesc = (ucCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'match_description'
+    )
+    if (tableExists(database, 'upcoming_charges') && !ucHasDesc) {
+      database.run(
+        `ALTER TABLE upcoming_charges ADD COLUMN match_description TEXT`
+      )
+    }
+    if (
+      tableExists(database, 'upcoming_charges') &&
+      tableExists(database, 'transactions') &&
+      !ucHasDesc
+    ) {
+      database.run(`
+        UPDATE upcoming_charges
+        SET match_description = (
+          SELECT t.description FROM transactions t
+          WHERE t.raw_text = upcoming_charges.match_raw_text
+          ORDER BY COALESCE(t.settled_at, t.created_at) DESC
+          LIMIT 1
+        )
+        WHERE match_raw_text IS NOT NULL AND match_raw_text != ''
+      `)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['47']
     )
   }
 }

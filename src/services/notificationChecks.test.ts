@@ -51,14 +51,16 @@ function insertTx(opts: {
   amount: number
   settled_at: string
   raw_text?: string | null
+  description?: string
   transfer_account_id?: string | null
 }) {
   db.run(
     `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at, transfer_account_id)
-     VALUES (?, 'acc1', 'SETTLED', ?, 'Payment', ?, ?, ?, ?)`,
+     VALUES (?, 'acc1', 'SETTLED', ?, ?, ?, ?, ?, ?)`,
     [
       opts.id,
       opts.raw_text ?? null,
+      opts.description ?? 'Payment',
       opts.amount,
       opts.settled_at,
       opts.settled_at,
@@ -192,7 +194,7 @@ describe('checkPaydayLanded', () => {
 })
 
 describe('checkLiabilityRepayments', () => {
-  const RAW = 'MORTGAGE-CBA-12345'
+  const LOAN_PAYMENT = 'Home Loan Repayment'
 
   function insertLiabilityAccount(balanceCents: number, name = 'Home Loan') {
     const now = new Date().toISOString()
@@ -208,14 +210,14 @@ describe('checkLiabilityRepayments', () => {
   function insertLiabilityCharge(opts: {
     amountCents: number
     linkedAccountId: number | null
-    matchRawText: string | null
+    matchDescription: string | null
     nextChargeDate?: string
     frequency?: string
   }) {
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, is_reserved, created_at,
-          charge_type, linked_manual_account_id, match_raw_text)
+          charge_type, linked_manual_account_id, match_description)
        VALUES ('Mortgage repayment', ?, ?, ?, 1, ?, 'LIABILITY_REPAYMENT', ?, ?)`,
       [
         opts.amountCents,
@@ -223,7 +225,7 @@ describe('checkLiabilityRepayments', () => {
         opts.nextChargeDate ?? localDateString(),
         new Date().toISOString(),
         opts.linkedAccountId,
-        opts.matchRawText,
+        opts.matchDescription,
       ]
     )
     return db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -247,13 +249,13 @@ describe('checkLiabilityRepayments', () => {
     const chargeId = insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -270,13 +272,13 @@ describe('checkLiabilityRepayments', () => {
     const chargeId = insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -300,13 +302,13 @@ describe('checkLiabilityRepayments', () => {
     insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -321,13 +323,13 @@ describe('checkLiabilityRepayments', () => {
     insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: null,
+      matchDescription: null,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -340,13 +342,13 @@ describe('checkLiabilityRepayments', () => {
     insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: null,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -360,7 +362,7 @@ describe('checkLiabilityRepayments', () => {
     const chargeId = insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -377,13 +379,13 @@ describe('checkLiabilityRepayments', () => {
     insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -397,13 +399,13 @@ describe('checkLiabilityRepayments', () => {
     const chargeId = insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: 9999, // no such account
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()
@@ -418,13 +420,13 @@ describe('checkLiabilityRepayments', () => {
     insertLiabilityCharge({
       amountCents: 250_000,
       linkedAccountId: accId,
-      matchRawText: RAW,
+      matchDescription: LOAN_PAYMENT,
     })
     insertTx({
       id: 'pay1',
       amount: -250_000,
       settled_at: new Date().toISOString(),
-      raw_text: RAW,
+      description: LOAN_PAYMENT,
     })
 
     checkLiabilityRepayments()

@@ -62,20 +62,30 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function addCharge(opts: { name: string; matchRawText?: string | null }) {
+function addCharge(opts: { name: string; matchDescription?: string | null }) {
   db.run(
     `INSERT INTO upcoming_charges
-       (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, created_at, match_raw_text)
+       (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, created_at, match_description)
      VALUES (?, 1999, 'MONTHLY', '2025-02-25', 1, 3, '2025-01-01', ?)`,
-    [opts.name, opts.matchRawText ?? null]
+    [opts.name, opts.matchDescription ?? null]
   )
 }
 
-function settleDebit(accountId: string, rawText: string, settledAt: string) {
+function settleDebit(
+  accountId: string,
+  description: string,
+  settledAt: string
+) {
   db.run(
-    `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at)
-     VALUES (?, ?, 'SETTLED', ?, 'Payment', -1999, ?, ?)`,
-    [`tx-${rawText}-${settledAt}`, accountId, rawText, settledAt, settledAt]
+    `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
+     VALUES (?, ?, 'SETTLED', ?, -1999, ?, ?)`,
+    [
+      `tx-${description}-${settledAt}`,
+      accountId,
+      description,
+      settledAt,
+      settledAt,
+    ]
   )
 }
 
@@ -89,7 +99,7 @@ function billsDueHistory(): Array<{ title: string; body: string }> {
 
 describe('bills_due is funding-source-agnostic (#99)', () => {
   it('fires identically for a classic user and an Essentials user with the same charge', () => {
-    addCharge({ name: 'Netflix', matchRawText: 'NETFLIX' })
+    addCharge({ name: 'Netflix', matchDescription: 'Netflix' })
     checkBillsDue()
     const classicHistory = billsDueHistory()
     expect(classicHistory).toHaveLength(1)
@@ -99,7 +109,7 @@ describe('bills_due is funding-source-agnostic (#99)', () => {
     // this exact Regular's funding source resolves to it. bills_due should
     // not special-case this — it's still a real upcoming debit.
     appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
-    settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-01-25T09:00:00.000Z')
+    settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z')
     // Clear today's guard so the check can run again in this test.
     delete appSettings['notif_last_bills_date']
 
@@ -114,25 +124,25 @@ describe('bills_due is funding-source-agnostic (#99)', () => {
 describe('checkBillsSettled auto-clear is funding-source-agnostic (#99)', () => {
   it('clears the bills_due notification when the matching debit settles from the nominated Essentials Saver', () => {
     appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
-    addCharge({ name: 'Netflix', matchRawText: 'NETFLIX' })
+    addCharge({ name: 'Netflix', matchDescription: 'Netflix' })
     checkBillsDue()
     expect(billsDueHistory()).toHaveLength(1)
 
     // Settles from the Essentials Saver, not the transactional account —
     // the existing settlement check (#93's account-agnostic boolean) should
     // still clear it, exactly as it would for a transactional settlement.
-    settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-02-20T09:00:00.000Z')
+    settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-02-20T09:00:00.000Z')
     checkBillsSettled()
 
     expect(billsDueHistory()).toHaveLength(0)
   })
 
   it('clears identically for a classic user (regression guard)', () => {
-    addCharge({ name: 'Netflix', matchRawText: 'NETFLIX' })
+    addCharge({ name: 'Netflix', matchDescription: 'Netflix' })
     checkBillsDue()
     expect(billsDueHistory()).toHaveLength(1)
 
-    settleDebit(TRANSACTIONAL, 'NETFLIX', '2025-02-20T09:00:00.000Z')
+    settleDebit(TRANSACTIONAL, 'Netflix', '2025-02-20T09:00:00.000Z')
     checkBillsSettled()
 
     expect(billsDueHistory()).toHaveLength(0)
@@ -141,13 +151,13 @@ describe('checkBillsSettled auto-clear is funding-source-agnostic (#99)', () => 
 
 describe('checkBillsSettled ignores HELD debits (#112)', () => {
   it('keeps the bills_due notification while the debit is HELD, then clears it once it settles', () => {
-    addCharge({ name: 'Netflix', matchRawText: 'NETFLIX' })
+    addCharge({ name: 'Netflix', matchDescription: 'Netflix' })
     checkBillsDue()
     expect(billsDueHistory()).toHaveLength(1)
 
     db.run(
       `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at)
-       VALUES ('tx-held', ?, 'HELD', 'NETFLIX', 'Payment', -1999, NULL, '2025-02-22T09:00:00.000Z')`,
+       VALUES ('tx-held', ?, 'HELD', NULL, 'Netflix', -1999, NULL, '2025-02-22T09:00:00.000Z')`,
       [TRANSACTIONAL]
     )
     checkBillsSettled()
@@ -157,6 +167,26 @@ describe('checkBillsSettled ignores HELD debits (#112)', () => {
     // have fired and this settlement would never clear the notification.
     db.run(
       `UPDATE transactions SET status = 'SETTLED', settled_at = '2025-02-23T09:00:00.000Z' WHERE id = 'tx-held'`
+    )
+    checkBillsSettled()
+    expect(billsDueHistory()).toHaveLength(0)
+  })
+})
+
+describe('checkBillsSettled follows linked payments, not raw_text (docs/adr/0020)', () => {
+  it('clears bills_due when the payment lands under a new descriptor', () => {
+    db.run(
+      `INSERT INTO upcoming_charges
+         (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, created_at, match_raw_text, match_description)
+       VALUES ('Netflix', 1999, 'MONTHLY', '2025-02-25', 1, 3, '2025-01-01', 'PAYPAL *NETFLIX, 4029357733', 'Netflix')`
+    )
+    checkBillsDue()
+    expect(billsDueHistory()).toHaveLength(1)
+
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at)
+       VALUES ('tx-direct', ?, 'SETTLED', 'NETFLIX.COM, LOS GATOS', 'Netflix', -1999, '2025-02-22T09:00:00Z', '2025-02-22T09:00:00Z')`,
+      [ESSENTIALS_SAVER]
     )
     checkBillsSettled()
     expect(billsDueHistory()).toHaveLength(0)

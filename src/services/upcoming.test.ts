@@ -23,6 +23,8 @@ const {
   getUpcomingChargeById,
   getLinkedLiabilityRepaymentCharges,
   getUpcomingChargesGrouped,
+  createUpcomingCharge,
+  updateUpcomingCharge,
 } = await import('./upcoming')
 const { localDateString } = await import('@/lib/format')
 
@@ -218,18 +220,18 @@ describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
     name: string
     chargeType?: 'EXPENSE' | 'LIABILITY_REPAYMENT'
     linkedAccountId?: number | null
-    matchRawText?: string | null
+    matchDescription?: string | null
   }) {
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, is_reserved, created_at,
-          charge_type, linked_manual_account_id, match_raw_text)
+          charge_type, linked_manual_account_id, match_description)
        VALUES (?, 100000, 'MONTHLY', '2026-01-15', 1, '2026-01-01T00:00:00.000Z', ?, ?, ?)`,
       [
         opts.name,
         opts.chargeType ?? 'EXPENSE',
         opts.linkedAccountId ?? null,
-        opts.matchRawText ?? null,
+        opts.matchDescription ?? null,
       ]
     )
     return db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -247,23 +249,51 @@ describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
       name: 'Mortgage (no fingerprint)',
       chargeType: 'LIABILITY_REPAYMENT',
       linkedAccountId: 3,
-      matchRawText: null,
+      matchDescription: null,
     })
     insertCharge({
       name: 'Mortgage (no account)',
       chargeType: 'LIABILITY_REPAYMENT',
       linkedAccountId: null,
-      matchRawText: 'RAW',
+      matchDescription: 'RAW',
     })
     const fullId = insertCharge({
       name: 'Mortgage (linked)',
       chargeType: 'LIABILITY_REPAYMENT',
       linkedAccountId: 3,
-      matchRawText: 'MORTGAGE-RAW',
+      matchDescription: 'MORTGAGE-RAW',
     })
 
     const linked = getLinkedLiabilityRepaymentCharges()
     expect(linked.map((c) => c.id)).toEqual([fullId])
+  })
+})
+
+describe('createUpcomingCharge / updateUpcomingCharge store the payment link (docs/adr/0020)', () => {
+  beforeAll(async () => {
+    SQL = await initSqlJs()
+  })
+
+  beforeEach(async () => {
+    const { runSchema } = await import('@/db/schema')
+    db = new SQL.Database()
+    runSchema(db)
+  })
+
+  it('stores the linked description, plus the legacy raw_text for detection dedup', () => {
+    // prettier-ignore
+    const id = createUpcomingCharge('Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, 'OURARING, OULU', 'Oura')
+    expect(getUpcomingChargeById(id)).toMatchObject({
+      match_description: 'Oura',
+      match_raw_text: 'OURARING, OULU',
+    })
+
+    // prettier-ignore
+    updateUpcomingCharge(id, 'Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, null, null)
+    expect(getUpcomingChargeById(id)).toMatchObject({
+      match_description: null,
+      match_raw_text: null,
+    })
   })
 })
 
