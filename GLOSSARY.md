@@ -105,11 +105,19 @@ The three buckets the Regulars list is split into. *Overdue* = a `ONCE` charge w
 _Avoid_: this pay period / future, urgent / non-urgent, upcoming / scheduled, arrears
 
 **Settlement detection**:
-Auto-clearing a bill's due notification when a real synced transaction matches the charge's linked `match_raw_text` (same amount sign, not a transfer, within 5 days before the projected date). Runs on app open.
+Auto-clearing a bill's due notification when a linked payment for the Regular lands within 5 days before its projected date. Runs on app open.
 _Avoid_: reconciliation, matching, clearing
 
+**Linked payment**:
+A settled, non-transfer Up debit that belongs to a Regular: its description is exactly the one the Regular is linked to, and its amount is within ±20% of the Regular's amount. A payment that would belong to two Regulars belongs to neither. The one rule behind settlement detection, funding source and liability-repayment prompts (`docs/adr/0020`).
+_Avoid_: match, fingerprint, reconciled transaction
+
+**Funding source**:
+The account that pays a Regular: the account of its most recent linked payment. Unknown when it has none, and unknown is always treated as the transactional account, never as Essentials (`docs/adr/0019`).
+_Avoid_: paying account, source account
+
 **Liability repayment charge**:
-A Regular with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it also carries a `linked_manual_account_id` and a `match_raw_text`, a detected payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
+A Regular with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it is also linked to a manual liability account and to its payments, a linked payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
 _Avoid_: loan payment, debt payment, transfer
 
 ### Comparisons
