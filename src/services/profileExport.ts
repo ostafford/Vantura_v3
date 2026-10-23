@@ -21,7 +21,7 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 7
+const EXPORT_PAYLOAD_VERSION = 8
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -132,6 +132,8 @@ export interface UpcomingChargeExportRow {
   reminder_days_before?: number | null
   cancel_by_date?: string | null
   bucket_id?: number | null
+  /** #111 — Up `description` of the Regular's linked payments (docs/adr/0020). Absent before payload v8. */
+  match_description?: string | null
 }
 
 export interface BudgetBucketExportRow {
@@ -325,7 +327,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date, bucket_id
+      reminder_days_before, cancel_by_date, bucket_id, match_description
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -340,6 +342,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       number | null,
       string | null,
       number | null,
+      string | null,
     ]
     rows.push({
       name: r[0],
@@ -351,6 +354,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       reminder_days_before: r[6] ?? null,
       cancel_by_date: r[7] ?? null,
       bucket_id: r[8] ?? null,
+      match_description: r[9] ?? null,
     })
   }
   stmt.free()
@@ -918,12 +922,17 @@ export function replaceUpcomingCharges(
         : null
     const bucketId =
       uc.bucket_id != null ? (bucketIdMap.get(uc.bucket_id) ?? null) : null
+    const matchDescription =
+      typeof uc.match_description === 'string' && uc.match_description
+        ? uc.match_description
+        : null
 
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, category_id, is_reserved,
-          reminder_days_before, cancel_by_date, bucket_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reminder_days_before, cancel_by_date, bucket_id, match_description,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -934,6 +943,7 @@ export function replaceUpcomingCharges(
         reminderDaysBefore,
         cancelByDate,
         bucketId,
+        matchDescription,
         now,
       ]
     )

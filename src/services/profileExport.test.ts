@@ -788,6 +788,27 @@ describe('profile import writers: real-DB coverage (#36)', () => {
   // ── replaceUpcomingCharges ─────────────────────────────────────────────
 
   describe('replaceUpcomingCharges', () => {
+    it("round-trips a Regular's payment link (docs/adr/0020) and leaves a file without one unlinked", () => {
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, match_raw_text, match_description)
+         VALUES ('Oura', 1000, 'MONTHLY', '2026-03-23', 1, '2026-01-01', 'OURARING, OULU', 'Oura')`
+      )
+      const exported = buildExportPayload().upcomingCharges
+
+      replaceUpcomingCharges([
+        ...exported,
+        chargeExport({ name: 'From an older file' }),
+      ])
+
+      const rows = realDb.exec(
+        `SELECT name, match_description FROM upcoming_charges ORDER BY id`
+      )[0].values
+      expect(rows).toEqual([
+        ['Oura', 'Oura'],
+        ['From an older file', null],
+      ])
+    })
+
     it('wipes existing charges and inserts the imported set', () => {
       realDb.run(
         `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
@@ -1170,7 +1191,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(7)
+      expect(payload.version).toBe(8)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1463,7 +1484,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(7)
+      expect(payload.version).toBe(8)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
