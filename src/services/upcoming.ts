@@ -21,12 +21,6 @@ export interface UpcomingChargeRow {
   charge_type: 'EXPENSE' | 'LIABILITY_REPAYMENT'
   /** Links a LIABILITY_REPAYMENT charge to a manual_accounts row. */
   linked_manual_account_id: number | null
-  /**
-   * Legacy raw_text fingerprint of a linked transaction. No longer used to
-   * find linked payments (docs/adr/0020) — kept for recurring-charge
-   * detection's dedup until #116.
-   */
-  match_raw_text: string | null
   /** Up `description` of the Regular's linked payments (docs/adr/0020). */
   match_description: string | null
 }
@@ -199,8 +193,7 @@ function readUpcomingRows(
   const stmt = db.prepare(
     `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
       reminder_days_before, cancel_by_date,
-      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_raw_text,
-      match_description
+      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_description
      FROM upcoming_charges ORDER BY next_charge_date`
   )
   const rows: UpcomingChargeRow[] = []
@@ -218,7 +211,6 @@ function readUpcomingRows(
       string,
       number | null,
       string | null,
-      string | null,
     ]
     rows.push({
       id: row[0],
@@ -232,8 +224,7 @@ function readUpcomingRows(
       cancel_by_date: row[8] ?? null,
       charge_type: (row[9] as 'EXPENSE' | 'LIABILITY_REPAYMENT') ?? 'EXPENSE',
       linked_manual_account_id: row[10] ?? null,
-      match_raw_text: row[11] ?? null,
-      match_description: row[12] ?? null,
+      match_description: row[11] ?? null,
     })
   }
   stmt.free()
@@ -288,7 +279,6 @@ export function createUpcomingCharge(
   cancelByDate: string | null = null,
   chargeType: 'EXPENSE' | 'LIABILITY_REPAYMENT' = 'EXPENSE',
   linkedManualAccountId: number | null = null,
-  matchRawText: string | null = null,
   matchDescription: string | null = null
 ): number {
   const db = getDb()
@@ -298,8 +288,8 @@ export function createUpcomingCharge(
     `INSERT INTO upcoming_charges
        (name, amount, frequency, next_charge_date, category_id, is_reserved,
         reminder_days_before, cancel_by_date, created_at,
-        charge_type, linked_manual_account_id, match_raw_text, match_description)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        charge_type, linked_manual_account_id, match_description)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       name,
       amountCents,
@@ -312,7 +302,6 @@ export function createUpcomingCharge(
       now,
       chargeType,
       linkedManualAccountId ?? null,
-      matchRawText ?? null,
       matchDescription ?? null,
     ]
   )
@@ -334,7 +323,6 @@ export function updateUpcomingCharge(
   cancelByDate: string | null = null,
   chargeType: 'EXPENSE' | 'LIABILITY_REPAYMENT' = 'EXPENSE',
   linkedManualAccountId: number | null = null,
-  matchRawText: string | null = null,
   matchDescription: string | null = null
 ): void {
   const db = getDb()
@@ -343,8 +331,7 @@ export function updateUpcomingCharge(
     `UPDATE upcoming_charges SET
        name = ?, amount = ?, frequency = ?, next_charge_date = ?, category_id = ?,
        is_reserved = ?, reminder_days_before = ?, cancel_by_date = ?,
-       charge_type = ?, linked_manual_account_id = ?, match_raw_text = ?,
-       match_description = ?
+       charge_type = ?, linked_manual_account_id = ?, match_description = ?
      WHERE id = ?`,
     [
       name,
@@ -357,7 +344,6 @@ export function updateUpcomingCharge(
       cancelByDate ?? null,
       chargeType,
       linkedManualAccountId ?? null,
-      matchRawText ?? null,
       matchDescription ?? null,
       id,
     ]
@@ -441,8 +427,7 @@ export function getDueSoonCharges(): UpcomingChargeRow[] {
   const stmt = db.prepare(
     `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
       reminder_days_before, cancel_by_date,
-      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_raw_text,
-      match_description
+      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_description
      FROM upcoming_charges
      WHERE reminder_days_before IS NOT NULL
        AND (charge_type IS NULL OR charge_type = 'EXPENSE')
@@ -463,7 +448,6 @@ export function getDueSoonCharges(): UpcomingChargeRow[] {
       string,
       number | null,
       string | null,
-      string | null,
     ]
     const charge: UpcomingChargeRow = {
       id: row[0],
@@ -477,8 +461,7 @@ export function getDueSoonCharges(): UpcomingChargeRow[] {
       cancel_by_date: row[8] ?? null,
       charge_type: (row[9] as 'EXPENSE' | 'LIABILITY_REPAYMENT') ?? 'EXPENSE',
       linked_manual_account_id: row[10] ?? null,
-      match_raw_text: row[11] ?? null,
-      match_description: row[12] ?? null,
+      match_description: row[11] ?? null,
     }
     const nextOccurrence = firstOccurrenceOnOrAfter(
       charge.next_charge_date,

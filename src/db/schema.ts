@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 47
+const SCHEMA_VERSION = 48
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1320,6 +1320,38 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['47']
+    )
+  }
+
+  // #116 — recurring-charge detection now groups by Up `description`, not
+  // `raw_text` (ADR-0016 amendment), so a dismissal keyed on a `raw_text`
+  // would stop matching. Add the description of the latest transaction with
+  // that `raw_text` as a dismissed key too, carrying the original
+  // dismissed_at. Old rows are kept; keys with no matching transaction (and
+  // keys that were already a description) are left alone.
+  if (version < 48) {
+    const txCols = database.exec(`PRAGMA table_info(transactions)`)
+    const txHasRawText = (txCols[0]?.values ?? []).some(
+      (r) => String(r[1]) === 'raw_text'
+    )
+    if (tableExists(database, 'dismissed_charge_suggestions') && txHasRawText) {
+      database.run(`
+        INSERT OR IGNORE INTO dismissed_charge_suggestions (suggestion_key, dismissed_at)
+        SELECT (
+          SELECT t.description FROM transactions t
+          WHERE t.raw_text = d.suggestion_key
+          ORDER BY COALESCE(t.settled_at, t.created_at) DESC
+          LIMIT 1
+        ), d.dismissed_at
+        FROM dismissed_charge_suggestions d
+        WHERE EXISTS (
+          SELECT 1 FROM transactions t WHERE t.raw_text = d.suggestion_key
+        )
+      `)
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['48']
     )
   }
 }

@@ -280,20 +280,27 @@ describe('createUpcomingCharge / updateUpcomingCharge store the payment link (do
     runSchema(db)
   })
 
-  it('stores the linked description, plus the legacy raw_text for detection dedup', () => {
-    // prettier-ignore
-    const id = createUpcomingCharge('Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, 'OURARING, OULU', 'Oura')
-    expect(getUpcomingChargeById(id)).toMatchObject({
-      match_description: 'Oura',
-      match_raw_text: 'OURARING, OULU',
-    })
+  function legacyRawText(id: number): unknown {
+    return db.exec(`SELECT match_raw_text FROM upcoming_charges WHERE id = ?`, [
+      id,
+    ])[0].values[0][0]
+  }
 
+  it('stores the linked description and never writes the legacy raw_text (#116)', () => {
     // prettier-ignore
-    updateUpcomingCharge(id, 'Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, null, null)
-    expect(getUpcomingChargeById(id)).toMatchObject({
-      match_description: null,
-      match_raw_text: null,
-    })
+    const id = createUpcomingCharge('Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, 'Oura')
+    expect(getUpcomingChargeById(id)?.match_description).toBe('Oura')
+    expect(legacyRawText(id)).toBeNull()
+
+    // A legacy value from before v47 is left as it was, not rewritten.
+    db.run(
+      `UPDATE upcoming_charges SET match_raw_text = 'OURARING, OULU' WHERE id = ?`,
+      [id]
+    )
+    // prettier-ignore
+    updateUpcomingCharge(id, 'Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, null)
+    expect(getUpcomingChargeById(id)?.match_description).toBeNull()
+    expect(legacyRawText(id)).toBe('OURARING, OULU')
   })
 })
 
