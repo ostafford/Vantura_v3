@@ -138,3 +138,27 @@ describe('checkBillsSettled auto-clear is funding-source-agnostic (#99)', () => 
     expect(billsDueHistory()).toHaveLength(0)
   })
 })
+
+describe('checkBillsSettled ignores HELD debits (#112)', () => {
+  it('keeps the bills_due notification while the debit is HELD, then clears it once it settles', () => {
+    addCharge({ name: 'Netflix', matchRawText: 'NETFLIX' })
+    checkBillsDue()
+    expect(billsDueHistory()).toHaveLength(1)
+
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at)
+       VALUES ('tx-held', ?, 'HELD', 'NETFLIX', 'Payment', -1999, NULL, '2025-02-22T09:00:00.000Z')`,
+      [TRANSACTIONAL]
+    )
+    checkBillsSettled()
+    expect(billsDueHistory()).toHaveLength(1)
+
+    // If the hold had been treated as paid, the cycle's guard would already
+    // have fired and this settlement would never clear the notification.
+    db.run(
+      `UPDATE transactions SET status = 'SETTLED', settled_at = '2025-02-23T09:00:00.000Z' WHERE id = 'tx-held'`
+    )
+    checkBillsSettled()
+    expect(billsDueHistory()).toHaveLength(0)
+  })
+})

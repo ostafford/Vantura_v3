@@ -32,13 +32,15 @@ function insertTx(opts: {
   created_at?: string
   raw_text?: string | null
   transfer_account_id?: string | null
+  status?: 'HELD' | 'SETTLED'
 }) {
   db.run(
     `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at, transfer_account_id)
-     VALUES (?, ?, 'SETTLED', ?, 'Payment', ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, 'Payment', ?, ?, ?, ?)`,
     [
       opts.id,
       opts.account_id,
+      opts.status ?? 'SETTLED',
       opts.raw_text ?? null,
       opts.amount,
       opts.settled_at ?? null,
@@ -138,6 +140,29 @@ describe('findMatchingSettledDebit', () => {
     const match = findMatchingSettledDebit(db, 'NETFLIX', '2026-03-01')
     expect(match?.transactionId).toBe('t-new')
     expect(match?.accountId).toBe('essentials-saver-1')
+  })
+
+  it('ignores a HELD debit until it settles', () => {
+    insertTx({
+      id: 't1',
+      account_id: 'essentials-saver-1',
+      amount: -1500,
+      settled_at: null,
+      created_at: '2026-03-05T09:00:00.000Z',
+      raw_text: 'NETFLIX',
+      status: 'HELD',
+    })
+    expect(findMatchingSettledDebit(db, 'NETFLIX', '2026-03-01')).toBeNull()
+    expect(getFundingSourceAccountId(db, 'NETFLIX')).toBeNull()
+
+    db.run(
+      `UPDATE transactions SET status = 'SETTLED', settled_at = '2026-03-06T09:00:00.000Z' WHERE id = 't1'`
+    )
+    expect(findMatchingSettledDebit(db, 'NETFLIX', '2026-03-01')).toEqual({
+      transactionId: 't1',
+      accountId: 'essentials-saver-1',
+      settledDate: '2026-03-06',
+    })
   })
 
   it('scopes matches to the given raw_text fingerprint', () => {
