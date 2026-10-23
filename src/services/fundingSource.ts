@@ -40,6 +40,7 @@ export function findMatchingSettledDebit(
     `SELECT id, account_id, substr(COALESCE(settled_at, created_at), 1, 10)
      FROM transactions
      WHERE raw_text = ?
+       AND status = 'SETTLED'
        AND amount < 0
        AND transfer_account_id IS NULL
        ${windowClause}
