@@ -17,8 +17,10 @@ export interface RecurringChargeSuggestion {
   /** Next projected occurrence on or after today (`YYYY-MM-DD`). */
   nextChargeDate: string
   categoryId: string | null
-  /** The group's `raw_text` if non-empty — carried onto the created charge for settlement auto-clear. */
+  /** The group's `raw_text` if non-empty — carried onto the created charge for detection dedup (until #116). */
   matchRawText: string | null
+  /** The latest occurrence's Up `description` — the created charge's payment link (docs/adr/0020). */
+  matchDescription: string
   occurrences: number
   /** Matched dates ascending, shown to the user as evidence. */
   sampleDates: string[]
@@ -200,6 +202,7 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
       ),
       categoryId,
       matchRawText: rawText,
+      matchDescription: rows[rows.length - 1].description,
       occurrences: dates.length,
       sampleDates: dates,
     })

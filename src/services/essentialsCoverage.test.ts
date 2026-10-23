@@ -66,20 +66,37 @@ function addCharge(opts: {
   name: string
   amount: number
   next_charge_date: string
-  match_raw_text?: string | null
+  match_description?: string | null
 }) {
   db.run(
-    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, match_raw_text)
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, match_description)
      VALUES (?, ?, 'ONCE', ?, 1, '2025-01-01', ?)`,
-    [opts.name, opts.amount, opts.next_charge_date, opts.match_raw_text ?? null]
+    [
+      opts.name,
+      opts.amount,
+      opts.next_charge_date,
+      opts.match_description ?? null,
+    ]
   )
 }
 
-function settleDebit(accountId: string, rawText: string, settledAt: string) {
+function settleDebit(
+  accountId: string,
+  description: string,
+  settledAt: string,
+  amountCents: number
+) {
   db.run(
-    `INSERT INTO transactions (id, account_id, status, raw_text, description, amount, settled_at, created_at)
-     VALUES (?, ?, 'SETTLED', ?, 'Payment', -1000, ?, ?)`,
-    [`tx-${rawText}-${settledAt}`, accountId, rawText, settledAt, settledAt]
+    `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
+     VALUES (?, ?, 'SETTLED', ?, ?, ?, ?)`,
+    [
+      `tx-${description}-${settledAt}`,
+      accountId,
+      description,
+      -amountCents,
+      settledAt,
+      settledAt,
+    ]
   )
 }
 
@@ -103,9 +120,9 @@ describe('getEssentialsCoverage', () => {
         name: 'Netflix',
         amount: 1500,
         next_charge_date: '2025-02-25',
-        match_raw_text: 'NETFLIX',
+        match_description: 'Netflix',
       })
-      settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-01-25T09:00:00.000Z')
+      settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
       setSaverBalance(5000)
 
       const coverage = getEssentialsCoverage()
@@ -121,9 +138,9 @@ describe('getEssentialsCoverage', () => {
         name: 'Netflix',
         amount: 1500,
         next_charge_date: '2025-02-25',
-        match_raw_text: 'NETFLIX',
+        match_description: 'Netflix',
       })
-      settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-01-25T09:00:00.000Z')
+      settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
       addCharge({ name: 'Gym', amount: 2000, next_charge_date: '2025-02-26' })
       setSaverBalance(5000)
 
@@ -139,9 +156,9 @@ describe('getEssentialsCoverage', () => {
         name: 'Netflix',
         amount: 1500,
         next_charge_date: '2025-02-25',
-        match_raw_text: 'NETFLIX',
+        match_description: 'Netflix',
       })
-      settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-01-25T09:00:00.000Z')
+      settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
       setSaverBalance(500) // short by 1000
 
       const coverage = getEssentialsCoverage()
@@ -154,9 +171,9 @@ describe('getEssentialsCoverage', () => {
         name: 'Netflix',
         amount: 1500,
         next_charge_date: '2025-02-25',
-        match_raw_text: 'NETFLIX',
+        match_description: 'Netflix',
       })
-      settleDebit(ESSENTIALS_SAVER, 'NETFLIX', '2025-01-25T09:00:00.000Z')
+      settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
       addCharge({ name: 'Gym', amount: 2000, next_charge_date: '2025-02-26' })
       setSaverBalance(0) // short by 1500, and Gym is still transactional
 

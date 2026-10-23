@@ -261,7 +261,8 @@ export function UpcomingSection({
 
   /**
    * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding-
-   * source inference needs a match_raw_text link, so an unlinked Regular
+   * source inference needs a payment link (`match_description`, docs/adr/0020),
+   * so an unlinked Regular
    * gets no Essentials benefit — it's always reserved regardless of which
    * account actually pays it. Surfaced only for a nominated Essentials
    * user; classic users get nothing here since linking has no effect on
@@ -269,7 +270,7 @@ export function UpcomingSection({
    */
   function unlinkedEssentialsLabel(c: UpcomingChargeRow): string | null {
     if (!essentialsUser || c.is_reserved !== 1) return null
-    return c.match_raw_text ? null : 'not linked to Essentials'
+    return c.match_description ? null : 'not linked to Essentials'
   }
 
   function openCreate() {
@@ -315,7 +316,7 @@ export function UpcomingSection({
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
     setMatchRawText(c.match_raw_text ?? null)
-    setMatchDescription('')
+    setMatchDescription(c.match_description ?? '')
     setShowSettlementPicker(false)
     setSettlementSearch('')
     setChargeType(c.charge_type ?? 'EXPENSE')
@@ -362,7 +363,8 @@ export function UpcomingSection({
         cancelBy,
         chargeType,
         chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchRawText
+        matchRawText,
+        matchDescription || null
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
       toast.success('Regular updated.')
@@ -378,7 +380,8 @@ export function UpcomingSection({
         cancelBy,
         chargeType,
         chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchRawText
+        matchRawText,
+        matchDescription || null
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
       toast.success('Regular added.')
@@ -411,19 +414,17 @@ export function UpcomingSection({
   }
 
   // Prefill the form from a picked past transaction (#22). Picking one also
-  // sets match_raw_text — reveal "More options" so the resulting auto-clear
-  // link is visible rather than silently applied.
+  // links the Regular to its payments (docs/adr/0020) — reveal "More options"
+  // so the resulting auto-clear link is visible rather than silently applied.
   function applySearchTx(tx: AnchorDebitRow) {
     setName(tx.description)
     setAmount((tx.amount / 100).toFixed(2))
     setCategoryId(tx.category_id ?? '')
     setNextChargeDate(nextChargeDateFromAnchor(tx.date, frequency))
     setImportedFromTx(tx)
-    if (tx.raw_text) {
-      setMatchRawText(tx.raw_text)
-      setMatchDescription(tx.description)
-    }
-    if (tx.category_id || tx.raw_text) setMoreOptionsOpen(true)
+    setMatchRawText(tx.raw_text ?? null)
+    setMatchDescription(tx.description)
+    setMoreOptionsOpen(true)
     setCreateStep('form')
     setTxSearch('')
   }
@@ -445,10 +446,10 @@ export function UpcomingSection({
     setLinkedManualAccountId(null)
     setImportedFromTx(null)
     setMatchRawText(s.matchRawText)
-    setMatchDescription(s.matchRawText ? s.name : '')
+    setMatchDescription(s.matchDescription)
     setShowSettlementPicker(false)
     setSettlementSearch('')
-    setMoreOptionsOpen(!!(s.categoryId || s.matchRawText))
+    setMoreOptionsOpen(true)
     setCreateStep('form')
     setShowModal(true)
   }
@@ -1294,7 +1295,7 @@ export function UpcomingSection({
                     <Form.Label className="small">
                       Auto-clear when paid
                     </Form.Label>
-                    {matchRawText ? (
+                    {matchDescription ? (
                       <div
                         className="d-flex align-items-center gap-2 px-2 py-2 rounded"
                         style={{
@@ -1309,9 +1310,9 @@ export function UpcomingSection({
                         />
                         <span
                           className="small flex-grow-1 text-truncate"
-                          title={matchRawText}
+                          title={matchDescription}
                         >
-                          Clears when “{matchDescription || matchRawText}” lands
+                          Clears when “{matchDescription}” lands
                         </span>
                         <Button
                           variant="link"
@@ -1365,13 +1366,11 @@ export function UpcomingSection({
                                 const trackable = searchRecentDebits(
                                   settlementSearch,
                                   20
-                                ).filter((tx) => tx.raw_text != null)
+                                )
                                 if (trackable.length === 0) {
                                   return (
                                     <p className="text-muted small text-center py-2 mb-0 px-2">
-                                      No trackable transactions found. Only
-                                      transactions with a bank fingerprint can
-                                      be linked.
+                                      No matching transactions found.
                                     </p>
                                   )
                                 }
@@ -1388,14 +1387,14 @@ export function UpcomingSection({
                                       fontSize: '0.8rem',
                                     }}
                                     onClick={() => {
-                                      setMatchRawText(tx.raw_text!)
+                                      setMatchRawText(tx.raw_text ?? null)
                                       setMatchDescription(tx.description)
                                       setShowSettlementPicker(false)
                                       setSettlementSearch('')
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        setMatchRawText(tx.raw_text!)
+                                        setMatchRawText(tx.raw_text ?? null)
                                         setMatchDescription(tx.description)
                                         setShowSettlementPicker(false)
                                         setSettlementSearch('')

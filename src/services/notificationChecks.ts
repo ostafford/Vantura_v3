@@ -7,7 +7,7 @@
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
 import type { Database } from 'sql.js'
 import { formatMoney, localDateString } from '@/lib/format'
-import { hasMatchingSettledDebit } from '@/services/fundingSource'
+import { hasLinkedPayment } from '@/services/fundingSource'
 import {
   getNotificationsEnabled,
   getNotifTypeEnabled,
@@ -59,9 +59,9 @@ function settlementWindowStart(projectedDate: string): string {
 // ─── 0. Auto-clear settled bill notifications ────────────────────────────────
 
 /**
- * For each upcoming charge that has a linked match_raw_text, detect whether a
- * matching settled debit has appeared in the transaction log since the charge
- * window opened. If settled, delete the corresponding bills_due notification
+ * For each upcoming charge linked to its payments (`match_description`),
+ * detect whether a linked payment (docs/adr/0020) has appeared in the
+ * transaction log since the charge window opened. If settled, delete the corresponding bills_due notification
  * from history so the banner disappears automatically.
  *
  * Runs on every app open — queries are cheap and idempotent per charge cycle.
@@ -76,7 +76,7 @@ function checkBillsSettled(): void {
   // next_charge_date on each item is the real upcoming occurrence date —
   // not the potentially stale stored value in the DB.
   const dueSoon = getDueSoonCharges().filter(
-    (c) => c.match_raw_text != null && c.match_raw_text !== ''
+    (c) => c.match_description != null && c.match_description !== ''
   )
 
   for (const charge of dueSoon) {
@@ -84,21 +84,13 @@ function checkBillsSettled(): void {
       id: chargeId,
       name: chargeName,
       next_charge_date: nextChargeDate,
-      match_raw_text: matchRawText,
     } = charge
-    if (!matchRawText) continue // guaranteed by the filter above; narrows the type
 
     // Per-cycle guard keyed on projected date — advances each month automatically
     const guardKey = `notif_bill_settled_${chargeId}_${nextChargeDate}`
     if (hasFiredForValue(guardKey, '1')) continue
 
-    if (
-      !hasMatchingSettledDebit(
-        db,
-        matchRawText,
-        settlementWindowStart(nextChargeDate)
-      )
-    )
+    if (!hasLinkedPayment(db, charge, settlementWindowStart(nextChargeDate)))
       continue
 
     // Payment found — remove matching bills_due notifications for this charge
@@ -144,7 +136,7 @@ function checkLiabilityRepayments(): void {
   const backfilling = getAppSetting('liab_repay_backfilled') !== '1'
 
   for (const charge of charges) {
-    if (!charge.match_raw_text || charge.linked_manual_account_id == null)
+    if (!charge.match_description || charge.linked_manual_account_id == null)
       continue
 
     const projected = firstOccurrenceOnOrAfter(
@@ -164,13 +156,7 @@ function checkLiabilityRepayments(): void {
       continue
     }
 
-    if (
-      !hasMatchingSettledDebit(
-        db,
-        charge.match_raw_text,
-        settlementWindowStart(projected)
-      )
-    )
+    if (!hasLinkedPayment(db, charge, settlementWindowStart(projected)))
       continue
 
     const account = getManualAccountById(charge.linked_manual_account_id)

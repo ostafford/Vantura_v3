@@ -7,7 +7,10 @@
 import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
 import { getEssentialsSaverAccountId } from './essentials'
-import { getFundingSourceAccountId } from './fundingSource'
+import {
+  getFundingSourceAccountId,
+  type LinkableRegular,
+} from './fundingSource'
 import { getAccountById } from './accounts'
 import { calculateReservedBreakdown, type UpcomingChargeRow } from './balance'
 
@@ -31,14 +34,13 @@ export interface EssentialsCoverage {
   transactionalCount: number
 }
 
-interface ChargeRow extends UpcomingChargeRow {
+interface ChargeRow extends UpcomingChargeRow, LinkableRegular {
   name: string
-  match_raw_text: string | null
 }
 
 function loadCharges(db: Database): ChargeRow[] {
   const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, match_raw_text FROM upcoming_charges`
+    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
   )
   const rows: ChargeRow[] = []
   while (stmt.step()) {
@@ -49,6 +51,7 @@ function loadCharges(db: Database): ChargeRow[] {
       number,
       number,
       string | null,
+      number,
       string | null,
     ]
     rows.push({
@@ -58,7 +61,8 @@ function loadCharges(db: Database): ChargeRow[] {
       amount: r[3],
       is_reserved: r[4],
       cancel_by_date: r[5],
-      match_raw_text: r[6] ?? null,
+      id: r[6],
+      match_description: r[7] ?? null,
     })
   }
   stmt.free()
@@ -86,9 +90,7 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   // nominated Saver, regardless of whether it's due this cycle? No window —
   // "has Essentials ever been observed", not "is it due right now".
   const anyEssentialsFunded = charges.some(
-    (c) =>
-      c.match_raw_text &&
-      getFundingSourceAccountId(db, c.match_raw_text) === essentialsSaverId
+    (c) => getFundingSourceAccountId(db, c) === essentialsSaverId
   )
   if (!anyEssentialsFunded) {
     return {
@@ -105,10 +107,9 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   const paydayFrequency = getAppSetting('payday_frequency')
   const reservedCharges = charges.filter((c) => c.is_reserved === 1)
 
-  const transactionalCharges = reservedCharges.filter((c) => {
-    if (!c.match_raw_text) return true
-    return getFundingSourceAccountId(db, c.match_raw_text) !== essentialsSaverId
-  })
+  const transactionalCharges = reservedCharges.filter(
+    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
+  )
 
   const fullBreakdown = calculateReservedBreakdown(
     reservedCharges,

@@ -9,7 +9,10 @@ import type { PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
 import { firstOccurrenceOnOrAfter } from './upcoming'
 import { getEssentialsSaverAccountId } from './essentials'
-import { getFundingSourceAccountId } from './fundingSource'
+import {
+  getFundingSourceAccountId,
+  type LinkableRegular,
+} from './fundingSource'
 
 export type { PaydayFrequency }
 
@@ -228,20 +231,20 @@ export function getAvailableBalance(): number {
  * nominated Essentials Saver) pass every charge through untouched — this is
  * the null guard that keeps the classic Reserved formula byte-identical.
  * For an Essentials user, drops any charge whose funding source — the
- * account of its most recent matched settled debit, no window restriction —
- * is the nominated Saver. A charge with no `match_raw_text`, or whose
- * funding source hasn't been observed yet, is kept (resolves transactional)
- * — never assumed Essentials-funded.
+ * account of its most recent linked payment (docs/adr/0020), no window
+ * restriction — is the nominated Saver. A charge with no `match_description`,
+ * or with no linked payment yet, is kept (resolves transactional) — never
+ * assumed Essentials-funded.
  */
-function excludeEssentialsFundedCharges<
-  T extends { match_raw_text?: string | null },
->(db: Database, charges: T[]): T[] {
+function excludeEssentialsFundedCharges<T extends LinkableRegular>(
+  db: Database,
+  charges: T[]
+): T[] {
   const essentialsSaverId = getEssentialsSaverAccountId()
   if (!essentialsSaverId) return charges
-  return charges.filter((c) => {
-    if (!c.match_raw_text) return true
-    return getFundingSourceAccountId(db, c.match_raw_text) !== essentialsSaverId
-  })
+  return charges.filter(
+    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
+  )
 }
 
 /**
@@ -253,10 +256,9 @@ export function getReservedAmount(): number {
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   const stmt = db.prepare(
-    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date, match_raw_text FROM upcoming_charges`
+    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
   )
-  const charges: Array<UpcomingChargeRow & { match_raw_text: string | null }> =
-    []
+  const charges: Array<UpcomingChargeRow & LinkableRegular> = []
   while (stmt.step()) {
     const row = stmt.get() as [
       string,
@@ -264,6 +266,7 @@ export function getReservedAmount(): number {
       number,
       number,
       string | null,
+      number,
       string | null,
     ]
     charges.push({
@@ -272,7 +275,8 @@ export function getReservedAmount(): number {
       amount: row[2],
       is_reserved: row[3],
       cancel_by_date: row[4] ?? null,
-      match_raw_text: row[5] ?? null,
+      id: row[5],
+      match_description: row[6] ?? null,
     })
   }
   stmt.free()
@@ -303,11 +307,9 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, match_raw_text FROM upcoming_charges`
+    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
   )
-  const rows: Array<
-    UpcomingChargeRow & { name: string; match_raw_text: string | null }
-  > = []
+  const rows: Array<UpcomingChargeRow & LinkableRegular & { name: string }> = []
   while (stmt.step()) {
     const r = stmt.get() as [
       string,
@@ -316,6 +318,7 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
       number,
       number,
       string | null,
+      number,
       string | null,
     ]
     rows.push({
@@ -325,7 +328,8 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
       amount: r[3],
       is_reserved: r[4],
       cancel_by_date: r[5],
-      match_raw_text: r[6] ?? null,
+      id: r[6],
+      match_description: r[7] ?? null,
     })
   }
   stmt.free()

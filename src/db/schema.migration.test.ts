@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(46)
+    expect(SCHEMA_VERSION).toBe(47)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1025,6 +1025,68 @@ describe('v46 migration: dismissed_charge_suggestions', () => {
     const rows = db.exec(`SELECT COUNT(*) FROM dismissed_charge_suggestions`)
     expect(rows[0].values[0][0]).toBe(1) // untouched by a second run
 
+    db.close()
+  })
+})
+
+describe('v47 migration: upcoming_charges.match_description (docs/adr/0020)', () => {
+  function buildV46(): Database {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '46')`
+    )
+    db.run(`
+      CREATE TABLE transactions (
+        id TEXT PRIMARY KEY,
+        raw_text TEXT,
+        description TEXT NOT NULL,
+        settled_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    `)
+    db.run(`
+      CREATE TABLE upcoming_charges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        match_raw_text TEXT
+      )
+    `)
+    return db
+  }
+
+  it('backfills from the latest transaction with that raw_text, leaves unmatched links unlinked, and keeps match_raw_text', () => {
+    const db = buildV46()
+    db.run(
+      `INSERT INTO transactions (id, raw_text, description, settled_at, created_at) VALUES
+         ('old', 'PAYPAL *CLOUDFLARE, 4029357733', 'Cloudflare Old', '2026-08-25T09:00:00Z', '2026-08-25T09:00:00Z'),
+         ('new', 'PAYPAL *CLOUDFLARE, 4029357733', 'Cloudflare', '2026-09-25T09:00:00Z', '2026-09-25T09:00:00Z'),
+         ('held', 'SUPERLOOP LIMITED, 1800961618', 'Superloop', NULL, '2026-10-19T09:00:00Z')`
+    )
+    db.run(
+      `INSERT INTO upcoming_charges (name, match_raw_text) VALUES
+         ('Cloudflare', 'PAYPAL *CLOUDFLARE, 4029357733'),
+         ('Superloop', 'SUPERLOOP LIMITED, 1800961618'),
+         ('Gone', 'NO SUCH MERCHANT'),
+         ('Manual', NULL)`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    const rows = db.exec(
+      `SELECT name, match_raw_text, match_description FROM upcoming_charges ORDER BY id`
+    )[0].values
+    expect(rows).toEqual([
+      ['Cloudflare', 'PAYPAL *CLOUDFLARE, 4029357733', 'Cloudflare'],
+      ['Superloop', 'SUPERLOOP LIMITED, 1800961618', 'Superloop'],
+      ['Gone', 'NO SUCH MERCHANT', null],
+      ['Manual', null, null],
+    ])
+
+    expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
 })
