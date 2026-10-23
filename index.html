@@ -10,22 +10,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Vantura</title>
-    <!-- Apply stored theme before first paint to prevent flash -->
-    <script>
-      (function () {
-        var m = localStorage.getItem('vantura_theme_mode') || 'dark'
-        var r =
-          m === 'system'
-            ? window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light'
-            : m
-        document.documentElement.setAttribute('data-theme', r)
-        document.documentElement.setAttribute('data-bs-theme', r)
-        var meta = document.querySelector('meta[name="theme-color"]')
-        if (meta) meta.setAttribute('content', r === 'light' ? '#f5f4f0' : '#13131c')
-      })()
-    </script>
+    <!-- Apply stored theme before first paint to prevent flash (external file: CSP blocks inline scripts) -->
+    <script src="/theme-init.js"></script>
     <style>
       html {
         color-scheme: dark light;
