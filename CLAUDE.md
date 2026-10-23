@@ -14,7 +14,7 @@ Vantura's product vision, target users, and non-negotiable design principles liv
 
 - **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
-- **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `CONTEXT.md` files specifically need an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
+- **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `GLOSSARY.md` specifically needs an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
 
 ## Commands
 
@@ -65,9 +65,9 @@ API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2
 
 ## Documentation map
 
-Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `CONTEXT.md` glossary plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
+Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `GLOSSARY.md` plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
 
-**Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — a short router pointing to `OVERVIEW.md` (how the feature works, always present) and out to the relevant entries in the repo-root `CONTEXT.md` glossary and `docs/adr/` for *why*. It may also point to a `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature). Folders not yet migrated to this model still carry their own `CONTEXT.md`; where both exist, the root glossary + ADRs are canonical.
+**Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — a short router pointing to `OVERVIEW.md` (how the feature works, always present) and out to the relevant entries in the repo-root `GLOSSARY.md` and `docs/adr/` for *why*. It may also point to a `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
 
 Feature folders live under `docs/features/` — list that directory rather than a name here that can drift out of sync with it.
 
@@ -82,9 +82,13 @@ Root-level docs (public, in git):
 
 Issues live in GitHub Issues (`ostafford/Vantura_v3`, via the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
 ### Domain docs
 
-Single-context layout: a repo-root `CONTEXT.md` glossary + `docs/adr/`. These are the canonical home for domain "why" — per-feature `docs/features/*/CONTEXT.md` files are being retired into them as each feature's docs are rebuilt (9 done so far; see issue #13). See `docs/agents/domain.md`.
+Single-context layout: a repo-root `GLOSSARY.md` + `docs/adr/`, the canonical home for domain "why". See `docs/agents/domain.md`.
 
 ### Design engineering
 

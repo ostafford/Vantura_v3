@@ -1,4 +1,4 @@
-# Vantura — Domain Context
+# Vantura — Glossary
 
 Vantura is a local-first personal finance app for Up Bank customers. This is the
 project glossary: the canonical word for each domain concept, and the words to

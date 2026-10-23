@@ -1,6 +1,6 @@
 ---
 name: vantura-audit
-description: Vantura's repeatable feature/codebase accuracy audit — scope, ground in the current docs (docs/features/*/OVERVIEW.md + CONTEXT.md + docs/adr/), review through parallel lenses (correctness, spec/doc fidelity, standards & structure, plus feel for interactive surfaces), fix, adversarial second pass, close out. Use when Okky asks to audit a feature, verify the 99%+ accuracy bar, or check something for bugs across the codebase.
+description: Vantura's repeatable feature/codebase accuracy audit — scope, ground in the current docs (docs/features/*/OVERVIEW.md + GLOSSARY.md + docs/adr/), review through parallel lenses (correctness, spec/doc fidelity, standards & structure, plus feel for interactive surfaces), fix, adversarial second pass, close out. Use when Okky asks to audit a feature, verify the 99%+ accuracy bar, or check something for bugs across the codebase.
 ---
 
 # Vantura accuracy audit
@@ -29,7 +29,7 @@ trackers") or a **whole-codebase pass**. Never assume one for the other.
 For a feature audit, read first:
 
 - **`docs/features/<feature>/OVERVIEW.md`** — how the feature is supposed to work.
-- The relevant entries in the repo-root **`CONTEXT.md`** glossary — the canonical term definitions and the precise filter/rule each names.
+- The relevant entries in the repo-root **`GLOSSARY.md`** glossary — the canonical term definitions and the precise filter/rule each names.
 - Any **`docs/adr/`** entry touching the area.
 - **`docs/DATABASE.md`** — schema, columns, `app_settings` keys.
 
@@ -85,7 +85,7 @@ Spawn these as **parallel `Agent` calls** so their contexts don't pollute each
 other. Each gets the diff command + commit list (or the file list), and reads its
 own docs first (section 3).
 
-1. **Correctness** — every calculation and conditional vs. the intended behaviour in `OVERVIEW.md` / `CONTEXT.md`, and vs. section 4's checklist. Report each failure as `file:line`, what breaks, the input that triggers it.
+1. **Correctness** — every calculation and conditional vs. the intended behaviour in `OVERVIEW.md` / `GLOSSARY.md`, and vs. section 4's checklist. Report each failure as `file:line`, what breaks, the input that triggers it.
 2. **Spec / doc fidelity** — does the behaviour match `OVERVIEW.md`, the glossary term definitions, and the originating issue? Report: missing/partial requirements; behaviour not asked for (scope creep); things that look implemented but wrong. Quote the doc/issue line per finding.
 3. **Standards & structure** — documented repo standards (`CLAUDE.md`, any `CONTRIBUTING`), **plus the Fowler smell baseline** (paste the 12 smells from `.claude/plugins/.../code-review/SKILL.md` step 3 into the agent prompt — it has no other access), **plus deep-module checks**: a shallow module (interface nearly as complex as its implementation); calc-critical logic not extracted into a pure, directly-testable core (see the `calculateReservedAmount` / `computeProjectedNetWorth` / `calculateForecastSpendable` pattern — pure function + thin DB wrapper); an interface whose invariants/ordering/error-modes aren't enforced by the module itself. Distinguish **hard violations** (a documented standard breached) from **judgement calls** (baseline smells — always heuristics). A documented repo standard overrides the baseline. Skip anything tooling already enforces.
 4. **Feel** — *only when the feature ships or changes an interactive surface* (a component, modal, drawer, gesture, transition, animation). Motion and interaction against the design-engineering bar: `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`, `docs/PRODUCT.md`'s *Motion & polish* section, and the eight categories in `.claude/skills/improve-animations/AUDIT.md`. Load the `emil-design-eng` and `animate` skills into the agent. Check: anything animating that shouldn't (keyboard-initiated / 100+-per-day actions)? `ease-in` on UI, or a bespoke curve/duration instead of the `--ease-*` / `--duration-*` tokens? a `@keyframes` where a retargetable transition belongs (rapidly-triggered or reversible UI)? an entrance with no matching exit? `width`/`height`/`top`/`left` animated instead of `transform`/`opacity`? no `prefers-reduced-motion` branch? Report each as `file:line`, what feels wrong, and the interaction that surfaces it. If the feature ships no interactive surface, say so in one line and skip the lens.
@@ -122,4 +122,4 @@ pass). Don't skip it.
 - `npm run validate` and `npm run test` — confirm clean before reporting done.
 - Report in the established shape: **Bugs fixed** (`file:line`, what broke, the fix), **Confirmed correct / not touched** (so the next audit knows what was checked), **Known open items NOT fixed** (flagged, with why).
 - A structural finding that's a genuine, hard-to-reverse trade-off → propose a `docs/adr/` entry.
-- Doc drift found → propose the specific `OVERVIEW.md` / `CONTEXT.md` / `DATABASE.md` edit and get explicit confirmation. Never edit a `*.md` autonomously (`CLAUDE.md` docs-collaboration rule).
+- Doc drift found → propose the specific `OVERVIEW.md` / `GLOSSARY.md` / `DATABASE.md` edit and get explicit confirmation. Never edit a `*.md` autonomously (`CLAUDE.md` docs-collaboration rule).
