@@ -67,8 +67,8 @@ export function EssentialsCoverageBlock({
         {coverage.state === 'partial' && (
           <>
             {coverage.transactionalCount} bill
-            {coverage.transactionalCount === 1 ? '' : 's'} still on your
-            everyday account
+            {coverage.transactionalCount === 1 ? '' : 's'} not yet paid from
+            Essentials
           </>
         )}
         {coverage.state === 'shortfall' && (

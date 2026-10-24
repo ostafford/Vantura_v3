@@ -44,7 +44,7 @@ describe('EssentialsCoverageBlock', () => {
       transactionalCount: 2,
     })
     expect(html).toContain('essentials-coverage--partial')
-    expect(html).toContain('2 bills still on your everyday account')
+    expect(html).toContain('2 bills not yet paid from Essentials')
     expect(html).toContain('Reserved here')
     expect(html).toContain('$20.00')
     expect(html).toContain('Set aside in Essentials')
@@ -58,7 +58,7 @@ describe('EssentialsCoverageBlock', () => {
       reservedHereCents: 2000,
       transactionalCount: 1,
     })
-    expect(html).toContain('1 bill still on your everyday account')
+    expect(html).toContain('1 bill not yet paid from Essentials')
     expect(html).not.toContain('1 bills')
   })
 
