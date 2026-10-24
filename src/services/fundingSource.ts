@@ -8,6 +8,7 @@
  */
 
 import type { Database } from 'sql.js'
+import { firstOccurrenceOnOrAfter } from './upcoming'
 
 export interface SettledDebitMatch {
   transactionId: string
@@ -106,4 +107,40 @@ export function getFundingSourceAccountId(
   regular: LinkableRegular
 ): string | null {
   return findLinkedPayment(db, regular)?.accountId ?? null
+}
+
+/**
+ * Why an Essentials user's Regular isn't getting the Essentials benefit yet
+ * (#97). Funding source needs a linked payment, so:
+ * - `unlinked` — no `match_description`: the user has to link one.
+ * - `no_payment` — linked, but no settled payment matches yet (none has
+ *   arrived, it's outside the ±20% band, or it also matches another Regular).
+ * Null when a payment is linked (whichever account paid it — that's an
+ * answer, not a linking problem), when the Regular is excluded from
+ * Spendable, or when it will never fall due again (same occurrence check as
+ * Reserved). Callers gate on an active Essentials nomination.
+ */
+export type EssentialsLinkHint = 'unlinked' | 'no_payment'
+
+export function getEssentialsLinkHint(
+  db: Database,
+  regular: LinkableRegular & {
+    is_reserved: number
+    frequency: string
+    next_charge_date: string
+    cancel_by_date: string | null
+  },
+  today: string
+): EssentialsLinkHint | null {
+  if (regular.is_reserved !== 1) return null
+  const fallsDueAgain =
+    firstOccurrenceOnOrAfter(
+      regular.next_charge_date,
+      regular.frequency,
+      today,
+      regular.cancel_by_date
+    ) !== null
+  if (!fallsDueAgain) return null
+  if (!regular.match_description) return 'unlinked'
+  return hasLinkedPayment(db, regular) ? null : 'no_payment'
 }
