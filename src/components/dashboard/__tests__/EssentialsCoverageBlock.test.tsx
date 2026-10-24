@@ -138,6 +138,7 @@ describe('EssentialsCoverageBlock: Saver balance beside the set-aside figure', (
       saverBalanceCents: 5000,
     })
     expect(html).toContain('Essentials Saver balance')
+    expect(html).toContain('$50.00')
   })
 
   it('stays collapsed with no balance line when covered', () => {
