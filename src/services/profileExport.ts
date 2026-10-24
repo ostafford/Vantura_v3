@@ -45,6 +45,7 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'dashboard_section_order',
   'lock_timeout_minutes',
   'saver_account_order',
+  'essentials_saver_account_id',
   'notifications_enabled',
   'notif_bills',
   'notif_tracker_overspent',

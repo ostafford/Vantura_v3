@@ -28,7 +28,7 @@ import {
 } from '@/services/budgetTransactionAnchors'
 import { RecurringChargeSuggestions } from './RecurringChargeSuggestions'
 import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetection'
-import { formatMoney, formatShortDate } from '@/lib/format'
+import { formatMoney, formatShortDate, localDateString } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import {
@@ -41,6 +41,11 @@ import {
   type ManualAccountRow,
 } from '@/services/manualAccounts'
 import { isEssentialsUser } from '@/services/essentials'
+import {
+  getEssentialsLinkHint,
+  type EssentialsLinkHint,
+} from '@/services/fundingSource'
+import { getDb } from '@/db'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
@@ -275,17 +280,28 @@ export function UpcomingSection({
   )
 
   /**
-   * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding-
-   * source inference needs a payment link (`match_description`, docs/adr/0020),
-   * so an unlinked Regular
-   * gets no Essentials benefit — it's always reserved regardless of which
-   * account actually pays it. Surfaced only for a nominated Essentials
-   * user; classic users get nothing here since linking has no effect on
-   * their Reserved figure.
+   * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding
+   * source needs a linked payment (docs/adr/0020), so a Regular without one
+   * gets no Essentials benefit — it's always reserved. Surfaced only for an
+   * active Essentials nomination; classic users get nothing here since
+   * linking has no effect on their Reserved figure. See getEssentialsLinkHint.
    */
-  function unlinkedEssentialsLabel(c: UpcomingChargeRow): string | null {
-    if (!essentialsUser || c.is_reserved !== 1) return null
-    return c.match_description ? null : 'not linked to Essentials'
+  const essentialsLinkHints = useMemo(() => {
+    const hints = new Map<number, EssentialsLinkHint | null>()
+    const db = getDb()
+    if (!essentialsUser || !db) return hints
+    const today = localDateString()
+    for (const c of [...overdue, ...nextPay, ...later, ...calendarCharges]) {
+      if (!hints.has(c.id)) hints.set(c.id, getEssentialsLinkHint(db, c, today))
+    }
+    return hints
+  }, [essentialsUser, overdue, nextPay, later, calendarCharges])
+
+  function essentialsLinkLabel(c: UpcomingChargeRow): string | null {
+    const hint = essentialsLinkHints.get(c.id)
+    if (hint === 'unlinked') return 'link a payment to use Essentials'
+    if (hint === 'no_payment') return 'no matching payment yet'
+    return null
   }
 
   function openCreate() {
@@ -517,14 +533,12 @@ export function UpcomingSection({
               <span className="badge badge-reminder ms-1">{dueLabel}</span>
             )}
           </div>
-          {(categoryName ||
-            c.is_reserved === 0 ||
-            unlinkedEssentialsLabel(c)) && (
+          {(categoryName || c.is_reserved === 0 || essentialsLinkLabel(c)) && (
             <div className="small text-muted">
               {[
                 categoryName,
                 c.is_reserved === 0 ? 'excluded from Spendable' : null,
-                unlinkedEssentialsLabel(c),
+                essentialsLinkLabel(c),
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -754,7 +768,7 @@ export function UpcomingSection({
                                         c.is_reserved === 0
                                           ? 'excluded from Spendable'
                                           : null,
-                                        unlinkedEssentialsLabel(c),
+                                        essentialsLinkLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}
@@ -818,7 +832,7 @@ export function UpcomingSection({
                                         c.is_reserved === 0
                                           ? 'excluded from Spendable'
                                           : null,
-                                        unlinkedEssentialsLabel(c),
+                                        essentialsLinkLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}

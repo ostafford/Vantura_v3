@@ -92,6 +92,12 @@ describe('profileExport', () => {
       }
     })
 
+    it('essentials_saver_account_id is in SETTINGS_WHITELIST (decision 6)', () => {
+      expect(
+        new Set(SETTINGS_WHITELIST).has('essentials_saver_account_id')
+      ).toBe(true)
+    })
+
     it('payday_raw_text and payday_description are in SETTINGS_WHITELIST', () => {
       const wl = new Set(SETTINGS_WHITELIST)
       expect(wl.has('payday_raw_text')).toBe(true)

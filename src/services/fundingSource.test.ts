@@ -4,6 +4,7 @@ import {
   findLinkedPayment,
   hasLinkedPayment,
   getFundingSourceAccountId,
+  getEssentialsLinkHint,
 } from './fundingSource'
 
 let SQL: SqlJsStatic
@@ -254,5 +255,74 @@ describe('findLinkedPayment (docs/adr/0020)', () => {
     })
     expect(hasLinkedPayment(db, regular)).toBe(false)
     expect(getFundingSourceAccountId(db, regular)).toBeNull()
+  })
+})
+
+describe('getEssentialsLinkHint (#97, decision 5)', () => {
+  const TODAY = '2026-03-01'
+  function hintFor(
+    description: string | null,
+    amount: number,
+    extra: Partial<{
+      is_reserved: number
+      frequency: string
+      next_charge_date: string
+      cancel_by_date: string | null
+    }> = {}
+  ) {
+    const regular = insertRegular(description, amount)
+    return getEssentialsLinkHint(
+      db,
+      {
+        ...regular,
+        is_reserved: 1,
+        frequency: 'MONTHLY',
+        next_charge_date: '2026-03-10',
+        cancel_by_date: null,
+        ...extra,
+      },
+      TODAY
+    )
+  }
+
+  it('asks to link a payment when the Regular has no link', () => {
+    expect(hintFor(null, 1500)).toBe('unlinked')
+  })
+
+  it('says no matching payment yet when linked but nothing matches', () => {
+    expect(hintFor('Gym', 6000)).toBe('no_payment')
+  })
+
+  it('says no matching payment when the only payment is outside the ±20% band', () => {
+    insertTx({
+      id: 't-band',
+      account_id: 'transactional-1',
+      amount: -9000,
+      description: 'Gym',
+      settled_at: '2026-02-10T09:00:00.000Z',
+    })
+    expect(hintFor('Gym', 6000)).toBe('no_payment')
+  })
+
+  it('shows nothing once a payment is linked, whichever account paid it', () => {
+    insertTx({
+      id: 't-everyday',
+      account_id: 'transactional-1',
+      amount: -1500,
+      description: 'Netflix',
+      settled_at: '2026-02-10T09:00:00.000Z',
+    })
+    expect(hintFor('Netflix', 1500)).toBeNull()
+  })
+
+  it('shows nothing for a Regular excluded from Spendable', () => {
+    expect(hintFor(null, 1500, { is_reserved: 0 })).toBeNull()
+  })
+
+  it('shows nothing for a Regular that will never fall due again', () => {
+    expect(
+      hintFor(null, 1500, { frequency: 'ONCE', next_charge_date: '2026-02-01' })
+    ).toBeNull()
+    expect(hintFor(null, 1500, { cancel_by_date: '2026-02-15' })).toBeNull()
   })
 })
