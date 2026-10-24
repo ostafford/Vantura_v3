@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-24
+
+Essentials follow-ups from the 0.11.0 audit: the bill-coverage block stops claiming "All bills covered" when it can't know, a closed Essentials Saver can no longer make Spendable read too high, and Regulars that aren't getting the Essentials benefit now say why.
+
 ### Fixed
 
 - **The Essentials bill-coverage block no longer says "All bills covered" when no payday is set.** Without a pay cycle there's no "before payday" to check bills against, so it now says "Set your payday to check bill coverage", with a link to Settings → Payday.
