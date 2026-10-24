@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-24
+
+Fixes from an accuracy audit of the 0.11.0 release. How Reserved and Spendable are calculated is unchanged; these are fixes to what the Dashboard and Settings show, and to wording.
+
+### Fixed
+
+- **The Regulars section now refreshes after a sync.** Its "reserved for Regulars" total only updated when you edited a Regular, so after a background sync an Essentials user could see it disagree with the Spendable card above it.
+- **The Essentials bill-coverage block is readable in the light theme.** The "All bills covered" and shortfall-warning text was pale pastel on white, below accessible contrast. It's now clearly legible, and screen readers announce when the coverage status changes.
+- **Settings → Essentials no longer hides a Saver that has since closed.** If your nominated Saver was closed, the picker showed "None" and the line below showed a raw account ID, while the nomination stayed active and couldn't be cleared. It now shows as "Unavailable Saver (closed or removed)", so you can see it and change it. Save is also disabled until you change something, and Saver balances show with a `$`.
+- **"Regulars" is now used everywhere it should be.** The Dashboard section title, the Settings → Dashboard sections list, notification links and the Budget Plan bucket page still said "Upcoming".
+- **Help no longer says monthly bills are prorated.** 0.11.0 corrected this claim in the Regulars tooltip, but the Help page still made it. A weekly or fortnightly Regular counts each time it falls due before payday. A monthly, quarterly, yearly or one-off Regular counts once, in full.
+- **The theme loads correctly when browser storage is blocked.** In a private window or with site data disabled, the script that sets your theme before the first paint could fail.
+
 ## [0.11.0] - 2026-10-24
 
 Essentials Saver support, with Regulars that now reliably recognise their own payments, by merchant name and amount rather than the bank's raw descriptor, plus fixes for pending payments, the light-theme flash on load, and profile backups.

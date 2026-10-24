@@ -25,6 +25,32 @@ export interface UpcomingItem {
 export const MILESTONES: Milestone[] = [
   {
     date: '24 Oct 2026',
+    heading: 'Essentials & Regulars Polish',
+    icon: 'mdi-shield-check-outline',
+    primaryMonth: '2026-10',
+    version: '0.11.1',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-sync',
+        text: 'The Regulars section now updates after a sync, so its reserved total always matches Spendable.',
+      },
+      {
+        icon: 'mdi-theme-light-dark',
+        text: 'The Essentials coverage status is now easy to read in the light theme.',
+      },
+      {
+        icon: 'mdi-piggy-bank-outline',
+        text: 'Settings → Essentials now clearly shows a nominated Saver that has since closed, so you can change it.',
+      },
+      {
+        icon: 'mdi-format-text',
+        text: 'The remaining "Upcoming" labels now say "Regulars", and Help no longer says monthly bills are prorated.',
+      },
+    ],
+  },
+  {
+    date: '24 Oct 2026',
     heading: 'Essentials Saver Support & Reliable Bill Linking',
     icon: 'mdi-piggy-bank-outline',
     primaryMonth: '2026-10',
