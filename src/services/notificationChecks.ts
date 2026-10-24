@@ -224,7 +224,7 @@ function checkBillsDue(): void {
       title,
       body,
       '/?scroll=upcoming',
-      'View Upcoming'
+      'View Regulars'
     )
     showNotification(title, body)
   }
@@ -754,7 +754,7 @@ export function ensureBillsDueNotifications(
       title,
       body,
       '/?scroll=upcoming',
-      'View Upcoming'
+      'View Regulars'
     )
   }
 }

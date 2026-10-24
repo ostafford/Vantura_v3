@@ -294,7 +294,7 @@ function BillsDueGroup({
             )
           })}
         </div>
-        <span className="notif-drawer__item-link">View Upcoming →</span>
+        <span className="notif-drawer__item-link">View Regulars →</span>
       </div>
       {hasUnread && <div className="notif-drawer__item-dot" aria-hidden />}
     </div>
