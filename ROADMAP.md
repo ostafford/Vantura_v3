@@ -278,18 +278,25 @@ system adopted as the presentation-tier standard, and consistent negative-amount
 
 ---
 
-### Essentials Saver Support — September 2026
+### v0.11.0 — Essentials Saver Support — September–October 2026
 
 Up shipped **Essentials** (a dedicated Saver that pays your bills, funded by a per-payday set-aside) for all customers on September 1st. Vantura now understands it as a first-class part of the money model, alongside the classic behaviour every existing user keeps unchanged.
+Checking it against real Essentials transactions (#84) showed the bank's raw descriptor can't be trusted to identify a bill's payments, so `v0.11.0` also rebuilds how a Regular recognises them.
 
 | Date | Feature |
 |------|---------|
+| Oct 24 | **`v0.11.0` released** — see [CHANGELOG](CHANGELOG.md#0110---2026-10-24) for the full list |
 | — | **Essentials Saver nomination** — Settings → Essentials; assist-only suggestion from a matching Saver name, never auto-set (ADR-0019) |
 | — | **Funding-source detection** — Vantura infers which Regulars are actually paid from the nominated Saver, from settled transaction history alone (the Up API exposes nothing Essentials-specific) |
 | — | **Reserved formula branch** — an Essentials-funded Regular is excluded from Reserved entirely; classic users see byte-identical behaviour, proven by the existing formula's test suite passing with zero edits |
 | — | **Dashboard bill-coverage block** — shows coverage status once at least one Regular is confirmed Essentials-funded, collapsing to a single line when everything's covered, with a shortfall warning if the Saver's balance looks short |
 | — | **Unlinked-Regulars nudge** — flags a Regular that can't benefit from Essentials detection yet because it has no linked settled transaction |
 | — | **"Upcoming charge" renamed to "Regular"** — matches Up's own terminology (ADR-0018) |
+| — | **Linked payments** — a Regular recognises its payments by Up's merchant description plus a ±20% amount band, one rule shared by bill auto-clear, liability-repayment prompts and funding-source detection; a payment that could belong to two Regulars is matched to neither (ADR-0020, [#111](https://github.com/ostafford/Vantura_v3/issues/111)) |
+| — | **Recurring-charge detection groups by description** — catches subscriptions whose descriptor changes every charge; existing dismissals carried over; settled debits only (ADR-0016 amendment, [#116](https://github.com/ostafford/Vantura_v3/issues/116)) |
+| — | **Pending payments no longer count as paid** — bill auto-clear waits for settlement ([#112](https://github.com/ostafford/Vantura_v3/issues/112)) |
+| — | **No dark flash for light-theme users** — the pre-paint theme script now loads as a file the security policy allows ([#113](https://github.com/ostafford/Vantura_v3/issues/113)) |
+| — | **Profile backups keep liability repayments** — charge type and the linked account (re-resolved by name) survive export/import, including a Net-Worth-only import ([#118](https://github.com/ostafford/Vantura_v3/issues/118)) |
 
 ---
 

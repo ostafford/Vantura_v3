@@ -24,6 +24,40 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '24 Oct 2026',
+    heading: 'Essentials Saver Support & Reliable Bill Linking',
+    icon: 'mdi-piggy-bank-outline',
+    primaryMonth: '2026-10',
+    version: '0.11.0',
+    color: '#ffcc80',
+    items: [
+      {
+        icon: 'mdi-piggy-bank-outline',
+        text: "Vantura now understands Up's Essentials Saver. Nominate yours in Settings → Essentials, and bills it pays come out of Reserved, since they're already covered. A Dashboard block shows what's covered and warns if the Saver looks short.",
+      },
+      {
+        icon: 'mdi-link-variant',
+        text: 'Regulars now recognise their payments by merchant name and amount, so auto-clear keeps working when a bill moves to another card or its bank descriptor changes every month.',
+      },
+      {
+        icon: 'mdi-radar',
+        text: 'Finding recurring charges now suggests subscriptions it used to miss.',
+      },
+      {
+        icon: 'mdi-timer-sand',
+        text: "A bill's reminder now clears only once the payment settles, not when a pending hold first appears.",
+      },
+      {
+        icon: 'mdi-theme-light-dark',
+        text: 'The light theme no longer flashes dark when the app opens.',
+      },
+      {
+        icon: 'mdi-backup-restore',
+        text: 'Profile backups now keep liability repayments and their linked accounts.',
+      },
+    ],
+  },
+  {
     date: '8 Sep 2026',
     heading: 'Spendable-First Dashboard & Smoother Motion',
     icon: 'mdi-view-dashboard-outline',
