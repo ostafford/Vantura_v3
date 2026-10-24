@@ -25,6 +25,36 @@ export interface UpcomingItem {
 export const MILESTONES: Milestone[] = [
   {
     date: '24 Oct 2026',
+    heading: 'Clearer Essentials Coverage',
+    icon: 'mdi-piggy-bank-outline',
+    primaryMonth: '2026-10',
+    version: '0.11.2',
+    color: '#ffcc80',
+    items: [
+      {
+        icon: 'mdi-check-decagram-outline',
+        text: '"All bills covered" now only shows when every bill is paid from your Essentials Saver, and it asks for your payday if none is set.',
+      },
+      {
+        icon: 'mdi-shield-alert-outline',
+        text: 'If your Essentials Saver closes, its bills count against Spendable again until you choose another Saver.',
+      },
+      {
+        icon: 'mdi-scale-balance',
+        text: "The coverage block now shows your Essentials Saver's balance next to what's due from it.",
+      },
+      {
+        icon: 'mdi-link-variant',
+        text: 'Regulars not yet getting the Essentials benefit now say why: no linked payment, or no matching payment found.',
+      },
+      {
+        icon: 'mdi-backup-restore',
+        text: 'Profile backups now include your Essentials Saver nomination.',
+      },
+    ],
+  },
+  {
+    date: '24 Oct 2026',
     heading: 'Essentials & Regulars Polish',
     icon: 'mdi-shield-check-outline',
     primaryMonth: '2026-10',
