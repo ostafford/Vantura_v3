@@ -203,6 +203,14 @@ describe('getEssentialsCoverage: states that decline to show a coverage result',
     expect(getEssentialsCoverage()?.state).toBe('payday_needed')
   })
 
+  it.each(['next_payday', 'payday_frequency'])(
+    'needs a payday when only %s is missing',
+    (key) => {
+      delete appSettings[key]
+      expect(getEssentialsCoverage()?.state).toBe('payday_needed')
+    }
+  )
+
   it('reports the Saver unavailable once it is closed', () => {
     db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [ESSENTIALS_SAVER])
     expect(getEssentialsCoverage()?.state).toBe('saver_unavailable')
