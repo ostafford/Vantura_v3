@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useStore } from 'zustand'
 import { Button, Modal, Spinner } from 'react-bootstrap'
 import { getAppSetting, deleteDatabase } from '@/db'
 import { toast } from '@/stores/toastStore'
 import { sessionStore } from '@/stores/sessionStore'
+import { syncStore } from '@/stores/syncStore'
 import { formatSyncProgressMessage } from '@/services/sync'
 import { useFullReSync } from '@/hooks/useFullReSync'
 import { clearBiometricSession } from '@/lib/biometricSession'
@@ -33,6 +35,8 @@ export function DataSection() {
     handleReSync,
     refreshLastSync,
   } = useFullReSync()
+  // Any sync in flight (e.g. the auto-sync after unlock) blocks a full re-sync.
+  const anySyncing = useStore(syncStore, (s) => s.syncing)
   const [showClearModal, setShowClearModal] = useState(false)
   const [clearing, setClearing] = useState(false)
 
@@ -89,7 +93,7 @@ export function DataSection() {
             className="btn-gradient-primary"
             size="sm"
             onClick={handleReSync}
-            disabled={syncing || isDemoMode}
+            disabled={syncing || anySyncing || isDemoMode}
             aria-label="Re-sync with Up Bank"
             aria-busy={syncing}
           >

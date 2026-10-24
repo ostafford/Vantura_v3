@@ -9,6 +9,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { MOBILE_MEDIA_QUERY, MOBILE_BREAKPOINT_PX } from '@/lib/constants'
 import { usePwaUpdate } from '@/hooks/usePwaUpdate'
+import { autoSyncIfStale } from '@/services/syncRunner'
 import {
   hasNewVersion,
   markVersionSeen,
@@ -26,6 +27,12 @@ export function Layout() {
   const setSidebarMobileOpen = useStore(uiStore, (s) => s.setSidebarMobileOpen)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const location = useLocation()
+  // Stale-data auto-sync (GLOSSARY *Stale data*). Layout remounts on every
+  // unlock and this re-runs on each navigation, so a session that stays
+  // unlocked still re-syncs once its data is 30+ minutes old.
+  useEffect(() => {
+    void autoSyncIfStale()
+  }, [location.pathname])
   const widthRef = useRef(
     typeof window !== 'undefined' ? window.innerWidth : 1280
   )

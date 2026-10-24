@@ -116,7 +116,27 @@ describe('autoSyncIfStale', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
+  it('stops retrying a rejected token, so the message shows once', async () => {
+    mocks.token = 'revoked'
+    mocks.performSync.mockRejectedValue(new UpBankUnauthorizedError())
+    await autoSyncIfStale()
+    await autoSyncIfStale()
+    expect(mocks.performSync).toHaveBeenCalledOnce()
+    expect(mocks.toastError).toHaveBeenCalledOnce()
+  })
+
+  it('resumes once the token changes', async () => {
+    mocks.token = 'revoked-2'
+    mocks.performSync.mockRejectedValueOnce(new UpBankUnauthorizedError())
+    await autoSyncIfStale()
+    mocks.token = 'new-token'
+    await autoSyncIfStale()
+    expect(mocks.performSync).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the token message on a 401, since it never fixes itself', async () => {
+    // Own token string: a rejected token is remembered for the module's life.
+    mocks.token = 'revoked-3'
     mocks.performSync.mockRejectedValue(new UpBankUnauthorizedError())
     await autoSyncIfStale()
     expect(mocks.toastError).toHaveBeenCalledWith(SYNC_401_MESSAGE)
