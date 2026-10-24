@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Essentials bill-coverage block no longer says "All bills covered" when no payday is set.** Without a pay cycle there's no "before payday" to check bills against, so it now says "Set your payday to check bill coverage", with a link to Settings → Payday.
+- **A closed Essentials Saver no longer makes Spendable read too high.** Bills last paid from a nominated Saver that has since closed were still left out of Reserved, even though nothing pays them now. A closed Saver now counts as no nomination: those bills are reserved again, and the coverage block asks you to choose another Saver in Settings → Essentials instead of showing a false shortfall. Your nomination itself isn't changed.
+
 ## [0.11.1] - 2026-10-24
 
 Fixes from an accuracy audit of the 0.11.0 release. How Reserved and Spendable are calculated is unchanged; these are fixes to what the Dashboard and Settings show, and to wording.

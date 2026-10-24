@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import React from 'react'
 import ReactDOMServer from 'react-dom/server'
+import { MemoryRouter } from 'react-router-dom'
 import { EssentialsCoverageBlock } from '@/components/dashboard/EssentialsCoverageBlock'
 import type { EssentialsCoverage } from '@/services/essentialsCoverage'
 
@@ -84,5 +85,33 @@ describe('EssentialsCoverageBlock', () => {
     })
     expect(html).toContain('Reserved here')
     expect(html).toMatch(/Reserved here<\/span><span>\$0\.00/)
+  })
+})
+
+describe('EssentialsCoverageBlock: declined states', () => {
+  function renderInRouter(coverage: EssentialsCoverage) {
+    return ReactDOMServer.renderToString(
+      <MemoryRouter>
+        <EssentialsCoverageBlock coverage={coverage} />
+      </MemoryRouter>
+    ).replace(/<!-- -->/g, '')
+  }
+
+  it('asks for a payday instead of showing a coverage result', () => {
+    const html = renderInRouter({ ...base, state: 'payday_needed' })
+    expect(html).toContain('Set your payday to check bill coverage')
+    expect(html).toContain('href="/settings#payday"')
+    expect(html).not.toContain('All bills covered')
+    expect(html).not.toContain('Reserved here')
+  })
+
+  it('asks for another Saver when the nominated one is closed', () => {
+    const html = renderInRouter({ ...base, state: 'saver_unavailable' })
+    expect(html).toContain(
+      'Your Essentials Saver is closed — choose another in Settings'
+    )
+    expect(html).toContain('href="/settings#essentials"')
+    expect(html).not.toContain('may be short')
+    expect(html).not.toContain('Set aside in Essentials')
   })
 })

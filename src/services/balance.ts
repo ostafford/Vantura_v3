@@ -8,7 +8,7 @@ import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
 import { firstOccurrenceOnOrAfter } from './upcoming'
-import { getEssentialsSaverAccountId } from './essentials'
+import { getActiveEssentialsSaverAccountId } from './essentials'
 import {
   getFundingSourceAccountId,
   type LinkableRegular,
@@ -228,7 +228,8 @@ export function getAvailableBalance(): number {
 
 /**
  * Essentials-era funding-source filter (docs/adr/0019). Classic users (no
- * nominated Essentials Saver) pass every charge through untouched — this is
+ * nominated Essentials Saver, or one that's closed/missing) pass every charge
+ * through untouched — this is
  * the null guard that keeps the classic Reserved formula byte-identical.
  * For an Essentials user, drops any charge whose funding source — the
  * account of its most recent linked payment (docs/adr/0020), no window
@@ -240,7 +241,7 @@ function excludeEssentialsFundedCharges<T extends LinkableRegular>(
   db: Database,
   charges: T[]
 ): T[] {
-  const essentialsSaverId = getEssentialsSaverAccountId()
+  const essentialsSaverId = getActiveEssentialsSaverAccountId()
   if (!essentialsSaverId) return charges
   return charges.filter(
     (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId

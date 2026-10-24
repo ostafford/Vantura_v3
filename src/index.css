@@ -1218,7 +1218,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .essentials-coverage--covered {
   border-left-color: var(--vantura-success);
 }
-.essentials-coverage--shortfall {
+.essentials-coverage--shortfall,
+.essentials-coverage--saver_unavailable {
   border-left-color: var(--vantura-warning);
 }
 .essentials-coverage__status {
@@ -1232,7 +1233,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .essentials-coverage--covered .essentials-coverage__status {
   color: var(--vantura-success);
 }
-.essentials-coverage--shortfall .essentials-coverage__status {
+.essentials-coverage--shortfall .essentials-coverage__status,
+.essentials-coverage--saver_unavailable .essentials-coverage__status {
   color: var(--vantura-warning);
 }
 /* Light theme: the pastel status hues are ~1.5:1 on a white surface. Pull
@@ -1245,6 +1247,9 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 [data-theme='light']
   .essentials-coverage--shortfall
+  .essentials-coverage__status,
+[data-theme='light']
+  .essentials-coverage--saver_unavailable
   .essentials-coverage__status {
   color: color-mix(in srgb, var(--vantura-warning) 45%, var(--vantura-text));
 }

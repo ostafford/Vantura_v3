@@ -183,3 +183,47 @@ describe('getEssentialsCoverage', () => {
     })
   })
 })
+
+describe('getEssentialsCoverage: states that decline to show a coverage result', () => {
+  beforeEach(() => {
+    appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
+    addCharge({
+      name: 'Netflix',
+      amount: 1500,
+      next_charge_date: '2025-02-25',
+      match_description: 'Netflix',
+    })
+    settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
+    setSaverBalance(5000)
+  })
+
+  it('needs a payday when none is configured, rather than claiming "covered"', () => {
+    delete appSettings['next_payday']
+    delete appSettings['payday_frequency']
+    expect(getEssentialsCoverage()?.state).toBe('payday_needed')
+  })
+
+  it.each(['next_payday', 'payday_frequency'])(
+    'needs a payday when only %s is missing',
+    (key) => {
+      delete appSettings[key]
+      expect(getEssentialsCoverage()?.state).toBe('payday_needed')
+    }
+  )
+
+  it('reports the Saver unavailable once it is closed', () => {
+    db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [ESSENTIALS_SAVER])
+    expect(getEssentialsCoverage()?.state).toBe('saver_unavailable')
+  })
+
+  it('reports the Saver unavailable when it is missing, rather than a $0-balance shortfall', () => {
+    db.run(`DELETE FROM accounts WHERE id = ?`, [ESSENTIALS_SAVER])
+    expect(getEssentialsCoverage()?.state).toBe('saver_unavailable')
+  })
+
+  it('reports the Saver unavailable even before any Essentials payment was seen', () => {
+    db.run(`DELETE FROM transactions`)
+    db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [ESSENTIALS_SAVER])
+    expect(getEssentialsCoverage()?.state).toBe('saver_unavailable')
+  })
+})
