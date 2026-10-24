@@ -1272,6 +1272,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-text-secondary);
   font-variant-numeric: tabular-nums;
 }
+/* The Saver balance the set-aside figure is checked against (#96): indented
+   under "Set aside in Essentials" so the pair reads as one comparison. */
+.essentials-coverage__split-row--sub {
+  padding-left: 0.75rem;
+}
 
 /* Phase 8: Purple React sidebar */
 .sidebar {

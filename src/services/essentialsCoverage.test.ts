@@ -227,3 +227,50 @@ describe('getEssentialsCoverage: states that decline to show a coverage result',
     expect(getEssentialsCoverage()?.state).toBe('saver_unavailable')
   })
 })
+
+describe('getEssentialsCoverage: partial counts every transactional bill, not just this cycle', () => {
+  beforeEach(() => {
+    appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
+    addCharge({
+      name: 'Netflix',
+      amount: 1500,
+      next_charge_date: '2025-02-25',
+      match_description: 'Netflix',
+    })
+    settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
+    setSaverBalance(5000)
+  })
+
+  it('is partial when a transactional bill is due after payday', () => {
+    addCharge({ name: 'Gym', amount: 6000, next_charge_date: '2025-03-10' })
+    const coverage = getEssentialsCoverage()
+    expect(coverage?.state).toBe('partial')
+    expect(coverage?.transactionalCount).toBe(1)
+    expect(coverage?.reservedHereCents).toBe(0)
+  })
+
+  it('ignores a transactional one-off whose date has passed (never reserved again)', () => {
+    addCharge({ name: 'Old fee', amount: 900, next_charge_date: '2025-02-20' })
+    expect(getEssentialsCoverage()?.state).toBe('covered')
+  })
+
+  it('ignores a transactional Regular past its cancel-by date', () => {
+    db.run(
+      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, cancel_by_date)
+       VALUES ('Old sub', 1000, 'MONTHLY', '2025-03-05', 1, '2025-01-01', '2025-02-01')`
+    )
+    expect(getEssentialsCoverage()?.state).toBe('covered')
+  })
+
+  it('ignores a transactional Regular that is not included in Spendable', () => {
+    db.run(
+      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
+       VALUES ('Excluded', 1000, 'ONCE', '2025-03-10', 0, '2025-01-01')`
+    )
+    expect(getEssentialsCoverage()?.state).toBe('covered')
+  })
+
+  it('exposes the Saver balance behind the set-aside figure', () => {
+    expect(getEssentialsCoverage()?.saverBalanceCents).toBe(5000)
+  })
+})

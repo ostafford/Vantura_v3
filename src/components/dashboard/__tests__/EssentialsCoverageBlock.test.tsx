@@ -115,3 +115,32 @@ describe('EssentialsCoverageBlock: declined states', () => {
     expect(html).not.toContain('Set aside in Essentials')
   })
 })
+
+describe('EssentialsCoverageBlock: Saver balance beside the set-aside figure', () => {
+  it('shows the Saver balance under "Set aside in Essentials" in a shortfall', () => {
+    const html = render({
+      ...base,
+      state: 'shortfall',
+      essentialsSetAsideCents: 6000,
+      saverBalanceCents: 5000,
+      shortfallCents: 1000,
+    })
+    expect(html).toContain('Set aside in Essentials')
+    expect(html).toContain('Essentials Saver balance')
+    expect(html).toContain('$50.00')
+  })
+
+  it('shows it in the partial state too', () => {
+    const html = render({
+      ...base,
+      state: 'partial',
+      transactionalCount: 1,
+      saverBalanceCents: 5000,
+    })
+    expect(html).toContain('Essentials Saver balance')
+  })
+
+  it('stays collapsed with no balance line when covered', () => {
+    expect(render(base)).not.toContain('Essentials Saver balance')
+  })
+})
