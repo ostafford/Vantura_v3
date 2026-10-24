@@ -21,7 +21,7 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 8
+const EXPORT_PAYLOAD_VERSION = 9
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -134,6 +134,14 @@ export interface UpcomingChargeExportRow {
   bucket_id?: number | null
   /** #111 — Up `description` of the Regular's linked payments (docs/adr/0020). Absent before payload v8. */
   match_description?: string | null
+  /** #118 — 'EXPENSE' | 'LIABILITY_REPAYMENT'. Absent before payload v9 (imports as 'EXPENSE'). */
+  charge_type?: string
+  /**
+   * #118 — name of the linked manual liability account. Local ids don't
+   * survive the export boundary (ADR-0013), so the link travels by name and
+   * is resolved after import. Absent before payload v9.
+   */
+  linked_account_name?: string | null
 }
 
 export interface BudgetBucketExportRow {
@@ -327,7 +335,10 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date, bucket_id, match_description
+      reminder_days_before, cancel_by_date, bucket_id, match_description,
+      COALESCE(charge_type, 'EXPENSE'),
+      (SELECT m.name FROM manual_accounts m
+       WHERE m.id = upcoming_charges.linked_manual_account_id)
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -343,6 +354,8 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string | null,
       number | null,
       string | null,
+      string,
+      string | null,
     ]
     rows.push({
       name: r[0],
@@ -355,6 +368,8 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       cancel_by_date: r[7] ?? null,
       bucket_id: r[8] ?? null,
       match_description: r[9] ?? null,
+      charge_type: r[10],
+      linked_account_name: r[11] ?? null,
     })
   }
   stmt.free()
@@ -881,15 +896,29 @@ export function replaceTrackers(
   }
 }
 
-/** Replace upcoming_charges with imported data. */
+/**
+ * A liability repayment Regular waiting to be re-linked to its manual account
+ * by name, once every selected section has been imported (#118).
+ */
+export interface PendingAccountLink {
+  chargeId: number
+  accountName: string
+}
+
+/**
+ * Replace upcoming_charges with imported data. Returns the account links to
+ * resolve by name once manual_accounts are final — see
+ * `relinkLiabilityAccounts`.
+ */
 export function replaceUpcomingCharges(
   upcomingCharges: UpcomingChargeExportRow[],
   bucketIdMap: Map<number, number> = new Map()
-): void {
+): PendingAccountLink[] {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   db.run(`DELETE FROM upcoming_charges`)
 
+  const pending: PendingAccountLink[] = []
   const now = new Date().toISOString()
   const charges = Array.isArray(upcomingCharges) ? upcomingCharges : []
   for (const uc of charges) {
@@ -926,13 +955,17 @@ export function replaceUpcomingCharges(
       typeof uc.match_description === 'string' && uc.match_description
         ? uc.match_description
         : null
+    const chargeType =
+      uc.charge_type === 'LIABILITY_REPAYMENT'
+        ? 'LIABILITY_REPAYMENT'
+        : 'EXPENSE'
 
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, category_id, is_reserved,
           reminder_days_before, cancel_by_date, bucket_id, match_description,
-          created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          charge_type, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -944,8 +977,63 @@ export function replaceUpcomingCharges(
         cancelByDate,
         bucketId,
         matchDescription,
+        chargeType,
         now,
       ]
+    )
+    if (
+      chargeType === 'LIABILITY_REPAYMENT' &&
+      typeof uc.linked_account_name === 'string' &&
+      uc.linked_account_name
+    ) {
+      pending.push({
+        chargeId: db.exec('SELECT last_insert_rowid()')[0]
+          .values[0][0] as number,
+        accountName: uc.linked_account_name,
+      })
+    }
+  }
+  return pending
+}
+
+/**
+ * The account links of this device's liability repayment Regulars, by name —
+ * captured before `replaceNetWorth` re-inserts manual_accounts under new ids,
+ * so a Net-Worth-only import doesn't leave them pointing at deleted rows.
+ */
+function captureLocalAccountLinks(
+  db: NonNullable<ReturnType<typeof getDb>>
+): PendingAccountLink[] {
+  const res = db.exec(
+    `SELECT c.id, m.name FROM upcoming_charges c
+     JOIN manual_accounts m ON m.id = c.linked_manual_account_id
+     WHERE c.charge_type = 'LIABILITY_REPAYMENT'`
+  )
+  return (res[0]?.values ?? []).map((r) => ({
+    chargeId: r[0] as number,
+    accountName: String(r[1]),
+  }))
+}
+
+/**
+ * Re-link each pending Regular to the manual account with exactly its name.
+ * Zero or several matches leave it unlinked — never a guess (same "ambiguous
+ * means no link" rule as docs/adr/0020). An unlinked Regular keeps
+ * `LIABILITY_REPAYMENT`: the debt still exists, Vantura just can't tell which
+ * account it is (#118).
+ */
+function relinkLiabilityAccounts(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  pending: PendingAccountLink[]
+): void {
+  for (const { chargeId, accountName } of pending) {
+    const res = db.exec(`SELECT id FROM manual_accounts WHERE name = ?`, [
+      accountName,
+    ])
+    const ids = res[0]?.values ?? []
+    db.run(
+      `UPDATE upcoming_charges SET linked_manual_account_id = ? WHERE id = ?`,
+      [ids.length === 1 ? (ids[0][0] as number) : null, chargeId]
     )
   }
 }
@@ -1146,8 +1234,20 @@ export function importPayloadWithOptions(
         bucketIdMap
       )
     }
+    // Liability-account links travel by name (#118): collect them from the
+    // imported Regulars, or — when only Net Worth is replaced — from this
+    // device's own Regulars before their accounts are re-inserted, then
+    // resolve once manual_accounts are final.
+    const replacesNetWorth =
+      options.netWorth && payload.manualAccounts !== undefined
+    let pendingLinks: PendingAccountLink[] = []
     if (options.upcomingCharges) {
-      replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
+      pendingLinks = replaceUpcomingCharges(
+        payload.upcomingCharges ?? [],
+        bucketIdMap
+      )
+    } else if (replacesNetWorth) {
+      pendingLinks = captureLocalAccountLinks(db)
     }
     // A pre-v5 payload has no Net Worth section at all. Running replaceNetWorth
     // then would DELETE both tables with nothing to reinsert, silently wiping
@@ -1156,9 +1256,13 @@ export function importPayloadWithOptions(
     // other caller (batch restore, tests, a future CLI) can trip the same
     // footgun. `manualAccounts: []` — present but empty — is still a real
     // replace-all and is left to run.
-    if (options.netWorth && payload.manualAccounts !== undefined) {
-      replaceNetWorth(payload.manualAccounts, payload.netWorthSnapshots ?? [])
+    if (replacesNetWorth) {
+      replaceNetWorth(
+        payload.manualAccounts ?? [],
+        payload.netWorthSnapshots ?? []
+      )
     }
+    relinkLiabilityAccounts(db, pendingLinks)
 
     db.run('COMMIT')
   } catch (err) {

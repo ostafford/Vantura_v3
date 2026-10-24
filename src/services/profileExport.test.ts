@@ -527,6 +527,14 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     netWorth: true,
   }
 
+  const NONE: ImportOptions = {
+    settings: false,
+    trackers: false,
+    upcomingCharges: false,
+    budgetPlan: false,
+    netWorth: false,
+  }
+
   function readTrackers(): Array<{
     id: number
     name: string
@@ -1191,7 +1199,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(8)
+      expect(payload.version).toBe(9)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1484,7 +1492,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(8)
+      expect(payload.version).toBe(9)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1597,6 +1605,108 @@ describe('profile import writers: real-DB coverage (#36)', () => {
         `SELECT target_amount_cents FROM accounts WHERE id = 'sav-1'`
       )
       expect(t[0].values[0][0]).toBeNull()
+    })
+  })
+  // ── #118: a Regular's charge_type and liability-account link ──────────
+
+  describe('liability repayment Regulars survive export/import (#118)', () => {
+    function addAccount(name: string): number {
+      realDb.run(
+        `INSERT INTO manual_accounts (name, account_type, kind, balance_cents, sort_order, last_updated_at, created_at)
+         VALUES (?, 'MORTGAGE', 'liability', 45000000, 0, '2026-02-10', '2026-01-01')`,
+        [name]
+      )
+      return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
+    }
+
+    function addRepayment(name: string, accountId: number | null): number {
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, charge_type, linked_manual_account_id)
+         VALUES (?, 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01', 'LIABILITY_REPAYMENT', ?)`,
+        [name, accountId]
+      )
+      return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
+    }
+
+    /** Each Regular's charge_type and the *name* of its linked account (ids change on import). */
+    function readRepayments(): Array<[string, string, string | null]> {
+      return realDb
+        .exec(
+          `SELECT c.name, c.charge_type, m.name
+           FROM upcoming_charges c
+           LEFT JOIN manual_accounts m ON m.id = c.linked_manual_account_id
+           ORDER BY c.id`
+        )[0]
+        .values.map((r) => [
+          String(r[0]),
+          String(r[1]),
+          r[2] == null ? null : String(r[2]),
+        ])
+    }
+
+    it('round-trips charge_type and re-links to the re-inserted account of the same name', () => {
+      const loanId = addAccount('Home Loan')
+      addRepayment('Mortgage repayment', loanId)
+      const payload = buildExportPayload()
+
+      importPayloadWithOptions(payload, ALL_ON)
+
+      expect(readRepayments()).toEqual([
+        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
+      ])
+    })
+
+    it('links to an existing local account of the same name when only Regulars are imported', () => {
+      const loanId = addAccount('Home Loan')
+      addRepayment('Mortgage repayment', loanId)
+      const payload = buildExportPayload()
+      realDb.run(`DELETE FROM upcoming_charges`)
+
+      importPayloadWithOptions(payload, { ...NONE, upcomingCharges: true })
+
+      expect(readRepayments()).toEqual([
+        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
+      ])
+    })
+
+    it('leaves the link empty, but keeps LIABILITY_REPAYMENT, when the name matches more than one account', () => {
+      const loanId = addAccount('Home Loan')
+      addRepayment('Mortgage repayment', loanId)
+      const payload = buildExportPayload()
+      addAccount('Home Loan')
+
+      importPayloadWithOptions(payload, { ...NONE, upcomingCharges: true })
+
+      expect(readRepayments()).toEqual([
+        ['Mortgage repayment', 'LIABILITY_REPAYMENT', null],
+      ])
+    })
+
+    it('imports a Regular from an older file without the new fields as an unlinked EXPENSE', () => {
+      addAccount('Home Loan')
+      importPayloadWithOptions(
+        emptyPayload({ upcomingCharges: [chargeExport({ name: 'Old file' })] }),
+        { ...NONE, upcomingCharges: true }
+      )
+      expect(readRepayments()).toEqual([['Old file', 'EXPENSE', null]])
+    })
+
+    it("re-links this device's Regulars when only Net Worth is imported, and unlinks one whose account name is gone", () => {
+      const loanId = addAccount('Home Loan')
+      const carId = addAccount('Car Loan')
+      addRepayment('Mortgage repayment', loanId)
+      addRepayment('Car repayment', carId)
+      const payload = buildExportPayload()
+      payload.manualAccounts = payload.manualAccounts?.filter(
+        (a) => a.name === 'Home Loan'
+      )
+
+      importPayloadWithOptions(payload, { ...NONE, netWorth: true })
+
+      expect(readRepayments()).toEqual([
+        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
+        ['Car repayment', 'LIABILITY_REPAYMENT', null],
+      ])
     })
   })
 })
