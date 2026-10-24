@@ -315,7 +315,6 @@ Features that have been discussed or noted as potential future additions. Nothin
 - **Advanced charts** — Category trends and spending heatmaps beyond the current Weekly Insights / Savers bar charts
 - **CSV export of transactions** — Export transaction history to CSV
 - **Budget forecasting** — Predict future balance based on trackers, upcoming charges, and Budget Plan
-- **Background auto-sync** — Sync automatically on app open instead of requiring a manual tap
 - **Multi-account support** — Multiple Up Bank accounts/tokens (e.g. joint accounts) in one Vantura profile
 
 ---
