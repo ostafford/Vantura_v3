@@ -1235,6 +1235,19 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .essentials-coverage--shortfall .essentials-coverage__status {
   color: var(--vantura-warning);
 }
+/* Light theme: the pastel status hues are ~1.5:1 on a white surface. Pull
+   the text toward --vantura-text for legible contrast; the left-border
+   accent keeps the pastel. */
+[data-theme='light']
+  .essentials-coverage--covered
+  .essentials-coverage__status {
+  color: color-mix(in srgb, var(--vantura-success) 45%, var(--vantura-text));
+}
+[data-theme='light']
+  .essentials-coverage--shortfall
+  .essentials-coverage__status {
+  color: color-mix(in srgb, var(--vantura-warning) 45%, var(--vantura-text));
+}
 .essentials-coverage__icon {
   font-size: 1.05rem;
   flex-shrink: 0;

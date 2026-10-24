@@ -206,7 +206,7 @@ function AddUpcomingTransactionModal({
                   className="fw-semibold small text-muted mb-2 text-uppercase"
                   style={{ letterSpacing: '0.05em' }}
                 >
-                  Your upcoming transactions
+                  Your Regulars
                 </div>
                 <div className="d-flex flex-column gap-1">
                   {unassigned.map((c) => (
@@ -1066,7 +1066,7 @@ export function AnalyticsBudgetPlanBucket() {
         <Card.Header className="d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-2">
             <i className="mdi mdi-calendar-clock text-muted" aria-hidden />
-            <span className="fw-semibold">Upcoming Transactions</span>
+            <span className="fw-semibold">Regulars</span>
           </div>
           <Button
             variant="outline-primary"
@@ -1081,8 +1081,8 @@ export function AnalyticsBudgetPlanBucket() {
           {upcomingItems.length === 0 ? (
             <p className="text-muted small mb-0">
               Add fixed recurring charges — subscriptions, bills, loan
-              repayments. You can assign existing upcoming transactions or
-              create one from a real transaction.
+              repayments. You can assign existing Regulars or create one from a
+              real transaction.
             </p>
           ) : (
             upcomingItems.map((u) => (

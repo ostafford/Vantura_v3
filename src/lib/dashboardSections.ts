@@ -50,7 +50,7 @@ export const DASHBOARD_SECTION_LABELS: Record<DashboardSectionId, string> = {
   month_summary: 'Month at a glance',
   insights: 'Weekly insights',
   trackers: 'Trackers',
-  upcoming: 'Upcoming transactions',
+  upcoming: 'Regulars',
   net_worth: 'Net Worth',
 }
 

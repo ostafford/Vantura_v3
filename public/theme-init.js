@@ -1,7 +1,12 @@
 // Apply stored theme before first paint to prevent flash. Loaded as a
 // same-origin file (not inline) so the CSP's script-src 'self' allows it.
 ;(function () {
-  var m = localStorage.getItem('vantura_theme_mode') || 'dark'
+  var m = 'dark'
+  try {
+    m = localStorage.getItem('vantura_theme_mode') || 'dark'
+  } catch (e) {
+    // Storage blocked (private mode, site data disabled): keep the default.
+  }
   var r =
     m === 'system'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
