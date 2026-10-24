@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **The coverage block shows your Essentials Saver's balance** under "Set aside in Essentials", so you can see what the shortfall warning compares against.
+- **The Essentials linking hint now shows whenever a Regular isn't getting the Essentials benefit.** "link a payment to use Essentials" means it has no linked payment; "no matching payment found" means it's linked but no Up payment matches it, for example because it hasn't arrived yet, the amount is more than 20% off, or the payment also matches another Regular. Previously only Regulars with no link at all got a hint, worded "not linked to Essentials".
+- **Profile backups now include your Essentials Saver nomination,** and the import preview says so. Restoring with the same Up account keeps Essentials; if that Saver doesn't exist where you restore, it shows as unavailable and Reserved works the classic way. Older backups leave your current nomination alone.
 
 ## [0.11.1] - 2026-10-24
 
