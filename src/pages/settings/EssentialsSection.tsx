@@ -69,7 +69,7 @@ export function EssentialsSection() {
             <option value="">None — I'm not using Essentials</option>
             {savers.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.display_name} ({formatMoney(a.balance)})
+                {a.display_name} (${formatMoney(a.balance)})
                 {a.id === suggestedId ? ' — suggested' : ''}
               </option>
             ))}
@@ -89,7 +89,12 @@ export function EssentialsSection() {
             </span>
           </p>
         )}
-        <Button type="submit" className="btn-gradient-primary" size="sm">
+        <Button
+          type="submit"
+          className="btn-gradient-primary"
+          size="sm"
+          disabled={selectedId === (nominatedId ?? '')}
+        >
           Save
         </Button>
       </Form>

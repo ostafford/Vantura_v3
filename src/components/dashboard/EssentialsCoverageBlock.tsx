@@ -19,7 +19,7 @@ export function EssentialsCoverageBlock({
     <div
       className={`essentials-coverage essentials-coverage--${coverage.state} mb-4`}
     >
-      <div className="essentials-coverage__status">
+      <div className="essentials-coverage__status" role="status">
         {coverage.state === 'covered' && (
           <>
             <i

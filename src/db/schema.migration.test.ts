@@ -1086,7 +1086,18 @@ describe('v47 migration: upcoming_charges.match_description (docs/adr/0020)', ()
       ['Manual', null, null],
     ])
 
+    // Re-run the v47 block itself (the version gate alone would skip it): the
+    // column-exists guard must stop a second ALTER and a second backfill.
+    db.run(
+      `UPDATE upcoming_charges SET match_description = 'Edited' WHERE name = 'Cloudflare'`
+    )
+    db.run(`UPDATE app_settings SET value = '46' WHERE key = 'schema_version'`)
     expect(() => runMigrations(db)).not.toThrow()
+    expect(
+      db.exec(
+        `SELECT match_description FROM upcoming_charges WHERE name = 'Cloudflare'`
+      )[0].values[0][0]
+    ).toBe('Edited')
     db.close()
   })
 })
@@ -1128,6 +1139,12 @@ describe('v48 migration: dismissed suggestions re-keyed by description (#116)', 
     )
 
     runMigrations(db)
+    // Re-run the v48 block itself (the version gate alone would skip it):
+    // INSERT OR IGNORE must not duplicate or re-date the added key.
+    db.run(
+      `UPDATE dismissed_charge_suggestions SET dismissed_at = '2026-04-01' WHERE suggestion_key = 'Gym'`
+    )
+    db.run(`UPDATE app_settings SET value = '47' WHERE key = 'schema_version'`)
     runMigrations(db)
 
     expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
@@ -1138,7 +1155,7 @@ describe('v48 migration: dismissed suggestions re-keyed by description (#116)', 
       .values.map((r) => [String(r[0]), String(r[1])])
     expect(keys).toEqual([
       ['Already A Description', '2026-03-01'],
-      ['Gym', '2026-03-01'],
+      ['Gym', '2026-04-01'],
       ['NO SUCH RAW TEXT', '2026-03-01'],
       ['PAYPAL *GYM, 4029357733', '2026-03-01'],
     ])

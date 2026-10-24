@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useStore } from 'zustand'
 import {
   Card,
   Button,
@@ -29,6 +30,7 @@ import { RecurringChargeSuggestions } from './RecurringChargeSuggestions'
 import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetection'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
+import { syncStore } from '@/stores/syncStore'
 import {
   getBuckets,
   getUpcomingBucketId,
@@ -183,6 +185,7 @@ export function UpcomingSection({
   dragHandleProps,
 }: UpcomingSectionProps) {
   const [refresh, setRefresh] = useState(0)
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [showModal, setShowModal] = useState(false)
   const [editingCharge, setEditingCharge] = useState<UpcomingChargeRow | null>(
     null
@@ -223,12 +226,12 @@ export function UpcomingSection({
   const { overdue, nextPay, later, nextPayday } = useMemo(
     () => getUpcomingChargesGrouped(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh]
+    [refresh, lastSyncCompletedAt]
   )
   const calendarCharges = useMemo(
     () => getUpcomingChargesForMonth(calendarMonth.year, calendarMonth.month),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [calendarMonth.year, calendarMonth.month, refresh]
+    [calendarMonth.year, calendarMonth.month, refresh, lastSyncCompletedAt]
   )
   const calendarDaysByDate = useMemo(() => {
     const map: Record<string, UpcomingChargeRow[]> = {}
@@ -239,24 +242,37 @@ export function UpcomingSection({
     }
     return map
   }, [calendarCharges])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const reserved = useMemo(() => getReservedAmount(), [refresh])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const categories = useMemo(() => getCategories(), [refresh])
+  const reserved = useMemo(
+    () => getReservedAmount(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
+  const categories = useMemo(
+    () => getCategories(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
   const categoryNameById = useMemo(() => {
     const map = new Map<string, string>()
     for (const c of categories) map.set(c.id, c.name)
     return map
   }, [categories])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allBuckets = useMemo(() => getBuckets(), [refresh])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allManualAccounts = useMemo(() => getManualAccounts(), [refresh])
+  const allBuckets = useMemo(() => getBuckets(), [refresh, lastSyncCompletedAt])
+  const allManualAccounts = useMemo(
+    () => getManualAccounts(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
   const manualLiabilities = allManualAccounts.filter(
     (a: ManualAccountRow) => a.kind === 'liability'
   )
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
-  const essentialsUser = isEssentialsUser()
+  const essentialsUser = useMemo(
+    () => isEssentialsUser(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh, lastSyncCompletedAt]
+  )
 
   /**
    * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding-
@@ -592,7 +608,7 @@ export function UpcomingSection({
             <span className="page-title-icon" {...dragHandleProps}>
               <i className="mdi mdi-calendar-clock" aria-hidden />
             </span>
-            <span>Upcoming transactions</span>
+            <span>Regulars</span>
             <div
               className="period-toggle ms-2"
               role="group"

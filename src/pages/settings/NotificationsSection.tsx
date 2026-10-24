@@ -69,7 +69,7 @@ const NOTIF_TYPES: {
     label: 'Bill reminders',
     desc: 'Regulars within their reminder window',
     setup: {
-      label: 'the Upcoming section on the Dashboard',
+      label: 'the Regulars section on the Dashboard',
       to: '/?scroll=upcoming',
     },
   },
