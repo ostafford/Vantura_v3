@@ -13,35 +13,8 @@ import {
   type ManualAccountExportRow,
   type ImportOptions,
 } from '@/services/profileExport'
-import { getPaydayDayLabel } from '@/lib/payday'
 import { classifyImportError } from './importErrorClassification'
-
-function formatSettingsSummary(settings: Record<string, string>): string {
-  if (!settings || Object.keys(settings).length === 0) return 'None'
-  const parts: string[] = []
-  const freq = settings.payday_frequency
-  if (freq) {
-    const label =
-      freq === 'WEEKLY'
-        ? 'Weekly'
-        : freq === 'FORTNIGHTLY'
-          ? 'Fortnightly'
-          : freq === 'MONTHLY'
-            ? 'Monthly'
-            : freq
-    const dayStr = settings.payday_day
-    if (dayStr) {
-      const dayNum = parseInt(dayStr, 10)
-      const dayLabel = Number.isNaN(dayNum)
-        ? dayStr
-        : getPaydayDayLabel(freq, dayNum)
-      parts.push(`${label} payday (${dayLabel})`)
-    } else {
-      parts.push(`${label} payday`)
-    }
-  }
-  return parts.length > 0 ? parts.join(', ') : 'Some settings'
-}
+import { formatSettingsSummary } from './importSettingsSummary'
 
 function formatTrackersSummary(trackers: TrackerExportRow[]): string {
   if (!Array.isArray(trackers) || trackers.length === 0) return 'None'

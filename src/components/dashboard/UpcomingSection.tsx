@@ -301,7 +301,7 @@ export function UpcomingSection({
   function essentialsLinkLabel(c: UpcomingChargeRow): string | null {
     const hint = essentialsLinkHints.get(c.id)
     if (hint === 'unlinked') return 'link a payment to use Essentials'
-    if (hint === 'no_payment') return 'no matching payment yet'
+    if (hint === 'no_payment') return 'no matching payment found'
     return null
   }
 
