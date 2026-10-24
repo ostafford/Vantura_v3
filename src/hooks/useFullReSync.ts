@@ -26,7 +26,8 @@ export function useFullReSync() {
 
   const handleReSync = useCallback(async () => {
     const token = sessionStore.getState().getToken()
-    if (!token || syncing) return
+    // syncStore.syncing also covers an incremental sync already in flight.
+    if (!token || syncing || syncStore.getState().syncing) return
     if (getAppSetting('demo_mode') === '1') {
       toast.info('Demo mode – no sync.')
       return

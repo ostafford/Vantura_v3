@@ -16,7 +16,7 @@ import { formatMoney, formatSignedMoney, formatShortDate } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
-import { performSync } from '@/services/sync'
+import { runSync } from '@/services/syncRunner'
 import { sessionStore } from '@/stores/sessionStore'
 import { InsightsSection } from '@/components/dashboard/InsightsSection'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
@@ -372,11 +372,10 @@ export function Dashboard() {
       toast.info('Demo mode – no sync.')
       return
     }
-    syncStore.getState().setSyncing(true)
     try {
-      await performSync(token, () => {})
-      syncStore.getState().syncCompleted()
-      toast.success('Sync complete. Data updated.')
+      if ((await runSync(token)) === 'ran') {
+        toast.success('Sync complete. Data updated.')
+      }
     } catch (err) {
       const message =
         err instanceof UpBankUnauthorizedError
@@ -385,8 +384,6 @@ export function Dashboard() {
             ? err.message
             : 'Sync failed. Please try again.'
       toast.error(message)
-    } finally {
-      syncStore.getState().setSyncing(false)
     }
   }, [])
 
@@ -436,25 +433,6 @@ export function Dashboard() {
       return () => clearTimeout(t)
     }
   }, [sectionOrder, sectionVisibility])
-
-  useEffect(() => {
-    const token = sessionStore.getState().getToken()
-    if (!token || getAppSetting('demo_mode') === '1') return
-    const lastSync = getAppSetting('last_sync')
-    if (lastSync) {
-      const ageMs = Date.now() - new Date(lastSync).getTime()
-      if (ageMs < 30 * 60 * 1000) return
-    }
-    syncStore.getState().setSyncing(true)
-    performSync(token, () => {})
-      .then(() => {
-        syncStore.getState().syncCompleted()
-      })
-      .catch(() => {})
-      .finally(() => {
-        syncStore.getState().setSyncing(false)
-      })
-  }, [])
 
   useEffect(() => {
     runNotificationChecks()

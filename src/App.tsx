@@ -3,6 +3,7 @@ import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
 import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
+import { autoSyncIfStale } from '@/services/syncRunner'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import {
   themeStore,
@@ -59,6 +60,11 @@ function AppContent() {
   const themeHydrated = useStore(themeStore, (s) => s.hydrated)
   const unlocked = useStore(sessionStore, (s) => s.unlocked)
   useInactivityLock(unlocked)
+  // Stale-data auto-sync (GLOSSARY *Stale data*): once per unlock, on
+  // whatever page the user lands on — not only when the Dashboard mounts.
+  useEffect(() => {
+    if (ready && onboardingComplete && unlocked) void autoSyncIfStale()
+  }, [ready, onboardingComplete, unlocked])
   const { updateReady, applyUpdate } = usePwaUpdate()
   const [bannerDismissed, setBannerDismissed] = useState(false)
 

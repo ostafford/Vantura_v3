@@ -7,7 +7,7 @@ import { sessionStore } from '@/stores/sessionStore'
 import { syncStore } from '@/stores/syncStore'
 import { notificationStore } from '@/stores/notificationStore'
 import { getAppSetting } from '@/db'
-import { performSync } from '@/services/sync'
+import { runSync } from '@/services/syncRunner'
 import { toast } from '@/stores/toastStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { VanturaLogo } from '@/components/VanturaLogo'
@@ -41,7 +41,8 @@ export function Navbar({
   const unreadCount = useStore(notificationStore, (s) => s.unreadCount)
   const openDrawer = useStore(notificationStore, (s) => s.openDrawer)
   const [lastSync, setLastSync] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
+  // Shared flag, so an auto-sync in flight also disables this button.
+  const syncing = useStore(syncStore, (s) => s.syncing)
   const isDemoMode = getAppSetting('demo_mode') === '1'
 
   function handleNavToggle() {
@@ -59,13 +60,11 @@ export function Navbar({
       toast.info('Demo mode – no sync.')
       return
     }
-    setSyncing(true)
-    syncStore.getState().setSyncing(true)
     try {
-      await performSync(token, () => {})
-      setLastSync(getAppSetting('last_sync'))
-      syncStore.getState().syncCompleted()
-      toast.success('Sync complete. Data updated.')
+      if ((await runSync(token)) === 'ran') {
+        setLastSync(getAppSetting('last_sync'))
+        toast.success('Sync complete. Data updated.')
+      }
     } catch (err) {
       const message =
         err instanceof UpBankUnauthorizedError
@@ -74,9 +73,6 @@ export function Navbar({
             ? err.message
             : 'Sync failed. Please try again.'
       toast.error(message)
-    } finally {
-      setSyncing(false)
-      syncStore.getState().setSyncing(false)
     }
   }
 
