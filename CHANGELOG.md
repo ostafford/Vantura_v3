@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-24
+
+Essentials Saver support, with Regulars that now reliably recognise their own payments, by merchant name and amount rather than the bank's raw descriptor, plus fixes for pending payments, the light-theme flash on load, and profile backups.
+
 ### Added
 
 - **Essentials Saver support.** Vantura now recognises Up's Essentials feature — a dedicated Saver, funded by a per-payday set-aside, that pays your bills directly. Nominate yours in Settings → Essentials (a Saver named like "Essentials" is suggested, but nothing is set without you confirming). Vantura then infers which Regulars it actually pays from your settled transaction history — never assumed — and excludes a Regular funded from the nominated Saver from Reserved entirely, since it's already covered from there rather than Available. A Regular with no linked transaction gets a "not linked to Essentials" hint so you know it isn't getting the benefit yet. Classic (non-Essentials) users see byte-identical behaviour to before. New `essentials_saver_account_id` setting (no schema migration needed). See `docs/adr/0019`.
@@ -14,10 +18,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **"Upcoming charge(s)" is now "Regular(s)"** throughout the app — Up's own term for the same concept. The underlying `upcoming_charges` table and internal code are unchanged. See `docs/adr/0018`.
+- **Regulars stay linked to their payments when a merchant changes how it bills you.** Linking used to rely on the bank's raw descriptor, which changes when a bill moves to a different card (for example from PayPal to a direct card charge) and, for some merchants, changes on every single charge. A Regular now recognises its payments by the merchant name Up shows plus an amount within 20% of the Regular's, so bill auto-clear, liability-repayment prompts and Essentials funding detection keep working. Existing links carry over automatically. If a payment could belong to two of your Regulars from the same merchant, it's matched to neither rather than guessed. See `docs/adr/0020`.
+- **You can link a Regular to any past transaction**, not only ones with a "bank fingerprint".
+- **Finding recurring charges suggests more of your bills,** including subscriptions whose bank descriptor changes every month. Merchants you'd already marked "Not recurring" stay dismissed. A merchant that bills you two clearly different amounts still isn't suggested.
+- **Profile backups from this version can't be imported into an older version** of Vantura.
 
 ### Fixed
 
 - **The Upcoming section's help tooltip claimed monthly-or-rarer bills are "prorated to your pay cycle."** They're not — Reserved counts them once in full, never prorated — the copy now says so.
+- **A pending payment no longer counts as a bill being paid.** A bill's due notification used to clear as soon as the pending hold appeared; if that hold was then cancelled or changed, the bill stayed marked as paid for that cycle. It now clears only once the payment settles. Pending payments also no longer count towards recurring-charge suggestions.
+- **Light theme no longer flashes dark when the app loads.** The script that applies your theme before the first paint was being blocked by the app's security policy, so light-theme users saw a dark screen and status bar until the app finished loading.
+- **Profile backups now keep liability repayments.** A Regular set up as a liability repayment came back from an import as an ordinary expense with no linked account. It now keeps its type and re-links to the manual account with the same name; it's left unlinked if no account, or more than one, has that name. Importing only Net Worth no longer breaks your existing Regulars' account links, and backups now also keep each Regular's payment link.
 
 ## [0.10.0] - 2026-09-08
 
