@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { formatMoney } from '@/lib/format'
 import type { EssentialsCoverage } from '@/services/essentialsCoverage'
 
@@ -6,7 +7,9 @@ import type { EssentialsCoverage } from '@/services/essentialsCoverage'
  * threshold/copy locked in ticket #95). Sits below the classic balance-cards
  * zone, which stays untouched for every user — this is additive, and only
  * ever rendered for an Essentials user with at least one observed
- * Essentials-funded Regular (`coverage.state !== 'hidden'`).
+ * Essentials-funded Regular (`coverage.state !== 'hidden'`) — or, as a
+ * notice with no figures, when the nominated Saver is closed or no payday
+ * is configured.
  */
 export function EssentialsCoverageBlock({
   coverage,
@@ -14,6 +17,38 @@ export function EssentialsCoverageBlock({
   coverage: EssentialsCoverage
 }) {
   if (coverage.state === 'hidden') return null
+
+  // Declined states: no coverage figures to show, only what to fix.
+  if (
+    coverage.state === 'saver_unavailable' ||
+    coverage.state === 'payday_needed'
+  ) {
+    const unavailable = coverage.state === 'saver_unavailable'
+    return (
+      <div
+        className={`essentials-coverage essentials-coverage--${coverage.state} mb-4`}
+      >
+        <div className="essentials-coverage__status" role="status">
+          <i
+            className={`mdi ${unavailable ? 'mdi-alert' : 'mdi-information-outline'} essentials-coverage__icon`}
+            aria-hidden
+          />
+          {unavailable
+            ? 'Your Essentials Saver is closed — choose another in Settings'
+            : 'Set your payday to check bill coverage'}
+        </div>
+        <div className="essentials-coverage__split">
+          <Link
+            to={unavailable ? '/settings#essentials' : '/settings#payday'}
+            className="text-decoration-none"
+          >
+            {unavailable ? 'Settings → Essentials' : 'Settings → Payday'}
+            <i className="mdi mdi-chevron-right" aria-hidden />
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

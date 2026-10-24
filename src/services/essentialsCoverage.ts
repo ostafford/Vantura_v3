@@ -6,7 +6,7 @@
 
 import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
-import { getEssentialsSaverAccountId } from './essentials'
+import { getEssentialsNomination } from './essentials'
 import {
   getFundingSourceAccountId,
   type LinkableRegular,
@@ -16,6 +16,8 @@ import { calculateReservedBreakdown, type UpcomingChargeRow } from './balance'
 
 export type EssentialsCoverageState =
   | 'hidden'
+  | 'saver_unavailable'
+  | 'payday_needed'
   | 'covered'
   | 'partial'
   | 'shortfall'
@@ -69,6 +71,17 @@ function loadCharges(db: Database): ChargeRow[] {
   return rows
 }
 
+function emptyCoverage(state: EssentialsCoverageState): EssentialsCoverage {
+  return {
+    state,
+    reservedHereCents: 0,
+    essentialsSetAsideCents: 0,
+    saverBalanceCents: 0,
+    shortfallCents: 0,
+    transactionalCount: 0,
+  }
+}
+
 /**
  * Null for a classic user (no nominated Saver) — the coverage block doesn't
  * exist for them. For an Essentials user, `state: 'hidden'` means no
@@ -76,10 +89,22 @@ function loadCharges(db: Database): ChargeRow[] {
  * resolves transactional) — the caller should render nothing, same as a
  * classic user, rather than a misleading "$0 set aside" split. See
  * docs/adr/0019 § Presentation.
+ *
+ * Two states decline to give a coverage result (the figures are all zero):
+ * - `saver_unavailable` — the nominated Saver is closed or missing. Reserved
+ *   has already fallen back to the classic formula, so the block only asks
+ *   the user to choose another; it's shown even if no Essentials payment was
+ *   ever observed, because the user did nominate one.
+ * - `payday_needed` — no pay cycle is configured, so "due before payday"
+ *   can't be evaluated; fails loudly instead of claiming "covered".
  */
 export function getEssentialsCoverage(): EssentialsCoverage | null {
-  const essentialsSaverId = getEssentialsSaverAccountId()
-  if (!essentialsSaverId) return null
+  const nomination = getEssentialsNomination()
+  if (nomination.status === 'none') return null
+  if (nomination.status === 'unavailable') {
+    return emptyCoverage('saver_unavailable')
+  }
+  const essentialsSaverId = nomination.accountId
 
   const db = getDb()
   if (!db) return null
@@ -92,19 +117,11 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   const anyEssentialsFunded = charges.some(
     (c) => getFundingSourceAccountId(db, c) === essentialsSaverId
   )
-  if (!anyEssentialsFunded) {
-    return {
-      state: 'hidden',
-      reservedHereCents: 0,
-      essentialsSetAsideCents: 0,
-      saverBalanceCents: 0,
-      shortfallCents: 0,
-      transactionalCount: 0,
-    }
-  }
+  if (!anyEssentialsFunded) return emptyCoverage('hidden')
 
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
+  if (!nextPayday || !paydayFrequency) return emptyCoverage('payday_needed')
   const reservedCharges = charges.filter((c) => c.is_reserved === 1)
 
   const transactionalCharges = reservedCharges.filter(
@@ -134,6 +151,7 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
     totalIfAllTransactionalCents - reservedHereCents
   const transactionalCount = transactionalBreakdown.length
 
+  // Present by construction: an active nomination has an open accounts row.
   const saverBalanceCents = getAccountById(essentialsSaverId)?.balance ?? 0
   const shortfallCents = Math.max(
     0,

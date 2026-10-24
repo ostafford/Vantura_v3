@@ -211,3 +211,28 @@ describe('Reserved formula: Regulars stay linked when the descriptor changes (do
     expect(getReservedBreakdown()).toEqual([])
   })
 })
+
+describe('Reserved formula: an unavailable nominated Saver counts as no nomination', () => {
+  beforeEach(() => {
+    appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
+    addCharge({
+      name: 'Netflix',
+      amount: 1500,
+      next_charge_date: '2025-02-25',
+      match_description: 'Netflix',
+    })
+    // Last paid from the Saver — while it's open, this bill is out of Reserved.
+    settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
+  })
+
+  it('reserves the bill again once the nominated Saver is closed', () => {
+    db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [ESSENTIALS_SAVER])
+    expect(getReservedAmount()).toBe(1500)
+    expect(getReservedBreakdown().map((r) => r.name)).toEqual(['Netflix'])
+  })
+
+  it('reserves the bill again when the nominated Saver is missing entirely', () => {
+    db.run(`DELETE FROM accounts WHERE id = ?`, [ESSENTIALS_SAVER])
+    expect(getReservedAmount()).toBe(1500)
+  })
+})
