@@ -321,5 +321,5 @@ The user-set floor below which Spendable counts as low — the Spendable card tu
 _Avoid_: limit, cap, budget, minimum balance
 
 **Stale data**:
-Synced Up Bank data old enough to act on: the Dashboard quietly re-syncs when the last sync is over 30 minutes old, and shows an "N h old" badge when it is over 60 minutes old.
+Synced Up Bank data whose last sync (`last_sync`) was 30 minutes or more ago, or that has never synced. What the app does about it (the quiet re-sync, and the "N h old" badge past 60 minutes) is in `docs/features/sync/OVERVIEW.md`.
 _Avoid_: outdated, expired, old data

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Vantura now quietly re-syncs on any page, not just the Dashboard.** When your data is 30 minutes or more old, it syncs on unlock and whenever you change page. A sync that fails because your Up token was revoked or expired now tells you so, once, instead of failing silently.
+
+### Fixed
+
+- **Tapping sync while a sync was already running started a second one**, doubling requests to Up. All sync buttons now wait for the one in progress.
+
 ## [0.11.2] - 2026-10-24
 
 Essentials follow-ups from the 0.11.0 audit: the bill-coverage block stops claiming "All bills covered" when it can't know, a closed Essentials Saver can no longer make Spendable read too high, and Regulars that aren't getting the Essentials benefit now say why.
