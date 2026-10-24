@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(47)
+    expect(SCHEMA_VERSION).toBe(48)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1087,6 +1087,61 @@ describe('v47 migration: upcoming_charges.match_description (docs/adr/0020)', ()
     ])
 
     expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+describe('v48 migration: dismissed suggestions re-keyed by description (#116)', () => {
+  it('adds the latest description for each dismissed raw_text key, keeps the old rows, leaves unmatched keys alone, and is idempotent', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '47')`
+    )
+    db.run(`
+      CREATE TABLE transactions (
+        id TEXT PRIMARY KEY,
+        raw_text TEXT,
+        description TEXT NOT NULL,
+        settled_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    `)
+    db.run(`
+      CREATE TABLE dismissed_charge_suggestions (
+        suggestion_key TEXT PRIMARY KEY,
+        dismissed_at TEXT NOT NULL
+      )
+    `)
+    db.run(
+      `INSERT INTO transactions (id, raw_text, description, settled_at, created_at) VALUES
+         ('old', 'PAYPAL *GYM, 4029357733', 'Gym Old Name', '2026-01-10T09:00:00Z', '2026-01-10T09:00:00Z'),
+         ('new', 'PAYPAL *GYM, 4029357733', 'Gym', '2026-02-10T09:00:00Z', '2026-02-10T09:00:00Z')`
+    )
+    db.run(
+      `INSERT INTO dismissed_charge_suggestions (suggestion_key, dismissed_at) VALUES
+         ('PAYPAL *GYM, 4029357733', '2026-03-01'),
+         ('Already A Description', '2026-03-01'),
+         ('NO SUCH RAW TEXT', '2026-03-01')`
+    )
+
+    runMigrations(db)
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    const keys = db
+      .exec(
+        `SELECT suggestion_key, dismissed_at FROM dismissed_charge_suggestions ORDER BY suggestion_key`
+      )[0]
+      .values.map((r) => [String(r[0]), String(r[1])])
+    expect(keys).toEqual([
+      ['Already A Description', '2026-03-01'],
+      ['Gym', '2026-03-01'],
+      ['NO SUCH RAW TEXT', '2026-03-01'],
+      ['PAYPAL *GYM, 4029357733', '2026-03-01'],
+    ])
     db.close()
   })
 })

@@ -9,7 +9,7 @@ import { localDateString } from '@/lib/format'
 import { nextChargeDateFromAnchor } from './upcoming'
 
 export interface RecurringChargeSuggestion {
-  /** Stable grouping key — `raw_text` when present, else `description`. Dismissals key on this. */
+  /** Stable grouping key — the Up `description` (docs/adr/0020). Dismissals key on this. */
   key: string
   name: string
   amountCents: number
@@ -17,8 +17,6 @@ export interface RecurringChargeSuggestion {
   /** Next projected occurrence on or after today (`YYYY-MM-DD`). */
   nextChargeDate: string
   categoryId: string | null
-  /** The group's `raw_text` if non-empty — carried onto the created charge for detection dedup (until #116). */
-  matchRawText: string | null
   /** The latest occurrence's Up `description` — the created charge's payment link (docs/adr/0020). */
   matchDescription: string
   occurrences: number
@@ -73,7 +71,6 @@ function normaliseName(s: string): string {
 
 interface DebitRow {
   key: string
-  raw_text: string | null
   description: string
   amount: number // positive cents
   date: string // YYYY-MM-DD
@@ -82,7 +79,7 @@ interface DebitRow {
 
 /**
  * Recurring-charge suggestions from ~3 years of settled Up debits. Excludes
- * anything already covered by an existing upcoming charge (by `match_raw_text`
+ * anything already covered by an existing upcoming charge (by `match_description`
  * or a normalised name match) or previously dismissed.
  */
 export function detectRecurringCharges(): RecurringChargeSuggestion[] {
@@ -96,14 +93,14 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
 
   const stmt = db.prepare(
     `SELECT
-       COALESCE(NULLIF(raw_text, ''), description) AS grp,
-       raw_text,
+       description AS grp,
        description,
        ABS(amount) AS amt,
        substr(COALESCE(settled_at, created_at), 1, 10) AS dt,
        category_id
      FROM transactions
-     WHERE amount < 0
+     WHERE status = 'SETTLED'
+       AND amount < 0
        AND transfer_account_id IS NULL
        AND round_up_parent_id IS NULL
        AND source = 'up'
@@ -113,22 +110,14 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
   stmt.bind([cutoff])
   const groups = new Map<string, DebitRow[]>()
   while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      string | null,
-      string,
-      number,
-      string,
-      string | null,
-    ]
-    if (!r[0] || !r[4]) continue
+    const r = stmt.get() as [string, string, number, string, string | null]
+    if (!r[0] || !r[3]) continue
     const row: DebitRow = {
       key: r[0],
-      raw_text: r[1] && r[1] !== '' ? r[1] : null,
-      description: r[2],
-      amount: r[3],
-      date: r[4],
-      category_id: r[5] ?? null,
+      description: r[1],
+      amount: r[2],
+      date: r[3],
+      category_id: r[4] ?? null,
     }
     const arr = groups.get(row.key)
     if (arr) arr.push(row)
@@ -137,16 +126,15 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
   stmt.free()
 
   const dismissed = getDismissedSuggestionKeys()
-  const { rawTexts: existingRawTexts, names: existingNames } =
+  const { descriptions: existingDescriptions, names: existingNames } =
     readExistingChargeFingerprints(db)
 
   const suggestions: RecurringChargeSuggestion[] = []
   for (const [key, rows] of groups) {
     if (dismissed.has(key)) continue
 
-    const rawText = rows.find((r) => r.raw_text)?.raw_text ?? null
-    if (rawText && existingRawTexts.has(rawText)) continue
-    if (existingNames.has(normaliseName(rows[0].description))) continue
+    if (existingDescriptions.has(key)) continue
+    if (existingNames.has(normaliseName(key))) continue
 
     // One occurrence per day (a repeated same-day debit is one bill).
     const dates = [...new Set(rows.map((r) => r.date))].sort()
@@ -201,7 +189,6 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
         today
       ),
       categoryId,
-      matchRawText: rawText,
       matchDescription: rows[rows.length - 1].description,
       occurrences: dates.length,
       sampleDates: dates,
@@ -220,15 +207,15 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
 
 function readExistingChargeFingerprints(
   db: NonNullable<ReturnType<typeof getDb>>
-): { rawTexts: Set<string>; names: Set<string> } {
-  const rawTexts = new Set<string>()
+): { descriptions: Set<string>; names: Set<string> } {
+  const descriptions = new Set<string>()
   const names = new Set<string>()
-  const res = db.exec(`SELECT name, match_raw_text FROM upcoming_charges`)
+  const res = db.exec(`SELECT name, match_description FROM upcoming_charges`)
   for (const row of res[0]?.values ?? []) {
     names.add(normaliseName(String(row[0])))
-    if (row[1]) rawTexts.add(String(row[1]))
+    if (row[1]) descriptions.add(String(row[1]))
   }
-  return { rawTexts, names }
+  return { descriptions, names }
 }
 
 /** Grouping keys the user marked "not recurring". */

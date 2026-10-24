@@ -81,16 +81,16 @@ describe('detectRecurringCharges (#20)', () => {
     }
   }
 
-  it('detects a clean monthly subscription and carries the raw_text', () => {
+  it('detects a clean monthly subscription and links it by description', () => {
     monthlyRun('DD NETFLIX.COM', 'Netflix', 1899, 6)
     const [s, ...rest] = detectRecurringCharges()
     expect(rest).toHaveLength(0)
     expect(s).toMatchObject({
-      key: 'DD NETFLIX.COM',
+      key: 'Netflix',
       name: 'Netflix',
       amountCents: 1899,
       frequency: 'MONTHLY',
-      matchRawText: 'DD NETFLIX.COM',
+      matchDescription: 'Netflix',
       occurrences: 6,
     })
     expect(s.nextChargeDate > TODAY).toBe(true)
@@ -133,15 +133,6 @@ describe('detectRecurringCharges (#20)', () => {
     expect(detectRecurringCharges()).toHaveLength(0)
   })
 
-  it('skips a group already covered by an existing upcoming charge (match_raw_text)', () => {
-    monthlyRun('DD NETFLIX.COM', 'Netflix', 1899, 6)
-    db.run(
-      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at, match_raw_text)
-       VALUES ('Netflix', 1899, 'MONTHLY', '2026-07-01', '2026-01-01', 'DD NETFLIX.COM')`
-    )
-    expect(detectRecurringCharges()).toHaveLength(0)
-  })
-
   it('skips a group whose name already matches an existing charge', () => {
     monthlyRun(null, 'Gym Membership', 5500, 4)
     db.run(
@@ -149,13 +140,6 @@ describe('detectRecurringCharges (#20)', () => {
        VALUES ('  gym   MEMBERSHIP ', 5500, 'MONTHLY', '2026-07-01', '2026-01-01')`
     )
     expect(detectRecurringCharges()).toHaveLength(0)
-  })
-
-  it('groups by description when raw_text is missing, and leaves matchRawText null', () => {
-    monthlyRun(null, 'Local Newspaper', 4200, 4)
-    const s = detectRecurringCharges()[0]
-    expect(s.key).toBe('Local Newspaper')
-    expect(s.matchRawText).toBeNull()
   })
 
   it('excludes transfers and round-ups from detection', () => {
@@ -171,11 +155,55 @@ describe('detectRecurringCharges (#20)', () => {
 
   it('respects dismissals and can restore them', () => {
     monthlyRun('DD NETFLIX.COM', 'Netflix', 1899, 6)
-    dismissChargeSuggestion('DD NETFLIX.COM')
-    expect(getDismissedSuggestionKeys().has('DD NETFLIX.COM')).toBe(true)
+    dismissChargeSuggestion('Netflix')
+    expect(getDismissedSuggestionKeys().has('Netflix')).toBe(true)
     expect(detectRecurringCharges()).toHaveLength(0)
 
-    undismissChargeSuggestion('DD NETFLIX.COM')
+    undismissChargeSuggestion('Netflix')
     expect(detectRecurringCharges()).toHaveLength(1)
+  })
+  describe('grouped by Up description (docs/adr/0020, #116)', () => {
+    it('suggests a merchant whose raw_text carries a per-charge token, keyed and linked by description', () => {
+      for (const [i, token] of ['P43F', 'P450', 'P462', 'P475'].entries()) {
+        const d = new Date(`${TODAY}T00:00:00Z`)
+        d.setUTCDate(d.getUTCDate() - 5 - (3 - i) * 30)
+        addDebit(
+          `SPOTIFY*${token}789B2A, 0012345678`,
+          'Spotify',
+          1299,
+          d.toISOString().slice(0, 10)
+        )
+      }
+      const suggestions = detectRecurringCharges()
+      expect(suggestions).toHaveLength(1)
+      expect(suggestions[0]).toMatchObject({
+        key: 'Spotify',
+        name: 'Spotify',
+        matchDescription: 'Spotify',
+        occurrences: 4,
+      })
+    })
+
+    it('does not suggest a description whose amounts spread beyond ±20% (two subscriptions under one merchant)', () => {
+      monthlyRun('APPLE.COM/BILL A', 'Apple', [449, 1599], 6)
+      expect(detectRecurringCharges()).toHaveLength(0)
+    })
+
+    it('skips a description already linked to a Regular, whatever its name', () => {
+      monthlyRun('DD NETFLIX.COM', 'Netflix', 1899, 6)
+      db.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at, match_description)
+         VALUES ('Streaming', 1899, 'MONTHLY', '2026-07-01', '2026-01-01', 'Netflix')`
+      )
+      expect(detectRecurringCharges()).toHaveLength(0)
+    })
+
+    it('counts only settled debits as occurrences (docs/adr/0016)', () => {
+      monthlyRun('DD NETFLIX.COM', 'Netflix', 1899, 3)
+      db.run(
+        `UPDATE transactions SET status = 'HELD', settled_at = NULL WHERE id = (SELECT id FROM transactions ORDER BY created_at DESC LIMIT 1)`
+      )
+      expect(detectRecurringCharges()).toHaveLength(0)
+    })
   })
 })

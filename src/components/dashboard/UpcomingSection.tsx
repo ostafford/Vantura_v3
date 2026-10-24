@@ -212,7 +212,6 @@ export function UpcomingSection({
   const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
     null
   )
-  const [matchRawText, setMatchRawText] = useState<string | null>(null)
   const [matchDescription, setMatchDescription] = useState<string>('')
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
   const [settlementSearch, setSettlementSearch] = useState('')
@@ -291,7 +290,6 @@ export function UpcomingSection({
     setTxSearch('')
     setMoreOptionsOpen(false)
     setImportedFromTx(null)
-    setMatchRawText(null)
     setMatchDescription('')
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -315,7 +313,6 @@ export function UpcomingSection({
     const bucketId = getUpcomingBucketId(c.id)
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
-    setMatchRawText(c.match_raw_text ?? null)
     setMatchDescription(c.match_description ?? '')
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -363,7 +360,6 @@ export function UpcomingSection({
         cancelBy,
         chargeType,
         chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchRawText,
         matchDescription || null
       )
       assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
@@ -380,7 +376,6 @@ export function UpcomingSection({
         cancelBy,
         chargeType,
         chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchRawText,
         matchDescription || null
       )
       assignUpcomingToBucket(newId, upcomingBucketId)
@@ -422,7 +417,6 @@ export function UpcomingSection({
     setCategoryId(tx.category_id ?? '')
     setNextChargeDate(nextChargeDateFromAnchor(tx.date, frequency))
     setImportedFromTx(tx)
-    setMatchRawText(tx.raw_text ?? null)
     setMatchDescription(tx.description)
     setMoreOptionsOpen(true)
     setCreateStep('form')
@@ -445,7 +439,6 @@ export function UpcomingSection({
     setChargeType('EXPENSE')
     setLinkedManualAccountId(null)
     setImportedFromTx(null)
-    setMatchRawText(s.matchRawText)
     setMatchDescription(s.matchDescription)
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -1319,7 +1312,6 @@ export function UpcomingSection({
                           size="sm"
                           className="p-0 text-muted flex-shrink-0"
                           onClick={() => {
-                            setMatchRawText(null)
                             setMatchDescription('')
                             setShowSettlementPicker(false)
                           }}
@@ -1387,14 +1379,12 @@ export function UpcomingSection({
                                       fontSize: '0.8rem',
                                     }}
                                     onClick={() => {
-                                      setMatchRawText(tx.raw_text ?? null)
                                       setMatchDescription(tx.description)
                                       setShowSettlementPicker(false)
                                       setSettlementSearch('')
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        setMatchRawText(tx.raw_text ?? null)
                                         setMatchDescription(tx.description)
                                         setShowSettlementPicker(false)
                                         setSettlementSearch('')

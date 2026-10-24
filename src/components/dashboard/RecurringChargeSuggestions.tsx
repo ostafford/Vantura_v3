@@ -64,7 +64,6 @@ export function RecurringChargeSuggestions({
       null,
       'EXPENSE',
       null,
-      s.matchRawText,
       s.matchDescription
     )
     toast.success(`"${s.name}" added to Regulars.`)
