@@ -291,11 +291,12 @@ export function UpcomingSection({
     const db = getDb()
     if (!essentialsUser || !db) return hints
     const today = localDateString()
-    for (const c of [...overdue, ...nextPay, ...later, ...calendarCharges]) {
-      if (!hints.has(c.id)) hints.set(c.id, getEssentialsLinkHint(db, c, today))
+    // Only the Next pay / Later rows show the hint.
+    for (const c of [...nextPay, ...later]) {
+      hints.set(c.id, getEssentialsLinkHint(db, c, today))
     }
     return hints
-  }, [essentialsUser, overdue, nextPay, later, calendarCharges])
+  }, [essentialsUser, nextPay, later])
 
   function essentialsLinkLabel(c: UpcomingChargeRow): string | null {
     const hint = essentialsLinkHints.get(c.id)

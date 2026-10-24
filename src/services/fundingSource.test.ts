@@ -304,6 +304,18 @@ describe('getEssentialsLinkHint (#97, decision 5)', () => {
     expect(hintFor('Gym', 6000)).toBe('no_payment')
   })
 
+  it('says no matching payment when the payment also matches another Regular', () => {
+    insertRegular('Apple', 999)
+    insertTx({
+      id: 't-ambiguous',
+      account_id: 'essentials-saver-1',
+      amount: -999,
+      description: 'Apple',
+      settled_at: '2026-02-10T09:00:00.000Z',
+    })
+    expect(hintFor('Apple', 999)).toBe('no_payment')
+  })
+
   it('shows nothing once a payment is linked, whichever account paid it', () => {
     insertTx({
       id: 't-everyday',
