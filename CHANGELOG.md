@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **The Essentials bill-coverage block no longer says "All bills covered" when no payday is set.** Without a pay cycle there's no "before payday" to check bills against, so it now says "Set your payday to check bill coverage", with a link to Settings → Payday.
 - **A closed Essentials Saver no longer makes Spendable read too high.** Bills last paid from a nominated Saver that has since closed were still left out of Reserved, even though nothing pays them now. A closed Saver now counts as no nomination: those bills are reserved again, and the coverage block asks you to choose another Saver in Settings → Essentials instead of showing a false shortfall. Your nomination itself isn't changed.
+- **"All bills covered" now means every bill.** A Regular still paid from your everyday account, or one Vantura hasn't yet seen paid from your Essentials Saver, didn't stop "All bills covered" unless it was due before payday. It now shows as "N bill(s) not yet paid from Essentials" until it's paid from your Essentials Saver. Cancelled Regulars and one-offs whose date has passed don't count.
+
+### Changed
+
+- **The coverage block shows your Essentials Saver's balance** under "Set aside in Essentials", so you can see what the shortfall warning compares against.
 
 ## [0.11.1] - 2026-10-24
 
