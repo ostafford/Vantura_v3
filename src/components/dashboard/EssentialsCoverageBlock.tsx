@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import type { EssentialsCoverage } from '@/services/essentialsCoverage'
 
 /**
@@ -67,8 +67,8 @@ export function EssentialsCoverageBlock({
         {coverage.state === 'partial' && (
           <>
             {coverage.transactionalCount} bill
-            {coverage.transactionalCount === 1 ? '' : 's'} still on your
-            everyday account
+            {coverage.transactionalCount === 1 ? '' : 's'} not yet paid from
+            Essentials
           </>
         )}
         {coverage.state === 'shortfall' && (
@@ -91,6 +91,10 @@ export function EssentialsCoverageBlock({
           <div className="essentials-coverage__split-row">
             <span>Set aside in Essentials</span>
             <span>${formatMoney(coverage.essentialsSetAsideCents)}</span>
+          </div>
+          <div className="essentials-coverage__split-row essentials-coverage__split-row--sub">
+            <span>Essentials Saver balance</span>
+            <span>{formatSignedMoney(coverage.saverBalanceCents)}</span>
           </div>
         </div>
       )}

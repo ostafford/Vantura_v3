@@ -44,7 +44,7 @@ describe('EssentialsCoverageBlock', () => {
       transactionalCount: 2,
     })
     expect(html).toContain('essentials-coverage--partial')
-    expect(html).toContain('2 bills still on your everyday account')
+    expect(html).toContain('2 bills not yet paid from Essentials')
     expect(html).toContain('Reserved here')
     expect(html).toContain('$20.00')
     expect(html).toContain('Set aside in Essentials')
@@ -58,7 +58,7 @@ describe('EssentialsCoverageBlock', () => {
       reservedHereCents: 2000,
       transactionalCount: 1,
     })
-    expect(html).toContain('1 bill still on your everyday account')
+    expect(html).toContain('1 bill not yet paid from Essentials')
     expect(html).not.toContain('1 bills')
   })
 
@@ -113,5 +113,35 @@ describe('EssentialsCoverageBlock: declined states', () => {
     expect(html).toContain('href="/settings#essentials"')
     expect(html).not.toContain('may be short')
     expect(html).not.toContain('Set aside in Essentials')
+  })
+})
+
+describe('EssentialsCoverageBlock: Saver balance beside the set-aside figure', () => {
+  it('shows the Saver balance under "Set aside in Essentials" in a shortfall', () => {
+    const html = render({
+      ...base,
+      state: 'shortfall',
+      essentialsSetAsideCents: 6000,
+      saverBalanceCents: 5000,
+      shortfallCents: 1000,
+    })
+    expect(html).toContain('Set aside in Essentials')
+    expect(html).toContain('Essentials Saver balance')
+    expect(html).toContain('$50.00')
+  })
+
+  it('shows it in the partial state too', () => {
+    const html = render({
+      ...base,
+      state: 'partial',
+      transactionalCount: 1,
+      saverBalanceCents: 5000,
+    })
+    expect(html).toContain('Essentials Saver balance')
+    expect(html).toContain('$50.00')
+  })
+
+  it('stays collapsed with no balance line when covered', () => {
+    expect(render(base)).not.toContain('Essentials Saver balance')
   })
 })

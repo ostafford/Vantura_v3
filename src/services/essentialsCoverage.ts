@@ -6,12 +6,14 @@
 
 import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
+import { localDateString } from '@/lib/format'
 import { getEssentialsNomination } from './essentials'
 import {
   getFundingSourceAccountId,
   type LinkableRegular,
 } from './fundingSource'
 import { getAccountById } from './accounts'
+import { firstOccurrenceOnOrAfter } from './upcoming'
 import { calculateReservedBreakdown, type UpcomingChargeRow } from './balance'
 
 export type EssentialsCoverageState =
@@ -32,7 +34,12 @@ export interface EssentialsCoverage {
   saverBalanceCents: number
   /** max(0, essentialsSetAsideCents - saverBalanceCents). */
   shortfallCents: number
-  /** Count of is_reserved, due-before-payday Regulars still transactional-funded. */
+  /**
+   * Count of is_reserved Regulars still transactional-funded that will fall
+   * due again (any occurrence from today, any cycle — not just before payday).
+   * Drives "partial": a bill not yet moved to Essentials stops "All bills
+   * covered" even when it isn't due this cycle.
+   */
   transactionalCount: number
 }
 
@@ -149,7 +156,16 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   )
   const essentialsSetAsideCents =
     totalIfAllTransactionalCents - reservedHereCents
-  const transactionalCount = transactionalBreakdown.length
+  const today = localDateString()
+  const transactionalCount = transactionalCharges.filter(
+    (c) =>
+      firstOccurrenceOnOrAfter(
+        c.next_charge_date,
+        c.frequency,
+        today,
+        c.cancel_by_date ?? null
+      ) !== null
+  ).length
 
   // Present by construction: an active nomination has an open accounts row.
   const saverBalanceCents = getAccountById(essentialsSaverId)?.balance ?? 0
