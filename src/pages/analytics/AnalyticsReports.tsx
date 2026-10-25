@@ -1294,7 +1294,14 @@ export function AnalyticsReports() {
                                     </div>
                                   )}
                                   {hasDelta && spendDelta !== null && (
-                                    <div style={{ color: deltaColor }}>
+                                    <div
+                                      style={{
+                                        color:
+                                          spendDelta > 0
+                                            ? 'var(--vantura-danger-on-tooltip)'
+                                            : 'var(--vantura-success-on-tooltip)',
+                                      }}
+                                    >
                                       {spendDelta > 0 ? '↑' : '↓'} $
                                       {formatMoney(Math.abs(spendDelta))}{' '}
                                       {spendDelta > 0 ? 'more' : 'less'} than{' '}
