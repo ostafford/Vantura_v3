@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-26
+
+Vantura keeps your data fresh on every page, not just the Dashboard, and tells you when your Up token stops working.
+
 ### Changed
 
 - **Vantura now quietly re-syncs on any page, not just the Dashboard.** When your data is 30 minutes or more old, it syncs on unlock and whenever you change page. A sync that fails because your Up token was revoked or expired now tells you so, once, instead of failing silently.
