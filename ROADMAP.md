@@ -308,8 +308,6 @@ Checking it against real Essentials transactions (#84) showed the bank's raw des
 
 Features that have been discussed or noted as potential future additions. Nothing here is committed.
 
-- **Profile export v2** — Include Budget Plan buckets in the exported profile file
-- **Recurring transaction detection** — Auto-suggest upcoming charges based on transaction history patterns
 - **Multi-currency display** — Show foreign transaction amounts alongside AUD equivalents
 - **Saver round-up tracking** — Dedicated view for Loose Change saver accumulation over time
 - **Android / desktop PWA biometric** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
