@@ -29,8 +29,10 @@ export default defineConfig({
         name: 'Vantura',
         short_name: 'Vantura',
         description: 'Local-first finance app synced with Up Bank',
-        theme_color: '#1a142d',
-        background_color: '#1a142d',
+        // Match the default dark theme's background (index.css --vantura-background,
+        // theme-init.js), so the Android splash / title bar doesn't flash a third colour.
+        theme_color: '#13131c',
+        background_color: '#13131c',
         display: 'standalone',
         icons: [
           {
