@@ -25,6 +25,28 @@ export interface UpcomingItem {
 export const MILESTONES: Milestone[] = [
   {
     date: '26 Oct 2026',
+    heading: 'Readable Colours',
+    icon: 'mdi-theme-light-dark',
+    primaryMonth: '2026-10',
+    version: '0.11.4',
+    color: '#a5d6a7',
+    items: [
+      {
+        icon: 'mdi-format-color-text',
+        text: 'Green, amber and red text, like money in, overspending or a negative Spendable, is now easy to read in the light theme.',
+      },
+      {
+        icon: 'mdi-tooltip-text-outline',
+        text: 'Coloured lines inside tooltips are now readable in the dark theme.',
+      },
+      {
+        icon: 'mdi-cellphone',
+        text: 'The Android home-screen app no longer flashes a stray colour when it opens.',
+      },
+    ],
+  },
+  {
+    date: '26 Oct 2026',
     heading: 'Fresher Data Everywhere',
     icon: 'mdi-sync',
     primaryMonth: '2026-10',
