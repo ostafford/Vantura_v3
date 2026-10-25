@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Green, amber and red text is readable in the light theme.** Money-in amounts, over-budget figures, a negative Spendable and other coloured text used the same pale pastels as the charts, well below accessible contrast on a light background. The light theme now uses deeper shades of the same colours; the dark theme is unchanged.
+- **Coloured lines inside tooltips are readable in the dark theme.** Tooltips show on a white background there, where pastel lines such as budget deltas or the negative-Spendable explanation were hard to read. They now use the deeper shades.
+
 ## [0.11.3] - 2026-10-26
 
 Vantura keeps your data fresh on every page, not just the Dashboard, and tells you when your Up token stops working.
