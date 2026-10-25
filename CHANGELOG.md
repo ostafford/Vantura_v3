@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-10-26
+
+Coloured text you can read: green, amber and red text is legible in the light theme, coloured tooltip lines are legible in the dark theme, and the Android app opens without a stray colour flash.
+
 ### Fixed
 
 - **Green, amber and red text is readable in the light theme.** Money-in amounts, over-budget figures, a negative Spendable and other coloured text used the same pale pastels as the charts, well below accessible contrast on a light background. The light theme now uses deeper shades of the same colours; the dark theme is unchanged.

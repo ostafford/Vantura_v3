@@ -289,6 +289,7 @@ Checking it against real Essentials transactions (#84) showed the bank's raw des
 | Oct 24 | **`v0.11.1` released** — audit fixes; see [CHANGELOG](CHANGELOG.md#0111---2026-10-24) |
 | Oct 24 | **`v0.11.2` released** — Essentials audit follow-ups; see [CHANGELOG](CHANGELOG.md#0112---2026-10-24) |
 | Oct 26 | **`v0.11.3` released** — app-wide auto-sync; see [CHANGELOG](CHANGELOG.md#0113---2026-10-26) |
+| Oct 26 | **`v0.11.4` released** — readable semantic colours; see [CHANGELOG](CHANGELOG.md#0114---2026-10-26) |
 | — | **Essentials Saver nomination** — Settings → Essentials; assist-only suggestion from a matching Saver name, never auto-set (ADR-0019) |
 | — | **Funding-source detection** — Vantura infers which Regulars are actually paid from the nominated Saver, from settled transaction history alone (the Up API exposes nothing Essentials-specific) |
 | — | **Reserved formula branch** — an Essentials-funded Regular is excluded from Reserved entirely; classic users see byte-identical behaviour, proven by the existing formula's test suite passing with zero edits |
