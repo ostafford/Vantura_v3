@@ -73,8 +73,8 @@ function KpiCell({
       : null
   const deltaColor =
     delta?.direction === 'up'
-      ? 'var(--vantura-success)'
-      : 'var(--vantura-danger)'
+      ? 'var(--vantura-success-on-tooltip)'
+      : 'var(--vantura-danger-on-tooltip)'
 
   const cell = (
     <div
@@ -708,7 +708,8 @@ export function AnalyticsSavers() {
                                     <div>
                                       <span
                                         style={{
-                                          color: 'var(--vantura-warning)',
+                                          color:
+                                            'var(--vantura-warning-on-tooltip)',
                                         }}
                                       >
                                         Need $

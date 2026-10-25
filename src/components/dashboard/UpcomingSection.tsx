@@ -1329,7 +1329,7 @@ export function UpcomingSection({
                       >
                         <i
                           className="mdi mdi-check-circle flex-shrink-0"
-                          style={{ color: 'var(--vantura-success)' }}
+                          style={{ color: 'var(--vantura-success-text)' }}
                           aria-hidden
                         />
                         <span
