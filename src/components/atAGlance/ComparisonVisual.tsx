@@ -16,8 +16,8 @@ function getSentiment(
 }
 
 const SENTIMENT_COLOR: Record<Sentiment, string> = {
-  positive: 'var(--vantura-success, #a5d6a7)',
-  negative: 'var(--vantura-danger, #ef9a9a)',
+  positive: 'var(--vantura-success-text)',
+  negative: 'var(--vantura-danger-text)',
   neutral: 'var(--vantura-text-secondary, #8888a0)',
 }
 
@@ -189,11 +189,11 @@ function ProgressBarRow({
     ? current < previous
     : current > previous
   const currentTooltipColor = currentIsBetter
-    ? 'var(--vantura-success)'
-    : 'var(--vantura-danger)'
+    ? 'var(--vantura-success-on-tooltip)'
+    : 'var(--vantura-danger-on-tooltip)'
   const previousTooltipColor = currentIsBetter
-    ? 'var(--vantura-danger)'
-    : 'var(--vantura-success)'
+    ? 'var(--vantura-danger-on-tooltip)'
+    : 'var(--vantura-success-on-tooltip)'
 
   return (
     <OverlayTrigger

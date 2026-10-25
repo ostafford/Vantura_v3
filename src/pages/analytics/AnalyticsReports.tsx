@@ -103,9 +103,9 @@ const FREQUENCY_LABELS: Record<string, string> = {
 }
 
 function trackerBarColor(progress: number): string {
-  if (progress >= 81) return 'var(--vantura-danger)'
-  if (progress > 50) return 'var(--vantura-warning)'
-  return 'var(--vantura-success)'
+  if (progress >= 81) return 'var(--vantura-danger-text)'
+  if (progress > 50) return 'var(--vantura-warning-text)'
+  return 'var(--vantura-success-text)'
 }
 
 function getProgressVariant(progress: number): {
@@ -327,8 +327,8 @@ function KpiCell({
     ? delta?.direction === 'down'
     : delta?.direction === 'up'
   const deltaColor = isPositive
-    ? 'var(--vantura-success)'
-    : 'var(--vantura-danger)'
+    ? 'var(--vantura-success-on-tooltip)'
+    : 'var(--vantura-danger-on-tooltip)'
 
   const cell = (
     <div
@@ -981,8 +981,8 @@ export function AnalyticsReports() {
                           spendDelta !== null && Math.abs(spendDelta) >= 1
                         const deltaColor = hasDelta
                           ? spendDelta! > 0
-                            ? 'var(--vantura-danger)'
-                            : 'var(--vantura-success)'
+                            ? 'var(--vantura-danger-text)'
+                            : 'var(--vantura-success-text)'
                           : undefined
                         const periods = trackerPeriodBreakdowns[tracker.id]
 
@@ -1076,8 +1076,8 @@ export function AnalyticsReports() {
                                   <span
                                     style={{
                                       color: overBudget
-                                        ? 'var(--vantura-danger)'
-                                        : 'var(--vantura-success)',
+                                        ? 'var(--vantura-danger-on-tooltip)'
+                                        : 'var(--vantura-success-on-tooltip)',
                                     }}
                                   >
                                     ${formatMoney(spent)}
@@ -1091,7 +1091,14 @@ export function AnalyticsReports() {
                                   </div>
                                 )}
                                 {hasDelta && spendDelta !== null && (
-                                  <div style={{ color: deltaColor }}>
+                                  <div
+                                    style={{
+                                      color:
+                                        spendDelta > 0
+                                          ? 'var(--vantura-danger-on-tooltip)'
+                                          : 'var(--vantura-success-on-tooltip)',
+                                    }}
+                                  >
                                     {spendDelta > 0 ? '↑' : '↓'} $
                                     {formatMoney(Math.abs(spendDelta))}{' '}
                                     {spendDelta > 0 ? 'more' : 'less'} than{' '}
@@ -1155,8 +1162,8 @@ export function AnalyticsReports() {
                           spendDelta !== null && Math.abs(spendDelta) >= 1
                         const deltaColor = hasDelta
                           ? spendDelta! > 0
-                            ? 'var(--vantura-danger)'
-                            : 'var(--vantura-success)'
+                            ? 'var(--vantura-danger-text)'
+                            : 'var(--vantura-success-text)'
                           : undefined
                         const periods = trackerPeriodBreakdowns[tracker.id]
 
@@ -1272,8 +1279,8 @@ export function AnalyticsReports() {
                                     <span
                                       style={{
                                         color: overBudget
-                                          ? 'var(--vantura-danger)'
-                                          : 'var(--vantura-success)',
+                                          ? 'var(--vantura-danger-on-tooltip)'
+                                          : 'var(--vantura-success-on-tooltip)',
                                       }}
                                     >
                                       ${formatMoney(spent)}

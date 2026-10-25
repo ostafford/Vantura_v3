@@ -183,7 +183,12 @@ export function Dashboard() {
           what&apos;s left to spend right now.
         </div>
         {forecastCents < 0 && (
-          <div style={{ marginTop: '0.3rem', color: 'var(--vantura-danger)' }}>
+          <div
+            style={{
+              marginTop: '0.3rem',
+              color: 'var(--vantura-danger-on-tooltip)',
+            }}
+          >
             Tracker budgets remaining exceed your current Spendable balance.
           </div>
         )}
@@ -215,14 +220,20 @@ export function Dashboard() {
           </div>
           {spendableCents < 0 && (
             <div
-              style={{ marginTop: '0.3rem', color: 'var(--vantura-danger)' }}
+              style={{
+                marginTop: '0.3rem',
+                color: 'var(--vantura-danger-on-tooltip)',
+              }}
             >
               Reserved charges exceed your available balance.
             </div>
           )}
           {isSpendableLow && spendableCents >= 0 && (
             <div
-              style={{ marginTop: '0.3rem', color: 'var(--vantura-warning)' }}
+              style={{
+                marginTop: '0.3rem',
+                color: 'var(--vantura-warning-on-tooltip)',
+              }}
             >
               Check your Regulars or tap to adjust the threshold.
             </div>

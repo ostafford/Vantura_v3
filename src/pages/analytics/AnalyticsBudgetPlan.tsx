@@ -735,8 +735,8 @@ export function AnalyticsBudgetPlan() {
                   style={{
                     color:
                       freeSpendingCents >= 0
-                        ? 'var(--vantura-success)'
-                        : 'var(--vantura-danger)',
+                        ? 'var(--vantura-success-text)'
+                        : 'var(--vantura-danger-text)',
                   }}
                 >
                   {formatSignedMoney(freeSpendingCents)}

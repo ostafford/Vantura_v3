@@ -146,7 +146,7 @@ export function PaydaySection() {
               <i
                 className="mdi mdi-check-circle flex-shrink-0"
                 style={{
-                  color: 'var(--vantura-success)',
+                  color: 'var(--vantura-success-text)',
                   fontSize: '1rem',
                 }}
                 aria-hidden
@@ -154,7 +154,7 @@ export function PaydaySection() {
               <span className="text-body-secondary" style={{ lineHeight: 1.3 }}>
                 <span
                   className="fw-semibold"
-                  style={{ color: 'var(--vantura-success)' }}
+                  style={{ color: 'var(--vantura-success-text)' }}
                 >
                   Linked:
                 </span>{' '}

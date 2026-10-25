@@ -27,19 +27,31 @@ function relativeTime(isoString: string): string {
 // ─── type → icon/colour mapping ───────────────────────────────────────────────
 
 const TYPE_META: Record<string, { icon: string; color: string }> = {
-  bills_due: { icon: 'mdi-calendar-clock', color: 'var(--vantura-warning)' },
+  bills_due: {
+    icon: 'mdi-calendar-clock',
+    color: 'var(--vantura-warning-text)',
+  },
   tracker_overspent: {
     icon: 'mdi-alert-circle',
-    color: 'var(--vantura-danger)',
+    color: 'var(--vantura-danger-text)',
   },
-  tracker_pace: { icon: 'mdi-trending-up', color: 'var(--vantura-warning)' },
-  spendable_low: { icon: 'mdi-wallet-outline', color: 'var(--vantura-danger)' },
-  payday: { icon: 'mdi-cash-check', color: 'var(--vantura-success)' },
+  tracker_pace: {
+    icon: 'mdi-trending-up',
+    color: 'var(--vantura-warning-text)',
+  },
+  spendable_low: {
+    icon: 'mdi-wallet-outline',
+    color: 'var(--vantura-danger-text)',
+  },
+  payday: { icon: 'mdi-cash-check', color: 'var(--vantura-success-text)' },
   possible_payday: { icon: 'mdi-cash-plus', color: 'var(--vantura-primary)' },
-  large_tx: { icon: 'mdi-receipt-text-outline', color: 'var(--vantura-info)' },
+  large_tx: {
+    icon: 'mdi-receipt-text-outline',
+    color: 'var(--vantura-info-text)',
+  },
   saver_milestone: {
     icon: 'mdi-piggy-bank-outline',
-    color: 'var(--vantura-success)',
+    color: 'var(--vantura-success-text)',
   },
   sync_stale: {
     icon: 'mdi-sync-alert',
@@ -195,8 +207,8 @@ function parseBillBody(body: string): {
 }
 
 function dayLabelColor(label: string): string {
-  if (label === 'due today') return 'var(--vantura-danger)'
-  if (label === 'due tomorrow') return 'var(--vantura-warning)'
+  if (label === 'due today') return 'var(--vantura-danger-text)'
+  if (label === 'due tomorrow') return 'var(--vantura-warning-text)'
   return 'var(--vantura-text-secondary)'
 }
 

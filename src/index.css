@@ -17,6 +17,20 @@
   --vantura-info: #90caf9;
   --vantura-warning: #ffcc80;
   --vantura-danger: #ef9a9a;
+  /* Semantic colours used as TEXT or meaning-carrying icons. Dark theme: the
+     pastels already read at 7.8–11:1. The light theme overrides these with
+     deeper shades of the same hues; fills, borders, badges and charts keep
+     the pastels above. */
+  --vantura-success-text: var(--vantura-success);
+  --vantura-info-text: var(--vantura-info);
+  --vantura-warning-text: var(--vantura-warning);
+  --vantura-danger-text: var(--vantura-danger);
+  /* Same, for text inside Bootstrap tooltips, whose surface is inverted
+     (white in the dark theme, black in the light theme). */
+  --vantura-success-on-tooltip: #2e7d32;
+  --vantura-info-on-tooltip: #1565c0;
+  --vantura-warning-on-tooltip: #9a5b00;
+  --vantura-danger-on-tooltip: #c62828;
   /* Neutral dark backgrounds */
   --vantura-content-bg: #13131c;
   --vantura-background: #13131c;
@@ -141,6 +155,15 @@
 /* ── Light theme overrides ─────────────────────────────────────────────────── */
 [data-theme='light'] {
   color-scheme: light;
+  /* 4.7–5.2:1 on the #f5f4f0 page, 5.1–5.8:1 on white surfaces */
+  --vantura-success-text: #2e7d32;
+  --vantura-info-text: #1565c0;
+  --vantura-warning-text: #9a5b00;
+  --vantura-danger-text: #c62828;
+  --vantura-success-on-tooltip: var(--vantura-success);
+  --vantura-info-on-tooltip: var(--vantura-info);
+  --vantura-warning-on-tooltip: var(--vantura-warning);
+  --vantura-danger-on-tooltip: var(--vantura-danger);
   --vantura-content-bg: #f5f4f0;
   --vantura-background: #f5f4f0;
   --vantura-surface: #ffffff;
@@ -1135,7 +1158,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-variant-numeric: tabular-nums;
 }
 .balance-hero--danger .balance-hero__value {
-  color: var(--vantura-danger);
+  color: var(--vantura-danger-text);
 }
 .balance-hero__subtitle {
   font-size: 0.82rem;
@@ -1187,7 +1210,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-variant-numeric: tabular-nums;
 }
 .balance-tile--danger .balance-tile__value {
-  color: var(--vantura-danger);
+  color: var(--vantura-danger-text);
 }
 .balance-tile__subtitle {
   font-size: 0.68rem;
@@ -1231,27 +1254,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-text);
 }
 .essentials-coverage--covered .essentials-coverage__status {
-  color: var(--vantura-success);
+  color: var(--vantura-success-text);
 }
 .essentials-coverage--shortfall .essentials-coverage__status,
 .essentials-coverage--saver_unavailable .essentials-coverage__status {
-  color: var(--vantura-warning);
-}
-/* Light theme: the pastel status hues are ~1.5:1 on a white surface. Pull
-   the text toward --vantura-text for legible contrast; the left-border
-   accent keeps the pastel. */
-[data-theme='light']
-  .essentials-coverage--covered
-  .essentials-coverage__status {
-  color: color-mix(in srgb, var(--vantura-success) 45%, var(--vantura-text));
-}
-[data-theme='light']
-  .essentials-coverage--shortfall
-  .essentials-coverage__status,
-[data-theme='light']
-  .essentials-coverage--saver_unavailable
-  .essentials-coverage__status {
-  color: color-mix(in srgb, var(--vantura-warning) 45%, var(--vantura-text));
+  color: var(--vantura-warning-text);
 }
 .essentials-coverage__icon {
   font-size: 1.05rem;
@@ -2090,11 +2097,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .text-primary {
   color: var(--vantura-primary) !important;
 }
+.text-success {
+  color: var(--vantura-success-text) !important;
+}
+.text-info {
+  color: var(--vantura-info-text) !important;
+}
 .text-warning {
-  color: var(--vantura-warning) !important;
+  color: var(--vantura-warning-text) !important;
 }
 .text-danger {
-  color: var(--vantura-danger) !important;
+  color: var(--vantura-danger-text) !important;
 }
 .bg-primary {
   background-color: var(--vantura-primary) !important;
