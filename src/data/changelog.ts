@@ -24,6 +24,28 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '26 Oct 2026',
+    heading: 'Fresher Data Everywhere',
+    icon: 'mdi-sync',
+    primaryMonth: '2026-10',
+    version: '0.11.3',
+    color: '#90caf9',
+    items: [
+      {
+        icon: 'mdi-sync',
+        text: 'Vantura now quietly re-syncs on any page when your data is 30 minutes or more old, not just on the Dashboard.',
+      },
+      {
+        icon: 'mdi-key-alert-outline',
+        text: "If your Up token is revoked or expires, you'll now be told once instead of syncs failing silently.",
+      },
+      {
+        icon: 'mdi-sync-off',
+        text: 'Tapping sync while a sync is already running no longer starts a second one.',
+      },
+    ],
+  },
+  {
     date: '24 Oct 2026',
     heading: 'Clearer Essentials Coverage',
     icon: 'mdi-piggy-bank-outline',
