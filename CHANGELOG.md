@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Green, amber and red text is readable in the light theme.** Money-in amounts, over-budget figures, a negative Spendable and other coloured text used the same pale pastels as the charts, well below accessible contrast on a light background. The light theme now uses deeper shades of the same colours; the dark theme is unchanged.
 - **Coloured lines inside tooltips are readable in the dark theme.** Tooltips show on a white background there, where pastel lines such as budget deltas or the negative-Spendable explanation were hard to read. They now use the deeper shades.
+- **The Android home-screen app no longer flashes a purple-tinted colour when it opens.** The app's splash and title-bar colour now match the dark theme's background instead of a third colour neither theme uses.
 
 ## [0.11.3] - 2026-10-26
 
