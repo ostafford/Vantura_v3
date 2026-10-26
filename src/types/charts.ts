@@ -11,12 +11,14 @@ export type InsightsChartDatum = {
 }
 
 /**
- * One row in the Weekly Insights chart: either a real category bar, or a
- * group-header divider between parent-category clusters. Kept as a single
- * ordered array (not bars + a separate groups side-array) so the data layer
- * owns all sorting/grouping and the chart just renders whatever order it's
- * given — no index-alignment bugs between two parallel arrays.
+ * One row in the Weekly Insights chart: either a category bar, or an
+ * unlabelled gap between parent-category clusters. The gap takes a band slot
+ * the same size as a bar's, so bars from different hue families are never
+ * adjacent — the layout the colour system's CVD check assumed (see
+ * docs/adr/0011). Kept as a single ordered array (not bars + a separate gaps
+ * side-array) so the data layer owns all ordering and the chart just renders
+ * whatever order it's given.
  */
 export type InsightsChartRow =
   | { kind: 'bar'; datum: InsightsChartDatum }
-  | { kind: 'header'; key: string; label: string }
+  | { kind: 'gap'; key: string }

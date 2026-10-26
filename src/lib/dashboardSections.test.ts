@@ -52,7 +52,6 @@ describe('getDashboardSectionOrder', () => {
       'month_summary',
       'insights',
       'upcoming',
-      'net_worth',
     ])
   })
 
@@ -61,6 +60,7 @@ describe('getDashboardSectionOrder', () => {
       'goals',
       'trackers',
       'need_vs_want',
+      'net_worth',
       'month_summary',
     ])
     expect(getDashboardSectionOrder()).toEqual([
@@ -68,7 +68,6 @@ describe('getDashboardSectionOrder', () => {
       'month_summary',
       'insights',
       'upcoming',
-      'net_worth',
     ])
   })
 
@@ -88,7 +87,7 @@ describe('getDashboardSectionSizes', () => {
   it('merges valid stored values onto defaults, keeping default for missing/invalid keys', () => {
     appSettings[DASHBOARD_SECTION_SIZES_KEY] = JSON.stringify({
       trackers: 'large',
-      net_worth: 'not-a-size',
+      insights: 'not-a-size',
     })
     expect(getDashboardSectionSizes()).toEqual({
       ...DEFAULT_SECTION_SIZES,
@@ -110,7 +109,7 @@ describe('getDashboardSectionVisibility', () => {
   it('merges valid stored values onto defaults, keeping default for missing/invalid keys', () => {
     appSettings[DASHBOARD_SECTION_VISIBILITY_KEY] = JSON.stringify({
       trackers: false,
-      net_worth: 'yes',
+      insights: 'yes',
     })
     expect(getDashboardSectionVisibility()).toEqual({
       ...DEFAULT_SECTION_VISIBILITY,

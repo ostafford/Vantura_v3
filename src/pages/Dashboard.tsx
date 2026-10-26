@@ -22,7 +22,6 @@ import { InsightsSection } from '@/components/dashboard/InsightsSection'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
-import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { BalanceCards } from '@/components/dashboard/BalanceCards'
 import { EssentialsCoverageBlock } from '@/components/dashboard/EssentialsCoverageBlock'
 import { getEssentialsCoverage } from '@/services/essentialsCoverage'
@@ -59,7 +58,6 @@ const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
   insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
-  net_worth: 'net-worth',
 }
 
 export function Dashboard() {
@@ -547,8 +545,6 @@ export function Dashboard() {
               onUpcomingChange={() => setDataVersion((v) => v + 1)}
             />
           )
-        case 'net_worth':
-          return <NetWorthCard dragHandleProps={dragHandleProps} />
         default:
           return null
       }
