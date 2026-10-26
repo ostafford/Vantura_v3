@@ -97,7 +97,7 @@ _Avoid_: disposable income, spare, remaining, leftover
 ### Regulars
 
 **Regular**:
-A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`), the due-soon banner, and the calendar view. Named after Up's own term for the same concept (`docs/adr/0018`); internally still the `upcoming_charges` table.
+A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`) and the due-soon banner. Named after Up's own term for the same concept (`docs/adr/0018`); internally still the `upcoming_charges` table.
 _Avoid_: upcoming charge, bill (bare), recurring transaction, scheduled payment
 
 **Overdue / Next pay / Later**:
