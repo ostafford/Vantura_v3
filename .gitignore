@@ -41,4 +41,6 @@ node_modules
 
 # Internal reference docs (working detail, not meant for a public repo)
 Reference_Docs
-docs
+/docs/*
+# Agent-skill config (issue tracker, triage labels, domain-doc rules) is public
+!/docs/agents/
