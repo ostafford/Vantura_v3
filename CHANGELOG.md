@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-10-31
+
+A simpler Dashboard: the Net Worth card and the Regulars calendar view are gone, Weekly insights reads more cleanly, and the chart legend and the welcome tour behave in the light theme and when closed.
+
+### Changed
+
+- **Month at a glance, Weekly insights and Trackers now span the full Dashboard width.** If you've resized these sections yourself, your sizes are kept.
+- **The Weekly insights chart no longer labels parent categories.** Its group headings and divider lines are gone; a small gap still separates bars from different parent categories.
+
+### Removed
+
+- **The Net Worth card is no longer on the Dashboard.** Your net worth, accounts and history are all still in Analytics → Net Worth.
+- **Regulars no longer has a calendar view.** Regulars shows as a list, split into Next pay and Later.
+
+### Fixed
+
+- **The month comparison chart's legend is readable in the light theme.** The labels under the chart (for example September, October and Average) were white on a light background. They now use the theme's text colours, including when a line is switched off or hovered. The same fix applies on Analytics → at a glance.
+- **The Dashboard tour stays closed once you close it.** Closing it in its first moment didn't count, so it opened again every time you came back to the Dashboard.
+
 ## [0.11.4] - 2026-10-26
 
 Coloured text you can read: green, amber and red text is legible in the light theme, coloured tooltip lines are legible in the dark theme, and the Android app opens without a stray colour flash.
