@@ -14,6 +14,33 @@ export async function startWithSampleData(page: Page): Promise<void> {
   })
 }
 
+/**
+ * Waits for the first-run dashboard tour (which always opens ~400ms after the
+ * dashboard mounts on a fresh DB) and closes it, so its overlay can't
+ * intercept later clicks. Uses the close button, which marks the tour
+ * completed; closing with Escape currently doesn't, so the tour would reopen
+ * on every return to the dashboard.
+ */
+export async function closeDashboardTour(page: Page): Promise<void> {
+  await expect(page.locator('.driver-popover')).toBeVisible()
+  await page.locator('.driver-popover-close-btn').click()
+  await expect(page.locator('.driver-overlay')).toHaveCount(0)
+}
+
+/**
+ * Switches to the light theme through Settings → Appearance, then returns to
+ * the dashboard. A fresh DB defaults to dark, and the theme is read from the
+ * DB, so this has to go through the UI rather than localStorage.
+ */
+export async function switchToLightTheme(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await page.getByRole('button', { name: 'Light', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-bs-theme', 'light')
+  await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
+  await expect(page.getByLabel(/Spendable balance/i)).toBeVisible()
+}
+
 export async function goToTrackers(page: Page): Promise<void> {
   await page.getByRole('link', { name: 'Analytics', exact: true }).click()
   await page.getByRole('link', { name: /View trackers/ }).click()
