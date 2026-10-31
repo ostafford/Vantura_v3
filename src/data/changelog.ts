@@ -24,6 +24,36 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '31 Oct 2026',
+    heading: 'Simpler Dashboard',
+    icon: 'mdi-view-dashboard-outline',
+    primaryMonth: '2026-10',
+    version: '0.11.5',
+    color: '#90caf9',
+    items: [
+      {
+        icon: 'mdi-view-dashboard-outline',
+        text: 'The Dashboard is simpler: Month at a glance, Weekly insights and Trackers span the full width, and the Net Worth card has moved to Analytics → Net Worth only.',
+      },
+      {
+        icon: 'mdi-format-list-bulleted',
+        text: 'Regulars is now a list only; the calendar view is gone.',
+      },
+      {
+        icon: 'mdi-chart-bar',
+        text: 'The Weekly insights chart drops its parent category headings for a cleaner look.',
+      },
+      {
+        icon: 'mdi-format-color-text',
+        text: 'The chart legend under Month at a glance is now readable in the light theme.',
+      },
+      {
+        icon: 'mdi-close-circle-outline',
+        text: 'The welcome tour stays closed once you close it.',
+      },
+    ],
+  },
+  {
     date: '26 Oct 2026',
     heading: 'Readable Colours',
     icon: 'mdi-theme-light-dark',
