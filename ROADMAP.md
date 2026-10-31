@@ -313,7 +313,6 @@ Features that have been discussed or noted as potential future additions. Nothin
 - **Android / desktop PWA biometric** — Biometric support on Android (currently optimised for iOS/macOS WebAuthn)
 - **Logo gradient on favicon** — Static `logo-icon.svg` uses neutral silver gradient; future work to generate per-accent favicons or use a Canvas-based approach
 - **Advanced charts** — Category trends and spending heatmaps beyond the current Weekly Insights / Savers bar charts
-- **CSV export of transactions** — Export transaction history to CSV
 - **Budget forecasting** — Predict future balance based on trackers, upcoming charges, and Budget Plan
 - **Multi-account support** — Multiple Up Bank accounts/tokens (e.g. joint accounts) in one Vantura profile
 
