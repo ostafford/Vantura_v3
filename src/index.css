@@ -2168,6 +2168,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 
 /* Month summary chart legend toggles: borderless/ghost buttons */
 .month-summary-legend-toggle.btn {
+  /* Bootstrap's outline-button colours assume its own filled backgrounds:
+     white active/hover text vanished in light theme and the grey off text
+     was under 4.5:1 in both (#138). Use the app's text tokens instead. */
+  --bs-btn-color: var(--vantura-text-secondary);
+  --bs-btn-hover-color: var(--vantura-text);
+  --bs-btn-active-color: var(--vantura-text);
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
