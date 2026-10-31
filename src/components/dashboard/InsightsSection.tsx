@@ -22,7 +22,7 @@ import {
 } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
-import { getCategoryColor, getUncategorisedColor } from '@/lib/colorSystem'
+import { buildInsightsChartRows } from '@/lib/insightsChartRows'
 import { HelpPopover } from '@/components/HelpPopover'
 import { StatCard } from '@/components/StatCard'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -69,52 +69,21 @@ export function InsightsSection({
     [weekRange]
   )
 
-  // Every section the data layer returns (real parent groups with spend,
-  // Uncategorised, Other) gets a header row before its bars — so each group
-  // boundary is a real visual divider and the groups that appear stay in the
-  // colour system's validated order. Empty parent groups are dropped upstream
-  // (#31); see colorSystem.ts and getWeeklyCategoryBreakdownGrouped's doc.
-  const rows: InsightsChartRow[] = useMemo(
-    () =>
-      sections.flatMap((section) => {
-        const header: InsightsChartRow = {
-          kind: 'header',
-          key: `header:${section.parentId ?? section.parentName}`,
-          label: section.parentName,
-        }
-        const bars: InsightsChartRow[] = section.rows.map((r) => {
-          const isNeutral = section.isOther || section.parentId === null
-          const hex = isNeutral
-            ? getUncategorisedColor(mode)
-            : getCategoryColor(r.category_id, mode)
-          return {
-            kind: 'bar',
-            datum: {
-              category_id:
-                r.category_id ??
-                (section.isOther ? '__other__' : '__uncategorised__'),
-              name: r.category_name,
-              totalDollars: r.total / 100,
-              fill: hex,
-              stroke: hex,
-            },
-          }
-        })
-        return [header, ...bars]
-      }),
+  const rows = useMemo(
+    () => buildInsightsChartRows(sections, mode),
     [sections, mode]
   )
-  const barCount = sections.reduce((sum, s) => sum + s.rows.length, 0)
+  const bars = rows
+    .filter(
+      (r): r is Extract<InsightsChartRow, { kind: 'bar' }> => r.kind === 'bar'
+    )
+    .map((r) => r.datum)
+  const barCount = bars.length
   const otherSection = sections.find((s) => s.isOther)
 
   const maxDomain = Math.max(
     1,
-    ...rows
-      .filter(
-        (r): r is Extract<InsightsChartRow, { kind: 'bar' }> => r.kind === 'bar'
-      )
-      .map((r) => r.datum.totalDollars)
-      .filter(Number.isFinite)
+    ...bars.map((d) => d.totalDollars).filter(Number.isFinite)
   )
 
   const titleBlock = (
@@ -128,7 +97,7 @@ export function InsightsSection({
           <HelpPopover
             id="insights-help"
             title="Weekly Insights"
-            content="Shows money in, money out, saver movement, and transaction count for the selected week. Use the arrows to browse previous weeks. The bar chart breaks spending down by category, grouped by parent category."
+            content="Shows money in, money out, saver movement, and transaction count for the selected week. Use the arrows to browse previous weeks. The bar chart breaks spending down by category."
             ariaLabel="What is Weekly Insights?"
           />
         </div>
@@ -280,7 +249,7 @@ export function InsightsSection({
             >
               <table className="table table-sm mb-0">
                 <caption className="visually-hidden">
-                  Spending by category this week, grouped by parent category
+                  Spending by category this week
                 </caption>
                 <thead>
                   <tr>
@@ -291,22 +260,14 @@ export function InsightsSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) =>
-                    r.kind === 'bar' ? (
-                      <tr key={r.datum.category_id}>
-                        <td>{r.datum.name}</td>
-                        <td className="text-end">
-                          ${formatDollars(r.datum.totalDollars)}
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={r.key}>
-                        <th scope="rowgroup" colSpan={2}>
-                          {r.label}
-                        </th>
-                      </tr>
-                    )
-                  )}
+                  {bars.map((d) => (
+                    <tr key={d.category_id}>
+                      <td>{d.name}</td>
+                      <td className="text-end">
+                        ${formatDollars(d.totalDollars)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

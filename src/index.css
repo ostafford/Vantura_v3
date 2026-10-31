@@ -698,52 +698,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding-top: 1rem;
 }
 
-/* Upcoming calendar view */
-.upcoming-calendar-dow {
-  width: calc(100% / 7);
-  display: inline-block;
-  text-align: center;
-  font-size: 0.7rem;
-}
-.upcoming-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-.upcoming-calendar-cell {
-  min-height: 48px;
-  padding: 4px;
-  border: 1px solid var(--vantura-border);
-  border-radius: 4px;
-  background: var(--vantura-surface);
-  font-size: 0.75rem;
-}
-.upcoming-calendar-cell-empty {
-  background: var(--vantura-content-bg);
-  border-color: transparent;
-}
-.upcoming-calendar-cell-today {
-  border-color: var(--vantura-primary);
-  background: color-mix(
-    in srgb,
-    var(--vantura-primary) 8%,
-    var(--vantura-surface)
-  );
-}
-.upcoming-calendar-cell-today .upcoming-calendar-day-num {
-  color: var(--vantura-primary);
-}
-.upcoming-calendar-day-num {
-  font-weight: 600;
-  color: var(--vantura-text-secondary);
-}
-.upcoming-calendar-cell-charges {
-  margin-top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
 /* Dashboard: 2-column grid, cards auto-size to content, responsive */
 .dashboard-grid {
   --dashboard-gap: 1.5rem;

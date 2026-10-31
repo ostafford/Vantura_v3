@@ -12,14 +12,12 @@ export const DASHBOARD_SECTION_IDS = [
   'insights',
   'trackers',
   'upcoming',
-  'net_worth',
 ] as const
 
 export type DashboardSectionId = (typeof DASHBOARD_SECTION_IDS)[number]
 
 export const DEFAULT_DASHBOARD_SECTION_ORDER: DashboardSectionId[] = [
   'month_summary',
-  'net_worth',
   'insights',
   'trackers',
   'upcoming',
@@ -51,7 +49,6 @@ export const DASHBOARD_SECTION_LABELS: Record<DashboardSectionId, string> = {
   insights: 'Weekly insights',
   trackers: 'Trackers',
   upcoming: 'Regulars',
-  net_worth: 'Net Worth',
 }
 
 // --- Section sizing ---
@@ -64,11 +61,10 @@ export const DEFAULT_SECTION_SIZES: Record<
   DashboardSectionId,
   DashboardSectionSize
 > = {
-  month_summary: 'medium',
-  insights: 'medium',
-  trackers: 'medium',
+  month_summary: 'large',
+  insights: 'large',
+  trackers: 'large',
   upcoming: 'large',
-  net_worth: 'small',
 }
 
 /**
@@ -130,7 +126,6 @@ export const DEFAULT_SECTION_VISIBILITY: Record<DashboardSectionId, boolean> = {
   insights: true,
   trackers: true,
   upcoming: true,
-  net_worth: true,
 }
 
 function isBoolean(val: unknown): val is boolean {

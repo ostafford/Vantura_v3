@@ -25,7 +25,7 @@ const MARGIN_RIGHT_DESKTOP = 24
 const MARGIN_RIGHT_MOBILE = 8
 
 type InsightsBarChartProps = {
-  /** Ordered mix of category bars and parent-group header dividers — see
+  /** Ordered mix of category bars and unlabelled group gaps — see
    * InsightsChartRow. The data layer owns all sorting/grouping/Other-folding;
    * the chart just renders whatever order it's given. */
   rows: InsightsChartRow[]
@@ -38,8 +38,9 @@ type InsightsBarChartProps = {
 }
 
 /**
- * D3 single-series bar chart for Weekly Insights (spending by category),
- * grouped into parent-category clusters with a header divider between each.
+ * D3 single-series bar chart for Weekly Insights (spending by category).
+ * Gap rows reserve an empty band slot (no label, tick or divider) between
+ * parent-category clusters.
  * Desktop: horizontal bars (Y = category, X = dollars). Mobile: vertical bars (X = category, Y = dollars).
  */
 export function InsightsBarChart({
@@ -57,29 +58,22 @@ export function InsightsBarChart({
     const container = containerRef.current
     const tooltipEl = tooltipRef.current
     if (!container || dimensions.width <= 0 || dimensions.height <= 0) return
-    if (rows.length === 0) return
-
-    select(container).selectAll('*').remove()
-
-    const barRows = rows
+    const data = rows
       .filter(
         (r): r is { kind: 'bar'; datum: InsightsChartDatum } => r.kind === 'bar'
       )
       .map((r) => r.datum)
-    const headerKeys = new Set(
-      rows.filter((r) => r.kind === 'header').map((r) => r.key)
-    )
+    if (data.length === 0) return
 
+    select(container).selectAll('*').remove()
+
+    // Gap keys take band slots in the scale domain but get no tick
     const keys = rows.map((r) =>
       r.kind === 'bar' ? r.datum.category_id : r.key
     )
+    const barKeys = data.map((d) => d.category_id)
     const labelByKey: Record<string, string> = {}
-    for (const r of rows) {
-      labelByKey[r.kind === 'bar' ? r.datum.category_id : r.key] =
-        r.kind === 'bar' ? r.datum.name : r.label
-    }
-    // Header labels count toward axis width too, so a long group name
-    // ("Good Life") doesn't get clipped.
+    for (const d of data) labelByKey[d.category_id] = d.name
     const allLabels = Object.values(labelByKey)
 
     const left = isMobile
@@ -138,57 +132,10 @@ export function InsightsBarChart({
       if (tooltipRef.current) tooltipRef.current.style.display = 'none'
     }
 
-    const formatTickLabel = (key: string) =>
-      headerKeys.has(key) ? '' : (labelByKey[key] ?? key)
-
-    /** Style header ticks distinctly (bold/muted, no tick line) and add a
-     * divider line at the start of each header's band slot — run after the
-     * default axis .call() so it can override/augment the generated ticks. */
-    function decorateHeaderTicks(
-      axisGroup: Selection<SVGGElement, unknown, null, undefined>,
-      orientation: 'horizontal' | 'vertical'
-    ) {
-      axisGroup.selectAll('.tick').each(function (d) {
-        const key = String(d)
-        if (!headerKeys.has(key)) return
-        const tick = select(this as SVGGElement)
-        tick.select('line').remove()
-        const label = labelByKey[key] ?? key
-        const textSel = tick
-          .select('text')
-          .text(label)
-          .style('font-weight', 700)
-          .style('font-size', '10px')
-          .style('text-transform', 'uppercase')
-          .style('letter-spacing', '0.04em')
-          .attr('fill', 'var(--vantura-text-secondary, currentColor)')
-        if (orientation === 'horizontal') {
-          textSel
-            .attr('transform', null)
-            .style('text-anchor', 'start')
-            .attr('x', 0)
-            .attr('dy', -4)
-        } else {
-          textSel.attr('transform', 'rotate(-60)').style('text-anchor', 'end')
-        }
-      })
-
-      const bandStart = (key: string) => categoryScale(key) ?? 0
-      const dividers = [...headerKeys].map((key) => bandStart(key))
-      g.selectAll('.group-divider')
-        .data(dividers)
-        .join('line')
-        .attr('class', 'group-divider')
-        .attr('x1', orientation === 'horizontal' ? 0 : (d) => d)
-        .attr('x2', orientation === 'horizontal' ? innerWidth : (d) => d)
-        .attr('y1', orientation === 'horizontal' ? (d) => d : 0)
-        .attr('y2', orientation === 'horizontal' ? (d) => d : innerHeight)
-        .attr('stroke', BORDER_COLOR)
-        .attr('stroke-width', 1)
-    }
+    const formatTickLabel = (key: string) => labelByKey[key] ?? key
 
     if (isMobile) {
-      barRows.forEach((d, index) => {
+      data.forEach((d, index) => {
         const grad = defs
           .append('linearGradient')
           .attr('id', `insights-bar-grad-${index}`)
@@ -211,26 +158,21 @@ export function InsightsBarChart({
       })
 
       const xAxis = axisBottom(categoryScale)
+        .tickValues(barKeys)
         .tickFormat(formatTickLabel)
         .tickSizeOuter(0)
       const yAxis = axisLeft(valueScaleVert)
         .tickFormat((d: NumberValue) => `$${formatDollars(Number(d))}`)
         .tickSizeOuter(0)
 
-      const xAxisGroup = g
-        .append('g')
+      g.append('g')
         .attr('transform', `translate(0,${innerHeight})`)
         .call(xAxis)
-      xAxisGroup
         .selectAll('text')
         .attr('transform', 'rotate(-60)')
         .style('text-anchor', 'end')
         .style('font-size', '11px')
         .attr('fill', 'currentColor')
-      decorateHeaderTicks(
-        xAxisGroup as Selection<SVGGElement, unknown, null, undefined>,
-        'vertical'
-      )
 
       g.append('g')
         .call(yAxis)
@@ -243,7 +185,7 @@ export function InsightsBarChart({
         )
 
       g.selectAll<SVGRectElement, InsightsChartDatum>('.bar')
-        .data(barRows)
+        .data(data)
         .join('rect')
         .attr('class', 'bar')
         .attr(
@@ -282,7 +224,7 @@ export function InsightsBarChart({
           select(this).style('opacity', null)
         })
     } else {
-      barRows.forEach((d, index) => {
+      data.forEach((d, index) => {
         const grad = defs
           .append('linearGradient')
           .attr('id', `insights-bar-grad-${index}`)
@@ -308,6 +250,7 @@ export function InsightsBarChart({
         .tickFormat((d: NumberValue) => `$${formatDollars(Number(d))}`)
         .tickSizeOuter(0)
       const yAxis = axisLeft(categoryScale)
+        .tickValues(barKeys)
         .tickFormat(formatTickLabel)
         .tickSizeOuter(0)
 
@@ -321,8 +264,7 @@ export function InsightsBarChart({
           sel.selectAll('.tick text').attr('fill', 'currentColor')
         )
 
-      const yAxisGroup = g
-        .append('g')
+      g.append('g')
         .call(yAxis)
         .style('font-size', '12px')
         .call((sel: Selection<SVGGElement, unknown, null, undefined>) =>
@@ -331,13 +273,9 @@ export function InsightsBarChart({
         .call((sel: Selection<SVGGElement, unknown, null, undefined>) =>
           sel.selectAll('.tick text').attr('fill', 'currentColor')
         )
-      decorateHeaderTicks(
-        yAxisGroup as Selection<SVGGElement, unknown, null, undefined>,
-        'horizontal'
-      )
 
       g.selectAll<SVGRectElement, InsightsChartDatum>('.bar')
-        .data(barRows)
+        .data(data)
         .join('rect')
         .attr('class', 'bar')
         .attr('x', 0)

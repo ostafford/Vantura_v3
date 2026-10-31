@@ -15,7 +15,6 @@ import {
   createUpcomingCharge,
   updateUpcomingCharge,
   deleteUpcomingCharge,
-  getUpcomingChargesForMonth,
   daysUntilCharge,
   nextChargeDateFromAnchor,
   type UpcomingChargeRow,
@@ -48,7 +47,7 @@ import {
 import { getDb } from '@/db'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { MOBILE_MEDIA_QUERY, MONTH_NAMES } from '@/lib/constants'
+import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import type React from 'react'
 
 const FREQUENCIES = [
@@ -62,123 +61,6 @@ const FREQUENCIES = [
 
 /** Default number of rows shown before the "Show all" toggle appears. */
 const DEFAULT_VISIBLE_COUNT = 5
-
-function UpcomingCalendar({
-  year,
-  month,
-  onPrevMonth,
-  onNextMonth,
-  daysByDate,
-  onChargeClick,
-}: {
-  year: number
-  month: number
-  onPrevMonth: () => void
-  onNextMonth: () => void
-  daysByDate: Record<string, UpcomingChargeRow[]>
-  onChargeClick: (c: UpcomingChargeRow) => void
-}) {
-  const firstDay = new Date(year, month - 1, 1)
-  const lastDay = new Date(year, month, 0)
-  // Mon=0 … Sun=6 so the grid starts on Monday (AU convention)
-  const startWeekday = (firstDay.getDay() + 6) % 7
-  const daysInMonth = lastDay.getDate()
-  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7
-  const leadingBlanks = startWeekday
-  const todayLocal = (() => {
-    const t = new Date()
-    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
-  })()
-  const dayNumbers: (number | null)[] = []
-  for (let i = 0; i < leadingBlanks; i++) dayNumbers.push(null)
-  for (let d = 1; d <= daysInMonth; d++) dayNumbers.push(d)
-  while (dayNumbers.length < totalCells) dayNumbers.push(null)
-
-  return (
-    <div className="upcoming-calendar">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={onPrevMonth}
-          aria-label="Previous month"
-        >
-          <i className="mdi mdi-chevron-left" aria-hidden />
-        </button>
-        <span className="fw-medium">
-          {MONTH_NAMES[month - 1]} {year}
-        </span>
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={onNextMonth}
-          aria-label="Next month"
-        >
-          <i className="mdi mdi-chevron-right" aria-hidden />
-        </button>
-      </div>
-      <div className="d-flex flex-wrap small mb-1 text-muted">
-        <span className="upcoming-calendar-dow">Mon</span>
-        <span className="upcoming-calendar-dow">Tue</span>
-        <span className="upcoming-calendar-dow">Wed</span>
-        <span className="upcoming-calendar-dow">Thu</span>
-        <span className="upcoming-calendar-dow">Fri</span>
-        <span className="upcoming-calendar-dow">Sat</span>
-        <span className="upcoming-calendar-dow">Sun</span>
-      </div>
-      <div className="upcoming-calendar-grid">
-        {dayNumbers.map((d, i) => {
-          if (d === null) {
-            return (
-              <div
-                key={`empty-${i}`}
-                className="upcoming-calendar-cell upcoming-calendar-cell-empty"
-              />
-            )
-          }
-          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-          const charges = daysByDate[dateStr] ?? []
-          const isToday = dateStr === todayLocal
-          return (
-            <div
-              key={dateStr}
-              className={`upcoming-calendar-cell${isToday ? ' upcoming-calendar-cell-today' : ''}`}
-            >
-              <span className="upcoming-calendar-day-num">{d}</span>
-              {charges.length > 0 && (
-                <div className="upcoming-calendar-cell-charges">
-                  {charges.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="btn btn-link btn-sm p-0 text-start d-flex flex-column"
-                      style={{ fontSize: '0.7rem', maxWidth: '100%' }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onChargeClick(c)
-                      }}
-                      aria-label={`${c.name} $${formatMoney(c.amount)}`}
-                    >
-                      <span
-                        className="text-truncate"
-                        style={{ maxWidth: '100%' }}
-                      >
-                        {c.name}
-                      </span>
-                      <span className="text-muted">
-                        ${formatMoney(c.amount)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 export interface UpcomingSectionProps {
   onUpcomingChange?: () => void
@@ -211,7 +93,6 @@ export function UpcomingSection({
   const [linkedManualAccountId, setLinkedManualAccountId] = useState<
     number | null
   >(null)
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
@@ -223,30 +104,12 @@ export function UpcomingSection({
   const [matchDescription, setMatchDescription] = useState<string>('')
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
   const [settlementSearch, setSettlementSearch] = useState('')
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const d = new Date()
-    return { year: d.getFullYear(), month: d.getMonth() + 1 }
-  })
 
   const { overdue, nextPay, later, nextPayday } = useMemo(
     () => getUpcomingChargesGrouped(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt]
   )
-  const calendarCharges = useMemo(
-    () => getUpcomingChargesForMonth(calendarMonth.year, calendarMonth.month),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [calendarMonth.year, calendarMonth.month, refresh, lastSyncCompletedAt]
-  )
-  const calendarDaysByDate = useMemo(() => {
-    const map: Record<string, UpcomingChargeRow[]> = {}
-    for (const c of calendarCharges) {
-      const d = c.next_charge_date.slice(0, 10)
-      if (!map[d]) map[d] = []
-      map[d].push(c)
-    }
-    return map
-  }, [calendarCharges])
   const reserved = useMemo(
     () => getReservedAmount(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,28 +487,6 @@ export function UpcomingSection({
               <i className="mdi mdi-calendar-clock" aria-hidden />
             </span>
             <span>Regulars</span>
-            <div
-              className="period-toggle ms-2"
-              role="group"
-              aria-label="View mode"
-            >
-              <button
-                type="button"
-                className={`segment-btn${viewMode === 'list' ? ' active' : ''}`}
-                onClick={() => setViewMode('list')}
-                aria-pressed={viewMode === 'list'}
-              >
-                List
-              </button>
-              <button
-                type="button"
-                className={`segment-btn${viewMode === 'calendar' ? ' active' : ''}`}
-                onClick={() => setViewMode('calendar')}
-                aria-pressed={viewMode === 'calendar'}
-              >
-                Calendar
-              </button>
-            </div>
             <HelpPopover
               id="upcoming-help"
               title="Regulars"
@@ -687,31 +528,12 @@ export function UpcomingSection({
           </div>
         </Card.Header>
         <Card.Body>
-          {nextPayday && viewMode === 'list' && (
+          {nextPayday && (
             <p className="small text-muted mb-2">
               Next pay day — {formatShortDate(nextPayday)}
             </p>
           )}
-          {viewMode === 'calendar' ? (
-            <UpcomingCalendar
-              year={calendarMonth.year}
-              month={calendarMonth.month}
-              onPrevMonth={() =>
-                setCalendarMonth((prev) => {
-                  if (prev.month <= 1) return { year: prev.year - 1, month: 12 }
-                  return { year: prev.year, month: prev.month - 1 }
-                })
-              }
-              onNextMonth={() =>
-                setCalendarMonth((prev) => {
-                  if (prev.month >= 12) return { year: prev.year + 1, month: 1 }
-                  return { year: prev.year, month: prev.month + 1 }
-                })
-              }
-              daysByDate={calendarDaysByDate}
-              onChargeClick={openEdit}
-            />
-          ) : !hasAny ? (
+          {!hasAny ? (
             <p className="text-muted small mb-0">
               No Regulars yet. Add one to track.
             </p>
@@ -895,7 +717,7 @@ export function UpcomingSection({
                 ))}
             </>
           )}
-          {viewMode === 'list' && totalCount > DEFAULT_VISIBLE_COUNT && (
+          {totalCount > DEFAULT_VISIBLE_COUNT && (
             <button
               type="button"
               className="btn btn-link btn-sm p-0 mt-2"
