@@ -65,7 +65,7 @@ API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2
 
 ## Documentation map
 
-Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `GLOSSARY.md` plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
+Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo, except `docs/agents/`, which holds agent-skill config and is committed): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `GLOSSARY.md` plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
 
 **Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — a short router pointing to `OVERVIEW.md` (how the feature works, always present) and out to the relevant entries in the repo-root `GLOSSARY.md` and `docs/adr/` for *why*. It may also point to a `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
 
