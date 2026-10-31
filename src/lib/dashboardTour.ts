@@ -152,9 +152,14 @@ export function startDashboardTour(
     doneBtnText: 'Done',
     progressText: '{{current}} of {{total}}',
     steps,
-    onDestroyed: () => {
+    // Any deliberate close (✕, Escape, overlay click, Done) counts as done.
+    // onDestroyStarted runs for all of them; onDestroyed is skipped when the
+    // close lands inside a step's 400ms entry transition (#139). Setting it
+    // hands the close to us, and destroy() doesn't re-enter this hook.
+    onDestroyStarted: () => {
       setAppSetting(TOUR_COMPLETED_KEY, '1')
       onCompleted?.()
+      driverObj.destroy()
     },
   })
 
