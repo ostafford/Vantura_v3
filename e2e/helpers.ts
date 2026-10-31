@@ -17,12 +17,15 @@ export async function startWithSampleData(page: Page): Promise<void> {
 /**
  * Waits for the first-run dashboard tour (which always opens ~400ms after the
  * dashboard mounts on a fresh DB) and closes it, so its overlay can't
- * intercept later clicks. Uses the close button, which marks the tour
- * completed; closing with Escape currently doesn't, so the tour would reopen
- * on every return to the dashboard.
+ * intercept later clicks. driver.js only records a close (onDestroyed, which
+ * marks the tour completed) once its 400ms step-entry transition has
+ * finished; closing earlier isn't recorded and the tour reopens on the next
+ * dashboard visit. Nothing in the DOM marks the end of that transition, so
+ * wait it out.
  */
 export async function closeDashboardTour(page: Page): Promise<void> {
   await expect(page.locator('.driver-popover')).toBeVisible()
+  await page.waitForTimeout(500)
   await page.locator('.driver-popover-close-btn').click()
   await expect(page.locator('.driver-overlay')).toHaveCount(0)
 }
