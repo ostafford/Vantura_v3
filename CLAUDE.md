@@ -65,7 +65,7 @@ API token and any secrets are encrypted client-side (`src/lib/crypto.ts`: PBKDF2
 
 ## Documentation map
 
-Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo, except `docs/agents/`, which holds agent-skill config and is committed): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `GLOSSARY.md` plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles. This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
+Vantura's deep technical reference lives in `docs/` (gitignored, not in the public repo, except `docs/agents/`, which holds agent-skill config and is committed): one folder per feature under `docs/features/` for *how* each feature works; a single repo-root `GLOSSARY.md` plus `docs/adr/` for *why* the domain is shaped the way it is; `docs/DATABASE.md` for the schema; `docs/PRODUCT.md` for product vision/design principles; `docs/research/` for research notes (where the `research` skill and wayfinder research tickets save). This replaced the old flat `Reference_Docs/` structure, fully retired 2026-08-11.
 
 **Navigation convention:** landing in a feature folder for context? Read that folder's `CLAUDE.md` first — a short router pointing to `OVERVIEW.md` (how the feature works, always present) and out to the relevant entries in the repo-root `GLOSSARY.md` and `docs/adr/` for *why*. It may also point to a `SKILL.md` (a pointer to a real skill in `.claude/skills/`, if one exists for that feature).
 
@@ -80,7 +80,7 @@ Root-level docs (public, in git):
 
 ### Issue tracker
 
-Issues live in GitHub Issues (`ostafford/Vantura_v3`, via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues (`ostafford/Vantura_v3`, via the `gh` CLI). Work lands on `main` only through squash-merged PRs; never commit to `main` directly. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -88,8 +88,8 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 ### Domain docs
 
-Single-context layout: a repo-root `GLOSSARY.md` + `docs/adr/`, the canonical home for domain "why". See `docs/agents/domain.md`.
+Single-context layout: a repo-root `GLOSSARY.md` + `docs/adr/`, the canonical home for domain "why". Edits to either need explicit confirmation first, even when a skill says to update them inline. See `docs/agents/domain.md`.
 
 ### Design engineering
 
-Motion, interaction, and UI-polish work uses Emil Kowalski's design-engineering skills (`emil-design-eng`, `apple-design`, `animate`, `improve-animations`, vendored from `emilkowalski/skills`, pinned in `skills-lock.json`). Presentation tier only; domain/correctness/testing/docs stay with `mattpocock-skills:*` and the practice above. See `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`.
+Motion, interaction, and UI-polish work uses Emil Kowalski's design-engineering skills (`emil-design-eng`, `apple-design`, `animate`, `improve-animations`, vendored from `emilkowalski/skills`, pinned in `skills-lock.json`). Presentation tier only; domain/correctness/testing/docs stay with the Matt Pocock engineering skills (installed user-level in `~/.claude/skills/`: `tdd`, `code-review`, `domain-modeling`, `triage`, etc.) and the practice above. See `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`.
