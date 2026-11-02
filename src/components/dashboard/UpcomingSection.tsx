@@ -18,7 +18,7 @@ import {
   nextChargeDateToStoreOnEdit,
   deleteUpcomingCharge,
   daysUntilCharge,
-  nextChargeDateFromAnchor,
+  regularDraftFromTransaction,
   type UpcomingChargeRow,
 } from '@/services/upcoming'
 import { getReservedAmount } from '@/services/balance'
@@ -322,12 +322,13 @@ export function UpcomingSection({
   // links the Regular to its payments (docs/adr/0020) — reveal "More options"
   // so the resulting auto-clear link is visible rather than silently applied.
   function applySearchTx(tx: AnchorDebitRow) {
-    setName(tx.description)
-    setAmount((tx.amount / 100).toFixed(2))
-    setCategoryId(tx.category_id ?? '')
-    setNextChargeDate(nextChargeDateFromAnchor(tx.date, frequency))
+    const draft = regularDraftFromTransaction(tx, frequency)
+    setName(draft.name)
+    setAmount((draft.amountCents / 100).toFixed(2))
+    setCategoryId(draft.categoryId ?? '')
+    setNextChargeDate(draft.nextChargeDate)
     setImportedFromTx(tx)
-    setMatchDescription(tx.description)
+    setMatchDescription(draft.matchDescription)
     setMoreOptionsOpen(true)
     setCreateStep('form')
     setTxSearch('')
@@ -940,7 +941,8 @@ export function UpcomingSection({
                         setFrequency(f)
                         if (importedFromTx) {
                           setNextChargeDate(
-                            nextChargeDateFromAnchor(importedFromTx.date, f)
+                            regularDraftFromTransaction(importedFromTx, f)
+                              .nextChargeDate
                           )
                         }
                       }}
