@@ -232,11 +232,20 @@ describe('nextChargeDateFromAnchor (#47)', () => {
     ).toBe('2026-02-12')
   })
 
-  it('keeps steps until the occurrence is strictly past today', () => {
+  it('keeps stepping until the occurrence is on or after today', () => {
     // Jan 31 → Feb 28 → Mar 31 → Apr 30: the anchor's day survives February (#145)
     expect(
       nextChargeDateFromAnchor('2026-01-31', 'MONTHLY', '2026-04-10')
     ).toBe('2026-04-30')
+  })
+
+  it('returns today when an occurrence falls on today, as the list does (#163)', () => {
+    expect(
+      nextChargeDateFromAnchor('2026-10-02', 'MONTHLY', '2026-11-02')
+    ).toBe('2026-11-02')
+    expect(
+      nextChargeDateFromAnchor('2026-11-02', 'MONTHLY', '2026-11-02')
+    ).toBe('2026-11-02')
   })
 
   it('returns an already-future anchor unchanged', () => {
