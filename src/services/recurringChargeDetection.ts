@@ -6,7 +6,7 @@
  */
 import { getDb, schedulePersist } from '@/db'
 import { localDateString } from '@/lib/format'
-import { nextChargeDateFromAnchor } from './upcoming'
+import { nextChargeDateFromAnchor } from './regulars'
 
 export interface RecurringChargeSuggestion {
   /** Stable grouping key — the Up `description` (docs/adr/0020). Dismissals key on this. */

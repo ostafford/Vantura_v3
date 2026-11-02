@@ -10,7 +10,7 @@ import {
 import {
   createUpcomingCharge,
   nextChargeDateToStoreOnCreate,
-} from '@/services/upcoming'
+} from '@/services/regulars'
 import { getCategories } from '@/services/categories'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'

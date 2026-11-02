@@ -14,7 +14,7 @@ import {
   regularDraftFromTransaction,
   nextChargeDateToStoreOnCreate,
   type UpcomingChargeRow,
-} from './upcoming'
+} from './index'
 
 let SQL: SqlJsStatic
 let db: Database
@@ -36,7 +36,7 @@ const {
   createUpcomingCharge,
   updateUpcomingCharge,
   nextChargeDateToStoreOnEdit,
-} = await import('./upcoming')
+} = await import('./index')
 const { localDateString } = await import('@/lib/format')
 
 function makeRow(

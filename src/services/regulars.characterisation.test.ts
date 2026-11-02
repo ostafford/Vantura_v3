@@ -43,7 +43,7 @@ const {
   getDueSoonCharges,
   getLinkedLiabilityRepaymentCharges,
   getUpcomingChargeById,
-} = await import('./upcoming')
+} = await import('./regulars')
 
 const TRANSACTIONAL = 'transactional-1'
 const ESSENTIALS_SAVER = 'essentials-saver-1'

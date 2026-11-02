@@ -22,7 +22,7 @@ import {
   nextChargeDateFromAnchor,
   nextChargeDateToStoreOnCreate,
   type UpcomingChargeRow,
-} from '@/services/upcoming'
+} from '@/services/regulars'
 import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
 import {

@@ -28,7 +28,7 @@ import {
 import {
   getUpcomingChargesForMonth,
   type UpcomingChargeRow,
-} from '@/services/upcoming'
+} from '@/services/regulars'
 import {
   getCategoryColor,
   getTrackerColor,

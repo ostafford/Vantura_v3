@@ -26,7 +26,7 @@ import {
   firstOccurrenceOnOrAfter,
   getLinkedLiabilityRepaymentCharges,
   type UpcomingChargeRow,
-} from '@/services/upcoming'
+} from '@/services/regulars'
 import { getTrackersWithProgress } from '@/services/trackers'
 import { getAccountsByTypes } from '@/services/accounts'
 import { getManualAccountById } from '@/services/manualAccounts'

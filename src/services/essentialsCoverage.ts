@@ -13,7 +13,7 @@ import {
   type LinkableRegular,
 } from './fundingSource'
 import { getAccountById } from './accounts'
-import { firstOccurrenceOnOrAfter } from './upcoming'
+import { firstOccurrenceOnOrAfter } from './regulars'
 import { calculateReservedBreakdown, type UpcomingChargeRow } from './balance'
 
 export type EssentialsCoverageState =

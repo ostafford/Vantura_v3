@@ -42,7 +42,7 @@ import {
   type DashboardSectionId,
   type DashboardSectionSize,
 } from '@/lib/dashboardSections'
-import { daysUntilCharge, getDueSoonCharges } from '@/services/upcoming'
+import { daysUntilCharge, getDueSoonCharges } from '@/services/regulars'
 import {
   runNotificationChecks,
   ensureBillsDueNotifications,

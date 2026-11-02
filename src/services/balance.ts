@@ -7,7 +7,7 @@ import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
-import { firstOccurrenceOnOrAfter } from './upcoming'
+import { firstOccurrenceOnOrAfter } from './regulars'
 import { getActiveEssentialsSaverAccountId } from './essentials'
 import {
   getFundingSourceAccountId,

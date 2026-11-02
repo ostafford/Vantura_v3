@@ -27,7 +27,7 @@ import {
   type ManualAccountType,
   type ManualAccountInput,
 } from '@/services/manualAccounts'
-import { getUpcomingChargeById } from '@/services/upcoming'
+import { getUpcomingChargeById } from '@/services/regulars'
 import { NetWorthTrendChart } from '@/components/charts/NetWorthTrendChart'
 import { HelpPopover } from '@/components/HelpPopover'
 import { toast } from '@/stores/toastStore'
