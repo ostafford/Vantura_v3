@@ -8,6 +8,7 @@ import {
   getMonthBoundsForOffset,
 } from '@/services/insights'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import type { MonthMetric } from '@/lib/monthSpendingSeries'
 import { MonthSpendingComparisonChart } from '@/components/charts/MonthSpendingComparisonChart'
 import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
@@ -28,19 +29,21 @@ export function MonthSummarySection({
   const [showAverageLine, setShowAverageLine] = useState(true)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
 
+  const today = useStore(todayStore, (s) => s.today)
   const { from, to, year, month } = useMemo(
     () => getMonthBoundsForOffset(monthOffset),
-    [monthOffset]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [monthOffset, today]
   )
   const comparison = useMemo(
     () => getMonthComparison(from, to),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [from, to, lastSyncCompletedAt]
+    [from, to, lastSyncCompletedAt, today]
   )
   const monthSeries = useMemo(
     () => getMonthDayByDaySeries(from, to),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [from, to, lastSyncCompletedAt]
+    [from, to, lastSyncCompletedAt, today]
   )
   const monthLabel = monthNameLong(year, month)
   const monthPairLabels = useMemo(

@@ -33,6 +33,7 @@ import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { HelpPopover } from '@/components/HelpPopover'
 import type React from 'react'
 
@@ -92,6 +93,7 @@ export function TrackersSection({
     useState<BudgetDisplayPeriod>('MONTHLY')
   const [searchParams, setSearchParams] = useSearchParams()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
 
   useEffect(() => {
     const rawId = searchParams.get('editTracker')
@@ -108,7 +110,7 @@ export function TrackersSection({
   const trackers = useMemo(
     () => getTrackersWithProgressForPeriod(0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
+    [refresh, lastSyncCompletedAt, today]
   )
   const categories = useMemo(
     () => getCategories(),
