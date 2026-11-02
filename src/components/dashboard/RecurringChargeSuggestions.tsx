@@ -8,8 +8,9 @@ import {
   type RecurringChargeSuggestion,
 } from '@/services/recurringChargeDetection'
 import {
-  createUpcomingCharge,
-  nextChargeDateToStoreOnCreate,
+  draftFromSuggestion,
+  validateRegularDraft,
+  saveRegular,
 } from '@/services/regulars'
 import { getCategories } from '@/services/categories'
 import { formatMoney, formatShortDate } from '@/lib/format'
@@ -56,24 +57,19 @@ export function RecurringChargeSuggestions({
     id ? (categories.find((c) => c.id === id)?.name ?? null) : null
 
   function handleAdd(s: RecurringChargeSuggestion) {
-    createUpcomingCharge(
-      s.name,
-      s.amountCents,
-      s.frequency,
-      // Store the latest payment's date as the anchor (#153).
-      nextChargeDateToStoreOnCreate({
-        anchorDate: s.anchorDate,
-        frequency: s.frequency,
-        shownDate: s.nextChargeDate,
-      }),
-      s.categoryId,
-      true, // is_reserved — a detected bill counts toward Spendable by default
-      null,
-      null,
-      'EXPENSE',
-      null,
-      s.matchDescription
-    )
+    // Counted in Spendable, with the latest payment's date as the anchor (#153).
+    const draft = draftFromSuggestion(s)
+    const errors = validateRegularDraft(draft)
+    if (errors.name) {
+      toast.error('This charge has no name. Use “Edit & add” to give it one.')
+      return
+    }
+    const firstError = Object.values(errors)[0]
+    if (firstError) {
+      toast.error(firstError)
+      return
+    }
+    saveRegular(draft)
     toast.success(`"${s.name}" added to Regulars.`)
     setTick((t) => t + 1)
     onChange()

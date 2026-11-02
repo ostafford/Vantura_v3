@@ -80,6 +80,11 @@ export function readRegulars(db: Database): Regular[] {
   return rows
 }
 
+/** One Regular as stored, or null. */
+export function readRegularById(db: Database, id: number): Regular | null {
+  return readRegulars(db).find((r) => r.id === id) ?? null
+}
+
 /**
  * Stored-date order, ties broken by id: the order the list views have always
  * shown Regulars in.

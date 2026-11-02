@@ -55,3 +55,33 @@ export function regularsWithFundingSource(): RegularWithFundingSource[] {
     })
   )
 }
+
+/**
+ * Why an Essentials user's Regular isn't getting the Essentials benefit yet
+ * (#97). Funding source needs a linked payment, so:
+ * - `unlinked`: no `match_description`, so the user has to link one.
+ * - `no_payment`: linked, but no settled payment matches yet (none has
+ *   arrived, it's outside the ±20% band, or it also matches another Regular).
+ */
+export type EssentialsLinkHint = 'unlinked' | 'no_payment'
+
+/**
+ * The Essentials link hint for each Regular that has one, keyed by id. A
+ * Regular has none when a payment is linked (whichever account paid it:
+ * that's an answer, not a linking problem), when it's excluded from Spendable,
+ * or when it never falls due again (the same occurrence check as Reserved).
+ * Callers gate on an active Essentials nomination.
+ */
+export function essentialsLinkHints(): Map<number, EssentialsLinkHint> {
+  const hints = new Map<number, EssentialsLinkHint>()
+  for (const {
+    regular,
+    fundingAccountId,
+    nextOccurrence,
+  } of regularsWithFundingSource()) {
+    if (regular.is_reserved !== 1 || nextOccurrence === null) continue
+    if (!regular.match_description) hints.set(regular.id, 'unlinked')
+    else if (fundingAccountId === null) hints.set(regular.id, 'no_payment')
+  }
+  return hints
+}

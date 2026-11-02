@@ -157,17 +157,6 @@ export function getBucketItems(bucketId: number): BucketItemSummary {
   return { upcoming }
 }
 
-/** Current bucket_id for an upcoming charge (null = unassigned). */
-export function getUpcomingBucketId(upcomingId: number): number | null {
-  const db = getDb()
-  if (!db) return null
-  const res = db.exec(`SELECT bucket_id FROM upcoming_charges WHERE id = ?`, [
-    upcomingId,
-  ])
-  const val = res[0]?.values?.[0]?.[0]
-  return val != null ? Number(val) : null
-}
-
 export interface BucketCardSummary {
   plannedCents: number
   hypotheticalCents: number

@@ -5,24 +5,30 @@
  *
  * Reads are projected here (docs/adr/0004): `regularsByPayday`,
  * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
- * (+ `totalReserved`), `regularsWithFundingSource`. Two return stored rows by
+ * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`.
+ * Two return stored rows by
  * design: `regularById` (the editor's anchor) and `linkedLiabilityRepayments`
  * (payment matching, #19).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`.
+ * `funding.ts`, `draft.ts`.
  *
- * Writes: `createUpcomingCharge` / `updateUpcomingCharge` / `deleteUpcomingCharge`
- * (replaced by the draft → validate → save path in #160) and
- * `unlinkRegularsFromManualAccount`.
+ * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
+ * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
+ * `saveRegular`, which applies the stored-date rule and writes the bucket in
+ * the same write; `deleteRegular`; and `unlinkRegularsFromManualAccount`.
  */
 
-import { getDb, getAppSetting, schedulePersist } from '@/db'
+import { getDb, getAppSetting } from '@/db'
 import { localDateString } from '@/lib/format'
-import { readRegulars, byStoredDate, type Regular } from './rows'
+import {
+  readRegulars,
+  readRegularById,
+  byStoredDate,
+  type Regular,
+} from './rows'
 import {
   nthOccurrence,
-  nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
   getProjectedOccurrencesInRange,
 } from './projection'
@@ -35,8 +41,25 @@ export {
 } from './reserved'
 export {
   regularsWithFundingSource,
+  essentialsLinkHints,
   type RegularWithFundingSource,
+  type EssentialsLinkHint,
 } from './funding'
+export {
+  blankDraft,
+  draftFromRegular,
+  draftFromTransaction,
+  draftFromSuggestion,
+  validateRegularDraft,
+  saveRegular,
+  deleteRegular,
+  type RegularDraft,
+  type RegularDraftErrors,
+  type RegularDraftField,
+  type RegularChargeType,
+  type DraftSourceTransaction,
+  type DraftSourceSuggestion,
+} from './draft'
 export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
@@ -52,73 +75,6 @@ export interface RegularsByPayday {
   nextPay: Regular[]
   later: Regular[]
   nextPayday: string | null
-}
-
-/** The fields a new Regular takes from a picked past transaction (#147). */
-export interface RegularDraftFromTransaction {
-  name: string
-  amountCents: number
-  categoryId: string | null
-  /** Links the Regular to its payments (docs/adr/0020). */
-  matchDescription: string
-  /** Next occurrence after today — what the create form shows. */
-  nextChargeDate: string
-  /** The payment's own date: the anchor to store (#153). */
-  anchorDate: string
-}
-
-/**
- * Build a new Regular from a picked past debit — the one rule every "pick a
- * transaction" create path uses, so the Dashboard and Budget Plan can't create
- * different Regulars from the same transaction (#147). The description becomes
- * both the name and the payment link; the date is the transaction's date
- * projected to its next occurrence after `today` for `frequency`.
- */
-export function regularDraftFromTransaction(
-  tx: {
-    description: string
-    amount: number
-    date: string
-    category_id: string | null
-  },
-  frequency: string,
-  today: string = localDateString()
-): RegularDraftFromTransaction {
-  return {
-    name: tx.description,
-    amountCents: Math.abs(tx.amount),
-    categoryId: tx.category_id ?? null,
-    matchDescription: tx.description,
-    nextChargeDate: nextChargeDateFromAnchor(tx.date, frequency, today),
-    anchorDate: tx.date.slice(0, 10),
-  }
-}
-
-/**
- * The `next_charge_date` to store when creating a Regular from a past payment
- * (#153). The form shows the next occurrence after today; storing that would
- * lose a month-end day (a Jan 31 payment shown as Apr 30 would then fall on
- * the 30th every month). So store the payment's own date as the anchor —
- * unless the user edited the date field (it no longer matches the date derived
- * from the payment), in which case their date is the anchor, the same rule as
- * editing (#146). `ONCE` stores the shown date: a past one-off would otherwise
- * show as Overdue. No payment (`anchorDate` null) stores the shown date.
- */
-export function nextChargeDateToStoreOnCreate(create: {
-  anchorDate: string | null
-  frequency: string
-  shownDate: string
-  today?: string
-}): string {
-  if (!create.anchorDate || create.frequency === 'ONCE') return create.shownDate
-  const derived = nextChargeDateFromAnchor(
-    create.anchorDate,
-    create.frequency,
-    create.today ?? localDateString()
-  )
-  return create.shownDate.slice(0, 10) === derived
-    ? create.anchorDate.slice(0, 10)
-    : create.shownDate
 }
 
 export const __test__ = {
@@ -171,111 +127,6 @@ export function regularsByPayday(): RegularsByPayday {
   return { overdue, nextPay, later, nextPayday }
 }
 
-export function createUpcomingCharge(
-  name: string,
-  amountCents: number,
-  frequency: string,
-  nextChargeDate: string,
-  categoryId: string | null,
-  isReserved: boolean,
-  reminderDaysBefore: number | null = null,
-  cancelByDate: string | null = null,
-  chargeType: 'EXPENSE' | 'LIABILITY_REPAYMENT' = 'EXPENSE',
-  linkedManualAccountId: number | null = null,
-  matchDescription: string | null = null
-): number {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  const now = new Date().toISOString()
-  db.run(
-    `INSERT INTO upcoming_charges
-       (name, amount, frequency, next_charge_date, category_id, is_reserved,
-        reminder_days_before, cancel_by_date, created_at,
-        charge_type, linked_manual_account_id, match_description)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      name,
-      amountCents,
-      frequency,
-      nextChargeDate,
-      categoryId,
-      isReserved ? 1 : 0,
-      reminderDaysBefore ?? null,
-      cancelByDate ?? null,
-      now,
-      chargeType,
-      linkedManualAccountId ?? null,
-      matchDescription ?? null,
-    ]
-  )
-  const result = db.exec('SELECT last_insert_rowid()')
-  const id = (result[0]?.values?.[0]?.[0] as number) ?? 0
-  schedulePersist()
-  return id
-}
-
-export function updateUpcomingCharge(
-  id: number,
-  name: string,
-  amountCents: number,
-  frequency: string,
-  nextChargeDate: string,
-  categoryId: string | null,
-  isReserved: boolean,
-  reminderDaysBefore: number | null = null,
-  cancelByDate: string | null = null,
-  chargeType: 'EXPENSE' | 'LIABILITY_REPAYMENT' = 'EXPENSE',
-  linkedManualAccountId: number | null = null,
-  matchDescription: string | null = null
-): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  db.run(
-    `UPDATE upcoming_charges SET
-       name = ?, amount = ?, frequency = ?, next_charge_date = ?, category_id = ?,
-       is_reserved = ?, reminder_days_before = ?, cancel_by_date = ?,
-       charge_type = ?, linked_manual_account_id = ?, match_description = ?
-     WHERE id = ?`,
-    [
-      name,
-      amountCents,
-      frequency,
-      nextChargeDate,
-      categoryId,
-      isReserved ? 1 : 0,
-      reminderDaysBefore ?? null,
-      cancelByDate ?? null,
-      chargeType,
-      linkedManualAccountId ?? null,
-      matchDescription ?? null,
-      id,
-    ]
-  )
-  schedulePersist()
-}
-
-/**
- * The `next_charge_date` to store when a Regular is edited (#146).
- *
- * The edit form shows the *projected* next occurrence, not the stored anchor.
- * Writing that back on every save would move the anchor — the stored date must
- * hold whatever the user last entered (docs/adr/0004). So keep `storedDate`
- * unless the user changed the date or the frequency in the form; then the date
- * in the form is the next charge they confirmed, and it becomes the new anchor.
- */
-export function nextChargeDateToStoreOnEdit(edit: {
-  storedDate: string
-  shownDate: string
-  shownFrequency: string
-  editedDate: string
-  editedFrequency: string
-}): string {
-  const dateChanged =
-    edit.editedDate.slice(0, 10) !== edit.shownDate.slice(0, 10)
-  const frequencyChanged = edit.editedFrequency !== edit.shownFrequency
-  return dateChanged || frequencyChanged ? edit.editedDate : edit.storedDate
-}
-
 /**
  * Unlinks every Regular tied to a manual account that's being deleted: a
  * linked liability repayment becomes a plain `EXPENSE` with no linked account
@@ -290,18 +141,11 @@ export function unlinkRegularsFromManualAccount(manualAccountId: number): void {
   )
 }
 
-export function deleteUpcomingCharge(id: number): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  db.run(`DELETE FROM upcoming_charges WHERE id = ?`, [id])
-  schedulePersist()
-}
-
 /** A single charge by id (raw stored row, no date projection), or null. */
 export function regularById(id: number): Regular | null {
   const db = getDb()
   if (!db) return null
-  return readRegularsByStoredDate(db).find((c) => c.id === id) ?? null
+  return readRegularById(db, id)
 }
 
 /**
