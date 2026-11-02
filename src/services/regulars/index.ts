@@ -14,6 +14,11 @@ import {
 
 export type { Regular } from './rows'
 export {
+  reservedBeforePayday,
+  totalReserved,
+  type ReservedItem,
+} from './reserved'
+export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
 } from './projection'

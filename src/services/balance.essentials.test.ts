@@ -22,7 +22,10 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getReservedAmount, getReservedBreakdown } = await import('./balance')
+const { getReservedAmount } = await import('./balance')
+const { reservedBeforePayday } = await import('./regulars')
+const spendableReservedItems = () =>
+  reservedBeforePayday({ excludeEssentialsFunded: true })
 
 const TRANSACTIONAL = 'transactional-1'
 const ESSENTIALS_SAVER = 'essentials-saver-1'
@@ -99,7 +102,7 @@ describe('Reserved formula: classic path unaffected by Essentials nomination', (
   it('reserves a charge in full with no nomination set', () => {
     addCharge({ name: 'Netflix', amount: 1500, next_charge_date: '2025-02-25' })
     expect(getReservedAmount()).toBe(1500)
-    expect(getReservedBreakdown().map((r) => r.name)).toEqual(['Netflix'])
+    expect(spendableReservedItems().map((r) => r.name)).toEqual(['Netflix'])
   })
 })
 
@@ -118,7 +121,7 @@ describe('Reserved formula: Essentials-funded Regulars are excluded', () => {
     settleDebit(ESSENTIALS_SAVER, 'Netflix', '2025-01-25T09:00:00.000Z', 1500)
 
     expect(getReservedAmount()).toBe(0)
-    expect(getReservedBreakdown()).toEqual([])
+    expect(spendableReservedItems()).toEqual([])
   })
 
   it('still reserves a charge funded from a different account (still transactional)', () => {
@@ -189,7 +192,7 @@ describe('Reserved formula: Essentials-funded Regulars are excluded', () => {
     addCharge({ name: 'Gym', amount: 2000, next_charge_date: '2025-02-26' })
 
     expect(getReservedAmount()).toBe(2000)
-    expect(getReservedBreakdown().map((r) => r.name)).toEqual(['Gym'])
+    expect(spendableReservedItems().map((r) => r.name)).toEqual(['Gym'])
   })
 })
 
@@ -208,7 +211,7 @@ describe('Reserved formula: Regulars stay linked when the descriptor changes (do
       [ESSENTIALS_SAVER]
     )
     expect(getReservedAmount()).toBe(0)
-    expect(getReservedBreakdown()).toEqual([])
+    expect(spendableReservedItems()).toEqual([])
   })
 })
 
@@ -228,7 +231,7 @@ describe('Reserved formula: an unavailable nominated Saver counts as no nominati
   it('reserves the bill again once the nominated Saver is closed', () => {
     db.run(`UPDATE accounts SET is_closed = 1 WHERE id = ?`, [ESSENTIALS_SAVER])
     expect(getReservedAmount()).toBe(1500)
-    expect(getReservedBreakdown().map((r) => r.name)).toEqual(['Netflix'])
+    expect(spendableReservedItems().map((r) => r.name)).toEqual(['Netflix'])
   })
 
   it('reserves the bill again when the nominated Saver is missing entirely', () => {

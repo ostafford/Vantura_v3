@@ -34,7 +34,7 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getReservedAmount, getReservedBreakdown } = await import('./balance')
+const { getReservedAmount } = await import('./balance')
 const { getEssentialsCoverage } = await import('./essentialsCoverage')
 const { getProjectedNetWorth } = await import('./netWorth')
 const {
@@ -43,6 +43,7 @@ const {
   getDueSoonCharges,
   getLinkedLiabilityRepaymentCharges,
   getUpcomingChargeById,
+  reservedBeforePayday,
 } = await import('./regulars')
 
 const TRANSACTIONAL = 'transactional-1'
@@ -283,7 +284,12 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('Reserved breakdown', () => {
-    expect(getReservedBreakdown()).toMatchInlineSnapshot(`
+    expect(
+      reservedBeforePayday({ excludeEssentialsFunded: true }).map(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ({ regular, ...item }) => item
+      )
+    ).toMatchInlineSnapshot(`
       [
         {
           "frequency": "MONTHLY",

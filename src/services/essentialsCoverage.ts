@@ -9,9 +9,8 @@ import { localDateString } from '@/lib/format'
 import { getEssentialsNomination } from './essentials'
 import { getFundingSourceAccountId } from './fundingSource'
 import { getAccountById } from './accounts'
-import { firstOccurrenceOnOrAfter } from './regulars'
+import { firstOccurrenceOnOrAfter, reservedBeforePayday } from './regulars'
 import { readRegulars } from './regulars/rows'
-import { calculateReservedBreakdown } from './balance'
 
 export type EssentialsCoverageState =
   | 'hidden'
@@ -97,24 +96,16 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
     (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
   )
 
-  const fullBreakdown = calculateReservedBreakdown(
-    reservedCharges,
-    nextPayday,
-    paydayFrequency
+  // Rounded per Regular, then summed — this block's figures as they've always been.
+  const sumReserved = (items: Array<{ reservedAmount: number }>) =>
+    items.reduce((sum, item) => sum + item.reservedAmount, 0)
+  const totalIfAllTransactionalCents = sumReserved(
+    reservedBeforePayday({ excludeEssentialsFunded: false })
   )
-  const transactionalBreakdown = calculateReservedBreakdown(
-    transactionalCharges,
-    nextPayday,
-    paydayFrequency
-  )
-
-  const totalIfAllTransactionalCents = fullBreakdown.reduce(
-    (sum, item) => sum + item.reservedAmount,
-    0
-  )
-  const reservedHereCents = transactionalBreakdown.reduce(
-    (sum, item) => sum + item.reservedAmount,
-    0
+  // The nomination is active here, so this excludes exactly the Regulars
+  // funded from `essentialsSaverId`.
+  const reservedHereCents = sumReserved(
+    reservedBeforePayday({ excludeEssentialsFunded: true })
   )
   const essentialsSetAsideCents =
     totalIfAllTransactionalCents - reservedHereCents
