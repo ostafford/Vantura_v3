@@ -14,6 +14,8 @@ import {
   getUpcomingChargesGrouped,
   createUpcomingCharge,
   updateUpcomingCharge,
+  getUpcomingChargeById,
+  nextChargeDateToStoreOnEdit,
   deleteUpcomingCharge,
   daysUntilCharge,
   nextChargeDateFromAnchor,
@@ -244,12 +246,24 @@ export function UpcomingSection({
       return
     }
     if (editingCharge) {
+      // `editingCharge` is the row as shown — its date is the projected next
+      // occurrence. Don't write that back over the stored anchor unless the
+      // user changed the date or frequency (#146, docs/adr/0004).
+      const storedDate =
+        getUpcomingChargeById(editingCharge.id)?.next_charge_date ??
+        nextChargeDate
       updateUpcomingCharge(
         editingCharge.id,
         name.trim(),
         amountCents,
         frequency,
-        nextChargeDate,
+        nextChargeDateToStoreOnEdit({
+          storedDate,
+          shownDate: editingCharge.next_charge_date,
+          shownFrequency: editingCharge.frequency,
+          editedDate: nextChargeDate,
+          editedFrequency: frequency,
+        }),
         categoryId || null,
         isReserved,
         reminderDays,

@@ -351,6 +351,28 @@ export function updateUpcomingCharge(
   schedulePersist()
 }
 
+/**
+ * The `next_charge_date` to store when a Regular is edited (#146).
+ *
+ * The edit form shows the *projected* next occurrence, not the stored anchor.
+ * Writing that back on every save would move the anchor — the stored date must
+ * hold whatever the user last entered (docs/adr/0004). So keep `storedDate`
+ * unless the user changed the date or the frequency in the form; then the date
+ * in the form is the next charge they confirmed, and it becomes the new anchor.
+ */
+export function nextChargeDateToStoreOnEdit(edit: {
+  storedDate: string
+  shownDate: string
+  shownFrequency: string
+  editedDate: string
+  editedFrequency: string
+}): string {
+  const dateChanged =
+    edit.editedDate.slice(0, 10) !== edit.shownDate.slice(0, 10)
+  const frequencyChanged = edit.editedFrequency !== edit.shownFrequency
+  return dateChanged || frequencyChanged ? edit.editedDate : edit.storedDate
+}
+
 export function deleteUpcomingCharge(id: number): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
