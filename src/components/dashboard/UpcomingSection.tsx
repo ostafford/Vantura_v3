@@ -21,7 +21,7 @@ import {
   regularDraftFromTransaction,
   nextChargeDateFromAnchor,
   nextChargeDateToStoreOnCreate,
-  type UpcomingChargeRow,
+  type Regular,
 } from '@/services/regulars'
 import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
@@ -78,9 +78,7 @@ export function UpcomingSection({
   const [refresh, setRefresh] = useState(0)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [showModal, setShowModal] = useState(false)
-  const [editingCharge, setEditingCharge] = useState<UpcomingChargeRow | null>(
-    null
-  )
+  const [editingCharge, setEditingCharge] = useState<Regular | null>(null)
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [frequency, setFrequency] = useState('MONTHLY')
@@ -168,7 +166,7 @@ export function UpcomingSection({
     return hints
   }, [essentialsUser, nextPay, later])
 
-  function essentialsLinkLabel(c: UpcomingChargeRow): string | null {
+  function essentialsLinkLabel(c: Regular): string | null {
     const hint = essentialsLinkHints.get(c.id)
     if (hint === 'unlinked') return 'link a payment to use Essentials'
     if (hint === 'no_payment') return 'no matching payment found'
@@ -202,7 +200,7 @@ export function UpcomingSection({
     setShowModal(true)
   }
 
-  function openEdit(c: UpcomingChargeRow) {
+  function openEdit(c: Regular) {
     setEditingCharge(c)
     setName(c.name)
     setAmount(String(c.amount / 100))
@@ -321,7 +319,7 @@ export function UpcomingSection({
   // a one-off has no next cycle to roll to and Vantura keeps no charge history
   // (the bank transaction in Transactions is the record). "Reschedule" just
   // reopens the edit form so the user can set a new future date.
-  function resolveOverdue(c: UpcomingChargeRow, paid: boolean) {
+  function resolveOverdue(c: Regular, paid: boolean) {
     deleteUpcomingCharge(c.id)
     setRefresh((r) => r + 1)
     onUpcomingChange?.()
@@ -388,7 +386,7 @@ export function UpcomingSection({
     : later
   const hiddenCount = totalCount - visibleNextPay.length - visibleLater.length
 
-  function reminderLabel(c: UpcomingChargeRow): string | null {
+  function reminderLabel(c: Regular): string | null {
     if (c.reminder_days_before == null || c.reminder_days_before < 0)
       return null
     const days = daysUntilCharge(c.next_charge_date)
@@ -399,7 +397,7 @@ export function UpcomingSection({
     return null
   }
 
-  function renderDataRow(c: UpcomingChargeRow) {
+  function renderDataRow(c: Regular) {
     const dueLabel = reminderLabel(c)
     const categoryName = c.category_id
       ? categoryNameById.get(c.category_id)

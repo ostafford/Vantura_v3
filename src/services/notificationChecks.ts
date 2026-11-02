@@ -25,7 +25,7 @@ import {
   daysUntilCharge,
   firstOccurrenceOnOrAfter,
   getLinkedLiabilityRepaymentCharges,
-  type UpcomingChargeRow,
+  type Regular,
 } from '@/services/regulars'
 import { getTrackersWithProgress } from '@/services/trackers'
 import { getAccountsByTypes } from '@/services/accounts'
@@ -714,9 +714,7 @@ function checkPossiblePayday(): void {
  * (whether created today by checkBillsDue or on a prior day) so only one
  * countdown row per bill ever exists in history.
  */
-export function ensureBillsDueNotifications(
-  charges: UpcomingChargeRow[]
-): void {
+export function ensureBillsDueNotifications(charges: Regular[]): void {
   const db = getDb()
   if (!db) return
   if (charges.length === 0) return

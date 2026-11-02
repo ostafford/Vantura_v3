@@ -4,26 +4,9 @@
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
 import { localDateString } from '@/lib/format'
+import { readRegulars, byStoredDate, type Regular } from './rows'
 
-export interface UpcomingChargeRow {
-  id: number
-  name: string
-  amount: number
-  frequency: string
-  next_charge_date: string
-  category_id: string | null
-  is_reserved: number
-  /** Remind me this many days before next charge (null = no reminder). */
-  reminder_days_before: number | null
-  /** Optional date by which to cancel (for subscriptions). */
-  cancel_by_date: string | null
-  /** 'EXPENSE' (default) reduces net worth; 'LIABILITY_REPAYMENT' is asset-liability neutral. */
-  charge_type: 'EXPENSE' | 'LIABILITY_REPAYMENT'
-  /** Links a LIABILITY_REPAYMENT charge to a manual_accounts row. */
-  linked_manual_account_id: number | null
-  /** Up `description` of the Regular's linked payments (docs/adr/0020). */
-  match_description: string | null
-}
+export type { Regular } from './rows'
 
 export interface UpcomingGrouped {
   /**
@@ -31,9 +14,9 @@ export interface UpcomingGrouped {
    * need an explicit "was this paid?" resolution — they are kept out of `nextPay`
    * so a past one-off doesn't inflate the "before next payday" total.
    */
-  overdue: UpcomingChargeRow[]
-  nextPay: UpcomingChargeRow[]
-  later: UpcomingChargeRow[]
+  overdue: Regular[]
+  nextPay: Regular[]
+  later: Regular[]
   nextPayday: string | null
 }
 
@@ -251,11 +234,11 @@ function firstRecurringIndexOnOrAfter(
 }
 
 function getProjectedOccurrencesInRange(
-  row: UpcomingChargeRow,
+  row: Regular,
   startDate: string,
   endDate: string
-): UpcomingChargeRow[] {
-  const list: UpcomingChargeRow[] = []
+): Regular[] {
+  const list: Regular[] = []
   if (row.frequency === 'ONCE') {
     const once = firstOccurrenceOnOrAfter(
       row.next_charge_date,
@@ -292,59 +275,22 @@ export const __test__ = {
   getProjectedOccurrencesInRange,
 }
 
-function readUpcomingRows(
+/** Every Regular in stored-date order (ties by id), the order the list views use. */
+function readRegularsByStoredDate(
   db: NonNullable<ReturnType<typeof getDb>>
-): UpcomingChargeRow[] {
-  const stmt = db.prepare(
-    `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date,
-      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_description
-     FROM upcoming_charges ORDER BY next_charge_date`
-  )
-  const rows: UpcomingChargeRow[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [
-      number,
-      string,
-      number,
-      string,
-      string,
-      string | null,
-      number,
-      number | null,
-      string | null,
-      string,
-      number | null,
-      string | null,
-    ]
-    rows.push({
-      id: row[0],
-      name: row[1],
-      amount: row[2],
-      frequency: row[3],
-      next_charge_date: row[4],
-      category_id: row[5],
-      is_reserved: row[6],
-      reminder_days_before: row[7] ?? null,
-      cancel_by_date: row[8] ?? null,
-      charge_type: (row[9] as 'EXPENSE' | 'LIABILITY_REPAYMENT') ?? 'EXPENSE',
-      linked_manual_account_id: row[10] ?? null,
-      match_description: row[11] ?? null,
-    })
-  }
-  stmt.free()
-  return rows
+): Regular[] {
+  return readRegulars(db).sort(byStoredDate)
 }
 
 export function getUpcomingChargesGrouped(): UpcomingGrouped {
   const db = getDb()
   if (!db) return { overdue: [], nextPay: [], later: [], nextPayday: null }
   const nextPayday = getAppSetting('next_payday')
-  const overdue: UpcomingChargeRow[] = []
-  const nextPay: UpcomingChargeRow[] = []
-  const later: UpcomingChargeRow[] = []
+  const overdue: Regular[] = []
+  const nextPay: Regular[] = []
+  const later: Regular[] = []
   const today = localDateString()
-  const rows = readUpcomingRows(db)
+  const rows = readRegularsByStoredDate(db)
   for (const row of rows) {
     const nextOccurrence = firstOccurrenceOnOrAfter(
       row.next_charge_date,
@@ -486,10 +432,10 @@ export function deleteUpcomingCharge(id: number): void {
 }
 
 /** A single charge by id (raw stored row, no date projection), or null. */
-export function getUpcomingChargeById(id: number): UpcomingChargeRow | null {
+export function getUpcomingChargeById(id: number): Regular | null {
   const db = getDb()
   if (!db) return null
-  return readUpcomingRows(db).find((c) => c.id === id) ?? null
+  return readRegularsByStoredDate(db).find((c) => c.id === id) ?? null
 }
 
 /**
@@ -497,10 +443,10 @@ export function getUpcomingChargeById(id: number): UpcomingChargeRow | null {
  * a payment link (`match_description`, docs/adr/0020) — the only charges the #19
  * verify-and-prompt flow (`checkLiabilityRepayments`) acts on. Raw stored rows.
  */
-export function getLinkedLiabilityRepaymentCharges(): UpcomingChargeRow[] {
+export function getLinkedLiabilityRepaymentCharges(): Regular[] {
   const db = getDb()
   if (!db) return []
-  return readUpcomingRows(db).filter(
+  return readRegularsByStoredDate(db).filter(
     (c) =>
       c.charge_type === 'LIABILITY_REPAYMENT' &&
       c.linked_manual_account_id != null &&
@@ -516,14 +462,14 @@ export function getLinkedLiabilityRepaymentCharges(): UpcomingChargeRow[] {
 export function getUpcomingChargesForMonth(
   year: number,
   month: number
-): UpcomingChargeRow[] {
+): Regular[] {
   const db = getDb()
   if (!db) return []
   const start = `${year}-${String(month).padStart(2, '0')}-01`
   const lastDay = new Date(year, month, 0).getDate()
   const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  const list: UpcomingChargeRow[] = []
-  const rows = readUpcomingRows(db)
+  const list: Regular[] = []
+  const rows = readRegularsByStoredDate(db)
   for (const row of rows) {
     list.push(...getProjectedOccurrencesInRange(row, start, end))
   }
@@ -547,49 +493,15 @@ export function daysUntilCharge(nextChargeDate: string): number {
  * Charges that are within their reminder window (due_days <= reminder_days_before).
  * Sorted by next_charge_date ascending (soonest first).
  */
-export function getDueSoonCharges(): UpcomingChargeRow[] {
+export function getDueSoonCharges(): Regular[] {
   const db = getDb()
   if (!db) return []
   const today = localDateString()
-  const stmt = db.prepare(
-    `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date,
-      COALESCE(charge_type, 'EXPENSE'), linked_manual_account_id, match_description
-     FROM upcoming_charges
-     WHERE reminder_days_before IS NOT NULL
-       AND (charge_type IS NULL OR charge_type = 'EXPENSE')
-     ORDER BY next_charge_date`
+  const candidates = readRegularsByStoredDate(db).filter(
+    (c) => c.reminder_days_before != null && c.charge_type === 'EXPENSE'
   )
-  const list: UpcomingChargeRow[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [
-      number,
-      string,
-      number,
-      string,
-      string,
-      string | null,
-      number,
-      number | null,
-      string | null,
-      string,
-      number | null,
-      string | null,
-    ]
-    const charge: UpcomingChargeRow = {
-      id: row[0],
-      name: row[1],
-      amount: row[2],
-      frequency: row[3],
-      next_charge_date: row[4],
-      category_id: row[5],
-      is_reserved: row[6],
-      reminder_days_before: row[7] ?? null,
-      cancel_by_date: row[8] ?? null,
-      charge_type: (row[9] as 'EXPENSE' | 'LIABILITY_REPAYMENT') ?? 'EXPENSE',
-      linked_manual_account_id: row[10] ?? null,
-      match_description: row[11] ?? null,
-    }
+  const list: Regular[] = []
+  for (const charge of candidates) {
     const nextOccurrence = firstOccurrenceOnOrAfter(
       charge.next_charge_date,
       charge.frequency,
@@ -607,7 +519,6 @@ export function getDueSoonCharges(): UpcomingChargeRow[] {
       list.push(projected)
     }
   }
-  stmt.free()
   list.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
   return list
 }

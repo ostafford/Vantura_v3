@@ -13,7 +13,7 @@ import {
   nextChargeDateFromAnchor,
   regularDraftFromTransaction,
   nextChargeDateToStoreOnCreate,
-  type UpcomingChargeRow,
+  type Regular,
 } from './index'
 
 let SQL: SqlJsStatic
@@ -39,9 +39,7 @@ const {
 } = await import('./index')
 const { localDateString } = await import('@/lib/format')
 
-function makeRow(
-  overrides: Partial<UpcomingChargeRow> = {}
-): UpcomingChargeRow {
+function makeRow(overrides: Partial<Regular> = {}): Regular {
   return {
     id: 1,
     name: 'Test charge',
@@ -580,7 +578,7 @@ describe('editing a Regular keeps its stored date (#146)', () => {
 
     /** What UpcomingSection's handleSave does for an edit, minus the React. */
     function saveEdit(
-      shownRow: UpcomingChargeRow,
+      shownRow: Regular,
       form: { name: string; date: string; frequency: string }
     ) {
       const storedDate =

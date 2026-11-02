@@ -8,6 +8,7 @@ import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
 import { localDateString } from '@/lib/format'
 import { firstOccurrenceOnOrAfter } from './regulars'
+import { readRegulars } from './regulars/rows'
 import { getActiveEssentialsSaverAccountId } from './essentials'
 import {
   getFundingSourceAccountId,
@@ -256,31 +257,7 @@ export function getReservedAmount(): number {
   if (!db) return 0
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
-  const stmt = db.prepare(
-    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
-  )
-  const charges: Array<UpcomingChargeRow & LinkableRegular> = []
-  while (stmt.step()) {
-    const row = stmt.get() as [
-      string,
-      string,
-      number,
-      number,
-      string | null,
-      number,
-      string | null,
-    ]
-    charges.push({
-      next_charge_date: row[0],
-      frequency: row[1],
-      amount: row[2],
-      is_reserved: row[3],
-      cancel_by_date: row[4] ?? null,
-      id: row[5],
-      match_description: row[6] ?? null,
-    })
-  }
-  stmt.free()
+  const charges = readRegulars(db)
   return calculateReservedAmount(
     excludeEssentialsFundedCharges(db, charges),
     nextPayday,
@@ -307,33 +284,7 @@ export function getReservedBreakdown(): ReservedBreakdownItem[] {
   if (!db) return []
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
-  const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
-  )
-  const rows: Array<UpcomingChargeRow & LinkableRegular & { name: string }> = []
-  while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      string,
-      string,
-      number,
-      number,
-      string | null,
-      number,
-      string | null,
-    ]
-    rows.push({
-      name: r[0],
-      next_charge_date: r[1],
-      frequency: r[2],
-      amount: r[3],
-      is_reserved: r[4],
-      cancel_by_date: r[5],
-      id: r[6],
-      match_description: r[7] ?? null,
-    })
-  }
-  stmt.free()
+  const rows = readRegulars(db)
   return calculateReservedBreakdown(
     excludeEssentialsFundedCharges(db, rows),
     nextPayday,

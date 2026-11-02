@@ -1,6 +1,7 @@
 import { getDb, schedulePersist, getAppSetting } from '@/db'
 import { calculateReservedAmount, type UpcomingChargeRow } from './balance'
 import { localDateString } from '@/lib/format'
+import { readRegulars } from './regulars/rows'
 
 export interface NetWorthSummary {
   /** Sum of all synced Up Bank account balances (TRANSACTIONAL + SAVER + HOME_LOAN). HOME_LOAN balances are negative, so this is a net figure — use upBankAssetsCents/upBankLiabilitiesCents for an assets/liabilities breakdown. */
@@ -94,25 +95,9 @@ export function getProjectedNetWorth(totalCents?: number): {
   const paydayFrequency = getAppSetting('payday_frequency')
   if (!nextPayday) return { projectedCents: total, upcomingExpenseCents: 0 }
 
-  const stmt = db.prepare(
-    `SELECT next_charge_date, frequency, amount, cancel_by_date
-     FROM upcoming_charges
-     WHERE (charge_type IS NULL OR charge_type = 'EXPENSE')
-       AND is_reserved = 1`
+  const charges = readRegulars(db).filter(
+    (c) => c.charge_type === 'EXPENSE' && c.is_reserved === 1
   )
-  const charges: UpcomingChargeRow[] = []
-  while (stmt.step()) {
-    const [next_charge_date, frequency, amount, cancel_by_date] =
-      stmt.get() as [string, string, number, string | null]
-    charges.push({
-      next_charge_date,
-      frequency,
-      amount,
-      is_reserved: 1,
-      cancel_by_date,
-    })
-  }
-  stmt.free()
 
   return computeProjectedNetWorth(charges, nextPayday, paydayFrequency, total)
 }

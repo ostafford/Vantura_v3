@@ -25,10 +25,7 @@ import {
   type TrackerPeriodSlice,
   type TrackerResetFrequency,
 } from '@/services/trackers'
-import {
-  getUpcomingChargesForMonth,
-  type UpcomingChargeRow,
-} from '@/services/regulars'
+import { getUpcomingChargesForMonth, type Regular } from '@/services/regulars'
 import {
   getCategoryColor,
   getTrackerColor,
@@ -130,7 +127,7 @@ type ChargeGroup = {
   occurrences: number
 }
 
-function groupUpcomingCharges(charges: UpcomingChargeRow[]): ChargeGroup[] {
+function groupUpcomingCharges(charges: Regular[]): ChargeGroup[] {
   const map = new Map<number, ChargeGroup>()
   for (const c of charges) {
     const existing = map.get(c.id)
