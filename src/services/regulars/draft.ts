@@ -135,7 +135,7 @@ export function draftFromRegular(
  * transaction" path uses, so the Dashboard and Budget Plan can't create
  * different Regulars from the same payment (#147). The description becomes
  * both the name and the payment link; the shown date is the payment's next
- * occurrence after `today` for `frequency`, and the payment's own date is
+ * occurrence on or after `today` for `frequency` (#163), and its own date is
  * kept as the anchor to store (#153).
  */
 export function draftFromTransaction(
@@ -327,7 +327,7 @@ export function nextChargeDateToStoreOnEdit(edit: {
 
 /**
  * The `next_charge_date` to store when creating a Regular from a past payment
- * (#153). The form shows the next occurrence after today; storing that would
+ * (#153). The form shows the next occurrence on or after today; storing that would
  * lose a month-end day (a Jan 31 payment shown as Apr 30 would then fall on
  * the 30th every month). So store the payment's own date as the anchor —
  * unless the user edited the date field (it no longer matches the date derived

@@ -296,6 +296,22 @@ describe('draftFromTransaction → saveRegular (#147, #153)', () => {
   })
 })
 
+describe('the create form shows the date the list will show (#163)', () => {
+  // Today is 15 Apr 2026 (see beforeEach).
+  for (const [label, date] of [
+    ['a payment made today', '2026-04-15'],
+    ['a payment whose next cycle falls today', '2026-03-15'],
+  ] as const) {
+    it(`${label}: due today in the form and in the list`, () => {
+      const draft = draftFromTransaction({ ...rentTx, date }, 'MONTHLY')
+      expect(draft.nextChargeDate).toBe('2026-04-15')
+      const id = saveRegular(draft)
+      expect(regularById(id)?.next_charge_date).toBe(date) // anchor kept (#153)
+      expect(shownRow(id).next_charge_date).toBe(draft.nextChargeDate)
+    })
+  }
+})
+
 describe('draftFromSuggestion → saveRegular', () => {
   const suggestion = {
     name: 'Netflix',

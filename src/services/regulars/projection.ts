@@ -67,9 +67,14 @@ export function nthOccurrence(
 
 /**
  * Next charge date to prefill when creating a recurring charge from a past
- * transaction: step the anchor forward by `frequency` until it lands past
- * `today` (default: local today). `ONCE` and any unrecognised frequency fall
- * back to `today`. Returns `YYYY-MM-DD`.
+ * transaction: step the anchor forward by `frequency` until it lands on or
+ * after `today` (default: local today). `ONCE` and any unrecognised frequency
+ * fall back to `today`. Returns `YYYY-MM-DD`.
+ *
+ * On-or-after is the same boundary as `firstOccurrenceOnOrAfter`, which the
+ * list, Reserved and notifications use, so the date the create form shows is
+ * the date the list shows once the Regular is saved (#163). A cycle that falls
+ * today is shown as due today, even if today's payment already settled.
  *
  * Projects via `nthOccurrence`, so month-end anchors clamp correctly — a Jan 31
  * monthly anchor gives Feb 28/29, not Mar 3, and Mar 31 after that (#145).
@@ -89,7 +94,7 @@ export function nextChargeDateFromAnchor(
   for (let n = 0; n < 1000; n++) {
     const occurrence = nthOccurrence(anchor, frequency, n)
     if (!occurrence) return today // unrecognised frequency
-    if (occurrence > today) return occurrence
+    if (occurrence >= today) return occurrence
   }
   return today
 }
