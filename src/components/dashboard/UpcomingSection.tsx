@@ -34,6 +34,7 @@ import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetect
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { getBuckets } from '@/services/budgetBuckets'
 import {
   getManualAccounts,
@@ -68,6 +69,7 @@ export function UpcomingSection({
 }: UpcomingSectionProps) {
   const [refresh, setRefresh] = useState(0)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
   const [showModal, setShowModal] = useState(false)
   const [editingCharge, setEditingCharge] = useState<Regular | null>(null)
   const {
@@ -108,12 +110,12 @@ export function UpcomingSection({
   const { overdue, nextPay, later, nextPayday } = useMemo(
     () => regularsByPayday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
+    [refresh, lastSyncCompletedAt, today]
   )
   const reserved = useMemo(
     () => getReservedAmount(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
+    [refresh, lastSyncCompletedAt, today]
   )
   const categories = useMemo(
     () => getCategories(),
@@ -152,7 +154,7 @@ export function UpcomingSection({
   const linkHints = useMemo(
     () => (essentialsUser ? essentialsLinkHints() : new Map()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [essentialsUser, refresh, lastSyncCompletedAt]
+    [essentialsUser, refresh, lastSyncCompletedAt, today]
   )
 
   function essentialsLinkLabel(c: Regular): string | null {

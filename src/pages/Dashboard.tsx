@@ -16,6 +16,7 @@ import { formatMoney, formatSignedMoney, formatShortDate } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { runSync } from '@/services/syncRunner'
 import { sessionStore } from '@/stores/sessionStore'
 import { InsightsSection } from '@/components/dashboard/InsightsSection'
@@ -82,11 +83,13 @@ export function Dashboard() {
     Record<DashboardSectionId, boolean>
   >(DEFAULT_SECTION_VISIBILITY)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
-  const [bannerDismissedToday, setBannerDismissedToday] = useState(() => {
-    const d = new Date()
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    return getAppSetting('dismissed_due_soon_date') === today
-  })
+  const today = useStore(todayStore, (s) => s.today)
+  // A dismissal lasts for the day it was made in, so the banner returns the
+  // next day even with the page left open (#164).
+  const [bannerDismissedOn, setBannerDismissedOn] = useState(() =>
+    getAppSetting('dismissed_due_soon_date')
+  )
+  const bannerDismissedToday = bannerDismissedOn === today
   const [showThresholdModal, setShowThresholdModal] = useState(false)
   const [thresholdMode, setThresholdMode] =
     useState<SpendableAlertMode>('dollars')
@@ -119,7 +122,7 @@ export function Dashboard() {
       })(),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt, dataVersion]
+    [lastSyncCompletedAt, dataVersion, today]
   )
 
   const effectiveThresholdCents = spendableAlert?.thresholdCents ?? null
@@ -291,16 +294,14 @@ export function Dashboard() {
   const dueSoon = useMemo(
     () => dueSoonRegulars(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt, dataVersion]
+    [lastSyncCompletedAt, dataVersion, today]
   )
   const handleDismissBanner = useCallback(() => {
-    const d = new Date()
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     setAppSetting('dismissed_due_soon_date', today)
-    setBannerDismissedToday(true)
+    setBannerDismissedOn(today)
     ensureBillsDueNotifications(dueSoon)
     notificationStore.getState().refreshUnreadCount()
-  }, [dueSoon])
+  }, [dueSoon, today])
 
   const scrollToUpcoming = useCallback(() => {
     const el = document.getElementById('dashboard-section-upcoming')

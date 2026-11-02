@@ -21,6 +21,7 @@ import {
   formatDollars,
 } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
 import { buildInsightsChartRows } from '@/lib/insightsChartRows'
 import { HelpPopover } from '@/components/HelpPopover'
@@ -47,7 +48,12 @@ export function InsightsSection({
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
-  const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
+  const today = useStore(todayStore, (s) => s.today)
+  const weekRange = useMemo(
+    () => getWeekRange(weekOffset),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekOffset, today]
+  )
   const { startStr, endStr } = weekRange
   const insights = useMemo(
     () => getWeeklyInsights(weekRange),
