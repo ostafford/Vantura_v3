@@ -11,7 +11,10 @@ import {
   type BudgetBucketRow,
   type BucketUpcomingItem,
 } from '@/services/budgetBuckets'
-import { createUpcomingCharge } from '@/services/upcoming'
+import {
+  createUpcomingCharge,
+  regularDraftFromTransaction,
+} from '@/services/upcoming'
 import {
   getHypotheticalLines,
   createBudgetLine,
@@ -123,20 +126,36 @@ function AddUpcomingTransactionModal({
 
   function handleSelectTx(tx: AnchorDebitRow) {
     setSelectedTx(tx)
+    setNextChargeDate(regularDraftFromTransaction(tx, frequency).nextChargeDate)
     setStep('configure')
+  }
+
+  function handleFrequencyChange(f: string) {
+    setFrequency(f)
+    if (selectedTx) {
+      setNextChargeDate(
+        regularDraftFromTransaction(selectedTx, f).nextChargeDate
+      )
+    }
   }
 
   function handleCreateAndAssign() {
     if (!selectedTx) return
+    // Same Regular the Dashboard creates from this transaction — including the
+    // payment link, so settlement detection and funding source work (#147).
+    const draft = regularDraftFromTransaction(selectedTx, frequency)
     const newId = createUpcomingCharge(
-      selectedTx.description,
-      selectedTx.amount,
+      draft.name,
+      draft.amountCents,
       frequency,
       nextChargeDate,
-      null,
+      draft.categoryId,
       true,
       null,
-      null
+      null,
+      'EXPENSE',
+      null,
+      draft.matchDescription
     )
     assignUpcomingToBucket(newId, bucketId)
     toast.success(`"${selectedTx.description}" added as upcoming transaction`)
@@ -172,7 +191,7 @@ function AddUpcomingTransactionModal({
                   <Form.Label>Frequency</Form.Label>
                   <Form.Select
                     value={frequency}
-                    onChange={(e) => setFrequency(e.target.value)}
+                    onChange={(e) => handleFrequencyChange(e.target.value)}
                   >
                     {BUDGET_FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>

@@ -11,6 +11,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import {
   __test__,
   nextChargeDateFromAnchor,
+  regularDraftFromTransaction,
   type UpcomingChargeRow,
 } from './upcoming'
 
@@ -629,5 +630,41 @@ describe('editing a Regular keeps its stored date (#146)', () => {
 
       expect(getUpcomingChargeById(id)?.next_charge_date).toBe('2026-04-05')
     })
+  })
+})
+
+describe('regularDraftFromTransaction: one Regular per picked transaction (#147)', () => {
+  const tx = {
+    description: 'Netflix',
+    amount: 2299,
+    date: '2026-01-15',
+    category_id: 'tv-and-music',
+  }
+
+  it('carries name, amount, category and the payment link from the transaction', () => {
+    expect(regularDraftFromTransaction(tx, 'MONTHLY', '2026-03-20')).toEqual({
+      name: 'Netflix',
+      amountCents: 2299,
+      categoryId: 'tv-and-music',
+      matchDescription: 'Netflix',
+      nextChargeDate: '2026-04-15',
+    })
+  })
+
+  it('projects the date for the chosen frequency', () => {
+    expect(
+      regularDraftFromTransaction(tx, 'FORTNIGHTLY', '2026-02-01')
+        .nextChargeDate
+    ).toBe('2026-02-12')
+  })
+
+  it('a transaction with no category gives a Regular with no category', () => {
+    expect(
+      regularDraftFromTransaction(
+        { ...tx, category_id: null },
+        'MONTHLY',
+        '2026-03-20'
+      ).categoryId
+    ).toBeNull()
   })
 })

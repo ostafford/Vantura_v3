@@ -123,6 +123,42 @@ export function nextChargeDateFromAnchor(
   return today
 }
 
+/** The fields a new Regular takes from a picked past transaction (#147). */
+export interface RegularDraftFromTransaction {
+  name: string
+  amountCents: number
+  categoryId: string | null
+  /** Links the Regular to its payments (docs/adr/0020). */
+  matchDescription: string
+  nextChargeDate: string
+}
+
+/**
+ * Build a new Regular from a picked past debit — the one rule every "pick a
+ * transaction" create path uses, so the Dashboard and Budget Plan can't create
+ * different Regulars from the same transaction (#147). The description becomes
+ * both the name and the payment link; the date is the transaction's date
+ * projected to its next occurrence after `today` for `frequency`.
+ */
+export function regularDraftFromTransaction(
+  tx: {
+    description: string
+    amount: number
+    date: string
+    category_id: string | null
+  },
+  frequency: string,
+  today: string = localDateString()
+): RegularDraftFromTransaction {
+  return {
+    name: tx.description,
+    amountCents: Math.abs(tx.amount),
+    categoryId: tx.category_id ?? null,
+    matchDescription: tx.description,
+    nextChargeDate: nextChargeDateFromAnchor(tx.date, frequency, today),
+  }
+}
+
 export function firstOccurrenceOnOrAfter(
   nextChargeDate: string,
   frequency: string,
