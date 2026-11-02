@@ -28,7 +28,6 @@ import {
   formatDate,
   formatShortDate,
   formatShortDateWithYear,
-  localDateString,
 } from '@/lib/format'
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
 import { buildCalendarPeriodHistory } from './trackerPeriodHistory'
@@ -37,6 +36,7 @@ import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 
 const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },
@@ -71,17 +71,17 @@ export function AnalyticsTrackersDetail() {
   const periodInitialized = useRef(false)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
 
   // Local calendar date — feeds the pace math (`daysElapsed` / `daysLeft`) and
   // the `today` marker on the pace chart. UTC here reads a day stale for
   // UTC+10/+11 users in the early-morning-local window (#56).
-  const today = localDateString()
 
   const id = trackerId != null ? parseInt(trackerId, 10) : NaN
   const tracker = useMemo(
     () => (Number.isNaN(id) ? null : getTracker(id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, lastSyncCompletedAt]
+    [id, lastSyncCompletedAt, today]
   )
 
   const nativeMatch = useMemo(
@@ -118,6 +118,7 @@ export function AnalyticsTrackersDetail() {
     displayPeriod,
     nativeMatch,
     lastSyncCompletedAt,
+    today,
   ])
 
   const currentPeriod = useMemo(
@@ -165,7 +166,7 @@ export function AnalyticsTrackersDetail() {
           })
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tracker, id, selectedPacePeriod, lastSyncCompletedAt]
+    [tracker, id, selectedPacePeriod, lastSyncCompletedAt, today]
   )
 
   const dateFilter = useMemo(() => {
@@ -185,13 +186,13 @@ export function AnalyticsTrackersDetail() {
           })
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tracker, id, dateFilter, page, lastSyncCompletedAt]
+    [tracker, id, dateFilter, page, lastSyncCompletedAt, today]
   )
 
   const totalTransactions = useMemo(
     () => (tracker ? getTrackerTransactionsCount(id, dateFilter) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tracker, id, dateFilter, lastSyncCompletedAt]
+    [tracker, id, dateFilter, lastSyncCompletedAt, today]
   )
 
   const categories = getCategories()
@@ -208,7 +209,7 @@ export function AnalyticsTrackersDetail() {
     if (!tracker) return []
     return [...getTrackerConfigHistory(id)].reverse()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracker, id, lastSyncCompletedAt])
+  }, [tracker, id, lastSyncCompletedAt, today])
 
   // `categories` is re-fetched unmemoized each render, so a useMemo keyed on it
   // would rebuild every time anyway — just build the lookup inline.

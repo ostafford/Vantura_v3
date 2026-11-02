@@ -27,6 +27,7 @@ import { getMonthlyInsights } from '@/services/insights'
 import type { MonthDelta } from '@/services/insights'
 import { formatMoney, formatSignedMoney, formatDeltaMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { SaverBalanceChart } from '@/components/charts/SaverBalanceChart'
 import { SaverMonthlyFlowChart } from '@/components/charts/SaverMonthlyFlowChart'
 import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
@@ -125,6 +126,7 @@ function KpiCell({
 
 export function AnalyticsSavers() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
 
   const savers = getAccountsByTypes(['SAVER'])
   const homeLoans = getAccountsByTypes(['HOME_LOAN'])
@@ -139,13 +141,13 @@ export function AnalyticsSavers() {
   const monthlyInsights = useMemo(
     () => getMonthlyInsights(currentYear, currentMonth),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentYear, currentMonth, lastSyncCompletedAt]
+    [currentYear, currentMonth, lastSyncCompletedAt, today]
   )
 
   const prevMonthlyInsights = useMemo(
     () => getMonthlyInsights(prev.year, prev.month),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [prev.year, prev.month, lastSyncCompletedAt]
+    [prev.year, prev.month, lastSyncCompletedAt, today]
   )
 
   // Bumped after every goal mutation so saverData's goal reads refresh without
@@ -188,7 +190,7 @@ export function AnalyticsSavers() {
         }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [savers.map((s) => s.id).join(','), lastSyncCompletedAt, goalVersion]
+    [savers.map((s) => s.id).join(','), lastSyncCompletedAt, goalVersion, today]
   )
 
   // Round-ups (Loose Change) — always a deposit into savers

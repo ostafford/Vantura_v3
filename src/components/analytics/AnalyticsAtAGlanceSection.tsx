@@ -34,6 +34,7 @@ import {
   monthNameLong,
 } from '@/lib/monthLabels'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 
 const WEEK_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -65,6 +66,7 @@ export function AnalyticsAtAGlanceSection() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [metric, setMetric] = useState<MonthMetric>('spending')
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
 
   const [showCurrentYear, setShowCurrentYear] = useState(true)
   const [showPreviousYear, setShowPreviousYear] = useState(true)
@@ -78,25 +80,29 @@ export function AnalyticsAtAGlanceSection() {
     to: monthTo,
     year: monthYear,
     month: monthNum,
-  } = useMemo(() => getMonthBoundsForOffset(monthOffset), [monthOffset])
+  } = useMemo(
+    () => getMonthBoundsForOffset(monthOffset),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [monthOffset, today]
+  )
 
   const comparison = useMemo(() => {
     if (mode === 'year') return getYearComparison(year)
     if (mode === 'month') return getMonthComparison(monthFrom, monthTo)
     return getWeekComparison(weekOffset)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, year, monthFrom, monthTo, weekOffset, lastSyncCompletedAt])
+  }, [mode, year, monthFrom, monthTo, weekOffset, lastSyncCompletedAt, today])
 
   const pointsCurrent = useMemo(
     () => getYearMonthlyTotals(year),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [year, lastSyncCompletedAt]
+    [year, lastSyncCompletedAt, today]
   )
 
   const pointsPrevious = useMemo(
     () => getYearMonthlyTotals(year - 1),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [year, lastSyncCompletedAt]
+    [year, lastSyncCompletedAt, today]
   )
   const previousYear = year - 1
 
@@ -105,10 +111,15 @@ export function AnalyticsAtAGlanceSection() {
     [monthYear, monthNum]
   )
 
-  const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
+  const weekRange = useMemo(
+    () => getWeekRange(weekOffset),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekOffset, today]
+  )
   const weekRangePrev = useMemo(
     () => getWeekRange(weekOffset - 1),
-    [weekOffset]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weekOffset, today]
   )
 
   const weekLineLabels = useMemo(
@@ -155,13 +166,13 @@ export function AnalyticsAtAGlanceSection() {
   const monthSeries = useMemo(
     () => getMonthDayByDaySeries(monthFrom, monthTo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [monthFrom, monthTo, lastSyncCompletedAt]
+    [monthFrom, monthTo, lastSyncCompletedAt, today]
   )
 
   const weekSeries = useMemo(
     () => getWeekDayByDaySeries(weekOffset),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekOffset, lastSyncCompletedAt]
+    [weekOffset, lastSyncCompletedAt, today]
   )
 
   const activeLineSeries =

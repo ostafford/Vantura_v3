@@ -10,6 +10,7 @@ import {
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { formatMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 
 const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },
@@ -50,11 +51,12 @@ export function AnalyticsTrackers() {
   const [displayPeriod, setDisplayPeriod] =
     useState<BudgetDisplayPeriod>('MONTHLY')
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
 
   const trackers = useMemo(
     () => getTrackersWithProgressForPeriod(0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt]
+    [lastSyncCompletedAt, today]
   )
 
   const sortedTrackers = useMemo(() => {
@@ -71,7 +73,7 @@ export function AnalyticsTrackers() {
   const effectiveDataByTrackerId = useMemo(
     () => getTrackersDisplayPeriodData(trackers, displayPeriod),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trackers, displayPeriod, lastSyncCompletedAt]
+    [trackers, displayPeriod, lastSyncCompletedAt, today]
   )
 
   return (

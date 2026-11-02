@@ -33,6 +33,7 @@ import {
 } from '@/lib/colorSystem'
 import { useStore } from 'zustand'
 import { syncStore } from '@/stores/syncStore'
+import { todayStore } from '@/stores/todayStore'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
 import {
   sidebarPinsStore,
@@ -455,6 +456,7 @@ export function AnalyticsReports() {
 
   // --- Store ---
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
+  const today = useStore(todayStore, (s) => s.today)
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
 
@@ -462,7 +464,7 @@ export function AnalyticsReports() {
   const monthComparison = useMemo(
     () => (!isCustomRange ? getMonthComparison(from, to) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [from, to, isCustomRange, lastSyncCompletedAt]
+    [from, to, isCustomRange, lastSyncCompletedAt, today]
   )
   const customComparison = useMemo(
     () =>
@@ -470,7 +472,14 @@ export function AnalyticsReports() {
         ? getCustomRangeComparison(dateFrom, dateTo)
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isCustomRange, isInvalidRange, dateFrom, dateTo, lastSyncCompletedAt]
+    [
+      isCustomRange,
+      isInvalidRange,
+      dateFrom,
+      dateTo,
+      lastSyncCompletedAt,
+      today,
+    ]
   )
   // The active comparison for whichever mode is showing — both are the same
   // MonthComparisonData shape (see ADR-0007's per-period callers).
@@ -478,17 +487,17 @@ export function AnalyticsReports() {
   const rangeInsights = useMemo(
     () => (isCustomRange ? getInsightsForDateRange(dateFrom, dateTo) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dateFrom, dateTo, isCustomRange, lastSyncCompletedAt]
+    [dateFrom, dateTo, isCustomRange, lastSyncCompletedAt, today]
   )
   const categories = useMemo(
     () => getCategoryBreakdownForDateRange(from, to),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [from, to, lastSyncCompletedAt]
+    [from, to, lastSyncCompletedAt, today]
   )
   const trackers = useMemo(
     () => getTrackersWithProgress(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastSyncCompletedAt]
+    [lastSyncCompletedAt, today]
   )
   const prevMonthBounds = useMemo(() => {
     if (isCustomRange) return null
@@ -514,12 +523,12 @@ export function AnalyticsReports() {
           : null,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trackers, from, exclusiveEnd, prevMonthBounds, lastSyncCompletedAt]
+    [trackers, from, exclusiveEnd, prevMonthBounds, lastSyncCompletedAt, today]
   )
   const upcomingCharges = useMemo(
     () => (!isCustomRange ? regularOccurrencesInMonth(year, month) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isCustomRange, year, month, lastSyncCompletedAt]
+    [isCustomRange, year, month, lastSyncCompletedAt, today]
   )
   const chargeGroups = useMemo(
     () => groupUpcomingCharges(upcomingCharges),
@@ -666,6 +675,7 @@ export function AnalyticsReports() {
     exclusiveEnd,
     isCustomRange,
     lastSyncCompletedAt,
+    today,
   ])
 
   const committedPct =
