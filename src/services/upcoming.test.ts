@@ -128,6 +128,83 @@ describe('upcoming recurrence projection', () => {
   })
 })
 
+describe('month-end anchors keep their day after a short month (#145)', () => {
+  function occurrences(
+    anchor: string,
+    frequency: string,
+    start: string,
+    end: string
+  ): string[] {
+    return __test__
+      .getProjectedOccurrencesInRange(
+        makeRow({ next_charge_date: anchor, frequency }),
+        start,
+        end
+      )
+      .map((c) => c.next_charge_date)
+  }
+
+  it('a Jan 31 monthly charge returns to the 31st after February', () => {
+    expect(
+      occurrences('2026-01-31', 'MONTHLY', '2026-02-01', '2026-05-31')
+    ).toEqual(['2026-02-28', '2026-03-31', '2026-04-30', '2026-05-31'])
+  })
+
+  it('a Jan 30 monthly charge returns to the 30th after February', () => {
+    expect(
+      occurrences('2026-01-30', 'MONTHLY', '2026-02-01', '2026-03-31')
+    ).toEqual(['2026-02-28', '2026-03-30'])
+  })
+
+  it('clamps to Feb 29 in a leap year, then returns to the 31st', () => {
+    expect(
+      occurrences('2024-01-31', 'MONTHLY', '2024-02-01', '2024-03-31')
+    ).toEqual(['2024-02-29', '2024-03-31'])
+  })
+
+  it('quarterly keeps the anchor day across February', () => {
+    expect(
+      occurrences('2025-11-30', 'QUARTERLY', '2026-01-01', '2026-06-30')
+    ).toEqual(['2026-02-28', '2026-05-30'])
+  })
+
+  it('yearly Feb 29 lands on Feb 28 in common years and Feb 29 in leap years', () => {
+    expect(
+      occurrences('2024-02-29', 'YEARLY', '2025-01-01', '2028-12-31')
+    ).toEqual(['2025-02-28', '2026-02-28', '2027-02-28', '2028-02-29'])
+  })
+
+  it('firstOccurrenceOnOrAfter projects from the anchor, not the clamped occurrence', () => {
+    expect(
+      __test__.firstOccurrenceOnOrAfter(
+        '2026-01-31',
+        'MONTHLY',
+        '2026-03-01',
+        null
+      )
+    ).toBe('2026-03-31')
+  })
+
+  it('cancel_by_date still stops a month-end charge', () => {
+    expect(
+      occurrences('2026-01-31', 'MONTHLY', '2026-02-01', '2026-05-31').length
+    ).toBe(4)
+    expect(
+      __test__
+        .getProjectedOccurrencesInRange(
+          makeRow({
+            next_charge_date: '2026-01-31',
+            frequency: 'MONTHLY',
+            cancel_by_date: '2026-04-15',
+          }),
+          '2026-02-01',
+          '2026-05-31'
+        )
+        .map((c) => c.next_charge_date)
+    ).toEqual(['2026-02-28', '2026-03-31'])
+  })
+})
+
 describe('nextChargeDateFromAnchor (#47)', () => {
   it('clamps a Jan 31 monthly anchor to end of February, not March 3', () => {
     expect(
@@ -163,10 +240,10 @@ describe('nextChargeDateFromAnchor (#47)', () => {
   })
 
   it('keeps steps until the occurrence is strictly past today', () => {
-    // Jan 31 → Feb 28 → Mar 28 → Apr 28 (clamp-drift, matching stepOccurrence)
+    // Jan 31 → Feb 28 → Mar 31 → Apr 30: the anchor's day survives February (#145)
     expect(
       nextChargeDateFromAnchor('2026-01-31', 'MONTHLY', '2026-04-10')
-    ).toBe('2026-04-28')
+    ).toBe('2026-04-30')
   })
 
   it('returns an already-future anchor unchanged', () => {
@@ -361,6 +438,27 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
 
     expect(overdue.map((c) => c.name)).toEqual(['Rego'])
     expect([...nextPay, ...later].map((c) => c.name)).toEqual(['Rent'])
+  })
+
+  it('a Jan 31 monthly charge due Mar 31 is Later when payday is Mar 30, not pulled into Next pay (#145)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 2, 20, 12, 0, 0)) // 20 Mar 2026, local
+    try {
+      appSettings['next_payday'] = '2026-03-30'
+      insert({
+        name: 'Rent',
+        frequency: 'MONTHLY',
+        nextChargeDate: '2026-01-31',
+      })
+
+      const { nextPay, later } = getUpcomingChargesGrouped()
+      expect(nextPay).toHaveLength(0)
+      expect(later.map((c) => [c.name, c.next_charge_date])).toEqual([
+        ['Rent', '2026-03-31'],
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('sorts overdue oldest-first', () => {
