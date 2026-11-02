@@ -67,8 +67,7 @@ describe('getWeeklyCategoryBreakdownGrouped', () => {
     start: new Date('2026-08-03'),
     end: new Date('2026-08-09'),
     startStr: '2026-08-03',
-    startIso: '2026-08-03T00:00:00.000Z',
-    endIso: '2026-08-09T23:59:59.999Z',
+    endStr: '2026-08-09',
   }
 
   it('omits real parent groups with zero spend (#31), keeping the rest in the fixed validated order', () => {

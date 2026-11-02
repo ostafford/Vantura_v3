@@ -4,7 +4,7 @@
  */
 
 import { getDb, schedulePersist } from '@/db'
-import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
+import { displayDaySql, toDayBound } from '@/services/displayDay'
 
 export interface TransactionRow {
   id: string
@@ -87,12 +87,12 @@ function buildWhereClause(filters: TransactionFilters): {
   const params: (string | number)[] = []
 
   if (filters.dateFrom) {
-    conditions.push('COALESCE(t.created_at, t.settled_at) >= ?')
-    params.push(localDateStartUtc(filters.dateFrom))
+    conditions.push(`${displayDaySql('t')} >= ?`)
+    params.push(toDayBound(filters.dateFrom))
   }
   if (filters.dateTo) {
-    conditions.push('COALESCE(t.created_at, t.settled_at) <= ?')
-    params.push(localDateEndUtc(filters.dateTo))
+    conditions.push(`${displayDaySql('t')} <= ?`)
+    params.push(toDayBound(filters.dateTo))
   }
   if (filters.categoryIds?.length) {
     const hasUncategorised = filters.categoryIds.includes('__uncategorised__')

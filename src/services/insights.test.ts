@@ -12,7 +12,6 @@ import {
   getMonthComparison,
   getCustomRangeComparison,
 } from './insights'
-import { localDateStartUtc, localDateEndUtc } from '@/lib/format'
 import * as db from '@/db'
 
 describe('getYearMonthlyTotals', () => {
@@ -53,13 +52,9 @@ describe('getYearMonthlyTotals', () => {
     expect(result[0]).toEqual({ month: 1, moneyIn: 10_000, moneyOut: 5_000 })
     expect(result[1]).toEqual({ month: 2, moneyIn: 0, moneyOut: 0 })
     expect(result[2]).toEqual({ month: 3, moneyIn: 2_000, moneyOut: 8_000 })
-    // Bounds are converted from local calendar dates to UTC instants (see
-    // localDateStartUtc/localDateEndUtc) so the query matches the user's
-    // local Jan 1 – Dec 31, not UTC Jan 1 – Dec 31.
-    expect(stmt.bind).toHaveBeenCalledWith([
-      localDateStartUtc('2024-01-01'),
-      localDateEndUtc('2024-12-31'),
-    ])
+    // Bounds are local calendar days, compared against each transaction's
+    // local display day (#149) — not UTC instants.
+    expect(stmt.bind).toHaveBeenCalledWith(['2024-01-01', '2024-12-31'])
   })
 })
 
@@ -200,7 +195,7 @@ describe('getCustomRangeComparison', () => {
   }
 
   const boundTo = (from: string, to: string) => (args: unknown[]) =>
-    args[0] === localDateStartUtc(from) && args[1] === localDateEndUtc(to)
+    args[0] === from && args[1] === to
 
   it('compares a fully-past range against the equal-length window immediately before it', () => {
     vi.useFakeTimers()
@@ -271,23 +266,17 @@ describe('getWeekComparison', () => {
 
     getWeekComparison(0)
 
-    // Expected previous-week bounds: previous Monday at local midnight,
-    // capped end = previous Monday + 2 days (3 elapsed days - 1) at local
-    // end-of-day — mirrors the production computation.
-    const prevMonday = new Date(2026, 3, 6)
-    prevMonday.setHours(0, 0, 0, 0)
-    const expectedPrevStartIso = prevMonday.toISOString()
-    const expectedPrevEnd = new Date(prevMonday)
-    expectedPrevEnd.setDate(expectedPrevEnd.getDate() + 2)
-    expectedPrevEnd.setHours(23, 59, 59, 999)
-    const expectedPrevEndIso = expectedPrevEnd.toISOString()
+    // Expected previous-week bounds (local days, #149): previous Monday,
+    // capped end = previous Monday + 2 days (3 elapsed days - 1).
+    const expectedPrevStart = '2026-04-06'
+    const expectedPrevEnd = '2026-04-08'
 
     const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStartIso
+      (args) => args[0] === expectedPrevStart
     )
     expect(previousBoundCalls.length).toBeGreaterThan(0)
     for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEndIso)
+      expect(args[1]).toBe(expectedPrevEnd)
     }
   })
 
@@ -308,20 +297,16 @@ describe('getWeekComparison', () => {
     // weekOffset -1 compares last week vs the week before — both fully elapsed.
     getWeekComparison(-1)
 
-    const priorMonday = new Date(2026, 2, 30) // 2026-03-30
-    priorMonday.setHours(0, 0, 0, 0)
-    const expectedPrevStartIso = priorMonday.toISOString()
-    const expectedPrevEnd = new Date(priorMonday)
-    expectedPrevEnd.setDate(expectedPrevEnd.getDate() + 6)
-    expectedPrevEnd.setHours(23, 59, 59, 999)
-    const expectedPrevEndIso = expectedPrevEnd.toISOString()
+    // Full prior week Mon 30 Mar – Sun 5 Apr, as local days (#149).
+    const expectedPrevStart = '2026-03-30'
+    const expectedPrevEnd = '2026-04-05'
 
     const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStartIso
+      (args) => args[0] === expectedPrevStart
     )
     expect(previousBoundCalls.length).toBeGreaterThan(0)
     for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEndIso)
+      expect(args[1]).toBe(expectedPrevEnd)
     }
   })
 })
@@ -385,19 +370,15 @@ describe('elapsed-day maths across a DST transition', () => {
     // Current week Mon Apr 20 – today Sat Apr 25 = 6 elapsed days, so the
     // previous week (Mon Apr 13 –) is capped to 6 days -> ends Apr 18.
     // A flat 24h divide floors elapsed to 5 and would cap to Apr 17.
-    const prevMonday = new Date(2026, 3, 13)
-    prevMonday.setHours(0, 0, 0, 0)
-    const expectedPrevStartIso = prevMonday.toISOString()
-    const cappedEnd = new Date(2026, 3, 18)
-    cappedEnd.setHours(23, 59, 59, 999)
-    const expectedPrevEndIso = cappedEnd.toISOString()
+    const expectedPrevStart = '2026-04-13'
+    const expectedPrevEnd = '2026-04-18'
 
     const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStartIso
+      (args) => args[0] === expectedPrevStart
     )
     expect(previousBoundCalls.length).toBeGreaterThan(0)
     for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEndIso)
+      expect(args[1]).toBe(expectedPrevEnd)
     }
   })
 })
