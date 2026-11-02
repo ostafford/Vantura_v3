@@ -18,7 +18,7 @@ import {
   PASSPHRASE_MIN_LENGTH,
 } from '@/lib/crypto'
 import { SCHEMA_VERSION } from '@/db/schema'
-import { writeTrackerConfigVersion } from './trackers'
+import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
 const EXPORT_PAYLOAD_VERSION = 9
@@ -567,6 +567,13 @@ export async function exportProfile(passphrase: string): Promise<void> {
 export const IMPORT_ERROR_INVALID_FILE =
   'This file is not a valid Vantura settings export.'
 
+/**
+ * User-facing error when an imported tracker's reset_day isn't valid for its
+ * reset_frequency (#150). The whole import is refused — nothing is written.
+ */
+export const IMPORT_ERROR_INVALID_TRACKER_RESET =
+  'This file has a tracker with an invalid reset day. Nothing was imported.'
+
 /** User-facing error when the passphrase does not match the file. */
 export const IMPORT_ERROR_WRONG_PASSPHRASE =
   'Incorrect passphrase for this settings file. Please try again.'
@@ -790,6 +797,10 @@ export function replaceTrackers(
       continue
     }
     const resetDay = t.reset_day != null ? t.reset_day : null
+    // Refuse rather than clamp: the throw rolls back the whole import (#150).
+    if (!isValidTrackerResetDay(t.reset_frequency, resetDay)) {
+      throw new Error(IMPORT_ERROR_INVALID_TRACKER_RESET)
+    }
     const startDate =
       typeof t.start_date === 'string' && t.start_date.length >= 10
         ? t.start_date.slice(0, 10)

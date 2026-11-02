@@ -20,6 +20,7 @@ import {
   getTrackerCategoryUsage,
   createTracker,
   updateTracker,
+  resetDayForFrequency,
   deleteTracker,
   calculatePaydayBudgetTotal,
   getTrackersDisplayPeriodData,
@@ -165,7 +166,9 @@ export function TrackersSection({
     setName(t.name)
     setBudget(String(t.budget_amount / 100))
     setFrequency(t.reset_frequency as TrackerResetFrequency)
-    setResetDay(t.reset_day ?? 1)
+    // A day that isn't an option for this frequency displays as option 1, so
+    // hold 1 — save then writes what the user sees (#150).
+    setResetDay(resetDayForFrequency(t.reset_frequency, t.reset_day))
     setSelectedCategoryIds(getTrackerCategoryIds(t.id))
     setCategoryUsage(getTrackerCategoryUsage(t.id))
     setShowModal(true)
@@ -209,6 +212,10 @@ export function TrackersSection({
         toast.error(
           'Payday not configured. Set up your pay schedule in Settings before adding a Payday tracker.'
         )
+        return
+      }
+      if (e instanceof Error && e.message === 'INVALID_RESET_DAY') {
+        toast.error('Please choose a reset day for this frequency.')
         return
       }
       if (
@@ -598,9 +605,12 @@ export function TrackersSection({
                 id="tracker-edit-frequency"
                 name="frequency"
                 value={frequency}
-                onChange={(e) =>
-                  setFrequency(e.target.value as TrackerResetFrequency)
-                }
+                onChange={(e) => {
+                  const f = e.target.value as TrackerResetFrequency
+                  setFrequency(f)
+                  // Monthly 15 → Weekly: 15 isn't a weekday option (#150).
+                  setResetDay((d) => resetDayForFrequency(f, d))
+                }}
               >
                 {RESET_FREQUENCIES.map((f) => (
                   <option key={f.value} value={f.value}>
