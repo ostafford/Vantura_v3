@@ -1,4 +1,12 @@
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import {
   __test__,
@@ -25,6 +33,7 @@ const {
   getUpcomingChargesGrouped,
   createUpcomingCharge,
   updateUpcomingCharge,
+  nextChargeDateToStoreOnEdit,
 } = await import('./upcoming')
 const { localDateString } = await import('@/lib/format')
 
@@ -498,5 +507,127 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
     expect(overdue).toHaveLength(0)
     expect(nextPay).toHaveLength(0)
     expect(later).toHaveLength(0)
+  })
+})
+
+describe('editing a Regular keeps its stored date (#146)', () => {
+  const shown = {
+    storedDate: '2026-01-31',
+    shownDate: '2026-03-31',
+    shownFrequency: 'MONTHLY',
+  }
+
+  it('keeps the stored date when neither date nor frequency changed', () => {
+    expect(
+      nextChargeDateToStoreOnEdit({
+        ...shown,
+        editedDate: '2026-03-31',
+        editedFrequency: 'MONTHLY',
+      })
+    ).toBe('2026-01-31')
+  })
+
+  it('stores the edited date when the user changed the date', () => {
+    expect(
+      nextChargeDateToStoreOnEdit({
+        ...shown,
+        editedDate: '2026-04-02',
+        editedFrequency: 'MONTHLY',
+      })
+    ).toBe('2026-04-02')
+  })
+
+  it('stores the date in the form when the user changed only the frequency', () => {
+    expect(
+      nextChargeDateToStoreOnEdit({
+        ...shown,
+        editedDate: '2026-03-31',
+        editedFrequency: 'FORTNIGHTLY',
+      })
+    ).toBe('2026-03-31')
+  })
+
+  it('compares dates by day, ignoring a time suffix', () => {
+    expect(
+      nextChargeDateToStoreOnEdit({
+        ...shown,
+        shownDate: '2026-03-31T00:00:00Z',
+        editedDate: '2026-03-31',
+        editedFrequency: 'MONTHLY',
+      })
+    ).toBe('2026-01-31')
+  })
+
+  describe("through the editor's save sequence", () => {
+    beforeAll(async () => {
+      SQL = await initSqlJs()
+    })
+
+    beforeEach(async () => {
+      const { runSchema } = await import('@/db/schema')
+      db = new SQL.Database()
+      runSchema(db)
+      for (const k of Object.keys(appSettings)) delete appSettings[k]
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 2, 20, 12, 0, 0)) // 20 Mar 2026, local
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    /** What UpcomingSection's handleSave does for an edit, minus the React. */
+    function saveEdit(
+      shownRow: UpcomingChargeRow,
+      form: { name: string; date: string; frequency: string }
+    ) {
+      const storedDate =
+        getUpcomingChargeById(shownRow.id)?.next_charge_date ?? form.date
+      // prettier-ignore
+      updateUpcomingCharge(shownRow.id, form.name, shownRow.amount, form.frequency,
+        nextChargeDateToStoreOnEdit({
+          storedDate,
+          shownDate: shownRow.next_charge_date,
+          shownFrequency: shownRow.frequency,
+          editedDate: form.date,
+          editedFrequency: form.frequency,
+        }),
+        null, true, null, null, 'EXPENSE', null, null)
+    }
+
+    it('renaming a projected Regular leaves its stored date alone', () => {
+      // prettier-ignore
+      const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
+      const [row] = getUpcomingChargesGrouped().later.concat(
+        getUpcomingChargesGrouped().nextPay
+      )
+      expect(row.next_charge_date).not.toBe('2025-12-31') // shown = projected
+
+      saveEdit(row, {
+        name: 'Rent (flat)',
+        date: row.next_charge_date,
+        frequency: row.frequency,
+      })
+
+      const stored = getUpcomingChargeById(id)
+      expect(stored?.name).toBe('Rent (flat)')
+      expect(stored?.next_charge_date).toBe('2025-12-31')
+    })
+
+    it('changing the date in the form re-anchors the Regular', () => {
+      // prettier-ignore
+      const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
+      const [row] = getUpcomingChargesGrouped().later.concat(
+        getUpcomingChargesGrouped().nextPay
+      )
+
+      saveEdit(row, {
+        name: row.name,
+        date: '2026-04-05',
+        frequency: row.frequency,
+      })
+
+      expect(getUpcomingChargeById(id)?.next_charge_date).toBe('2026-04-05')
+    })
   })
 })
