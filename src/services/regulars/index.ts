@@ -11,6 +11,10 @@
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
  * `funding.ts`.
+ *
+ * Writes: `createUpcomingCharge` / `updateUpcomingCharge` / `deleteUpcomingCharge`
+ * (replaced by the draft → validate → save path in #160) and
+ * `unlinkRegularsFromManualAccount`.
  */
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
@@ -270,6 +274,20 @@ export function nextChargeDateToStoreOnEdit(edit: {
     edit.editedDate.slice(0, 10) !== edit.shownDate.slice(0, 10)
   const frequencyChanged = edit.editedFrequency !== edit.shownFrequency
   return dateChanged || frequencyChanged ? edit.editedDate : edit.storedDate
+}
+
+/**
+ * Unlinks every Regular tied to a manual account that's being deleted: a
+ * linked liability repayment becomes a plain `EXPENSE` with no linked account
+ * (foreign keys aren't enforced in sql.js). The caller persists.
+ */
+export function unlinkRegularsFromManualAccount(manualAccountId: number): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(
+    `UPDATE upcoming_charges SET charge_type = 'EXPENSE', linked_manual_account_id = NULL WHERE linked_manual_account_id = ?`,
+    [manualAccountId]
+  )
 }
 
 export function deleteUpcomingCharge(id: number): void {

@@ -18,6 +18,7 @@ const {
   deleteManualAccount,
 } = await import('./manualAccounts')
 const { getNetWorthSnapshots } = await import('./netWorth')
+const { regularById } = await import('./regulars')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -74,5 +75,34 @@ describe('manualAccounts snapshot-on-mutation', () => {
     const snapshots = getNetWorthSnapshots()
     expect(snapshots.length).toBe(1)
     expect(snapshots[0].manual_liabilities_cents).toBe(0)
+  })
+})
+
+describe('deleting a manual account unlinks its Regulars', () => {
+  it('turns a linked liability repayment back into a plain expense, leaving others alone', () => {
+    const loan = addManualAccount(baseInput())
+    const other = addManualAccount(baseInput({ name: 'Car loan' }))
+    const insert = (name: string, accountId: number) =>
+      db.run(
+        `INSERT INTO upcoming_charges
+           (name, amount, frequency, next_charge_date, created_at, charge_type, linked_manual_account_id)
+         VALUES (?, 50000, 'MONTHLY', '2025-01-28', '2025-01-01', 'LIABILITY_REPAYMENT', ?)`,
+        [name, accountId]
+      )
+    insert('Mortgage repayment', loan)
+    insert('Car repayment', other)
+
+    deleteManualAccount(loan)
+
+    expect(regularById(1)).toMatchObject({
+      name: 'Mortgage repayment',
+      charge_type: 'EXPENSE',
+      linked_manual_account_id: null,
+    })
+    expect(regularById(2)).toMatchObject({
+      name: 'Car repayment',
+      charge_type: 'LIABILITY_REPAYMENT',
+      linked_manual_account_id: other,
+    })
   })
 })
