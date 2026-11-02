@@ -358,7 +358,7 @@ function prevPaydayDate(nextPayday: string): string | null {
 }
 
 /**
- * Advance tracker reset dates where current time >= next_reset_date.
+ * Advance tracker reset dates where the local date >= next_reset_date.
  * Loops until all trackers are current (handles multiple missed periods).
  * For PAYDAY frequency uses app_settings next_payday; skips if not configured.
  */
@@ -370,7 +370,9 @@ export function recalculateTrackers(): void {
   let changed = true
   while (changed) {
     changed = false
-    const now = new Date().toISOString()
+    // Local calendar date, like next_reset_date itself: a tracker due today
+    // resets at local midnight, not 00:00 UTC (#148).
+    const today = localDateString()
     const nextPayday = getAppSetting('next_payday')
     const stmt = db.prepare(
       `SELECT id, reset_frequency, next_reset_date FROM trackers WHERE is_active = 1`
@@ -380,7 +382,7 @@ export function recalculateTrackers(): void {
       const id = row[0]
       const freq = row[1]
       const nextReset = row[2] as string
-      if (!nextReset || now < nextReset) continue
+      if (!nextReset || today < nextReset.slice(0, 10)) continue
       if (freq === 'PAYDAY') {
         if (!nextPayday) continue
         const nextPaydayNorm =
