@@ -20,6 +20,7 @@ import {
   draftFromSuggestion,
   essentialsLinkHints,
   type Regular,
+  type RegularChargeType,
 } from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import { getReservedAmount } from '@/services/balance'
@@ -996,9 +997,7 @@ export function UpcomingSection({
                       size="sm"
                       value={chargeType}
                       onChange={(e) => {
-                        const type = e.target.value as
-                          | 'EXPENSE'
-                          | 'LIABILITY_REPAYMENT'
+                        const type = e.target.value as RegularChargeType
                         update(
                           type === 'LIABILITY_REPAYMENT'
                             ? { chargeType: type }

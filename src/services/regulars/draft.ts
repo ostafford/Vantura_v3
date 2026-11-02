@@ -14,7 +14,7 @@ import type { Database } from 'sql.js'
 import { getDb, schedulePersist } from '@/db'
 import { localDateString } from '@/lib/format'
 import { nextChargeDateFromAnchor } from './projection'
-import { readRegulars, type Regular } from './rows'
+import { readRegularById, type Regular } from './rows'
 
 export type RegularChargeType = Regular['charge_type']
 
@@ -198,10 +198,6 @@ export function validateRegularDraft(draft: RegularDraft): RegularDraftErrors {
   return errors
 }
 
-export function isValidRegularDraft(draft: RegularDraft): boolean {
-  return Object.keys(validateRegularDraft(draft)).length === 0
-}
-
 /**
  * Stores the draft, with its bucket, in one write, and returns the Regular's
  * id. Throws on an invalid draft, so validate first to show the errors.
@@ -291,7 +287,7 @@ function storedBucketId(id: number): number | null {
 /** The `next_charge_date` to store for this draft: the edit or create rule. */
 function nextChargeDateToStore(db: Database, draft: RegularDraft): string {
   if (draft.id != null && draft.shown) {
-    const stored = readRegulars(db).find((r) => r.id === draft.id)
+    const stored = readRegularById(db, draft.id)
     return nextChargeDateToStoreOnEdit({
       storedDate: stored?.next_charge_date ?? draft.nextChargeDate,
       shownDate: draft.shown.nextChargeDate,

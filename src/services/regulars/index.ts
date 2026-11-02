@@ -21,16 +21,17 @@
 
 import { getDb, getAppSetting } from '@/db'
 import { localDateString } from '@/lib/format'
-import { readRegulars, byStoredDate, type Regular } from './rows'
+import {
+  readRegulars,
+  readRegularById,
+  byStoredDate,
+  type Regular,
+} from './rows'
 import {
   nthOccurrence,
   firstOccurrenceOnOrAfter,
   getProjectedOccurrencesInRange,
 } from './projection'
-import {
-  nextChargeDateToStoreOnCreate,
-  nextChargeDateToStoreOnEdit,
-} from './draft'
 
 export type { Regular } from './rows'
 export {
@@ -50,7 +51,6 @@ export {
   draftFromTransaction,
   draftFromSuggestion,
   validateRegularDraft,
-  isValidRegularDraft,
   saveRegular,
   deleteRegular,
   type RegularDraft,
@@ -78,8 +78,6 @@ export interface RegularsByPayday {
 }
 
 export const __test__ = {
-  nextChargeDateToStoreOnCreate,
-  nextChargeDateToStoreOnEdit,
   nthOccurrence,
   firstOccurrenceOnOrAfter,
   getProjectedOccurrencesInRange,
@@ -147,7 +145,7 @@ export function unlinkRegularsFromManualAccount(manualAccountId: number): void {
 export function regularById(id: number): Regular | null {
   const db = getDb()
   if (!db) return null
-  return readRegularsByStoredDate(db).find((c) => c.id === id) ?? null
+  return readRegularById(db, id)
 }
 
 /**

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import { __test__, nextChargeDateFromAnchor, type Regular } from './index'
-
-const { nextChargeDateToStoreOnCreate, nextChargeDateToStoreOnEdit } = __test__
+import {
+  nextChargeDateToStoreOnCreate,
+  nextChargeDateToStoreOnEdit,
+} from './draft'
 
 let SQL: SqlJsStatic
 let db: Database
