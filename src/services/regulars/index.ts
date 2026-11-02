@@ -19,6 +19,10 @@ export {
   type ReservedItem,
 } from './reserved'
 export {
+  regularsWithFundingSource,
+  type RegularWithFundingSource,
+} from './funding'
+export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
 } from './projection'

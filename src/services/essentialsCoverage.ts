@@ -5,12 +5,9 @@
  */
 
 import { getDb, getAppSetting } from '@/db'
-import { localDateString } from '@/lib/format'
 import { getEssentialsNomination } from './essentials'
-import { getFundingSourceAccountId } from './fundingSource'
 import { getAccountById } from './accounts'
-import { firstOccurrenceOnOrAfter, reservedBeforePayday } from './regulars'
-import { readRegulars } from './regulars/rows'
+import { regularsWithFundingSource, reservedBeforePayday } from './regulars'
 
 export type EssentialsCoverageState =
   | 'hidden'
@@ -77,24 +74,19 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   const db = getDb()
   if (!db) return null
 
-  const charges = readRegulars(db)
+  const regulars = regularsWithFundingSource()
 
   // Visibility gate: has any Regular's funding source ever resolved to the
   // nominated Saver, regardless of whether it's due this cycle? No window —
   // "has Essentials ever been observed", not "is it due right now".
-  const anyEssentialsFunded = charges.some(
-    (c) => getFundingSourceAccountId(db, c) === essentialsSaverId
+  const anyEssentialsFunded = regulars.some(
+    (r) => r.fundingAccountId === essentialsSaverId
   )
   if (!anyEssentialsFunded) return emptyCoverage('hidden')
 
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   if (!nextPayday || !paydayFrequency) return emptyCoverage('payday_needed')
-  const reservedCharges = charges.filter((c) => c.is_reserved === 1)
-
-  const transactionalCharges = reservedCharges.filter(
-    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
-  )
 
   // Rounded per Regular, then summed — this block's figures as they've always been.
   const sumReserved = (items: Array<{ reservedAmount: number }>) =>
@@ -109,15 +101,11 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   )
   const essentialsSetAsideCents =
     totalIfAllTransactionalCents - reservedHereCents
-  const today = localDateString()
-  const transactionalCount = transactionalCharges.filter(
-    (c) =>
-      firstOccurrenceOnOrAfter(
-        c.next_charge_date,
-        c.frequency,
-        today,
-        c.cancel_by_date ?? null
-      ) !== null
+  const transactionalCount = regulars.filter(
+    (r) =>
+      r.regular.is_reserved === 1 &&
+      r.fundingAccountId !== essentialsSaverId &&
+      r.nextOccurrence !== null
   ).length
 
   // Present by construction: an active nomination has an open accounts row.

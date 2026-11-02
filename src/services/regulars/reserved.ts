@@ -14,9 +14,9 @@ import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
 import { localDateString } from '@/lib/format'
 import { getActiveEssentialsSaverAccountId } from '../essentials'
-import { getFundingSourceAccountId } from '../fundingSource'
 import { firstOccurrenceOnOrAfter } from './projection'
 import { readRegulars, type Regular } from './rows'
+import { withFundingSource } from './funding'
 
 /** The fields the Reserved calculation reads from a Regular. */
 export type ReservedInput = Pick<
@@ -175,9 +175,9 @@ function excludeEssentialsFundedCharges(
 ): Regular[] {
   const essentialsSaverId = getActiveEssentialsSaverAccountId()
   if (!essentialsSaverId) return charges
-  return charges.filter(
-    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
-  )
+  return withFundingSource(db, charges)
+    .filter((c) => c.fundingAccountId !== essentialsSaverId)
+    .map((c) => c.regular)
 }
 
 /**
