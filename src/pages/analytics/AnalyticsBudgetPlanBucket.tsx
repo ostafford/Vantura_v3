@@ -11,11 +11,8 @@ import {
   type BudgetBucketRow,
   type BucketUpcomingItem,
 } from '@/services/budgetBuckets'
-import {
-  createUpcomingCharge,
-  regularDraftFromTransaction,
-  nextChargeDateToStoreOnCreate,
-} from '@/services/regulars'
+import { blankDraft, draftFromTransaction } from '@/services/regulars'
+import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import {
   getHypotheticalLines,
   createBudgetLine,
@@ -95,20 +92,17 @@ function AddUpcomingTransactionModal({
   const [step, setStep] = useState<'pick' | 'configure'>('pick')
   const [txSearch, setTxSearch] = useState('')
   const [selectedTx, setSelectedTx] = useState<AnchorDebitRow | null>(null)
-  const [frequency, setFrequency] = useState('MONTHLY')
-  const [nextChargeDate, setNextChargeDate] = useState('')
+  const { draft, reset, update, setFrequency, save } =
+    useRegularDraft(blankDraft)
 
   useMemo(() => {
     if (show) {
       setStep('pick')
       setTxSearch('')
       setSelectedTx(null)
-      setFrequency('MONTHLY')
-      const d = new Date()
-      setNextChargeDate(
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      )
+      reset(blankDraft())
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show])
 
   const unassigned = useMemo(
@@ -125,45 +119,26 @@ function AddUpcomingTransactionModal({
     onClose()
   }
 
+  // Same Regular the Dashboard creates from this payment, including the
+  // payment link (#147) and its date as the anchor (#153): counted in
+  // Spendable, an expense, in this bucket.
   function handleSelectTx(tx: AnchorDebitRow) {
     setSelectedTx(tx)
-    setNextChargeDate(regularDraftFromTransaction(tx, frequency).nextChargeDate)
+    reset({ ...draftFromTransaction(tx, draft.frequency), bucketId })
     setStep('configure')
-  }
-
-  function handleFrequencyChange(f: string) {
-    setFrequency(f)
-    if (selectedTx) {
-      setNextChargeDate(
-        regularDraftFromTransaction(selectedTx, f).nextChargeDate
-      )
-    }
   }
 
   function handleCreateAndAssign() {
     if (!selectedTx) return
-    // Same Regular the Dashboard creates from this transaction — including the
-    // payment link, so settlement detection and funding source work (#147).
-    const draft = regularDraftFromTransaction(selectedTx, frequency)
-    const newId = createUpcomingCharge(
-      draft.name,
-      draft.amountCents,
-      frequency,
-      // Store the payment's date, unless the user edited this one (#153).
-      nextChargeDateToStoreOnCreate({
-        anchorDate: draft.anchorDate,
-        frequency,
-        shownDate: nextChargeDate,
-      }),
-      draft.categoryId,
-      true,
-      null,
-      null,
-      'EXPENSE',
-      null,
-      draft.matchDescription
-    )
-    assignUpcomingToBucket(newId, bucketId)
+    const result = save()
+    if (!result.ok) {
+      toast.error(
+        result.errors.name
+          ? 'This transaction has no description to name the Regular by.'
+          : (Object.values(result.errors)[0] ?? 'This Regular can’t be saved.')
+      )
+      return
+    }
     toast.success(`"${selectedTx.description}" added as upcoming transaction`)
     onSaved()
     onClose()
@@ -196,8 +171,8 @@ function AddUpcomingTransactionModal({
                 <Form.Group>
                   <Form.Label>Frequency</Form.Label>
                   <Form.Select
-                    value={frequency}
-                    onChange={(e) => handleFrequencyChange(e.target.value)}
+                    value={draft.frequency}
+                    onChange={(e) => setFrequency(e.target.value)}
                   >
                     {BUDGET_FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>
@@ -212,8 +187,8 @@ function AddUpcomingTransactionModal({
                   <Form.Label>Next charge date</Form.Label>
                   <Form.Control
                     type="date"
-                    value={nextChargeDate}
-                    onChange={(e) => setNextChargeDate(e.target.value)}
+                    value={draft.nextChargeDate}
+                    onChange={(e) => update({ nextChargeDate: e.target.value })}
                   />
                 </Form.Group>
               </Col>
@@ -353,7 +328,7 @@ function AddUpcomingTransactionModal({
             <Button
               variant="primary"
               onClick={handleCreateAndAssign}
-              disabled={!nextChargeDate}
+              disabled={!draft.nextChargeDate}
             >
               Add to bucket
             </Button>

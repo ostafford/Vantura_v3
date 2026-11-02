@@ -19,7 +19,8 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { regularsWithFundingSource } = await import('@/services/regulars')
+const { regularsWithFundingSource, essentialsLinkHints } =
+  await import('@/services/regulars')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -97,5 +98,89 @@ describe('regularsWithFundingSource', () => {
       ['Phone', '2025-01-31', '2025-02-28'],
       ['Concert', '2025-02-10', null],
     ])
+  })
+})
+
+describe('essentialsLinkHints (#97, decision 5)', () => {
+  // Today is 23 Feb 2025 (see beforeEach).
+  function addHinted(opts: {
+    matchDescription: string | null
+    amount?: number
+    frequency?: string
+    date?: string
+    cancelBy?: string | null
+    reserved?: 0 | 1
+  }): number {
+    db.run(
+      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, cancel_by_date, is_reserved, created_at, match_description)
+       VALUES ('Regular', ?, ?, ?, ?, ?, '2025-01-01', ?)`,
+      [
+        opts.amount ?? 1000,
+        opts.frequency ?? 'MONTHLY',
+        opts.date ?? '2025-03-10',
+        opts.cancelBy ?? null,
+        opts.reserved ?? 1,
+        opts.matchDescription,
+      ]
+    )
+    return Number(db.exec(`SELECT last_insert_rowid()`)[0].values[0][0])
+  }
+
+  function pay(description: string, amount: number, accountId = 'everyday') {
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
+       VALUES (?, ?, 'SETTLED', ?, ?, '2025-02-10T09:00:00.000Z', '2025-02-10T09:00:00.000Z')`,
+      [`${description}-${amount}-${accountId}`, accountId, description, amount]
+    )
+  }
+
+  it('asks to link a payment when the Regular has no link', () => {
+    const id = addHinted({ matchDescription: null })
+    expect(essentialsLinkHints().get(id)).toBe('unlinked')
+  })
+
+  it('says no matching payment yet when linked but nothing matches', () => {
+    const id = addHinted({ matchDescription: 'Gym' })
+    expect(essentialsLinkHints().get(id)).toBe('no_payment')
+  })
+
+  it('says no matching payment when the only payment is outside the ±20% band', () => {
+    const id = addHinted({ matchDescription: 'Gym', amount: 6000 })
+    pay('Gym', -9000)
+    expect(essentialsLinkHints().get(id)).toBe('no_payment')
+  })
+
+  it('says no matching payment when the payment also matches another Regular', () => {
+    addHinted({ matchDescription: 'Apple', amount: 999 })
+    const id = addHinted({ matchDescription: 'Apple', amount: 999 })
+    pay('Apple', -999, 'bills')
+    expect(essentialsLinkHints().get(id)).toBe('no_payment')
+  })
+
+  it('has no hint once a payment is linked, whichever account paid it', () => {
+    const id = addHinted({ matchDescription: 'Netflix', amount: 1500 })
+    pay('Netflix', -1500)
+    expect(essentialsLinkHints().has(id)).toBe(false)
+  })
+
+  it('has no hint for a Regular excluded from Spendable', () => {
+    const id = addHinted({ matchDescription: null, reserved: 0 })
+    expect(essentialsLinkHints().has(id)).toBe(false)
+  })
+
+  it('has no hint for a Regular that will never fall due again', () => {
+    const pastOnce = addHinted({
+      matchDescription: null,
+      frequency: 'ONCE',
+      date: '2025-02-01',
+    })
+    const cancelled = addHinted({
+      matchDescription: null,
+      date: '2025-01-10',
+      cancelBy: '2025-02-15',
+    })
+    const hints = essentialsLinkHints()
+    expect(hints.has(pastOnce)).toBe(false)
+    expect(hints.has(cancelled)).toBe(false)
   })
 })

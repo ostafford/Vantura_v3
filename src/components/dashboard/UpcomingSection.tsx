@@ -12,17 +12,16 @@ import {
 } from 'react-bootstrap'
 import {
   regularsByPayday,
-  createUpcomingCharge,
-  updateUpcomingCharge,
   regularById,
-  nextChargeDateToStoreOnEdit,
-  deleteUpcomingCharge,
+  deleteRegular,
   daysUntilCharge,
-  regularDraftFromTransaction,
-  nextChargeDateFromAnchor,
-  nextChargeDateToStoreOnCreate,
+  blankDraft,
+  draftFromRegular,
+  draftFromSuggestion,
+  essentialsLinkHints,
   type Regular,
 } from '@/services/regulars'
+import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
 import {
@@ -31,24 +30,15 @@ import {
 } from '@/services/budgetTransactionAnchors'
 import { RecurringChargeSuggestions } from './RecurringChargeSuggestions'
 import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetection'
-import { formatMoney, formatShortDate, localDateString } from '@/lib/format'
+import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
-import {
-  getBuckets,
-  getUpcomingBucketId,
-  assignUpcomingToBucket,
-} from '@/services/budgetBuckets'
+import { getBuckets } from '@/services/budgetBuckets'
 import {
   getManualAccounts,
   type ManualAccountRow,
 } from '@/services/manualAccounts'
 import { isEssentialsUser } from '@/services/essentials'
-import {
-  getEssentialsLinkHint,
-  type EssentialsLinkHint,
-} from '@/services/fundingSource'
-import { getDb } from '@/db'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
@@ -79,22 +69,30 @@ export function UpcomingSection({
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [showModal, setShowModal] = useState(false)
   const [editingCharge, setEditingCharge] = useState<Regular | null>(null)
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-  const [nextChargeDate, setNextChargeDate] = useState('')
-  const [categoryId, setCategoryId] = useState<string>('')
-  const [isReserved, setIsReserved] = useState(true)
-  const [reminderDaysBefore, setReminderDaysBefore] = useState<string>('')
-  const [cancelByDate, setCancelByDate] = useState('')
-  const [upcomingBucketId, setUpcomingBucketId] = useState<number | null>(null)
+  const {
+    draft,
+    reset,
+    update,
+    setFrequency,
+    applyTransaction,
+    detachPayment,
+    save,
+  } = useRegularDraft(blankDraft)
+  const {
+    name,
+    amount,
+    frequency,
+    nextChargeDate,
+    categoryId,
+    isReserved,
+    reminderDaysBefore,
+    cancelByDate,
+    chargeType,
+    linkedManualAccountId,
+    matchDescription,
+    bucketId: upcomingBucketId,
+  } = draft
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [chargeType, setChargeType] = useState<
-    'EXPENSE' | 'LIABILITY_REPAYMENT'
-  >('EXPENSE')
-  const [linkedManualAccountId, setLinkedManualAccountId] = useState<
-    number | null
-  >(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
@@ -103,10 +101,6 @@ export function UpcomingSection({
   const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
     null
   )
-  // The payment a new Regular was created from (picked transaction or
-  // suggestion): its date is the anchor stored on save (#153).
-  const [createAnchorDate, setCreateAnchorDate] = useState<string | null>(null)
-  const [matchDescription, setMatchDescription] = useState<string>('')
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
   const [settlementSearch, setSettlementSearch] = useState('')
 
@@ -152,22 +146,16 @@ export function UpcomingSection({
    * source needs a linked payment (docs/adr/0020), so a Regular without one
    * gets no Essentials benefit — it's always reserved. Surfaced only for an
    * active Essentials nomination; classic users get nothing here since
-   * linking has no effect on their Reserved figure. See getEssentialsLinkHint.
+   * linking has no effect on their Reserved figure. See essentialsLinkHints.
    */
-  const essentialsLinkHints = useMemo(() => {
-    const hints = new Map<number, EssentialsLinkHint | null>()
-    const db = getDb()
-    if (!essentialsUser || !db) return hints
-    const today = localDateString()
-    // Only the Next pay / Later rows show the hint.
-    for (const c of [...nextPay, ...later]) {
-      hints.set(c.id, getEssentialsLinkHint(db, c, today))
-    }
-    return hints
-  }, [essentialsUser, nextPay, later])
+  const linkHints = useMemo(
+    () => (essentialsUser ? essentialsLinkHints() : new Map()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [essentialsUser, refresh, lastSyncCompletedAt]
+  )
 
   function essentialsLinkLabel(c: Regular): string | null {
-    const hint = essentialsLinkHints.get(c.id)
+    const hint = linkHints.get(c.id)
     if (hint === 'unlinked') return 'link a payment to use Essentials'
     if (hint === 'no_payment') return 'no matching payment found'
     return null
@@ -175,131 +163,52 @@ export function UpcomingSection({
 
   function openCreate() {
     setEditingCharge(null)
-    setName('')
-    setAmount('')
-    setFrequency('MONTHLY')
-    const d = new Date()
-    setNextChargeDate(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    )
-    setCategoryId('')
-    setIsReserved(true)
-    setReminderDaysBefore('')
-    setCancelByDate('')
-    setUpcomingBucketId(null)
+    reset(blankDraft())
     setCreateStep('search')
     setTxSearch('')
     setMoreOptionsOpen(false)
     setImportedFromTx(null)
-    setCreateAnchorDate(null)
-    setMatchDescription('')
     setShowSettlementPicker(false)
     setSettlementSearch('')
-    setChargeType('EXPENSE')
-    setLinkedManualAccountId(null)
     setShowModal(true)
   }
 
+  // `c` is the row as shown: its date is the projected next occurrence. The
+  // draft keeps it as the shown date, and saving keeps the stored anchor
+  // unless the user changes the date or frequency (#146, docs/adr/0004).
   function openEdit(c: Regular) {
+    const stored = regularById(c.id)
+    if (!stored) return
+    const d = draftFromRegular(stored, c)
     setEditingCharge(c)
-    setName(c.name)
-    setAmount(String(c.amount / 100))
-    setFrequency(c.frequency)
-    setNextChargeDate(c.next_charge_date)
-    setCategoryId(c.category_id ?? '')
-    setIsReserved(c.is_reserved === 1)
-    setReminderDaysBefore(
-      c.reminder_days_before != null ? String(c.reminder_days_before) : ''
-    )
-    setCancelByDate(c.cancel_by_date ?? '')
-    const bucketId = getUpcomingBucketId(c.id)
-    setUpcomingBucketId(bucketId)
+    reset(d)
     setImportedFromTx(null)
-    setCreateAnchorDate(null)
-    setMatchDescription(c.match_description ?? '')
     setShowSettlementPicker(false)
     setSettlementSearch('')
-    setChargeType(c.charge_type ?? 'EXPENSE')
-    setLinkedManualAccountId(c.linked_manual_account_id ?? null)
     setMoreOptionsOpen(
       !!(
-        c.category_id ||
-        c.reminder_days_before != null ||
-        c.cancel_by_date ||
-        bucketId != null ||
-        c.charge_type === 'LIABILITY_REPAYMENT'
+        d.categoryId ||
+        d.reminderDaysBefore !== '' ||
+        d.cancelByDate ||
+        d.bucketId != null ||
+        d.chargeType === 'LIABILITY_REPAYMENT'
       )
     )
     setShowModal(true)
   }
 
   function handleSave() {
-    const amountCents = Math.round(parseFloat(amount || '0') * 100)
-    if (!name.trim() || amountCents <= 0 || !nextChargeDate) {
-      toast.error('Please fill in name, amount, and next charge date.')
-      return
-    }
-    const reminder =
-      reminderDaysBefore.trim() === '' ? null : parseInt(reminderDaysBefore, 10)
-    const reminderDays =
-      reminder != null && !Number.isNaN(reminder) ? reminder : null
-    const cancelBy = cancelByDate.trim() ? cancelByDate.slice(0, 10) : null
-    if (cancelBy && cancelBy < nextChargeDate.slice(0, 10)) {
+    const result = save()
+    if (!result.ok) {
+      const { errors } = result
       toast.error(
-        'Cancel by date is before the next charge date — this charge would never appear.'
+        errors.name || errors.amount || errors.nextChargeDate
+          ? 'Please fill in name, amount, and next charge date.'
+          : (errors.cancelByDate ?? 'This Regular can’t be saved.')
       )
       return
     }
-    if (editingCharge) {
-      // `editingCharge` is the row as shown — its date is the projected next
-      // occurrence. Don't write that back over the stored anchor unless the
-      // user changed the date or frequency (#146, docs/adr/0004).
-      const storedDate =
-        regularById(editingCharge.id)?.next_charge_date ?? nextChargeDate
-      updateUpcomingCharge(
-        editingCharge.id,
-        name.trim(),
-        amountCents,
-        frequency,
-        nextChargeDateToStoreOnEdit({
-          storedDate,
-          shownDate: editingCharge.next_charge_date,
-          shownFrequency: editingCharge.frequency,
-          editedDate: nextChargeDate,
-          editedFrequency: frequency,
-        }),
-        categoryId || null,
-        isReserved,
-        reminderDays,
-        cancelBy,
-        chargeType,
-        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchDescription || null
-      )
-      assignUpcomingToBucket(editingCharge.id, upcomingBucketId)
-      toast.success('Regular updated.')
-    } else {
-      const newId = createUpcomingCharge(
-        name.trim(),
-        amountCents,
-        frequency,
-        // From a payment: store its date, unless the user edited this one (#153).
-        nextChargeDateToStoreOnCreate({
-          anchorDate: createAnchorDate,
-          frequency,
-          shownDate: nextChargeDate,
-        }),
-        categoryId || null,
-        isReserved,
-        reminderDays,
-        cancelBy,
-        chargeType,
-        chargeType === 'LIABILITY_REPAYMENT' ? linkedManualAccountId : null,
-        matchDescription || null
-      )
-      assignUpcomingToBucket(newId, upcomingBucketId)
-      toast.success('Regular added.')
-    }
+    toast.success(editingCharge ? 'Regular updated.' : 'Regular added.')
     setShowModal(false)
     setRefresh((r) => r + 1)
     onUpcomingChange?.()
@@ -307,7 +216,7 @@ export function UpcomingSection({
 
   function handleDelete() {
     if (!editingCharge) return
-    deleteUpcomingCharge(editingCharge.id)
+    deleteRegular(editingCharge.id)
     setShowDeleteConfirm(false)
     setShowModal(false)
     setRefresh((r) => r + 1)
@@ -319,7 +228,7 @@ export function UpcomingSection({
   // (the bank transaction in Transactions is the record). "Reschedule" just
   // reopens the edit form so the user can set a new future date.
   function resolveOverdue(c: Regular, paid: boolean) {
-    deleteUpcomingCharge(c.id)
+    deleteRegular(c.id)
     setRefresh((r) => r + 1)
     onUpcomingChange?.()
     toast.success(
@@ -331,14 +240,8 @@ export function UpcomingSection({
   // links the Regular to its payments (docs/adr/0020) — reveal "More options"
   // so the resulting auto-clear link is visible rather than silently applied.
   function applySearchTx(tx: AnchorDebitRow) {
-    const draft = regularDraftFromTransaction(tx, frequency)
-    setName(draft.name)
-    setAmount((draft.amountCents / 100).toFixed(2))
-    setCategoryId(draft.categoryId ?? '')
-    setNextChargeDate(draft.nextChargeDate)
+    applyTransaction(tx)
     setImportedFromTx(tx)
-    setCreateAnchorDate(draft.anchorDate)
-    setMatchDescription(draft.matchDescription)
     setMoreOptionsOpen(true)
     setCreateStep('form')
     setTxSearch('')
@@ -348,20 +251,8 @@ export function UpcomingSection({
   // form (skipping the search step) with the detected values.
   function prefillFromSuggestion(s: RecurringChargeSuggestion) {
     setEditingCharge(null)
-    setName(s.name)
-    setAmount((s.amountCents / 100).toFixed(2))
-    setFrequency(s.frequency)
-    setNextChargeDate(s.nextChargeDate)
-    setCategoryId(s.categoryId ?? '')
-    setIsReserved(true)
-    setReminderDaysBefore('')
-    setCancelByDate('')
-    setUpcomingBucketId(null)
-    setChargeType('EXPENSE')
-    setLinkedManualAccountId(null)
+    reset(draftFromSuggestion(s))
     setImportedFromTx(null)
-    setCreateAnchorDate(s.anchorDate)
-    setMatchDescription(s.matchDescription)
     setShowSettlementPicker(false)
     setSettlementSearch('')
     setMoreOptionsOpen(true)
@@ -840,7 +731,7 @@ export function UpcomingSection({
                     className="p-0 text-muted"
                     onClick={() => {
                       setImportedFromTx(null)
-                      setCreateAnchorDate(null)
+                      detachPayment()
                       setCreateStep('form')
                     }}
                   >
@@ -875,9 +766,8 @@ export function UpcomingSection({
                           className="p-0 text-muted small"
                           onClick={() => {
                             setImportedFromTx(null)
-                            setCreateAnchorDate(null)
-                            setName('')
-                            setAmount('')
+                            detachPayment()
+                            update({ name: '', amount: '' })
                             setCreateStep('search')
                           }}
                         >
@@ -889,9 +779,8 @@ export function UpcomingSection({
                           className="p-0 text-muted"
                           onClick={() => {
                             setImportedFromTx(null)
-                            setCreateAnchorDate(null)
-                            setName('')
-                            setAmount('')
+                            detachPayment()
+                            update({ name: '', amount: '' })
                           }}
                           aria-label="Clear import"
                         >
@@ -920,7 +809,7 @@ export function UpcomingSection({
                   id="upcoming-charge-name"
                   name="name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => update({ name: e.target.value })}
                 />
               </Form.Group>
 
@@ -937,7 +826,7 @@ export function UpcomingSection({
                       step="0.01"
                       min="0"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => update({ amount: e.target.value })}
                     />
                   </Form.Group>
                 </Col>
@@ -950,15 +839,7 @@ export function UpcomingSection({
                       id="upcoming-charge-frequency"
                       name="frequency"
                       value={frequency}
-                      onChange={(e) => {
-                        const f = e.target.value
-                        setFrequency(f)
-                        if (createAnchorDate) {
-                          setNextChargeDate(
-                            nextChargeDateFromAnchor(createAnchorDate, f)
-                          )
-                        }
-                      }}
+                      onChange={(e) => setFrequency(e.target.value)}
                     >
                       {FREQUENCIES.map((f) => (
                         <option key={f} value={f}>
@@ -979,7 +860,7 @@ export function UpcomingSection({
                   name="nextChargeDate"
                   type="date"
                   value={nextChargeDate}
-                  onChange={(e) => setNextChargeDate(e.target.value)}
+                  onChange={(e) => update({ nextChargeDate: e.target.value })}
                 />
               </Form.Group>
 
@@ -990,7 +871,7 @@ export function UpcomingSection({
                   name="isReserved"
                   label="Include in Spendable (reserve this amount)"
                   checked={isReserved}
-                  onChange={(e) => setIsReserved(e.target.checked)}
+                  onChange={(e) => update({ isReserved: e.target.checked })}
                 />
               </Form.Group>
 
@@ -1021,7 +902,9 @@ export function UpcomingSection({
                           id="upcoming-charge-category"
                           name="categoryId"
                           value={categoryId}
-                          onChange={(e) => setCategoryId(e.target.value)}
+                          onChange={(e) =>
+                            update({ categoryId: e.target.value })
+                          }
                         >
                           <option value="">None</option>
                           {categories.map((c) => (
@@ -1046,9 +929,11 @@ export function UpcomingSection({
                                 : ''
                             }
                             onChange={(e) =>
-                              setUpcomingBucketId(
-                                e.target.value ? Number(e.target.value) : null
-                              )
+                              update({
+                                bucketId: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                              })
                             }
                           >
                             <option value="">None (unassigned)</option>
@@ -1077,7 +962,7 @@ export function UpcomingSection({
                           placeholder="e.g. 3"
                           value={reminderDaysBefore}
                           onChange={(e) =>
-                            setReminderDaysBefore(e.target.value)
+                            update({ reminderDaysBefore: e.target.value })
                           }
                         />
                       </Form.Group>
@@ -1091,7 +976,9 @@ export function UpcomingSection({
                           id="upcoming-charge-cancel-by"
                           type="date"
                           value={cancelByDate}
-                          onChange={(e) => setCancelByDate(e.target.value)}
+                          onChange={(e) =>
+                            update({ cancelByDate: e.target.value })
+                          }
                         />
                       </Form.Group>
                     </Col>
@@ -1109,11 +996,14 @@ export function UpcomingSection({
                       size="sm"
                       value={chargeType}
                       onChange={(e) => {
-                        setChargeType(
-                          e.target.value as 'EXPENSE' | 'LIABILITY_REPAYMENT'
+                        const type = e.target.value as
+                          | 'EXPENSE'
+                          | 'LIABILITY_REPAYMENT'
+                        update(
+                          type === 'LIABILITY_REPAYMENT'
+                            ? { chargeType: type }
+                            : { chargeType: type, linkedManualAccountId: null }
                         )
-                        if (e.target.value !== 'LIABILITY_REPAYMENT')
-                          setLinkedManualAccountId(null)
                       }}
                     >
                       <option value="EXPENSE">
@@ -1143,9 +1033,11 @@ export function UpcomingSection({
                               : ''
                           }
                           onChange={(e) =>
-                            setLinkedManualAccountId(
-                              e.target.value ? Number(e.target.value) : null
-                            )
+                            update({
+                              linkedManualAccountId: e.target.value
+                                ? Number(e.target.value)
+                                : null,
+                            })
                           }
                         >
                           <option value="">None</option>
@@ -1194,7 +1086,7 @@ export function UpcomingSection({
                           size="sm"
                           className="p-0 text-muted flex-shrink-0"
                           onClick={() => {
-                            setMatchDescription('')
+                            update({ matchDescription: '' })
                             setShowSettlementPicker(false)
                           }}
                           aria-label="Remove the linked transaction"
@@ -1261,13 +1153,17 @@ export function UpcomingSection({
                                       fontSize: '0.8rem',
                                     }}
                                     onClick={() => {
-                                      setMatchDescription(tx.description)
+                                      update({
+                                        matchDescription: tx.description,
+                                      })
                                       setShowSettlementPicker(false)
                                       setSettlementSearch('')
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        setMatchDescription(tx.description)
+                                        update({
+                                          matchDescription: tx.description,
+                                        })
                                         setShowSettlementPicker(false)
                                         setSettlementSearch('')
                                       }

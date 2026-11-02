@@ -1,20 +1,8 @@
-import {
-  describe,
-  expect,
-  it,
-  vi,
-  beforeAll,
-  beforeEach,
-  afterEach,
-} from 'vitest'
+import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
-import {
-  __test__,
-  nextChargeDateFromAnchor,
-  regularDraftFromTransaction,
-  nextChargeDateToStoreOnCreate,
-  type Regular,
-} from './index'
+import { __test__, nextChargeDateFromAnchor, type Regular } from './index'
+
+const { nextChargeDateToStoreOnCreate, nextChargeDateToStoreOnEdit } = __test__
 
 let SQL: SqlJsStatic
 let db: Database
@@ -29,14 +17,8 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const {
-  regularById,
-  linkedLiabilityRepayments,
-  regularsByPayday,
-  createUpcomingCharge,
-  updateUpcomingCharge,
-  nextChargeDateToStoreOnEdit,
-} = await import('./index')
+const { regularById, linkedLiabilityRepayments, regularsByPayday } =
+  await import('./index')
 const { localDateString } = await import('@/lib/format')
 
 function makeRow(overrides: Partial<Regular> = {}): Regular {
@@ -355,41 +337,6 @@ describe('regularById / linkedLiabilityRepayments', () => {
   })
 })
 
-describe('createUpcomingCharge / updateUpcomingCharge store the payment link (docs/adr/0020)', () => {
-  beforeAll(async () => {
-    SQL = await initSqlJs()
-  })
-
-  beforeEach(async () => {
-    const { runSchema } = await import('@/db/schema')
-    db = new SQL.Database()
-    runSchema(db)
-  })
-
-  function legacyRawText(id: number): unknown {
-    return db.exec(`SELECT match_raw_text FROM upcoming_charges WHERE id = ?`, [
-      id,
-    ])[0].values[0][0]
-  }
-
-  it('stores the linked description and never writes the legacy raw_text (#116)', () => {
-    // prettier-ignore
-    const id = createUpcomingCharge('Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, 'Oura')
-    expect(regularById(id)?.match_description).toBe('Oura')
-    expect(legacyRawText(id)).toBeNull()
-
-    // A legacy value from before v47 is left as it was, not rewritten.
-    db.run(
-      `UPDATE upcoming_charges SET match_raw_text = 'OURARING, OULU' WHERE id = ?`,
-      [id]
-    )
-    // prettier-ignore
-    updateUpcomingCharge(id, 'Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, null)
-    expect(regularById(id)?.match_description).toBeNull()
-    expect(legacyRawText(id)).toBe('OURARING, OULU')
-  })
-})
-
 describe('regularsByPayday — overdue ONCE charges (#18)', () => {
   beforeAll(async () => {
     SQL = await initSqlJs()
@@ -557,111 +504,6 @@ describe('editing a Regular keeps its stored date (#146)', () => {
       })
     ).toBe('2026-01-31')
   })
-
-  describe("through the editor's save sequence", () => {
-    beforeAll(async () => {
-      SQL = await initSqlJs()
-    })
-
-    beforeEach(async () => {
-      const { runSchema } = await import('@/db/schema')
-      db = new SQL.Database()
-      runSchema(db)
-      for (const k of Object.keys(appSettings)) delete appSettings[k]
-      vi.useFakeTimers({ toFake: ['Date'] })
-      vi.setSystemTime(new Date(2026, 2, 20, 12, 0, 0)) // 20 Mar 2026, local
-    })
-
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    /** What UpcomingSection's handleSave does for an edit, minus the React. */
-    function saveEdit(
-      shownRow: Regular,
-      form: { name: string; date: string; frequency: string }
-    ) {
-      const storedDate = regularById(shownRow.id)?.next_charge_date ?? form.date
-      // prettier-ignore
-      updateUpcomingCharge(shownRow.id, form.name, shownRow.amount, form.frequency,
-        nextChargeDateToStoreOnEdit({
-          storedDate,
-          shownDate: shownRow.next_charge_date,
-          shownFrequency: shownRow.frequency,
-          editedDate: form.date,
-          editedFrequency: form.frequency,
-        }),
-        null, true, null, null, 'EXPENSE', null, null)
-    }
-
-    it('renaming a projected Regular leaves its stored date alone', () => {
-      // prettier-ignore
-      const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
-      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
-      expect(row.next_charge_date).not.toBe('2025-12-31') // shown = projected
-
-      saveEdit(row, {
-        name: 'Rent (flat)',
-        date: row.next_charge_date,
-        frequency: row.frequency,
-      })
-
-      const stored = regularById(id)
-      expect(stored?.name).toBe('Rent (flat)')
-      expect(stored?.next_charge_date).toBe('2025-12-31')
-    })
-
-    it('changing the date in the form re-anchors the Regular', () => {
-      // prettier-ignore
-      const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
-      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
-
-      saveEdit(row, {
-        name: row.name,
-        date: '2026-04-05',
-        frequency: row.frequency,
-      })
-
-      expect(regularById(id)?.next_charge_date).toBe('2026-04-05')
-    })
-  })
-})
-
-describe('regularDraftFromTransaction: one Regular per picked transaction (#147)', () => {
-  const tx = {
-    description: 'Netflix',
-    amount: 2299,
-    date: '2026-01-15',
-    category_id: 'tv-and-music',
-  }
-
-  it('carries name, amount, category and the payment link from the transaction', () => {
-    expect(regularDraftFromTransaction(tx, 'MONTHLY', '2026-03-20')).toEqual({
-      name: 'Netflix',
-      amountCents: 2299,
-      categoryId: 'tv-and-music',
-      matchDescription: 'Netflix',
-      nextChargeDate: '2026-04-15',
-      anchorDate: '2026-01-15',
-    })
-  })
-
-  it('projects the date for the chosen frequency', () => {
-    expect(
-      regularDraftFromTransaction(tx, 'FORTNIGHTLY', '2026-02-01')
-        .nextChargeDate
-    ).toBe('2026-02-12')
-  })
-
-  it('a transaction with no category gives a Regular with no category', () => {
-    expect(
-      regularDraftFromTransaction(
-        { ...tx, category_id: null },
-        'MONTHLY',
-        '2026-03-20'
-      ).categoryId
-    ).toBeNull()
-  })
 })
 
 describe('creating a Regular from a payment stores the payment date (#153)', () => {
@@ -706,48 +548,5 @@ describe('creating a Regular from a payment stores the payment date (#153)', () 
         today: '2026-04-15',
       })
     ).toBe('2026-04-30')
-  })
-
-  describe('through create + projection', () => {
-    beforeAll(async () => {
-      SQL = await initSqlJs()
-    })
-
-    beforeEach(async () => {
-      const { runSchema } = await import('@/db/schema')
-      db = new SQL.Database()
-      runSchema(db)
-      for (const k of Object.keys(appSettings)) delete appSettings[k]
-      vi.useFakeTimers({ toFake: ['Date'] })
-      vi.setSystemTime(new Date(2026, 3, 15, 12, 0, 0)) // 15 Apr 2026, local
-    })
-
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    it('a monthly Regular made in April from a Jan 31 payment falls on the 31st in May', () => {
-      const tx = {
-        description: 'Rent',
-        amount: 200000,
-        date: '2026-01-31',
-        category_id: null,
-      }
-      const draft = regularDraftFromTransaction(tx, 'MONTHLY')
-      expect(draft.nextChargeDate).toBe('2026-04-30') // what the form shows
-      // prettier-ignore
-      const id = createUpcomingCharge(draft.name, draft.amountCents, 'MONTHLY',
-        nextChargeDateToStoreOnCreate({
-          anchorDate: draft.anchorDate,
-          frequency: 'MONTHLY',
-          shownDate: draft.nextChargeDate,
-        }),
-        null, true, null, null, 'EXPENSE', null, draft.matchDescription)
-
-      expect(regularById(id)?.next_charge_date).toBe('2026-01-31')
-      vi.setSystemTime(new Date(2026, 4, 3, 12, 0, 0)) // 3 May
-      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
-      expect(row.next_charge_date).toBe('2026-05-31')
-    })
   })
 })
