@@ -19,6 +19,8 @@ import {
   deleteUpcomingCharge,
   daysUntilCharge,
   regularDraftFromTransaction,
+  nextChargeDateFromAnchor,
+  nextChargeDateToStoreOnCreate,
   type UpcomingChargeRow,
 } from '@/services/upcoming'
 import { getReservedAmount } from '@/services/balance'
@@ -103,6 +105,9 @@ export function UpcomingSection({
   const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
     null
   )
+  // The payment a new Regular was created from (picked transaction or
+  // suggestion): its date is the anchor stored on save (#153).
+  const [createAnchorDate, setCreateAnchorDate] = useState<string | null>(null)
   const [matchDescription, setMatchDescription] = useState<string>('')
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
   const [settlementSearch, setSettlementSearch] = useState('')
@@ -188,6 +193,7 @@ export function UpcomingSection({
     setTxSearch('')
     setMoreOptionsOpen(false)
     setImportedFromTx(null)
+    setCreateAnchorDate(null)
     setMatchDescription('')
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -211,6 +217,7 @@ export function UpcomingSection({
     const bucketId = getUpcomingBucketId(c.id)
     setUpcomingBucketId(bucketId)
     setImportedFromTx(null)
+    setCreateAnchorDate(null)
     setMatchDescription(c.match_description ?? '')
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -279,7 +286,12 @@ export function UpcomingSection({
         name.trim(),
         amountCents,
         frequency,
-        nextChargeDate,
+        // From a payment: store its date, unless the user edited this one (#153).
+        nextChargeDateToStoreOnCreate({
+          anchorDate: createAnchorDate,
+          frequency,
+          shownDate: nextChargeDate,
+        }),
         categoryId || null,
         isReserved,
         reminderDays,
@@ -328,6 +340,7 @@ export function UpcomingSection({
     setCategoryId(draft.categoryId ?? '')
     setNextChargeDate(draft.nextChargeDate)
     setImportedFromTx(tx)
+    setCreateAnchorDate(draft.anchorDate)
     setMatchDescription(draft.matchDescription)
     setMoreOptionsOpen(true)
     setCreateStep('form')
@@ -350,6 +363,7 @@ export function UpcomingSection({
     setChargeType('EXPENSE')
     setLinkedManualAccountId(null)
     setImportedFromTx(null)
+    setCreateAnchorDate(s.anchorDate)
     setMatchDescription(s.matchDescription)
     setShowSettlementPicker(false)
     setSettlementSearch('')
@@ -829,6 +843,7 @@ export function UpcomingSection({
                     className="p-0 text-muted"
                     onClick={() => {
                       setImportedFromTx(null)
+                      setCreateAnchorDate(null)
                       setCreateStep('form')
                     }}
                   >
@@ -863,6 +878,7 @@ export function UpcomingSection({
                           className="p-0 text-muted small"
                           onClick={() => {
                             setImportedFromTx(null)
+                            setCreateAnchorDate(null)
                             setName('')
                             setAmount('')
                             setCreateStep('search')
@@ -876,6 +892,7 @@ export function UpcomingSection({
                           className="p-0 text-muted"
                           onClick={() => {
                             setImportedFromTx(null)
+                            setCreateAnchorDate(null)
                             setName('')
                             setAmount('')
                           }}
@@ -939,10 +956,9 @@ export function UpcomingSection({
                       onChange={(e) => {
                         const f = e.target.value
                         setFrequency(f)
-                        if (importedFromTx) {
+                        if (createAnchorDate) {
                           setNextChargeDate(
-                            regularDraftFromTransaction(importedFromTx, f)
-                              .nextChargeDate
+                            nextChargeDateFromAnchor(createAnchorDate, f)
                           )
                         }
                       }}

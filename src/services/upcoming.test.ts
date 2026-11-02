@@ -12,6 +12,7 @@ import {
   __test__,
   nextChargeDateFromAnchor,
   regularDraftFromTransaction,
+  nextChargeDateToStoreOnCreate,
   type UpcomingChargeRow,
 } from './upcoming'
 
@@ -648,6 +649,7 @@ describe('regularDraftFromTransaction: one Regular per picked transaction (#147)
       categoryId: 'tv-and-music',
       matchDescription: 'Netflix',
       nextChargeDate: '2026-04-15',
+      anchorDate: '2026-01-15',
     })
   })
 
@@ -666,5 +668,95 @@ describe('regularDraftFromTransaction: one Regular per picked transaction (#147)
         '2026-03-20'
       ).categoryId
     ).toBeNull()
+  })
+})
+
+describe('creating a Regular from a payment stores the payment date (#153)', () => {
+  const create = { anchorDate: '2026-01-31', today: '2026-04-15' }
+
+  it('stores the payment date when the shown date is the one derived from it', () => {
+    expect(
+      nextChargeDateToStoreOnCreate({
+        ...create,
+        frequency: 'MONTHLY',
+        shownDate: '2026-04-30',
+      })
+    ).toBe('2026-01-31')
+  })
+
+  it("stores the user's date when they edited the date field", () => {
+    expect(
+      nextChargeDateToStoreOnCreate({
+        ...create,
+        frequency: 'MONTHLY',
+        shownDate: '2026-05-02',
+      })
+    ).toBe('2026-05-02')
+  })
+
+  it('stores the shown date for ONCE, so a past payment never shows as Overdue', () => {
+    expect(
+      nextChargeDateToStoreOnCreate({
+        ...create,
+        frequency: 'ONCE',
+        shownDate: '2026-04-15',
+      })
+    ).toBe('2026-04-15')
+  })
+
+  it('stores the shown date when there is no payment to anchor to', () => {
+    expect(
+      nextChargeDateToStoreOnCreate({
+        anchorDate: null,
+        frequency: 'MONTHLY',
+        shownDate: '2026-04-30',
+        today: '2026-04-15',
+      })
+    ).toBe('2026-04-30')
+  })
+
+  describe('through create + projection', () => {
+    beforeAll(async () => {
+      SQL = await initSqlJs()
+    })
+
+    beforeEach(async () => {
+      const { runSchema } = await import('@/db/schema')
+      db = new SQL.Database()
+      runSchema(db)
+      for (const k of Object.keys(appSettings)) delete appSettings[k]
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 3, 15, 12, 0, 0)) // 15 Apr 2026, local
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('a monthly Regular made in April from a Jan 31 payment falls on the 31st in May', () => {
+      const tx = {
+        description: 'Rent',
+        amount: 200000,
+        date: '2026-01-31',
+        category_id: null,
+      }
+      const draft = regularDraftFromTransaction(tx, 'MONTHLY')
+      expect(draft.nextChargeDate).toBe('2026-04-30') // what the form shows
+      // prettier-ignore
+      const id = createUpcomingCharge(draft.name, draft.amountCents, 'MONTHLY',
+        nextChargeDateToStoreOnCreate({
+          anchorDate: draft.anchorDate,
+          frequency: 'MONTHLY',
+          shownDate: draft.nextChargeDate,
+        }),
+        null, true, null, null, 'EXPENSE', null, draft.matchDescription)
+
+      expect(getUpcomingChargeById(id)?.next_charge_date).toBe('2026-01-31')
+      vi.setSystemTime(new Date(2026, 4, 3, 12, 0, 0)) // 3 May
+      const [row] = getUpcomingChargesGrouped().later.concat(
+        getUpcomingChargesGrouped().nextPay
+      )
+      expect(row.next_charge_date).toBe('2026-05-31')
+    })
   })
 })

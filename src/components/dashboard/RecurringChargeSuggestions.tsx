@@ -7,7 +7,10 @@ import {
   getDismissedSuggestionKeys,
   type RecurringChargeSuggestion,
 } from '@/services/recurringChargeDetection'
-import { createUpcomingCharge } from '@/services/upcoming'
+import {
+  createUpcomingCharge,
+  nextChargeDateToStoreOnCreate,
+} from '@/services/upcoming'
 import { getCategories } from '@/services/categories'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
@@ -57,7 +60,12 @@ export function RecurringChargeSuggestions({
       s.name,
       s.amountCents,
       s.frequency,
-      s.nextChargeDate,
+      // Store the latest payment's date as the anchor (#153).
+      nextChargeDateToStoreOnCreate({
+        anchorDate: s.anchorDate,
+        frequency: s.frequency,
+        shownDate: s.nextChargeDate,
+      }),
       s.categoryId,
       true, // is_reserved — a detected bill counts toward Spendable by default
       null,

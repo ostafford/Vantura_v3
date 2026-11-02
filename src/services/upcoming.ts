@@ -130,7 +130,10 @@ export interface RegularDraftFromTransaction {
   categoryId: string | null
   /** Links the Regular to its payments (docs/adr/0020). */
   matchDescription: string
+  /** Next occurrence after today — what the create form shows. */
   nextChargeDate: string
+  /** The payment's own date: the anchor to store (#153). */
+  anchorDate: string
 }
 
 /**
@@ -156,7 +159,35 @@ export function regularDraftFromTransaction(
     categoryId: tx.category_id ?? null,
     matchDescription: tx.description,
     nextChargeDate: nextChargeDateFromAnchor(tx.date, frequency, today),
+    anchorDate: tx.date.slice(0, 10),
   }
+}
+
+/**
+ * The `next_charge_date` to store when creating a Regular from a past payment
+ * (#153). The form shows the next occurrence after today; storing that would
+ * lose a month-end day (a Jan 31 payment shown as Apr 30 would then fall on
+ * the 30th every month). So store the payment's own date as the anchor —
+ * unless the user edited the date field (it no longer matches the date derived
+ * from the payment), in which case their date is the anchor, the same rule as
+ * editing (#146). `ONCE` stores the shown date: a past one-off would otherwise
+ * show as Overdue. No payment (`anchorDate` null) stores the shown date.
+ */
+export function nextChargeDateToStoreOnCreate(create: {
+  anchorDate: string | null
+  frequency: string
+  shownDate: string
+  today?: string
+}): string {
+  if (!create.anchorDate || create.frequency === 'ONCE') return create.shownDate
+  const derived = nextChargeDateFromAnchor(
+    create.anchorDate,
+    create.frequency,
+    create.today ?? localDateString()
+  )
+  return create.shownDate.slice(0, 10) === derived
+    ? create.anchorDate.slice(0, 10)
+    : create.shownDate
 }
 
 export function firstOccurrenceOnOrAfter(
