@@ -16,6 +16,7 @@ import {
   replaceSaverGoals,
   importPayloadWithOptions,
   IMPORT_ERROR_INVALID_FILE,
+  IMPORT_ERROR_INVALID_TRACKER_RESET,
   IMPORT_ERROR_WRONG_PASSPHRASE,
   type ExportPayload,
   type ImportOptions,
@@ -902,6 +903,86 @@ describe('profile import writers: real-DB coverage (#36)', () => {
   // ── importPayloadWithOptions ──────────────────────────────────────────
 
   describe('importPayloadWithOptions', () => {
+    it('refuses a file with a MONTHLY tracker reset_day past 28 and writes nothing (#150)', () => {
+      realDb.run(
+        `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
+         VALUES ('Keep me', 9999, 'MONTHLY', 5, '2026-01-01', '2026-02-05', '2026-03-05', 1, '2026-01-01')`
+      )
+
+      expect(() =>
+        importPayloadWithOptions(
+          emptyPayload({
+            budgetBuckets: [
+              { id: 7, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
+            ],
+            trackers: [
+              trackerExport({ reset_frequency: 'MONTHLY', reset_day: 31 }),
+            ],
+          }),
+          ALL_ON
+        )
+      ).toThrow(IMPORT_ERROR_INVALID_TRACKER_RESET)
+
+      // The whole import rolled back: local tracker kept, bucket not added.
+      expect(readTrackers().map((t) => t.name)).toEqual(['Keep me'])
+      expect(
+        realDb.exec(`SELECT COUNT(*) FROM budget_buckets`)[0].values[0][0]
+      ).toBe(0)
+    })
+
+    it('refuses a tracker with an unknown reset_frequency (#150)', () => {
+      expect(() =>
+        importPayloadWithOptions(
+          emptyPayload({
+            trackers: [
+              trackerExport({ reset_frequency: 'YEARLY', reset_day: 1 }),
+            ],
+          }),
+          ALL_ON
+        )
+      ).toThrow(IMPORT_ERROR_INVALID_TRACKER_RESET)
+      expect(readTrackers()).toEqual([])
+    })
+
+    it('accepts every reset_day the app itself writes (#150)', () => {
+      importPayloadWithOptions(
+        emptyPayload({
+          trackers: [
+            trackerExport({
+              id: 1,
+              name: 'W',
+              reset_frequency: 'WEEKLY',
+              reset_day: 7,
+            }),
+            trackerExport({
+              id: 2,
+              name: 'M',
+              reset_frequency: 'MONTHLY',
+              reset_day: 28,
+            }),
+            trackerExport({
+              id: 3,
+              name: 'P',
+              reset_frequency: 'PAYDAY',
+              reset_day: null,
+            }),
+            trackerExport({
+              id: 4,
+              name: 'P1',
+              reset_frequency: 'PAYDAY',
+              reset_day: 1,
+            }),
+          ],
+        }),
+        ALL_ON
+      )
+      expect(
+        readTrackers()
+          .map((t) => t.name)
+          .sort()
+      ).toEqual(['M', 'P', 'P1', 'W'])
+    })
+
     it('applies the budget plan before trackers so payload bucket_ids remap onto the freshly-inserted local buckets', () => {
       const payload = emptyPayload({
         budgetBuckets: [

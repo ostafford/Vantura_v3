@@ -13,6 +13,10 @@ const {
   getPeriodBoundsForOffset,
   calculatePaydayBudgetTotal,
   getTrackersDisplayPeriodData,
+  isValidTrackerResetDay,
+  resetDayForFrequency,
+  createTracker,
+  updateTracker,
 } = await import('./trackers')
 const { toPeriodCents } = await import('@/lib/monthlyEquivalent')
 const { formatShortDate } = await import('@/lib/format')
@@ -394,5 +398,60 @@ describe('getTrackersDisplayPeriodData', () => {
     expect(Object.keys(out).sort()).toEqual(['7', '9'])
     expect(out[7].isNativePeriod).toBe(false)
     expect(out[9].isNativePeriod).toBe(true)
+  })
+})
+
+describe('tracker reset_day validation (#150)', () => {
+  it.each([
+    ['WEEKLY', 1],
+    ['WEEKLY', 7],
+    ['FORTNIGHTLY', 4],
+    ['MONTHLY', 1],
+    ['MONTHLY', 28],
+    ['PAYDAY', null],
+    ['PAYDAY', 1],
+    ['PAYDAY', 28],
+  ])('%s with reset_day %s is valid', (frequency, day) => {
+    expect(isValidTrackerResetDay(frequency, day)).toBe(true)
+  })
+
+  it.each([
+    ['WEEKLY', 0],
+    ['WEEKLY', 8],
+    ['FORTNIGHTLY', null],
+    ['MONTHLY', 29],
+    ['MONTHLY', 31],
+    ['MONTHLY', 0],
+    ['MONTHLY', 1.5],
+    ['MONTHLY', null],
+    ['PAYDAY', 29],
+    ['YEARLY', 1],
+  ])('%s with reset_day %s is invalid', (frequency, day) => {
+    expect(isValidTrackerResetDay(frequency, day)).toBe(false)
+  })
+
+  it('createTracker refuses a MONTHLY reset_day past 28', () => {
+    expect(() => createTracker('Food', 30000, 'MONTHLY', 31, [])).toThrow(
+      'INVALID_RESET_DAY'
+    )
+  })
+
+  it('updateTracker refuses a WEEKLY reset_day outside 1–7', () => {
+    expect(() => updateTracker(1, 'Food', 30000, 'WEEKLY', 8, [])).toThrow(
+      'INVALID_RESET_DAY'
+    )
+  })
+})
+
+describe('resetDayForFrequency: the form holds what the dropdown shows (#150)', () => {
+  it('keeps a day that is valid for the new frequency', () => {
+    expect(resetDayForFrequency('WEEKLY', 5)).toBe(5)
+    expect(resetDayForFrequency('MONTHLY', 5)).toBe(5)
+  })
+
+  it('falls back to 1 when the day is not an option for the new frequency', () => {
+    expect(resetDayForFrequency('WEEKLY', 15)).toBe(1) // Monthly 15 → Weekly
+    expect(resetDayForFrequency('MONTHLY', 31)).toBe(1)
+    expect(resetDayForFrequency('WEEKLY', null)).toBe(1)
   })
 })

@@ -1130,6 +1130,57 @@ function maintainConfigHistoryOnEdit(args: {
  * Create tracker and set start_date, last_reset_date, next_reset_date.
  * For PAYDAY use app_settings next_payday; for others use period start (e.g. last Monday) so the tracker shows the full frequency window.
  */
+/**
+ * Whether `resetDay` is valid for `resetFrequency` (#150): WEEKLY / FORTNIGHTLY
+ * take an ISO weekday 1–7, MONTHLY a day of month 1–28 (the period maths is
+ * only correct up to 28). PAYDAY ignores the value, so it may be null or any
+ * day the form can write (1–28). An unknown frequency is never valid.
+ */
+export function isValidTrackerResetDay(
+  resetFrequency: string,
+  resetDay: number | null
+): boolean {
+  const inRange = (max: number) =>
+    resetDay != null &&
+    Number.isInteger(resetDay) &&
+    resetDay >= 1 &&
+    resetDay <= max
+  switch (resetFrequency) {
+    case 'WEEKLY':
+    case 'FORTNIGHTLY':
+      return inRange(7)
+    case 'MONTHLY':
+      return inRange(28)
+    case 'PAYDAY':
+      return resetDay == null || inRange(28)
+    default:
+      return false
+  }
+}
+
+/**
+ * The reset day a form should hold for `resetFrequency` (#150): `resetDay` when
+ * it's valid for that frequency, otherwise 1 — the first option, which is what
+ * the reset-day dropdown displays when its value isn't one of its options.
+ */
+export function resetDayForFrequency(
+  resetFrequency: string,
+  resetDay: number | null
+): number {
+  return resetDay != null && isValidTrackerResetDay(resetFrequency, resetDay)
+    ? resetDay
+    : 1
+}
+
+function assertValidResetDay(
+  resetFrequency: string,
+  resetDay: number | null
+): void {
+  if (!isValidTrackerResetDay(resetFrequency, resetDay)) {
+    throw new Error('INVALID_RESET_DAY')
+  }
+}
+
 export function createTracker(
   name: string,
   budgetAmountCents: number,
@@ -1137,6 +1188,7 @@ export function createTracker(
   resetDay: number,
   categoryIds: string[]
 ): number {
+  assertValidResetDay(resetFrequency, resetDay)
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   assertCategoriesAvailable(categoryIds)
@@ -1195,6 +1247,7 @@ export function updateTracker(
   resetDay: number,
   categoryIds: string[]
 ): void {
+  assertValidResetDay(resetFrequency, resetDay)
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   assertCategoriesAvailable(categoryIds, id)
