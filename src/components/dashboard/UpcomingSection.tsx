@@ -11,10 +11,10 @@ import {
   Tooltip,
 } from 'react-bootstrap'
 import {
-  getUpcomingChargesGrouped,
+  regularsByPayday,
   createUpcomingCharge,
   updateUpcomingCharge,
-  getUpcomingChargeById,
+  regularById,
   nextChargeDateToStoreOnEdit,
   deleteUpcomingCharge,
   daysUntilCharge,
@@ -111,7 +111,7 @@ export function UpcomingSection({
   const [settlementSearch, setSettlementSearch] = useState('')
 
   const { overdue, nextPay, later, nextPayday } = useMemo(
-    () => getUpcomingChargesGrouped(),
+    () => regularsByPayday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt]
   )
@@ -255,8 +255,7 @@ export function UpcomingSection({
       // occurrence. Don't write that back over the stored anchor unless the
       // user changed the date or frequency (#146, docs/adr/0004).
       const storedDate =
-        getUpcomingChargeById(editingCharge.id)?.next_charge_date ??
-        nextChargeDate
+        regularById(editingCharge.id)?.next_charge_date ?? nextChargeDate
       updateUpcomingCharge(
         editingCharge.id,
         name.trim(),

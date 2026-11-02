@@ -38,11 +38,11 @@ const { getReservedAmount } = await import('./balance')
 const { getEssentialsCoverage } = await import('./essentialsCoverage')
 const { getProjectedNetWorth } = await import('./netWorth')
 const {
-  getUpcomingChargesGrouped,
-  getUpcomingChargesForMonth,
-  getDueSoonCharges,
-  getLinkedLiabilityRepaymentCharges,
-  getUpcomingChargeById,
+  regularsByPayday,
+  regularOccurrencesInMonth,
+  dueSoonRegulars,
+  linkedLiabilityRepayments,
+  regularById,
   reservedBeforePayday,
 } = await import('./regulars')
 
@@ -382,7 +382,7 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('Overdue / Next pay / Later grouping', () => {
-    const g = getUpcomingChargesGrouped()
+    const g = regularsByPayday()
     expect({
       overdue: brief(g.overdue),
       nextPay: brief(g.nextPay),
@@ -415,7 +415,7 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('grouping returns full rows (projected date, all fields)', () => {
-    expect(getUpcomingChargesGrouped().nextPay).toMatchInlineSnapshot(`
+    expect(regularsByPayday().nextPay).toMatchInlineSnapshot(`
       [
         {
           "amount": 1500,
@@ -535,7 +535,7 @@ describe('Regulars readers — characterisation (#159)', () => {
 
   it('grouping with no payday configured', () => {
     delete appSettings['next_payday']
-    const g = getUpcomingChargesGrouped()
+    const g = regularsByPayday()
     expect({
       overdue: brief(g.overdue),
       nextPay: brief(g.nextPay),
@@ -566,10 +566,10 @@ describe('Regulars readers — characterisation (#159)', () => {
 
   it('calendar month view — February, March, April, May 2025', () => {
     expect({
-      feb: brief(getUpcomingChargesForMonth(2025, 2)),
-      mar: brief(getUpcomingChargesForMonth(2025, 3)),
-      apr: brief(getUpcomingChargesForMonth(2025, 4)),
-      may: brief(getUpcomingChargesForMonth(2025, 5)),
+      feb: brief(regularOccurrencesInMonth(2025, 2)),
+      mar: brief(regularOccurrencesInMonth(2025, 3)),
+      apr: brief(regularOccurrencesInMonth(2025, 4)),
+      may: brief(regularOccurrencesInMonth(2025, 5)),
     }).toMatchInlineSnapshot(`
       {
         "apr": [
@@ -642,7 +642,7 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('due-soon Regulars', () => {
-    expect(getDueSoonCharges()).toMatchInlineSnapshot(`
+    expect(dueSoonRegulars()).toMatchInlineSnapshot(`
       [
         {
           "amount": 1299,
@@ -719,7 +719,7 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('linked liability repayments (#19 set, stored rows)', () => {
-    expect(getLinkedLiabilityRepaymentCharges()).toMatchInlineSnapshot(`
+    expect(linkedLiabilityRepayments()).toMatchInlineSnapshot(`
       [
         {
           "amount": 45000,
@@ -740,10 +740,8 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('by id returns the stored, unprojected date', () => {
-    const phone = getUpcomingChargesGrouped().nextPay.find(
-      (r) => r.name === 'Phone'
-    )!
-    expect(getUpcomingChargeById(phone.id)).toMatchInlineSnapshot(`
+    const phone = regularsByPayday().nextPay.find((r) => r.name === 'Phone')!
+    expect(regularById(phone.id)).toMatchInlineSnapshot(`
       {
         "amount": 4500,
         "cancel_by_date": null,
@@ -759,6 +757,6 @@ describe('Regulars readers — characterisation (#159)', () => {
         "reminder_days_before": 10,
       }
     `)
-    expect(getUpcomingChargeById(9999)).toMatchInlineSnapshot(`null`)
+    expect(regularById(9999)).toMatchInlineSnapshot(`null`)
   })
 })

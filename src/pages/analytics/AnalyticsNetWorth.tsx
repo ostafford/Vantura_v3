@@ -27,7 +27,7 @@ import {
   type ManualAccountType,
   type ManualAccountInput,
 } from '@/services/manualAccounts'
-import { getUpcomingChargeById } from '@/services/regulars'
+import { regularById } from '@/services/regulars'
 import { NetWorthTrendChart } from '@/components/charts/NetWorthTrendChart'
 import { HelpPopover } from '@/components/HelpPopover'
 import { toast } from '@/stores/toastStore'
@@ -724,7 +724,7 @@ export function AnalyticsNetWorth() {
 
     const chargeId = Number(repayRaw)
     if (!Number.isInteger(chargeId)) return
-    const charge = getUpcomingChargeById(chargeId)
+    const charge = regularById(chargeId)
     if (!charge || charge.linked_manual_account_id == null) return
     const account = manualAccounts.find(
       (a) => a.id === charge.linked_manual_account_id

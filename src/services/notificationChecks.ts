@@ -21,10 +21,10 @@ import {
 } from '@/lib/notifications'
 import { getSpendableBalance, getSpendableAlert } from '@/services/balance'
 import {
-  getDueSoonCharges,
+  dueSoonRegulars,
   daysUntilCharge,
   firstOccurrenceOnOrAfter,
-  getLinkedLiabilityRepaymentCharges,
+  linkedLiabilityRepayments,
   type Regular,
 } from '@/services/regulars'
 import { getTrackersWithProgress } from '@/services/trackers'
@@ -72,10 +72,10 @@ function checkBillsSettled(): void {
   const db = getDb()
   if (!db) return
 
-  // getDueSoonCharges() already applies firstOccurrenceOnOrAfter, so
+  // dueSoonRegulars() already applies firstOccurrenceOnOrAfter, so
   // next_charge_date on each item is the real upcoming occurrence date —
   // not the potentially stale stored value in the DB.
-  const dueSoon = getDueSoonCharges().filter(
+  const dueSoon = dueSoonRegulars().filter(
     (c) => c.match_description != null && c.match_description !== ''
   )
 
@@ -129,7 +129,7 @@ function checkLiabilityRepayments(): void {
   const db = getDb()
   if (!db) return
 
-  const charges = getLinkedLiabilityRepaymentCharges()
+  const charges = linkedLiabilityRepayments()
   if (charges.length === 0) return
 
   const today = localDateString()
@@ -190,7 +190,7 @@ function checkBillsDue(): void {
   if (!getNotifTypeEnabled('bills')) return
   if (hasCheckedToday('notif_last_bills_date')) return
 
-  const charges = getDueSoonCharges()
+  const charges = dueSoonRegulars()
   if (charges.length === 0) return
 
   markCheckedToday('notif_last_bills_date')

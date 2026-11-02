@@ -42,7 +42,7 @@ import {
   type DashboardSectionId,
   type DashboardSectionSize,
 } from '@/lib/dashboardSections'
-import { daysUntilCharge, getDueSoonCharges } from '@/services/regulars'
+import { daysUntilCharge, dueSoonRegulars } from '@/services/regulars'
 import {
   runNotificationChecks,
   ensureBillsDueNotifications,
@@ -289,7 +289,7 @@ export function Dashboard() {
   const headerDate = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
 
   const dueSoon = useMemo(
-    () => getDueSoonCharges(),
+    () => dueSoonRegulars(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, dataVersion]
   )
@@ -445,7 +445,7 @@ export function Dashboard() {
 
   useEffect(() => {
     runNotificationChecks()
-    ensureBillsDueNotifications(getDueSoonCharges())
+    ensureBillsDueNotifications(dueSoonRegulars())
     notificationStore.getState().refreshUnreadCount()
   }, [])
 

@@ -1,5 +1,16 @@
 /**
- * Upcoming charges: CRUD, group by Next pay / Later (Option A: edit/delete only, no auto-advance).
+ * The Regulars module (GLOSSARY: **Regular**; docs/adr/0021). Import from
+ * `@/services/regulars` only — never its internal files, and never SELECT
+ * `upcoming_charges` elsewhere.
+ *
+ * Reads are projected here (docs/adr/0004): `regularsByPayday`,
+ * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
+ * (+ `totalReserved`), `regularsWithFundingSource`. Two return stored rows by
+ * design: `regularById` (the editor's anchor) and `linkedLiabilityRepayments`
+ * (payment matching, #19).
+ *
+ * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
+ * `funding.ts`.
  */
 
 import { getDb, getAppSetting, schedulePersist } from '@/db'
@@ -27,7 +38,7 @@ export {
   firstOccurrenceOnOrAfter,
 } from './projection'
 
-export interface UpcomingGrouped {
+export interface RegularsByPayday {
   /**
    * `ONCE` charges whose date has passed with no future occurrence (`#18`). They
    * need an explicit "was this paid?" resolution — they are kept out of `nextPay`
@@ -119,7 +130,7 @@ function readRegularsByStoredDate(
   return readRegulars(db).sort(byStoredDate)
 }
 
-export function getUpcomingChargesGrouped(): UpcomingGrouped {
+export function regularsByPayday(): RegularsByPayday {
   const db = getDb()
   if (!db) return { overdue: [], nextPay: [], later: [], nextPayday: null }
   const nextPayday = getAppSetting('next_payday')
@@ -269,7 +280,7 @@ export function deleteUpcomingCharge(id: number): void {
 }
 
 /** A single charge by id (raw stored row, no date projection), or null. */
-export function getUpcomingChargeById(id: number): Regular | null {
+export function regularById(id: number): Regular | null {
   const db = getDb()
   if (!db) return null
   return readRegularsByStoredDate(db).find((c) => c.id === id) ?? null
@@ -280,7 +291,7 @@ export function getUpcomingChargeById(id: number): Regular | null {
  * a payment link (`match_description`, docs/adr/0020) — the only charges the #19
  * verify-and-prompt flow (`checkLiabilityRepayments`) acts on. Raw stored rows.
  */
-export function getLinkedLiabilityRepaymentCharges(): Regular[] {
+export function linkedLiabilityRepayments(): Regular[] {
   const db = getDb()
   if (!db) return []
   return readRegularsByStoredDate(db).filter(
@@ -296,7 +307,7 @@ export function getLinkedLiabilityRepaymentCharges(): Regular[] {
  * Charges whose next_charge_date falls in the given month (for calendar view).
  * month is 1-12, year is full year.
  */
-export function getUpcomingChargesForMonth(
+export function regularOccurrencesInMonth(
   year: number,
   month: number
 ): Regular[] {
@@ -330,7 +341,7 @@ export function daysUntilCharge(nextChargeDate: string): number {
  * Charges that are within their reminder window (due_days <= reminder_days_before).
  * Sorted by next_charge_date ascending (soonest first).
  */
-export function getDueSoonCharges(): Regular[] {
+export function dueSoonRegulars(): Regular[] {
   const db = getDb()
   if (!db) return []
   const today = localDateString()

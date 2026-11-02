@@ -25,7 +25,7 @@ import {
   type TrackerPeriodSlice,
   type TrackerResetFrequency,
 } from '@/services/trackers'
-import { getUpcomingChargesForMonth, type Regular } from '@/services/regulars'
+import { regularOccurrencesInMonth, type Regular } from '@/services/regulars'
 import {
   getCategoryColor,
   getTrackerColor,
@@ -517,7 +517,7 @@ export function AnalyticsReports() {
     [trackers, from, exclusiveEnd, prevMonthBounds, lastSyncCompletedAt]
   )
   const upcomingCharges = useMemo(
-    () => (!isCustomRange ? getUpcomingChargesForMonth(year, month) : []),
+    () => (!isCustomRange ? regularOccurrencesInMonth(year, month) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isCustomRange, year, month, lastSyncCompletedAt]
   )
