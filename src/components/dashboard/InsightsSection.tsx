@@ -48,7 +48,7 @@ export function InsightsSection({
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
   const weekRange = useMemo(() => getWeekRange(weekOffset), [weekOffset])
-  const { startStr, endIso } = weekRange
+  const { startStr, endStr } = weekRange
   const insights = useMemo(
     () => getWeeklyInsights(weekRange),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,7 +191,7 @@ export function InsightsSection({
       {import.meta.env.DEV && (
         <Card.Body className="py-1 small text-muted border-bottom">
           <div>
-            Range: {startStr} – {endIso} · {rawCount} transactions in range
+            Range: {startStr} – {endStr} · {rawCount} transactions in range
           </div>
           {debugCounts != null && (
             <div className="mt-1">

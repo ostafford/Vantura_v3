@@ -2,26 +2,6 @@
  * Format helpers for display.
  */
 
-/**
- * Convert a plain local calendar-date string (YYYY-MM-DD, e.g. from an
- * `<input type="date">`) into the UTC ISO instant for local midnight.
- * Transaction timestamps are always UTC ('Z'-suffixed) Up API values —
- * comparing them directly against a bare date string treats it as UTC
- * midnight instead of the user's local midnight, shifting date-range
- * filters by the user's UTC offset. Pass-through if already a full
- * timestamp (length > 10).
- */
-export function localDateStartUtc(dateStr: string): string {
-  if (dateStr.length > 10) return dateStr
-  return new Date(dateStr.slice(0, 10) + 'T00:00:00').toISOString()
-}
-
-/** End-of-local-day counterpart to {@link localDateStartUtc}, for `<=` bounds. */
-export function localDateEndUtc(dateStr: string): string {
-  if (dateStr.length > 10) return dateStr
-  return new Date(dateStr.slice(0, 10) + 'T23:59:59.999').toISOString()
-}
-
 /** Format a Date as a local calendar-day string (YYYY-MM-DD), e.g. for "today" comparisons/storage. Defaults to now. */
 export function localDateString(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
