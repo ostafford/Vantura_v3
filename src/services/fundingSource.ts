@@ -8,7 +8,7 @@
  */
 
 import type { Database } from 'sql.js'
-import { firstOccurrenceOnOrAfter } from './upcoming'
+import { firstOccurrenceOnOrAfter } from './regulars'
 
 export interface SettledDebitMatch {
   transactionId: string

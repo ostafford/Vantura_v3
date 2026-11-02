@@ -8,7 +8,6 @@ import {
   afterEach,
 } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
-import { calculateReservedAmount } from './balance'
 
 let SQL: SqlJsStatic
 let db: Database
@@ -20,8 +19,7 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getProjectedNetWorth, computeProjectedNetWorth } =
-  await import('./netWorth')
+const { getProjectedNetWorth } = await import('./netWorth')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -68,63 +66,6 @@ function insertCharge(opts: {
     ]
   )
 }
-
-describe('computeProjectedNetWorth', () => {
-  it('subtracts nothing when there are no charges', () => {
-    expect(
-      computeProjectedNetWorth([], '2025-03-01', 'MONTHLY', 500000)
-    ).toEqual({
-      projectedCents: 500000,
-      upcomingExpenseCents: 0,
-    })
-  })
-
-  it('sums every WEEKLY occurrence before payday, not just the first', () => {
-    const charges = [
-      {
-        next_charge_date: '2025-02-25',
-        frequency: 'WEEKLY',
-        amount: 4000,
-        is_reserved: 1,
-      },
-    ]
-    // 2025-02-25 -> 03-04 -> 03-11: three occurrences strictly before 2025-03-14.
-    const result = computeProjectedNetWorth(
-      charges,
-      '2025-03-14',
-      'FORTNIGHTLY',
-      500000
-    )
-    expect(result.upcomingExpenseCents).toBe(12000)
-    expect(result.projectedCents).toBe(488000)
-  })
-
-  it('agrees exactly with calculateReservedAmount for the same charge set', () => {
-    const charges = [
-      {
-        next_charge_date: '2025-02-25',
-        frequency: 'WEEKLY',
-        amount: 4000,
-        is_reserved: 1,
-      },
-      {
-        next_charge_date: '2025-02-26',
-        frequency: 'MONTHLY',
-        amount: 15000,
-        is_reserved: 1,
-      },
-    ]
-    const { upcomingExpenseCents } = computeProjectedNetWorth(
-      charges,
-      '2025-03-14',
-      'FORTNIGHTLY',
-      500000
-    )
-    expect(upcomingExpenseCents).toBe(
-      calculateReservedAmount(charges, '2025-03-14', 'FORTNIGHTLY')
-    )
-  })
-})
 
 describe('getProjectedNetWorth', () => {
   it('sums every WEEKLY occurrence before payday when read from the DB', () => {

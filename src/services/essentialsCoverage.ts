@@ -4,17 +4,10 @@
  * doesn't exist for them, the classic three-card Dashboard zone is untouched.
  */
 
-import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
-import { localDateString } from '@/lib/format'
 import { getEssentialsNomination } from './essentials'
-import {
-  getFundingSourceAccountId,
-  type LinkableRegular,
-} from './fundingSource'
 import { getAccountById } from './accounts'
-import { firstOccurrenceOnOrAfter } from './upcoming'
-import { calculateReservedBreakdown, type UpcomingChargeRow } from './balance'
+import { regularsWithFundingSource, reservedBeforePayday } from './regulars'
 
 export type EssentialsCoverageState =
   | 'hidden'
@@ -41,41 +34,6 @@ export interface EssentialsCoverage {
    * covered" even when it isn't due this cycle.
    */
   transactionalCount: number
-}
-
-interface ChargeRow extends UpcomingChargeRow, LinkableRegular {
-  name: string
-}
-
-function loadCharges(db: Database): ChargeRow[] {
-  const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
-  )
-  const rows: ChargeRow[] = []
-  while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      string,
-      string,
-      number,
-      number,
-      string | null,
-      number,
-      string | null,
-    ]
-    rows.push({
-      name: r[0],
-      next_charge_date: r[1],
-      frequency: r[2],
-      amount: r[3],
-      is_reserved: r[4],
-      cancel_by_date: r[5],
-      id: r[6],
-      match_description: r[7] ?? null,
-    })
-  }
-  stmt.free()
-  return rows
 }
 
 function emptyCoverage(state: EssentialsCoverageState): EssentialsCoverage {
@@ -116,55 +74,38 @@ export function getEssentialsCoverage(): EssentialsCoverage | null {
   const db = getDb()
   if (!db) return null
 
-  const charges = loadCharges(db)
+  const regulars = regularsWithFundingSource()
 
   // Visibility gate: has any Regular's funding source ever resolved to the
   // nominated Saver, regardless of whether it's due this cycle? No window —
   // "has Essentials ever been observed", not "is it due right now".
-  const anyEssentialsFunded = charges.some(
-    (c) => getFundingSourceAccountId(db, c) === essentialsSaverId
+  const anyEssentialsFunded = regulars.some(
+    (r) => r.fundingAccountId === essentialsSaverId
   )
   if (!anyEssentialsFunded) return emptyCoverage('hidden')
 
   const nextPayday = getAppSetting('next_payday')
   const paydayFrequency = getAppSetting('payday_frequency')
   if (!nextPayday || !paydayFrequency) return emptyCoverage('payday_needed')
-  const reservedCharges = charges.filter((c) => c.is_reserved === 1)
 
-  const transactionalCharges = reservedCharges.filter(
-    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
+  // Rounded per Regular, then summed — this block's figures as they've always been.
+  const sumReserved = (items: Array<{ reservedAmount: number }>) =>
+    items.reduce((sum, item) => sum + item.reservedAmount, 0)
+  const totalIfAllTransactionalCents = sumReserved(
+    reservedBeforePayday({ excludeEssentialsFunded: false })
   )
-
-  const fullBreakdown = calculateReservedBreakdown(
-    reservedCharges,
-    nextPayday,
-    paydayFrequency
-  )
-  const transactionalBreakdown = calculateReservedBreakdown(
-    transactionalCharges,
-    nextPayday,
-    paydayFrequency
-  )
-
-  const totalIfAllTransactionalCents = fullBreakdown.reduce(
-    (sum, item) => sum + item.reservedAmount,
-    0
-  )
-  const reservedHereCents = transactionalBreakdown.reduce(
-    (sum, item) => sum + item.reservedAmount,
-    0
+  // The nomination is active here, so this excludes exactly the Regulars
+  // funded from `essentialsSaverId`.
+  const reservedHereCents = sumReserved(
+    reservedBeforePayday({ excludeEssentialsFunded: true })
   )
   const essentialsSetAsideCents =
     totalIfAllTransactionalCents - reservedHereCents
-  const today = localDateString()
-  const transactionalCount = transactionalCharges.filter(
-    (c) =>
-      firstOccurrenceOnOrAfter(
-        c.next_charge_date,
-        c.frequency,
-        today,
-        c.cancel_by_date ?? null
-      ) !== null
+  const transactionalCount = regulars.filter(
+    (r) =>
+      r.regular.is_reserved === 1 &&
+      r.fundingAccountId !== essentialsSaverId &&
+      r.nextOccurrence !== null
   ).length
 
   // Present by construction: an active nomination has an open accounts row.

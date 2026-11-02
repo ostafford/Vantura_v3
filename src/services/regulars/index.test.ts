@@ -13,8 +13,8 @@ import {
   nextChargeDateFromAnchor,
   regularDraftFromTransaction,
   nextChargeDateToStoreOnCreate,
-  type UpcomingChargeRow,
-} from './upcoming'
+  type Regular,
+} from './index'
 
 let SQL: SqlJsStatic
 let db: Database
@@ -30,18 +30,16 @@ vi.mock('@/db', () => ({
 }))
 
 const {
-  getUpcomingChargeById,
-  getLinkedLiabilityRepaymentCharges,
-  getUpcomingChargesGrouped,
+  regularById,
+  linkedLiabilityRepayments,
+  regularsByPayday,
   createUpcomingCharge,
   updateUpcomingCharge,
   nextChargeDateToStoreOnEdit,
-} = await import('./upcoming')
+} = await import('./index')
 const { localDateString } = await import('@/lib/format')
 
-function makeRow(
-  overrides: Partial<UpcomingChargeRow> = {}
-): UpcomingChargeRow {
+function makeRow(overrides: Partial<Regular> = {}): Regular {
   return {
     id: 1,
     name: 'Test charge',
@@ -292,7 +290,7 @@ describe('nextChargeDateFromAnchor (#47)', () => {
   })
 })
 
-describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
+describe('regularById / linkedLiabilityRepayments', () => {
   beforeAll(async () => {
     SQL = await initSqlJs()
   })
@@ -325,13 +323,13 @@ describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
     return db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
   }
 
-  it('getUpcomingChargeById returns the row or null', () => {
+  it('regularById returns the row or null', () => {
     const id = insertCharge({ name: 'Spotify' })
-    expect(getUpcomingChargeById(id)?.name).toBe('Spotify')
-    expect(getUpcomingChargeById(9999)).toBeNull()
+    expect(regularById(id)?.name).toBe('Spotify')
+    expect(regularById(9999)).toBeNull()
   })
 
-  it('getLinkedLiabilityRepaymentCharges returns only fully-linked LIABILITY_REPAYMENT rows', () => {
+  it('linkedLiabilityRepayments returns only fully-linked LIABILITY_REPAYMENT rows', () => {
     insertCharge({ name: 'Groceries' }) // EXPENSE
     insertCharge({
       name: 'Mortgage (no fingerprint)',
@@ -352,7 +350,7 @@ describe('getUpcomingChargeById / getLinkedLiabilityRepaymentCharges', () => {
       matchDescription: 'MORTGAGE-RAW',
     })
 
-    const linked = getLinkedLiabilityRepaymentCharges()
+    const linked = linkedLiabilityRepayments()
     expect(linked.map((c) => c.id)).toEqual([fullId])
   })
 })
@@ -377,7 +375,7 @@ describe('createUpcomingCharge / updateUpcomingCharge store the payment link (do
   it('stores the linked description and never writes the legacy raw_text (#116)', () => {
     // prettier-ignore
     const id = createUpcomingCharge('Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, 'Oura')
-    expect(getUpcomingChargeById(id)?.match_description).toBe('Oura')
+    expect(regularById(id)?.match_description).toBe('Oura')
     expect(legacyRawText(id)).toBeNull()
 
     // A legacy value from before v47 is left as it was, not rewritten.
@@ -387,12 +385,12 @@ describe('createUpcomingCharge / updateUpcomingCharge store the payment link (do
     )
     // prettier-ignore
     updateUpcomingCharge(id, 'Oura', 1000, 'MONTHLY', '2026-03-23', null, true, null, null, 'EXPENSE', null, null)
-    expect(getUpcomingChargeById(id)?.match_description).toBeNull()
+    expect(regularById(id)?.match_description).toBeNull()
     expect(legacyRawText(id)).toBe('OURARING, OULU')
   })
 })
 
-describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
+describe('regularsByPayday — overdue ONCE charges (#18)', () => {
   beforeAll(async () => {
     SQL = await initSqlJs()
   })
@@ -445,7 +443,7 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
       amount: 200000,
     })
 
-    const { overdue, nextPay, later } = getUpcomingChargesGrouped()
+    const { overdue, nextPay, later } = regularsByPayday()
 
     expect(overdue.map((c) => c.name)).toEqual(['Rego'])
     expect([...nextPay, ...later].map((c) => c.name)).toEqual(['Rent'])
@@ -462,7 +460,7 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
         nextChargeDate: '2026-01-31',
       })
 
-      const { nextPay, later } = getUpcomingChargesGrouped()
+      const { nextPay, later } = regularsByPayday()
       expect(nextPay).toHaveLength(0)
       expect(later.map((c) => [c.name, c.next_charge_date])).toEqual([
         ['Rent', '2026-03-31'],
@@ -477,7 +475,7 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
     insert({ name: 'A', frequency: 'ONCE', nextChargeDate: daysFromToday(-30) })
     insert({ name: 'C', frequency: 'ONCE', nextChargeDate: daysFromToday(-1) })
 
-    expect(getUpcomingChargesGrouped().overdue.map((c) => c.name)).toEqual([
+    expect(regularsByPayday().overdue.map((c) => c.name)).toEqual([
       'A',
       'B',
       'C',
@@ -492,7 +490,7 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
       nextChargeDate: daysFromToday(4),
     })
 
-    const { overdue, nextPay } = getUpcomingChargesGrouped()
+    const { overdue, nextPay } = regularsByPayday()
     expect(overdue).toHaveLength(0)
     expect(nextPay.map((c) => c.name)).toEqual(['Insurance'])
   })
@@ -505,7 +503,7 @@ describe('getUpcomingChargesGrouped — overdue ONCE charges (#18)', () => {
       cancelByDate: daysFromToday(-30),
     })
 
-    const { overdue, nextPay, later } = getUpcomingChargesGrouped()
+    const { overdue, nextPay, later } = regularsByPayday()
     expect(overdue).toHaveLength(0)
     expect(nextPay).toHaveLength(0)
     expect(later).toHaveLength(0)
@@ -580,11 +578,10 @@ describe('editing a Regular keeps its stored date (#146)', () => {
 
     /** What UpcomingSection's handleSave does for an edit, minus the React. */
     function saveEdit(
-      shownRow: UpcomingChargeRow,
+      shownRow: Regular,
       form: { name: string; date: string; frequency: string }
     ) {
-      const storedDate =
-        getUpcomingChargeById(shownRow.id)?.next_charge_date ?? form.date
+      const storedDate = regularById(shownRow.id)?.next_charge_date ?? form.date
       // prettier-ignore
       updateUpcomingCharge(shownRow.id, form.name, shownRow.amount, form.frequency,
         nextChargeDateToStoreOnEdit({
@@ -600,9 +597,7 @@ describe('editing a Regular keeps its stored date (#146)', () => {
     it('renaming a projected Regular leaves its stored date alone', () => {
       // prettier-ignore
       const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
-      const [row] = getUpcomingChargesGrouped().later.concat(
-        getUpcomingChargesGrouped().nextPay
-      )
+      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
       expect(row.next_charge_date).not.toBe('2025-12-31') // shown = projected
 
       saveEdit(row, {
@@ -611,7 +606,7 @@ describe('editing a Regular keeps its stored date (#146)', () => {
         frequency: row.frequency,
       })
 
-      const stored = getUpcomingChargeById(id)
+      const stored = regularById(id)
       expect(stored?.name).toBe('Rent (flat)')
       expect(stored?.next_charge_date).toBe('2025-12-31')
     })
@@ -619,9 +614,7 @@ describe('editing a Regular keeps its stored date (#146)', () => {
     it('changing the date in the form re-anchors the Regular', () => {
       // prettier-ignore
       const id = createUpcomingCharge('Rent', 200000, 'MONTHLY', '2025-12-31', null, true)
-      const [row] = getUpcomingChargesGrouped().later.concat(
-        getUpcomingChargesGrouped().nextPay
-      )
+      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
 
       saveEdit(row, {
         name: row.name,
@@ -629,7 +622,7 @@ describe('editing a Regular keeps its stored date (#146)', () => {
         frequency: row.frequency,
       })
 
-      expect(getUpcomingChargeById(id)?.next_charge_date).toBe('2026-04-05')
+      expect(regularById(id)?.next_charge_date).toBe('2026-04-05')
     })
   })
 })
@@ -751,11 +744,9 @@ describe('creating a Regular from a payment stores the payment date (#153)', () 
         }),
         null, true, null, null, 'EXPENSE', null, draft.matchDescription)
 
-      expect(getUpcomingChargeById(id)?.next_charge_date).toBe('2026-01-31')
+      expect(regularById(id)?.next_charge_date).toBe('2026-01-31')
       vi.setSystemTime(new Date(2026, 4, 3, 12, 0, 0)) // 3 May
-      const [row] = getUpcomingChargesGrouped().later.concat(
-        getUpcomingChargesGrouped().nextPay
-      )
+      const [row] = regularsByPayday().later.concat(regularsByPayday().nextPay)
       expect(row.next_charge_date).toBe('2026-05-31')
     })
   })

@@ -173,7 +173,7 @@ One `net_worth_snapshots` row per calendar day, last write wins, holding the thr
 _Avoid_: history entry, balance record, daily total
 
 **Projected net worth**:
-Net worth minus the reserved `EXPENSE` Regulars due before the next payday. Excludes liability-repayment charges — those don't reduce net worth (`docs/adr/0005`).
+Net worth minus the reserved `EXPENSE` Regulars due before the next payday, including those funded from the Essentials Saver, which still leave net worth even though they're excluded from Reserved. Excludes liability-repayment charges — those don't reduce net worth (`docs/adr/0005`).
 _Avoid_: forecast net worth, future net worth, adjusted net worth
 
 **Stale account**:

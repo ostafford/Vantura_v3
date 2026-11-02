@@ -1,5 +1,6 @@
 import { getDb, schedulePersist } from '@/db'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
+import { unlinkRegularsFromManualAccount } from '@/services/regulars'
 
 export type ManualAccountType =
   | 'CREDIT_CARD'
@@ -243,11 +244,8 @@ export function updateManualAccountBalance(
 export function deleteManualAccount(id: number): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
-  // Clear any upcoming charge links before deletion (foreign keys not enforced in sql.js)
-  db.run(
-    `UPDATE upcoming_charges SET charge_type = 'EXPENSE', linked_manual_account_id = NULL WHERE linked_manual_account_id = ?`,
-    [id]
-  )
+  // Unlink its Regulars first (foreign keys aren't enforced in sql.js).
+  unlinkRegularsFromManualAccount(id)
   db.run(`DELETE FROM manual_accounts WHERE id = ?`, [id])
   schedulePersist()
   writeNetWorthSnapshot()

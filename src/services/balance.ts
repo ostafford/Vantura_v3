@@ -3,138 +3,11 @@
  * Reserved calculation documented in docs/features/payday-spendable/OVERVIEW.md.
  */
 
-import type { Database } from 'sql.js'
 import { getDb, getAppSetting } from '@/db'
 import type { PaydayFrequency } from '@/lib/payday'
-import { localDateString } from '@/lib/format'
-import { firstOccurrenceOnOrAfter } from './upcoming'
-import { getActiveEssentialsSaverAccountId } from './essentials'
-import {
-  getFundingSourceAccountId,
-  type LinkableRegular,
-} from './fundingSource'
+import { reservedBeforePayday, totalReserved } from './regulars'
 
 export type { PaydayFrequency }
-
-export interface UpcomingChargeRow {
-  next_charge_date: string
-  frequency: string
-  amount: number
-  is_reserved: number
-  cancel_by_date?: string | null
-}
-
-export interface ReservedBreakdownItem {
-  name: string
-  projectedDate: string
-  fullAmount: number
-  reservedAmount: number
-  occurrenceCount: number
-  frequency: string
-}
-
-interface ChargeReservedResult {
-  reservedAmount: number
-  occurrenceCount: number
-  projectedDate: string
-}
-
-/**
- * Calculates the reserved amount for a single charge within the pay window.
- * Returns null if the charge has no qualifying occurrence strictly before nextPayday.
- * Charges due ON the payday itself are excluded — that day's incoming pay covers them,
- * so they don't need to be reserved from the current balance.
- * Single source of truth — used by both calculateReservedAmount and calculateReservedBreakdown.
- */
-function calcChargeReserved(
-  charge: UpcomingChargeRow,
-  nextPayday: string,
-  today: string
-): ChargeReservedResult | null {
-  const projectedDate = firstOccurrenceOnOrAfter(
-    charge.next_charge_date,
-    charge.frequency,
-    today,
-    charge.cancel_by_date ?? null
-  )
-  if (!projectedDate || projectedDate >= nextPayday) return null
-
-  switch (charge.frequency) {
-    case 'WEEKLY':
-    case 'FORTNIGHTLY': {
-      // Count every occurrence strictly before payday.
-      // A 26-day window can contain 3–4 weekly or 2 fortnightly occurrences.
-      const stepDays = charge.frequency === 'WEEKLY' ? 7 : 14
-      let occDate = projectedDate
-      let total = 0
-      let count = 0
-      while (occDate < nextPayday) {
-        if (charge.cancel_by_date && occDate > charge.cancel_by_date) break
-        total += charge.amount
-        count++
-        const d = new Date(occDate + 'T12:00:00Z')
-        d.setUTCDate(d.getUTCDate() + stepDays)
-        occDate = d.toISOString().slice(0, 10)
-      }
-      return { reservedAmount: total, occurrenceCount: count, projectedDate }
-    }
-    // ONCE / MONTHLY / QUARTERLY / YEARLY: a charge that reaches this point already has
-    // its one qualifying occurrence strictly before nextPayday (the guard above only lets
-    // charges due within one pay cycle through), so it's always reserved in full — there's
-    // no "periods until due" left to prorate across.
-    default:
-      return {
-        reservedAmount: charge.amount,
-        occurrenceCount: 1,
-        projectedDate,
-      }
-  }
-}
-
-/**
- * Total reserved amount (cents) across all is_reserved charges due before next payday.
- */
-export function calculateReservedAmount(
-  upcomingCharges: UpcomingChargeRow[],
-  nextPayday: string | null,
-  paydayFrequency: string | null
-): number {
-  if (!nextPayday || !paydayFrequency) return 0
-  const today = localDateString()
-  let total = 0
-  for (const charge of upcomingCharges.filter((c) => c.is_reserved === 1)) {
-    const result = calcChargeReserved(charge, nextPayday, today)
-    if (result) total += result.reservedAmount
-  }
-  return Math.round(total)
-}
-
-/**
- * Same logic as calculateReservedAmount but returns per-charge detail rows.
- * Pure function — accepts charges array directly so it can be unit tested without a DB.
- */
-export function calculateReservedBreakdown(
-  charges: Array<UpcomingChargeRow & { name: string }>,
-  nextPayday: string | null,
-  paydayFrequency: string | null
-): ReservedBreakdownItem[] {
-  if (!nextPayday || !paydayFrequency) return []
-  const today = localDateString()
-  const result: ReservedBreakdownItem[] = []
-  for (const charge of charges.filter((c) => c.is_reserved === 1)) {
-    const calc = calcChargeReserved(charge, nextPayday, today)
-    if (!calc) continue
-    result.push({
-      name: charge.name,
-      projectedDate: calc.projectedDate,
-      fullAmount: charge.amount,
-      reservedAmount: Math.round(calc.reservedAmount),
-      occurrenceCount: calc.occurrenceCount,
-      frequency: charge.frequency,
-    })
-  }
-  return result
-}
 
 /**
  * Pay amount per pay period (cents) from app_settings. Returns null when not set or invalid.
@@ -227,65 +100,11 @@ export function getAvailableBalance(): number {
 }
 
 /**
- * Essentials-era funding-source filter (docs/adr/0019). Classic users (no
- * nominated Essentials Saver, or one that's closed/missing) pass every charge
- * through untouched — this is
- * the null guard that keeps the classic Reserved formula byte-identical.
- * For an Essentials user, drops any charge whose funding source — the
- * account of its most recent linked payment (docs/adr/0020), no window
- * restriction — is the nominated Saver. A charge with no `match_description`,
- * or with no linked payment yet, is kept (resolves transactional) — never
- * assumed Essentials-funded.
- */
-function excludeEssentialsFundedCharges<T extends LinkableRegular>(
-  db: Database,
-  charges: T[]
-): T[] {
-  const essentialsSaverId = getActiveEssentialsSaverAccountId()
-  if (!essentialsSaverId) return charges
-  return charges.filter(
-    (c) => getFundingSourceAccountId(db, c) !== essentialsSaverId
-  )
-}
-
-/**
- * Reserved amount (cents) from upcoming_charges due before next payday.
+ * Reserved (cents): every reserved Regular due before next payday, less the
+ * Essentials-funded ones (docs/adr/0019). Calculated in the Regulars module.
  */
 export function getReservedAmount(): number {
-  const db = getDb()
-  if (!db) return 0
-  const nextPayday = getAppSetting('next_payday')
-  const paydayFrequency = getAppSetting('payday_frequency')
-  const stmt = db.prepare(
-    `SELECT next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
-  )
-  const charges: Array<UpcomingChargeRow & LinkableRegular> = []
-  while (stmt.step()) {
-    const row = stmt.get() as [
-      string,
-      string,
-      number,
-      number,
-      string | null,
-      number,
-      string | null,
-    ]
-    charges.push({
-      next_charge_date: row[0],
-      frequency: row[1],
-      amount: row[2],
-      is_reserved: row[3],
-      cancel_by_date: row[4] ?? null,
-      id: row[5],
-      match_description: row[6] ?? null,
-    })
-  }
-  stmt.free()
-  return calculateReservedAmount(
-    excludeEssentialsFundedCharges(db, charges),
-    nextPayday,
-    paydayFrequency
-  )
+  return totalReserved(reservedBeforePayday({ excludeEssentialsFunded: true }))
 }
 
 /**
@@ -297,46 +116,4 @@ export function getSpendableBalance(): number {
   const available = getAvailableBalance()
   const reserved = getReservedAmount()
   return available - reserved
-}
-
-/**
- * DB wrapper around calculateReservedBreakdown — loads charges from DB then delegates to the pure function.
- */
-export function getReservedBreakdown(): ReservedBreakdownItem[] {
-  const db = getDb()
-  if (!db) return []
-  const nextPayday = getAppSetting('next_payday')
-  const paydayFrequency = getAppSetting('payday_frequency')
-  const stmt = db.prepare(
-    `SELECT name, next_charge_date, frequency, amount, is_reserved, cancel_by_date, id, match_description FROM upcoming_charges`
-  )
-  const rows: Array<UpcomingChargeRow & LinkableRegular & { name: string }> = []
-  while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      string,
-      string,
-      number,
-      number,
-      string | null,
-      number,
-      string | null,
-    ]
-    rows.push({
-      name: r[0],
-      next_charge_date: r[1],
-      frequency: r[2],
-      amount: r[3],
-      is_reserved: r[4],
-      cancel_by_date: r[5],
-      id: r[6],
-      match_description: r[7] ?? null,
-    })
-  }
-  stmt.free()
-  return calculateReservedBreakdown(
-    excludeEssentialsFundedCharges(db, rows),
-    nextPayday,
-    paydayFrequency
-  )
 }
