@@ -14,6 +14,7 @@ import {
 import {
   createUpcomingCharge,
   regularDraftFromTransaction,
+  nextChargeDateToStoreOnCreate,
 } from '@/services/upcoming'
 import {
   getHypotheticalLines,
@@ -148,7 +149,12 @@ function AddUpcomingTransactionModal({
       draft.name,
       draft.amountCents,
       frequency,
-      nextChargeDate,
+      // Store the payment's date, unless the user edited this one (#153).
+      nextChargeDateToStoreOnCreate({
+        anchorDate: draft.anchorDate,
+        frequency,
+        shownDate: nextChargeDate,
+      }),
       draft.categoryId,
       true,
       null,

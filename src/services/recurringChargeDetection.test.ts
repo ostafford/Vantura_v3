@@ -95,6 +95,8 @@ describe('detectRecurringCharges (#20)', () => {
     })
     expect(s.nextChargeDate > TODAY).toBe(true)
     expect(s.sampleDates).toHaveLength(6)
+    // The latest payment is the anchor a created Regular stores (#153).
+    expect(s.anchorDate).toBe(s.sampleDates[s.sampleDates.length - 1])
   })
 
   it('classifies a ~7-day pattern as WEEKLY', () => {

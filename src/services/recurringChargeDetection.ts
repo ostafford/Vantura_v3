@@ -16,6 +16,8 @@ export interface RecurringChargeSuggestion {
   frequency: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
   /** Next projected occurrence on or after today (`YYYY-MM-DD`). */
   nextChargeDate: string
+  /** The latest matched payment's date — the anchor a created Regular stores (#153). */
+  anchorDate: string
   categoryId: string | null
   /** The latest occurrence's Up `description` — the created charge's payment link (docs/adr/0020). */
   matchDescription: string
@@ -188,6 +190,7 @@ export function detectRecurringCharges(): RecurringChargeSuggestion[] {
         frequency,
         today
       ),
+      anchorDate: dates[dates.length - 1],
       categoryId,
       matchDescription: rows[rows.length - 1].description,
       occurrences: dates.length,
