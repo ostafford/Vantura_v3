@@ -6,13 +6,13 @@
  * Reads are projected here (docs/adr/0004): `regularsByMonth`,
  * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
  * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
- * `linkedPaymentsInMonth`.
+ * `linkedPaymentsInMonth`, `regularsInMonth`.
  * Two return stored rows by
  * design: `regularById` (the editor's anchor) and `linkedLiabilityRepayments`
  * (payment matching, #19).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`, `linkedPayments.ts`, `draft.ts`.
+ * `funding.ts`, `linkedPayments.ts`, `month.ts`, `draft.ts`.
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
@@ -66,6 +66,7 @@ export {
   type LinkedPayment,
   type RegularLinkedPayments,
 } from './linkedPayments'
+export { regularsInMonth, type RegularMonth } from './month'
 export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
