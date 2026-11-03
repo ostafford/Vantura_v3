@@ -29,6 +29,7 @@ import {
 import { getCategories } from '@/services/categories'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate, formatSignedMoney } from '@/lib/format'
+import { budgetPercent } from '@/lib/spendingPercent'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
@@ -332,6 +333,10 @@ export function TrackersSection({
                   const progressStyle = getTrackerProgressStyle(
                     effectiveData.progress
                   )
+                  const budgetPct = budgetPercent(
+                    effectiveData.spent,
+                    effectiveData.budget
+                  )
                   const periodTxEntry = periodTxsByTrackerId[t.id]
                   const periodTxs = periodTxEntry?.list ?? []
                   const periodTxsHasMore = periodTxEntry?.hasMore ?? false
@@ -412,7 +417,9 @@ export function TrackersSection({
                           variant={progressStyle.variant}
                           striped={progressStyle.striped}
                           animated={progressStyle.animated}
-                          label={`${Math.round(effectiveData.progress)}%`}
+                          label={
+                            budgetPct === null ? undefined : `${budgetPct}%`
+                          }
                         />
                       </div>
                       <div

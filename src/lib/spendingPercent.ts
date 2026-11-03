@@ -28,3 +28,13 @@ export function sharesOfTotal(values: number[]): number[] | null {
   if (total <= 0) return null
   return values.map((v) => Math.round((v / total) * 100))
 }
+
+/**
+ * Rounded percent of a tracker's budget spent, as a whole percent. Not
+ * clamped: overspending reads above 100%. Null when spend is zero or negative
+ * (refunds met or exceeded purchases) or the budget isn't positive (#201).
+ */
+export function budgetPercent(spent: number, budget: number): number | null {
+  if (spent <= 0 || budget <= 0) return null
+  return Math.round((spent / budget) * 100)
+}
