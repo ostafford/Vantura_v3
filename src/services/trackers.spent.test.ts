@@ -22,6 +22,12 @@ beforeEach(async () => {
   db = new SQL.Database()
   runSchema(db)
   db.run(`INSERT INTO categories (id, name) VALUES ('groceries', 'Groceries')`)
+  // Tracker spend is Actual spending (#188): it only counts transactions on
+  // the Spending account or a Saver.
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+     VALUES ('acc1', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01')`
+  )
 })
 
 function insertTransaction(
