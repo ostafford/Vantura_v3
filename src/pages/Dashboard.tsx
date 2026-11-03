@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { Modal, Button, Form } from 'react-bootstrap'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
+import { DashboardPrototype } from '@/pages/dashboardPrototype/DashboardPrototype'
 import { useStore } from 'zustand'
 import {
   getAvailableBalance,
@@ -61,7 +62,16 @@ const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
   upcoming: 'upcoming',
 }
 
+// PROTOTYPE (#181): ?variant= swaps in the Dashboard-after-the-cuts variants, DEV only.
 export function Dashboard() {
+  const [params] = useSearchParams()
+  if (import.meta.env.DEV && params.get('variant')) {
+    return <DashboardPrototype />
+  }
+  return <DashboardReal />
+}
+
+function DashboardReal() {
   const location = useLocation()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const isSyncing = useStore(syncStore, (s) => s.syncing)
