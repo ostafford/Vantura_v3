@@ -589,6 +589,35 @@ describe('updateTracker records config versions', () => {
     })
   })
 
+  it('a second frequency change stamps only the rows that had the old cadence (#186)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 2, 2, 12, 0, 0)) // Mon 2 Mar
+      const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+      vi.setSystemTime(new Date(2026, 2, 4, 12, 0, 0))
+      updateTracker(id, 'Food', 60000, 'FORTNIGHTLY', 1, ['groceries'])
+      vi.setSystemTime(new Date(2026, 2, 6, 12, 0, 0))
+      updateTracker(id, 'Food', 70000, 'FORTNIGHTLY', 1, ['groceries'])
+      vi.setSystemTime(new Date(2026, 2, 10, 12, 0, 0))
+      updateTracker(id, 'Food', 150000, 'MONTHLY', 1, ['groceries'])
+
+      expect(
+        getTrackerConfigHistory(id).map((v) => [
+          v.effective_from,
+          v.budget_amount,
+          v.reset_frequency,
+        ])
+      ).toEqual([
+        ['2026-03-02', 30000, 'WEEKLY'], // genesis keeps its own cadence
+        ['2026-03-05', 60000, 'FORTNIGHTLY'],
+        ['2026-03-07', 70000, 'FORTNIGHTLY'], // untagged: had the old cadence
+        ['2026-03-11', 150000, 'MONTHLY'],
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a reset-day-only change gets the same transitional treatment', () => {
     const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries']) // Monday
     updateTracker(id, 'Food', 30000, 'WEEKLY', 4, ['groceries']) // Thursday

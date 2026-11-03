@@ -997,7 +997,8 @@ export function deleteTrackerConfigHistory(
 /**
  * Record the config-history effect of an `updateTracker` edit (#16, #38):
  * - frequency / reset-day change, transitional (the common case) → keep the
- *   timeline; stamp every existing row (`effective_from <= today`) with the OLD
+ *   timeline; stamp each untagged row (`effective_from <= today`, no
+ *   `reset_frequency` yet — the rows that had the OLD cadence) with the OLD
  *   cadence so the split prices the pre-transition part of the transitional
  *   period at that daily rate, then write a version effective tomorrow carrying
  *   the NEW cadence + budget + categories;
@@ -1050,9 +1051,12 @@ function maintainConfigHistoryOnEdit(args: {
       return
     }
     // Transitional: the pre-transition part of the current period is priced
-    // against the old cadence's daily rate.
+    // against the old cadence's daily rate. Only untagged rows had the old
+    // cadence (NULL = "the tracker's frequency", which was the old one); a row
+    // already tagged by an earlier change keeps the cadence it was written in.
     db.run(
-      `UPDATE tracker_config_history SET reset_frequency = ? WHERE tracker_id = ? AND effective_from <= ?`,
+      `UPDATE tracker_config_history SET reset_frequency = ?
+       WHERE tracker_id = ? AND effective_from <= ? AND reset_frequency IS NULL`,
       [existing.reset_frequency, id, today]
     )
     const hasBaseline = getTrackerConfigHistory(id).some(
