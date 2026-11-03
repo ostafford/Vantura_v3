@@ -15,27 +15,33 @@ export function MonthReviewCard({
   compact?: boolean
 }) {
   if (!f.review) return null
+  const over = f.review.savedCents < 0
+  const tone = over ? 'var(--vantura-danger)' : 'var(--vantura-success)'
   return (
     <div
       className={`d-flex align-items-center gap-2 ${compact ? 'py-2 px-3' : 'p-3'} mb-3`}
       style={{
-        border: '1px solid var(--vantura-success)',
+        border: `1px solid ${tone}`,
         borderRadius: 8,
-        background:
-          'color-mix(in srgb, var(--vantura-success) 10%, transparent)',
+        background: `color-mix(in srgb, ${tone} 10%, transparent)`,
       }}
     >
       <i
-        className="mdi mdi-calendar-check-outline"
+        className={`mdi ${over ? 'mdi-trending-down' : 'mdi-calendar-check-outline'}`}
         aria-hidden
-        style={{ color: success, fontSize: compact ? '1rem' : '1.4rem' }}
+        style={{
+          color: over ? danger : success,
+          fontSize: compact ? '1rem' : '1.4rem',
+        }}
       />
       <div className="flex-grow-1">
-        <strong>{f.review.month}:</strong> you saved{' '}
-        <strong>{money(f.review.savedCents)}</strong>
+        <strong>{f.review.month}:</strong> you {over ? 'overspent' : 'saved'}{' '}
+        <strong style={{ color: over ? danger : undefined }}>
+          {money(Math.abs(f.review.savedCents))}
+        </strong>
         {!compact && (
           <div className="small" style={{ color: muted }}>
-            Tap to open October on the Budget Plan
+            Tap to open {f.review.month} on the Budget Plan
           </div>
         )}
       </div>

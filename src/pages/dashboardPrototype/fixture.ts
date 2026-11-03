@@ -34,6 +34,7 @@ export interface DashFixture {
   /** Mon..Sun this week, null = future day */
   week: (number | null)[]
   lastWeek: number[]
+  /** savedCents < 0 = overspent */
   review: { month: string; savedCents: number } | null
 }
 
@@ -79,7 +80,13 @@ export function getFixture(opts: {
     moneyOutCents: opts.neg ? 526_210 : 207_360,
     week: [4_210, 1_850, 9_920, 2_300, null, null, null],
     lastWeek: [3_100, 2_400, 6_500, 1_200, 15_800, 8_200, 4_400],
-    review: opts.review ? { month: 'October', savedCents: 48_215 } : null,
+    review:
+      opts.review === 'off'
+        ? null
+        : {
+            month: 'October',
+            savedCents: opts.review === 'over' ? -21_380 : 48_215,
+          },
   }
 }
 
