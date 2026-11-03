@@ -17,6 +17,7 @@ import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
 import { AnalyticsNetWorth } from '@/pages/analytics/AnalyticsNetWorth'
 import { AnalyticsBudgetPlan } from '@/pages/analytics/AnalyticsBudgetPlan'
 import { AnalyticsBudgetPlanBucket } from '@/pages/analytics/AnalyticsBudgetPlanBucket'
+import { RegularsPrototype } from '@/pages/analytics/regularsPrototype/RegularsPrototype'
 import { Settings } from '@/pages/Settings'
 import { Help } from '@/pages/Help'
 import { Changelog } from '@/pages/Changelog'
@@ -122,6 +123,20 @@ export const appRouter = createBrowserRouter(
               path: 'income',
               element: <Navigate to="/analytics" replace />,
             },
+            // PROTOTYPE (#183): the Regulars page, DEV only, fixture data.
+            ...(import.meta.env.DEV
+              ? [
+                  {
+                    path: 'regulars',
+                    element: <RegularsPrototype />,
+                    handle: {
+                      breadcrumbLabel: 'Regulars',
+                      pageTitle: 'Regulars',
+                      pageTitleIcon: 'mdi-calendar-sync-outline',
+                    } satisfies AppRouteHandle,
+                  },
+                ]
+              : []),
             {
               path: 'trackers',
               element: <AnalyticsTrackers />,

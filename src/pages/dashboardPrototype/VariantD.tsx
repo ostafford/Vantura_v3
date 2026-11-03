@@ -3,7 +3,7 @@
 // Regulars on their day; A/C's full Month review card. No net worth.
 import { createContext, useContext } from 'react'
 import { Card } from 'react-bootstrap'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { headroom, money, type DashFixture, type ToGo } from './fixture'
 import { MonthReviewCard, Stub, WeekBars, danger, muted, warning } from './bits'
 
@@ -126,8 +126,16 @@ const Op = ({ c }: { c: string }) => (
 
 function RegularRow({ t }: { t: ToGo }) {
   const overdue = t.status === 'overdue'
+  const navigate = useNavigate()
   return (
-    <div className="d-flex justify-content-between align-items-center py-1 gap-2">
+    <div
+      className="d-flex justify-content-between align-items-center py-1 gap-2"
+      role="button"
+      style={{ cursor: 'pointer' }}
+      onClick={() =>
+        navigate(`/analytics/regulars?edit=${encodeURIComponent(t.name)}`)
+      }
+    >
       <span
         className="d-flex align-items-center flex-wrap"
         style={{ minWidth: 0, columnGap: '0.5rem', rowGap: '0.15rem' }}
@@ -318,7 +326,9 @@ export function VariantD({ f }: { f: DashFixture }) {
             className="fw-semibold"
             style={{ fontSize: '0.72rem', color: warning }}
           >
-            Regulars not paid yet
+            <Link to="/analytics/regulars" style={{ color: 'inherit' }}>
+              Regulars not paid yet ›
+            </Link>
           </div>
           {f.stillToGo
             .filter((t) => t.kind === 'regular')
@@ -390,7 +400,6 @@ export function VariantD({ f }: { f: DashFixture }) {
       <div className="dashboard-grid">
         <Stub label="Month at a glance (chart + money in/out)" />
         <Stub label="Trackers" />
-        <Stub label="Upcoming (Overdue / This month / Later)" />
       </div>
     </div>
   )
