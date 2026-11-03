@@ -15,7 +15,9 @@
 
 import type { Database } from 'sql.js'
 import { getDb } from '@/db'
-import { displayDayBetweenSql, displayDaySql } from '../displayDay'
+import { calendarMonthDayBounds } from '@/lib/dateStr'
+import { actualSpendingWhere } from '@/services/actualSpending'
+import { displayDaySql } from '../displayDay'
 import { readRegulars, type Regular } from './rows'
 
 export interface LinkedPayment {
@@ -38,21 +40,6 @@ export type RegularLinkedPayments =
   | { regularId: number; linked: true; payments: LinkedPayment[] }
 
 /**
- * The Actual spending **debit** predicate on `transactions t` joined to
- * `accounts a`. Kept in one place so it can be swapped onto the shared Actual
- * spending predicate from #187 once that lands; Linked payments are always
- * debits (`amount < 0`), so only the debit half of the definition applies.
- */
-const ACTUAL_SPENDING_DEBIT_SQL = `
-  t.source = 'up'
-  AND a.account_type IN ('TRANSACTIONAL', 'SAVER')
-  AND (a.ownership_type IS NULL OR a.ownership_type != 'JOINT')
-  AND t.transfer_account_id IS NULL
-  AND (t.transaction_type IS NULL OR t.transaction_type != 'Round Up')
-  AND t.status IN ('HELD', 'SETTLED')
-  AND t.amount < 0`
-
-/**
  * True when `debitCents` (negative) is within ±20% of the Regular's amount,
  * inclusive. Integer arithmetic (|Δ| × 5 ≤ amount) so the boundary is exact.
  */
@@ -60,17 +47,11 @@ function withinBand(debitCents: number, regularAmount: number): boolean {
   return Math.abs(Math.abs(debitCents) - regularAmount) * 5 <= regularAmount
 }
 
-/** First and last local day of a `YYYY-MM` month. */
-function monthBounds(month: string): [string, string] {
-  const match = /^(\d{4})-(\d{2})$/.exec(month)
-  if (!match) throw new Error(`Invalid month: ${month}`)
-  const year = Number(match[1])
-  const m = Number(match[2])
-  if (m < 1 || m > 12) throw new Error(`Invalid month: ${month}`)
-  const lastDay = new Date(year, m, 0).getDate()
-  return [`${month}-01`, `${month}-${String(lastDay).padStart(2, '0')}`]
-}
-
+/**
+ * Actual spending **debits** (the shared #187 predicate plus `amount < 0`:
+ * Linked payments are always debits) in `[start, end]` whose description is
+ * one of `descriptions`.
+ */
 function readDebitsInMonth(
   db: Database,
   descriptions: string[],
@@ -79,16 +60,16 @@ function readDebitsInMonth(
 ): Array<LinkedPayment & { description: string }> {
   if (descriptions.length === 0) return []
   const placeholders = descriptions.map(() => '?').join(', ')
+  const spending = actualSpendingWhere({ from: start, to: end }, 't')
   const stmt = db.prepare(
     `SELECT t.id, t.account_id, t.amount, ${displayDaySql('t')}, t.status, t.description
      FROM transactions t
-     JOIN accounts a ON a.id = t.account_id
-     WHERE ${ACTUAL_SPENDING_DEBIT_SQL}
+     WHERE ${spending.sql}
+       AND t.amount < 0
        AND t.description IN (${placeholders})
-       AND ${displayDayBetweenSql('t')}
      ORDER BY ${displayDaySql('t')}, COALESCE(t.created_at, t.settled_at), t.id`
   )
-  stmt.bind([...descriptions, start, end])
+  stmt.bind([...spending.params, ...descriptions])
   const out: Array<LinkedPayment & { description: string }> = []
   while (stmt.step()) {
     const r = stmt.get()
@@ -111,7 +92,7 @@ function readDebitsInMonth(
  * Regular isn't listed. Empty when the DB isn't ready.
  */
 export function linkedPaymentsInMonth(month: string): RegularLinkedPayments[] {
-  const [start, end] = monthBounds(month)
+  const { first: start, last: end } = calendarMonthDayBounds(month)
   const db = getDb()
   if (!db) return []
   const regulars = readRegulars(db)

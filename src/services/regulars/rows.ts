@@ -80,6 +80,21 @@ export function readRegulars(db: Database): Regular[] {
   return rows
 }
 
+/**
+ * Each Regular's Budget Plan bucket (`null` = not in a bucket), by Regular id.
+ * Membership only — it never decides where money counts.
+ */
+export function readRegularBucketIds(db: Database): Map<number, number | null> {
+  const stmt = db.prepare(`SELECT id, bucket_id FROM upcoming_charges`)
+  const out = new Map<number, number | null>()
+  while (stmt.step()) {
+    const r = stmt.get() as [number, number | null]
+    out.set(r[0], r[1] ?? null)
+  }
+  stmt.free()
+  return out
+}
+
 /** One Regular as stored, or null. */
 export function readRegularById(db: Database, id: number): Regular | null {
   return readRegulars(db).find((r) => r.id === id) ?? null
