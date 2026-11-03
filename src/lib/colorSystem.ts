@@ -267,10 +267,6 @@ const FREQUENCY_BADGE_HEX: Record<
     light: { bg: '#ded1f0', text: '#593f74' },
     dark: { bg: '#342742', text: '#c3abe1' },
   },
-  PAYDAY: {
-    light: { bg: '#f2cfc0', text: '#743b1f' },
-    dark: { bg: '#422518', text: '#e3a88d' },
-  },
 }
 
 export function getFrequencyBadgeColors(

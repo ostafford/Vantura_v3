@@ -1,5 +1,3 @@
-import { getAppSetting } from '@/db'
-
 export type RecurringFrequency =
   | 'WEEKLY'
   | 'FORTNIGHTLY'
@@ -9,21 +7,10 @@ export type RecurringFrequency =
 
 export type BudgetDisplayPeriod = 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 
-/**
- * PAYDAY is a placeholder, not a real cadence — it means "this user's actual
- * configured pay cycle" (app_settings.payday_frequency). Resolved here, once,
- * so every period-length calculation below goes through it and no call site
- * can silently assume a cadence instead of reading the real one.
- */
-function resolveFrequency(frequency: string): string {
-  if (frequency !== 'PAYDAY') return frequency
-  return getAppSetting('payday_frequency') ?? 'MONTHLY'
-}
-
 export function monthlyEquivalentMultiplier(
   frequency: RecurringFrequency | string
 ): number {
-  switch (resolveFrequency(frequency)) {
+  switch (frequency) {
     case 'WEEKLY':
       return 52 / 12
     case 'FORTNIGHTLY':
@@ -49,7 +36,7 @@ export function toMonthlyEquivalentCents(
 
 export function toYearlyCents(amountCents: number, frequency: string): number {
   const safe = Math.max(0, amountCents)
-  switch (resolveFrequency(frequency)) {
+  switch (frequency) {
     case 'WEEKLY':
       return Math.round(safe * 52)
     case 'FORTNIGHTLY':

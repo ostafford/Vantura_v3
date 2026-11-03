@@ -82,32 +82,14 @@ describe('toPeriodCents', () => {
   })
 })
 
-describe('PAYDAY frequency resolution', () => {
+describe('PAYDAY is no longer a frequency (#192)', () => {
   afterEach(() => {
     delete appSettings.payday_frequency
   })
 
-  it('resolves PAYDAY to the configured payday_frequency, not a hardcoded MONTHLY', () => {
+  it('does not resolve PAYDAY to the pay frequency: it is unknown, so 0', () => {
     appSettings.payday_frequency = 'WEEKLY'
-    // $100/payday, paid WEEKLY → $5200/year, same as a native WEEKLY tracker.
-    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).toBe(
-      toPeriodCents(10000, 'WEEKLY', 'YEARLY')
-    )
-    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).not.toBe(
-      toPeriodCents(10000, 'MONTHLY', 'YEARLY')
-    )
-  })
-
-  it('resolves PAYDAY to FORTNIGHTLY when that is the configured cadence', () => {
-    appSettings.payday_frequency = 'FORTNIGHTLY'
-    expect(toPeriodCents(10000, 'PAYDAY', 'MONTHLY')).toBe(
-      toPeriodCents(10000, 'FORTNIGHTLY', 'MONTHLY')
-    )
-  })
-
-  it('falls back to MONTHLY only when payday_frequency is unconfigured', () => {
-    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).toBe(
-      toPeriodCents(10000, 'MONTHLY', 'YEARLY')
-    )
+    expect(monthlyEquivalentMultiplier('PAYDAY')).toBe(0)
+    expect(toPeriodCents(10000, 'PAYDAY', 'YEARLY')).toBe(0)
   })
 })

@@ -138,7 +138,7 @@ describe('colorSystem', () => {
   })
 
   describe('getFrequencyBadgeColors', () => {
-    it.each(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY', 'PAYDAY'] as const)(
+    it.each(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'] as const)(
       'resolves both bg and text hex for %s in both modes',
       (frequency) => {
         const hexPattern = /^#[0-9a-f]{6}$/

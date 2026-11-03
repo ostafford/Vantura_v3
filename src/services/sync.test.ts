@@ -22,8 +22,7 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { __test__, recalculateTrackers } = await import('./sync')
-const { prevPaydayDate } = __test__
+const { recalculateTrackers } = await import('./sync')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -54,35 +53,14 @@ function insertTracker(overrides: {
   )
 }
 
-// Full edge-case coverage of the underlying math (including the MONTHLY "last
-// weekday" day-31 regression this used to guard directly) lives in
-// payday.test.ts against previousPaydayDate() directly. This only proves
-// prevPaydayDate reads app_settings (parsing payday_day, defaulting to 1
-// when unset) and delegates correctly.
-describe('prevPaydayDate', () => {
-  it('reads app_settings and delegates to payday.ts for the math', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '100'
-    expect(prevPaydayDate('2026-03-31')).toBe('2026-02-27')
-  })
-})
-
 // recalculateTrackers previously set `changed = true` as soon as a tracker's
 // next_reset_date was found to be in the past, before confirming it could
-// actually advance — so a tracker that can never advance (PAYDAY with no
-// next_payday configured, or an unrecognized reset_frequency) caused the
+// actually advance — so a tracker that can never advance (an unrecognized
+// reset_frequency, such as a leftover PAYDAY row) caused the
 // outer while(changed) loop to find the same stale row forever. These tests
 // assert the function actually returns (a hang would fail via vitest's
 // default test timeout, not spin forever).
 describe('recalculateTrackers — termination', () => {
-  it('returns without hanging when a PAYDAY tracker has no next_payday configured', () => {
-    insertTracker({ reset_frequency: 'PAYDAY', next_reset_date: '2026-01-01' })
-    // next_payday intentionally left unset.
-    expect(() => recalculateTrackers()).not.toThrow()
-    const rows = db.exec('SELECT next_reset_date FROM trackers')
-    expect(rows[0].values[0][0]).toBe('2026-01-01') // left untouched, not advanced
-  })
-
   it('returns without hanging for an unrecognized reset_frequency', () => {
     insertTracker({ reset_frequency: 'BOGUS', next_reset_date: '2026-01-01' })
     expect(() => recalculateTrackers()).not.toThrow()
@@ -90,16 +68,20 @@ describe('recalculateTrackers — termination', () => {
     expect(rows[0].values[0][0]).toBe('2026-01-01')
   })
 
-  it('advances a stuck PAYDAY tracker once next_payday is configured, and terminates', () => {
+  it('no longer resolves a PAYDAY tracker from payday settings (#192)', () => {
     appSettings.payday_frequency = 'MONTHLY'
     appSettings.payday_day = '1'
     appSettings.next_payday = '2026-04-01'
-    insertTracker({ reset_frequency: 'PAYDAY', next_reset_date: '2026-01-01' })
+    insertTracker({
+      reset_frequency: 'PAYDAY',
+      last_reset_date: '2025-12-01',
+      next_reset_date: '2026-01-01',
+    })
     expect(() => recalculateTrackers()).not.toThrow()
     const rows = db.exec(
       'SELECT last_reset_date, next_reset_date FROM trackers'
     )
-    expect(rows[0].values[0]).toEqual(['2026-03-01', '2026-04-01'])
+    expect(rows[0].values[0]).toEqual(['2025-12-01', '2026-01-01'])
   })
 
   it('advances a MONTHLY tracker across multiple missed cycles and terminates', () => {
@@ -170,21 +152,5 @@ describe('recalculateTrackers — resets at local midnight (#148)', () => {
     })
     recalculateTrackers()
     expect(resetDates()).toEqual(['2026-10-27', '2026-11-03'])
-  })
-
-  it('a PAYDAY tracker follows next_payday on the morning of payday', () => {
-    // advanceNextPaydayIfNeeded already uses the local date, so by 8:30am on
-    // payday next_payday has moved on — the tracker must move with it.
-    vi.setSystemTime(new Date('2026-11-02T21:30:00Z'))
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '3'
-    appSettings.next_payday = '2026-12-03'
-    insertTracker({
-      reset_frequency: 'PAYDAY',
-      last_reset_date: '2026-10-03',
-      next_reset_date: '2026-11-03',
-    })
-    recalculateTrackers()
-    expect(resetDates()).toEqual(['2026-11-03', '2026-12-03'])
   })
 })
