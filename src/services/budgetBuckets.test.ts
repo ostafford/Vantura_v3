@@ -46,18 +46,6 @@ function insertUpcoming(
   )
 }
 
-function insertHypothetical(
-  name: string,
-  amountCents: number,
-  frequency: string,
-  bucketId = 1
-) {
-  db.run(
-    `INSERT INTO budget_hypotheticals (bucket_id, name, amount_cents, frequency, is_hypothetical, created_at) VALUES (?, ?, ?, ?, 1, '2026-01-01')`,
-    [bucketId, name, amountCents, frequency]
-  )
-}
-
 function insertTracker(
   budgetAmount: number,
   resetFrequency: string,
@@ -75,20 +63,12 @@ describe('getBucketCardSummary', () => {
     insertUpcoming('Rent', 200000, 'MONTHLY')
     const summary = getBucketCardSummary(1, 'MONTHLY')
     expect(summary.plannedCents).toBe(200000)
-    expect(summary.hypotheticalCents).toBe(0)
   })
 
   it('excludes ONCE-frequency upcoming charges from the planned total', () => {
     insertUpcoming('One-off gift', 5000, 'ONCE')
     const summary = getBucketCardSummary(1, 'MONTHLY')
     expect(summary.plannedCents).toBe(0)
-  })
-
-  it('includes hypothetical lines in both hypotheticalCents and plannedCents', () => {
-    insertHypothetical('Maybe gym', 8000, 'MONTHLY')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.hypotheticalCents).toBe(8000)
-    expect(summary.plannedCents).toBe(8000)
   })
 
   it('includes active trackers assigned to the bucket using their own reset_frequency', () => {
@@ -109,13 +89,12 @@ describe('getBucketCardSummary', () => {
     expect(summary.plannedCents).toBe(0)
   })
 
-  it('combines upcoming charges, hypotheticals, and trackers in a single total', () => {
+  it('plans exactly its Regulars plus its Trackers, with no hypothetical part (#204)', () => {
     insertUpcoming('Rent', 200000, 'MONTHLY')
-    insertHypothetical('Maybe gym', 8000, 'MONTHLY')
     insertTracker(30000, 'MONTHLY')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(200000 + 8000 + 30000)
-    expect(summary.hypotheticalCents).toBe(8000)
+    expect(getBucketCardSummary(1, 'MONTHLY')).toEqual({
+      plannedCents: 200000 + 30000,
+    })
   })
 })
 

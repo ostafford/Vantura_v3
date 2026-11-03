@@ -4,7 +4,6 @@ import {
   toPeriodCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
-import { getHypotheticalLines } from '@/services/budgetHypotheticals'
 
 export interface BudgetBucketRow {
   id: number
@@ -120,7 +119,6 @@ export function deleteBucket(id: number): void {
     id,
   ])
   db.run(`UPDATE trackers SET bucket_id = NULL WHERE bucket_id = ?`, [id])
-  db.run(`DELETE FROM budget_hypotheticals WHERE bucket_id = ?`, [id])
   db.run(`DELETE FROM budget_transaction_anchors WHERE bucket_id = ?`, [id])
   db.run(`DELETE FROM budget_buckets WHERE id = ?`, [id])
   schedulePersist()
@@ -159,8 +157,8 @@ export function getBucketItems(bucketId: number): BucketItemSummary {
 }
 
 export interface BucketCardSummary {
+  /** Regulars (except `ONCE`) plus active Trackers, in the display period. */
   plannedCents: number
-  hypotheticalCents: number
 }
 
 export function getBucketCardSummary(
@@ -169,18 +167,11 @@ export function getBucketCardSummary(
 ): BucketCardSummary {
   const db = getDb()
   const { upcoming } = getBucketItems(bucketId)
-  const hypotheticals = getHypotheticalLines(bucketId)
   let plannedCents = 0
-  let hypotheticalCents = 0
 
   for (const u of upcoming) {
     if (u.frequency === 'ONCE') continue
     plannedCents += toPeriodCents(u.amount, u.frequency, period)
-  }
-  for (const h of hypotheticals) {
-    const contrib = toPeriodCents(h.amount_cents, h.frequency, period)
-    hypotheticalCents += contrib
-    plannedCents += contrib
   }
 
   if (db) {
@@ -195,7 +186,7 @@ export function getBucketCardSummary(
     stmt.free()
   }
 
-  return { plannedCents, hypotheticalCents }
+  return { plannedCents }
 }
 
 /** Total outgoing cents for a bucket in the given display period. */

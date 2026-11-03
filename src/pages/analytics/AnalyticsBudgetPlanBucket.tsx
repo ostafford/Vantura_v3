@@ -14,13 +14,6 @@ import {
 import { blankDraft, draftFromTransaction } from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import {
-  getHypotheticalLines,
-  createBudgetLine,
-  updateBudgetLine,
-  deleteBudgetLine,
-  type BudgetLineRow,
-} from '@/services/budgetHypotheticals'
-import {
   getBucketTrackers,
   assignTrackerToBucket,
   getTrackersForPicker,
@@ -470,226 +463,6 @@ function AddTrackerModal({
   )
 }
 
-// ─── Add hypothetical modal ───────────────────────────────────────────────────
-
-interface AddHypotheticalModalProps {
-  show: boolean
-  bucketId: number
-  onClose: () => void
-  onSaved: () => void
-}
-
-function AddHypotheticalModal({
-  show,
-  bucketId,
-  onClose,
-  onSaved,
-}: AddHypotheticalModalProps) {
-  const [name, setName] = useState('')
-  const [amountStr, setAmountStr] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-
-  useMemo(() => {
-    if (show) {
-      setName('')
-      setAmountStr('')
-      setFrequency('MONTHLY')
-    }
-  }, [show])
-
-  function handleSave() {
-    const trimmed = name.trim()
-    const dollars = parseFloat(amountStr)
-    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
-    createBudgetLine(
-      bucketId,
-      trimmed,
-      Math.round(dollars * 100),
-      frequency,
-      true
-    )
-    toast.success('Hypothetical added')
-    onSaved()
-    onClose()
-  }
-
-  return (
-    <Modal show={show} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Add hypothetical</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted small mb-3">
-          Test affordability — kept separate from real expenses so you can
-          remove it any time.
-        </p>
-        <Form.Group className="mb-3">
-          <Form.Label>Name</Form.Label>
-          <Form.Control
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. New apartment"
-            autoFocus
-            maxLength={80}
-          />
-        </Form.Group>
-        <Row className="g-3">
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Amount ($)</Form.Label>
-              <Form.Control
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
-              />
-            </Form.Group>
-          </Col>
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Frequency</Form.Label>
-              <Form.Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {BUDGET_FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={
-            !name.trim() ||
-            !amountStr ||
-            Number.isNaN(parseFloat(amountStr)) ||
-            parseFloat(amountStr) <= 0
-          }
-        >
-          Add hypothetical
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-// ─── Edit hypothetical modal ──────────────────────────────────────────────────
-
-interface EditHypotheticalModalProps {
-  line: BudgetLineRow | null
-  onClose: () => void
-  onSaved: () => void
-}
-
-function EditHypotheticalModal({
-  line,
-  onClose,
-  onSaved,
-}: EditHypotheticalModalProps) {
-  const [name, setName] = useState('')
-  const [amountStr, setAmountStr] = useState('')
-  const [frequency, setFrequency] = useState('MONTHLY')
-
-  useMemo(() => {
-    if (line) {
-      setName(line.name)
-      setAmountStr((line.amount_cents / 100).toFixed(2))
-      setFrequency(line.frequency)
-    }
-  }, [line])
-
-  function handleSave() {
-    if (!line) return
-    const trimmed = name.trim()
-    const dollars = parseFloat(amountStr)
-    if (!trimmed || Number.isNaN(dollars) || dollars <= 0) return
-    updateBudgetLine(line.id, trimmed, Math.round(dollars * 100), frequency)
-    toast.success('Hypothetical updated')
-    onSaved()
-    onClose()
-  }
-
-  return (
-    <Modal show={!!line} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Edit hypothetical</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <Form.Group className="mb-3">
-          <Form.Label>Name</Form.Label>
-          <Form.Control
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-            maxLength={80}
-          />
-        </Form.Group>
-        <Row className="g-3">
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Amount ($)</Form.Label>
-              <Form.Control
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
-              />
-            </Form.Group>
-          </Col>
-          <Col xs={6}>
-            <Form.Group>
-              <Form.Label>Frequency</Form.Label>
-              <Form.Select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                {BUDGET_FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={
-            !name.trim() ||
-            !amountStr ||
-            Number.isNaN(parseFloat(amountStr)) ||
-            parseFloat(amountStr) <= 0
-          }
-        >
-          Save changes
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
 // ─── Upcoming transaction row ─────────────────────────────────────────────────
 
 interface UpcomingRowProps {
@@ -844,77 +617,6 @@ function TrackerBucketRow({
   )
 }
 
-// ─── Hypothetical row ─────────────────────────────────────────────────────────
-
-interface HypotheticalRowProps {
-  line: BudgetLineRow
-  period: BudgetDisplayPeriod
-  periodLabel: string
-  onEdit: () => void
-  onDelete: () => void
-}
-
-function HypotheticalRow({
-  line,
-  period,
-  periodLabel,
-  onEdit,
-  onDelete,
-}: HypotheticalRowProps) {
-  const periodCents = toPeriodCents(line.amount_cents, line.frequency, period)
-
-  return (
-    <div
-      className="d-flex align-items-center justify-content-between py-2 px-3"
-      style={{
-        borderRadius: 8,
-        border: '1.5px dashed var(--bs-border-color)',
-        marginBottom: 8,
-      }}
-    >
-      <div className="d-flex align-items-center gap-2 min-w-0">
-        <Badge bg="warning" text="dark" className="flex-shrink-0">
-          ?
-        </Badge>
-        <span className="text-truncate">{line.name}</span>
-        <Badge
-          bg="secondary"
-          className="flex-shrink-0"
-          style={{ fontSize: '0.65rem' }}
-        >
-          {frequencyLabel(line.frequency)}
-        </Badge>
-      </div>
-      <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
-        <div className="text-end">
-          <div className="fw-semibold">${formatMoney(periodCents)}</div>
-          <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-            /{periodLabel.toLowerCase()}
-          </div>
-        </div>
-        <Button
-          variant="link"
-          size="sm"
-          className="p-0 text-muted"
-          onClick={onEdit}
-          aria-label={`Edit ${line.name}`}
-        >
-          <i className="mdi mdi-pencil-outline" aria-hidden />
-        </Button>
-        <Button
-          variant="link"
-          size="sm"
-          className="p-0 text-muted"
-          onClick={onDelete}
-          aria-label={`Remove ${line.name}`}
-        >
-          <i className="mdi mdi-close" aria-hidden />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function AnalyticsBudgetPlanBucket() {
@@ -943,9 +645,6 @@ export function AnalyticsBudgetPlanBucket() {
 
   const [showAddUpcoming, setShowAddUpcoming] = useState(false)
   const [showAddTracker, setShowAddTracker] = useState(false)
-  const [showAddHypothetical, setShowAddHypothetical] = useState(false)
-  const [editingHypothetical, setEditingHypothetical] =
-    useState<BudgetLineRow | null>(null)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -965,12 +664,6 @@ export function AnalyticsBudgetPlanBucket() {
 
   const trackers = useMemo(
     () => (id != null ? getBucketTrackers(id) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, version, lastSyncCompletedAt]
-  )
-
-  const hypotheticals = useMemo(
-    () => (id != null ? getHypotheticalLines(id) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id, version, lastSyncCompletedAt]
   )
@@ -1005,12 +698,6 @@ export function AnalyticsBudgetPlanBucket() {
   function handleUnassignTracker(tracker: BucketTrackerItem) {
     assignTrackerToBucket(tracker.id, null)
     toast.success(`"${tracker.name}" removed from bucket`)
-    refresh()
-  }
-
-  function handleDeleteHypothetical(line: BudgetLineRow) {
-    deleteBudgetLine(line.id)
-    toast.success(`Removed "${line.name}"`)
     refresh()
   }
 
@@ -1135,44 +822,6 @@ export function AnalyticsBudgetPlanBucket() {
         </Card.Body>
       </Card>
 
-      {/* Hypotheticals */}
-      <Card className="mb-3">
-        <Card.Header className="d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <i className="mdi mdi-flask-outline text-muted" aria-hidden />
-            <span className="fw-semibold">Hypotheticals</span>
-            <span className="text-muted small">— can I afford this?</span>
-          </div>
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            onClick={() => setShowAddHypothetical(true)}
-          >
-            <i className="mdi mdi-plus me-1" aria-hidden />
-            Add
-          </Button>
-        </Card.Header>
-        <Card.Body>
-          {hypotheticals.length === 0 ? (
-            <p className="text-muted small mb-0">
-              Add a hypothetical item to test "can I afford this?" — stays
-              separate from real expenses and persists until you remove it.
-            </p>
-          ) : (
-            hypotheticals.map((h) => (
-              <HypotheticalRow
-                key={h.id}
-                line={h}
-                period={period}
-                periodLabel={periodLabel}
-                onEdit={() => setEditingHypothetical(h)}
-                onDelete={() => handleDeleteHypothetical(h)}
-              />
-            ))
-          )}
-        </Card.Body>
-      </Card>
-
       {/* Bucket total */}
       <Card style={{ borderLeft: `4px solid ${hex}` }}>
         <Card.Body>
@@ -1198,17 +847,6 @@ export function AnalyticsBudgetPlanBucket() {
         show={showAddTracker}
         bucketId={bucket.id}
         onClose={() => setShowAddTracker(false)}
-        onSaved={refresh}
-      />
-      <AddHypotheticalModal
-        show={showAddHypothetical}
-        bucketId={bucket.id}
-        onClose={() => setShowAddHypothetical(false)}
-        onSaved={refresh}
-      />
-      <EditHypotheticalModal
-        line={editingHypothetical}
-        onClose={() => setEditingHypothetical(null)}
         onSaved={refresh}
       />
     </div>

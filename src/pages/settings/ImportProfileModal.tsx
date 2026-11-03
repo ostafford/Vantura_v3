@@ -5,11 +5,11 @@ import {
   previewImportProfile,
   importPayloadWithOptions,
   buildExportPayload,
+  describeSkippedSections,
   type ExportPayload,
   type TrackerExportRow,
   type UpcomingChargeExportRow,
   type BudgetBucketExportRow,
-  type BudgetHypotheticalExportRow,
   type ManualAccountExportRow,
   type ImportOptions,
 } from '@/services/profileExport'
@@ -28,13 +28,9 @@ function formatUpcomingSummary(charges: UpcomingChargeExportRow[]): string {
   return `${charges.length} Regular${charges.length !== 1 ? 's' : ''}`
 }
 
-function formatBudgetSummary(
-  buckets: BudgetBucketExportRow[],
-  hypotheticals: BudgetHypotheticalExportRow[]
-): string {
+function formatBudgetSummary(buckets: BudgetBucketExportRow[]): string {
   if (!Array.isArray(buckets) || buckets.length === 0) return 'None'
-  const hypsArr = Array.isArray(hypotheticals) ? hypotheticals : []
-  return `${buckets.length} bucket${buckets.length !== 1 ? 's' : ''}, ${hypsArr.length} hypothetical${hypsArr.length !== 1 ? 's' : ''}`
+  return `${buckets.length} bucket${buckets.length !== 1 ? 's' : ''}`
 }
 
 function formatNetWorthSummary(
@@ -305,8 +301,18 @@ export function ImportProfileModal() {
               {preview &&
                 (() => {
                   const current = buildExportPayload()
+                  const skipped = describeSkippedSections(preview)
                   return (
                     <div className="mb-3">
+                      {skipped && (
+                        <p className="small text-muted mb-3" role="note">
+                          <i
+                            className="mdi mdi-information-outline me-1"
+                            aria-hidden
+                          />
+                          {skipped}
+                        </p>
+                      )}
                       <div className="mb-2">
                         <Form.Check
                           type="checkbox"
@@ -373,7 +379,7 @@ export function ImportProfileModal() {
                         <Form.Check
                           type="checkbox"
                           id="import-opt-budget-plan"
-                          label="Budget Plan (buckets & hypotheticals)"
+                          label="Budget Plan (buckets)"
                           checked={options.budgetPlan}
                           onChange={(e) =>
                             setOptions((o) => ({
@@ -384,17 +390,10 @@ export function ImportProfileModal() {
                           aria-label="Import budget plan"
                         />
                         <div className="small text-muted ms-4 mt-1">
-                          Current:{' '}
-                          {formatBudgetSummary(
-                            current.budgetBuckets,
-                            current.budgetHypotheticals
-                          )}
+                          Current: {formatBudgetSummary(current.budgetBuckets)}
                           {' → '}
                           New:{' '}
-                          {formatBudgetSummary(
-                            preview.budgetBuckets ?? [],
-                            preview.budgetHypotheticals ?? []
-                          )}
+                          {formatBudgetSummary(preview.budgetBuckets ?? [])}
                         </div>
                       </div>
                       {preview.manualAccounts !== undefined && (

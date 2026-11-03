@@ -124,8 +124,8 @@ export function AnalyticsIndex() {
                 <div>
                   <h6 className="mb-1 fw-semibold">Budget Plan</h6>
                   <p className="mb-0 text-muted small">
-                    Group your expenses into buckets, see weekly, monthly and
-                    yearly totals, and test affordability with hypotheticals.
+                    Group your expenses into buckets and see weekly, monthly and
+                    yearly totals.
                   </p>
                   <span
                     className="small mt-1 d-inline-block"

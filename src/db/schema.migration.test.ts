@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(51)
+    expect(SCHEMA_VERSION).toBe(52)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1319,6 +1319,70 @@ describe('v51 migration: "Possible payday detected" notification removed (#186)'
     expect(
       db.exec(`SELECT type FROM notification_history ORDER BY id`)[0].values
     ).toEqual([['payday']])
+    db.close()
+  })
+})
+
+describe('v52 migration: Hypothetical lines cut (#204)', () => {
+  const tableExists = (db: Database, name: string) =>
+    db.exec(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+      name,
+    ]).length > 0
+
+  it('drops budget_hypotheticals and keeps every other Budget Plan row', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    // The v51 shape of the table, with a line in it.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS budget_hypotheticals (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         bucket_id INTEGER NOT NULL,
+         name TEXT NOT NULL,
+         amount_cents INTEGER NOT NULL,
+         frequency TEXT NOT NULL,
+         is_hypothetical INTEGER NOT NULL DEFAULT 0,
+         created_at TEXT NOT NULL,
+         FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE
+       )`
+    )
+    db.run(
+      `INSERT INTO budget_buckets (id, name, icon, sort_order, created_at)
+       VALUES (7, 'Household', 'mdi-home', 0, '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at, bucket_id)
+       VALUES ('Synthetic rent', 200000, 'MONTHLY', '2026-12-01', '2026-01-01', 7)`
+    )
+    db.run(
+      `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at, bucket_id)
+       VALUES ('Synthetic groceries', 60000, 'MONTHLY', 1, '2026-01-01', '2026-11-01', '2026-12-01', 1, '2026-01-01', 7)`
+    )
+    db.run(
+      `INSERT INTO budget_hypotheticals (bucket_id, name, amount_cents, frequency, is_hypothetical, created_at)
+       VALUES (7, 'Maybe gym', 8000, 'MONTHLY', 1, '2026-01-01')`
+    )
+    db.run(`UPDATE app_settings SET value = '51' WHERE key = 'schema_version'`)
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(tableExists(db, 'budget_hypotheticals')).toBe(false)
+    expect(
+      db.exec(`SELECT id, name, icon FROM budget_buckets`)[0].values
+    ).toEqual([[7, 'Household', 'mdi-home']])
+    expect(
+      db.exec(`SELECT name, bucket_id FROM upcoming_charges`)[0].values
+    ).toEqual([['Synthetic rent', 7]])
+    expect(db.exec(`SELECT name, bucket_id FROM trackers`)[0].values).toEqual([
+      ['Synthetic groceries', 7],
+    ])
+    db.close()
+  })
+
+  it('creates no budget_hypotheticals table on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(tableExists(db, 'budget_hypotheticals')).toBe(false)
     db.close()
   })
 })
