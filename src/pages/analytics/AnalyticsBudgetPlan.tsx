@@ -32,6 +32,7 @@ import { themeStore, resolveTheme } from '@/stores/themeStore'
 import type { BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import type React from 'react'
 import { HelpPopover } from '@/components/HelpPopover'
+import { PlanVsActualPrototype } from './planVsActualPrototype/PlanVsActualPrototype'
 
 // ─── Bucket modal ────────────────────────────────────────────────────────────
 
@@ -261,7 +262,16 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 
+// PROTOTYPE (#174): ?variant= swaps in the plan-vs-actual variants, DEV only.
 export function AnalyticsBudgetPlan() {
+  const [params] = useSearchParams()
+  if (import.meta.env.DEV && params.get('variant')) {
+    return <PlanVsActualPrototype />
+  }
+  return <AnalyticsBudgetPlanReal />
+}
+
+function AnalyticsBudgetPlanReal() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
