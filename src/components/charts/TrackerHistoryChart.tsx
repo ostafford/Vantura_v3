@@ -12,6 +12,7 @@ import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
+import { budgetPercent } from '@/lib/spendingPercent'
 
 const BORDER_COLOR = 'var(--vantura-border, #2c2c3c)'
 const STRIPE_ID = 'tracker-history-stripe'
@@ -147,10 +148,9 @@ export function TrackerHistoryChart({
 
     const showTooltip = (row: TrackerPeriodHistoryRow, event: MouseEvent) => {
       if (!tooltipEl || !container.parentElement) return
-      const pct =
-        row.budget > 0 ? Math.round((row.spent / row.budget) * 100) : 0
+      const pct = budgetPercent(row.spent, row.budget)
       setTooltipContent(tooltipEl, row.periodLabel, [
-        `Spent: ${formatSignedMoney(row.spent)} (${pct}%)`,
+        `Spent: ${formatSignedMoney(row.spent)}${pct === null ? '' : ` (${pct}%)`}`,
         `Budget: $${formatMoney(row.budget)}`,
       ])
       tooltipEl.style.display = 'block'
