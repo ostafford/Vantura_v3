@@ -160,11 +160,112 @@ function RegularRow({ t }: { t: ToGo }) {
   )
 }
 
+type HrBody = 'none' | 'bar' | 'perday' | 'free' | 'all'
+
+/** Options for filling the Headroom card (#181 follow-up). */
+function HeadroomBody({ f, hr }: { f: DashFixture; hr: HrBody }) {
+  const h = headroom(f)
+  const neg = h.headroom < 0
+  const show = (k: HrBody) => hr === k || hr === 'all'
+  const daysLeft = f.daysInMonth - f.day + 1
+  const perDay = Math.floor(h.headroom / daysLeft)
+  const toGoPct = h.onHand > 0 ? Math.min(100, (h.toGo / h.onHand) * 100) : 100
+  const row = 'd-flex justify-content-between align-items-center py-1 gap-2'
+  return (
+    <>
+      {show('bar') && (
+        <div className="mt-2">
+          <div
+            style={{
+              display: 'flex',
+              height: 10,
+              borderRadius: 5,
+              overflow: 'hidden',
+              background: 'var(--bs-tertiary-bg)',
+            }}
+            title="On hand, split into Still to go out and Headroom"
+          >
+            <div style={{ width: `${toGoPct}%`, background: TO_GO }} />
+            {!neg && (
+              <div style={{ flex: 1, background: 'var(--vantura-success)' }} />
+            )}
+          </div>
+          <div
+            className="d-flex justify-content-between mt-1"
+            style={{ fontSize: '0.7rem', color: muted }}
+          >
+            <span>
+              {neg
+                ? 'Still to go out is more than on hand'
+                : `${Math.round(toGoPct)}% of on hand is still going out`}
+            </span>
+          </div>
+        </div>
+      )}
+      {show('perday') && (
+        <div
+          className={`${row} mt-2`}
+          style={{ borderTop: '1px solid var(--bs-border-color)' }}
+        >
+          <span className="d-flex align-items-center gap-2">
+            <i
+              className="mdi mdi-calendar-today-outline"
+              style={{ color: neg ? danger : 'var(--vantura-success)' }}
+              aria-hidden
+            />
+            <Name>{neg ? 'Short per day' : 'About this much a day'}</Name>
+            <span style={{ fontSize: '0.68rem', color: muted }}>
+              {daysLeft} days left
+            </span>
+          </span>
+          <span className="flex-shrink-0">
+            <Fig cents={perDay} />
+          </span>
+        </div>
+      )}
+      {show('free') && (
+        <div
+          className={row}
+          style={{ borderTop: '1px solid var(--bs-border-color)' }}
+        >
+          <span className="d-flex align-items-center gap-2">
+            <i
+              className="mdi mdi-piggy-bank-outline"
+              style={{
+                color: f.freeSoFarCents < 0 ? danger : 'var(--vantura-success)',
+              }}
+              aria-hidden
+            />
+            <Name>Free spending so far</Name>
+            <a href="#" style={{ fontSize: '0.68rem' }}>
+              Budget Plan →
+            </a>
+          </span>
+          <span
+            className="flex-shrink-0"
+            style={{ color: f.freeSoFarCents < 0 ? danger : undefined }}
+          >
+            {f.freeSoFarCents < 0 ? (
+              money(f.freeSoFarCents)
+            ) : (
+              <Fig cents={f.freeSoFarCents} />
+            )}
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function VariantD({ f }: { f: DashFixture }) {
   const h = headroom(f)
   const neg = h.headroom < 0
   const hTone = neg ? 'var(--vantura-danger)' : 'var(--vantura-success)'
   const [params] = useSearchParams()
+  const hr =
+    (['none', 'bar', 'perday', 'free', 'all'] as const).find(
+      (v) => v === params.get('hr')
+    ) ?? 'all'
   const level: InkLevel =
     (['off', 'figures', 'all'] as const).find((v) => v === params.get('ink')) ??
     'figures'
@@ -264,6 +365,7 @@ export function VariantD({ f }: { f: DashFixture }) {
               ? 'Short of what’s still going out this month.'
               : 'Yours after everything still going out this month.'}
           </div>
+          <HeadroomBody f={f} hr={hr} />
         </SumCard>
       </div>
 

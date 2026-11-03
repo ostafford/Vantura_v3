@@ -55,6 +55,16 @@ export function DashboardPrototype() {
             ],
           },
           {
+            param: 'hr',
+            options: [
+              { value: 'none', label: 'Headroom: empty' },
+              { value: 'bar', label: 'Headroom: bar' },
+              { value: 'perday', label: 'Headroom: per day' },
+              { value: 'free', label: 'Headroom: free so far' },
+              { value: 'all', label: 'Headroom: all three' },
+            ],
+          },
+          {
             param: 'ink',
             options: [
               { value: 'off', label: 'Text: plain' },
