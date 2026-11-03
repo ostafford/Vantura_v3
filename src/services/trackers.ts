@@ -1452,9 +1452,11 @@ export function getTrackerPeriodsInRange(
 export interface TrackerTransactionTimelineRow {
   id: string
   date: string
+  /** Signed cents as stored: a purchase is negative, a refund positive. */
   amount: number
   description: string
   status: string
+  /** Running spend through this row: purchases add, refunds subtract. */
   cumulativeSpent: number
 }
 
@@ -1508,14 +1510,13 @@ export function getTrackerTransactionTimeline(
   stmt.free()
   let cumulative = 0
   return raw.map((r) => {
-    // Spend contribution: a debit adds, a refund subtracts.
-    const spend = -r.amount
-    cumulative += spend
+    // A purchase (negative) adds to spend, a refund subtracts.
+    cumulative -= r.amount
     const date = r.created_at ?? r.settled_at ?? ''
     return {
       id: r.id,
       date: date.slice(0, 10),
-      amount: spend,
+      amount: r.amount,
       description: r.description,
       status: r.status,
       cumulativeSpent: cumulative,
@@ -1524,7 +1525,8 @@ export function getTrackerTransactionTimeline(
 }
 
 /**
- * Paginated transactions for a tracker (for detail table). Ordered newest first.
+ * Paginated transactions for a tracker (for detail table). Ordered newest
+ * first. `amount` is as stored: a purchase is negative, a refund positive.
  */
 export function getTrackerTransactionsForTable(
   trackerId: number,
@@ -1579,8 +1581,8 @@ export function getTrackerTransactionsForTable(
     list.push({
       id: r[0],
       date: date.slice(0, 10),
-      // Spend contribution: a debit is positive, a refund negative.
-      amount: -r[4],
+      // As stored: a purchase is negative, a refund positive.
+      amount: r[4],
       description: r[1],
       status: r[5],
     })

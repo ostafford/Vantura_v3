@@ -10,7 +10,11 @@ import {
   type NumberValue,
 } from 'd3'
 import type { TrackerTransactionTimelineRow } from '@/services/trackers'
-import { formatMoney, formatSignedMoney } from '@/lib/format'
+import {
+  formatMoney,
+  formatSignedMoney,
+  formatTransactionAmount,
+} from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -183,7 +187,7 @@ export function TrackerPaceChart({
       .on('mouseover', function (event: MouseEvent, d) {
         if (!tooltipEl || !container.parentElement) return
         setTooltipContent(tooltipEl, d.row!.date, [
-          `${d.row!.description || 'Transaction'}: ${formatSignedMoney(d.row!.amount)}`,
+          `${d.row!.description || 'Transaction'}: ${formatTransactionAmount(d.row!.amount)}`,
           `Cumulative: ${formatSignedMoney(d.row!.cumulativeSpent)}`,
         ])
         tooltipEl.style.display = 'block'

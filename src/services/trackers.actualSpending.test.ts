@@ -265,7 +265,7 @@ describe('tracker transaction lists include refunds', () => {
     expect(list.reduce((s, r) => s - r.amount, 0)).toBe(prev.spent)
   })
 
-  it('the analytics timeline and table net refunds and count them', () => {
+  it('the analytics timeline and table show each row as stored, net refunds and count them', () => {
     const id = weeklyGroceries()
     addTx({ amount: -4000, createdAt: '2026-03-03T10:00:00+11:00' })
     addTx({ amount: 1000, createdAt: '2026-03-04T10:00:00+11:00' })
@@ -279,14 +279,16 @@ describe('tracker transaction lists include refunds', () => {
       dateFrom: '2026-03-02',
       dateTo: '2026-03-09',
     })
-    expect(timeline.map((r) => r.amount)).toEqual([4000, -1000])
+    // Row amounts carry the stored sign, like the Transactions page: a
+    // purchase is negative, a refund positive.
+    expect(timeline.map((r) => r.amount)).toEqual([-4000, 1000])
     expect(timeline[timeline.length - 1].cumulativeSpent).toBe(3000)
 
     const table = getTrackerTransactionsForTable(id, {
       dateFrom: '2026-03-02',
       dateTo: '2026-03-08',
     })
-    expect(table.map((r) => r.amount).sort()).toEqual([-1000, 4000])
+    expect(table.map((r) => r.amount)).toEqual([1000, -4000])
     expect(
       getTrackerTransactionsCount(id, {
         dateFrom: '2026-03-02',

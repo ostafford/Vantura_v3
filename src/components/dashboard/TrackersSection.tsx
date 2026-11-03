@@ -26,16 +26,12 @@ import {
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
-import {
-  formatMoney,
-  formatShortDate,
-  formatSignedMoney,
-  formatDeltaMoney,
-} from '@/lib/format'
+import { formatMoney, formatShortDate, formatSignedMoney } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { HelpPopover } from '@/components/HelpPopover'
+import { TransactionAmount } from '@/components/TransactionAmount'
 import type React from 'react'
 
 const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
@@ -491,9 +487,7 @@ export function TrackersSection({
                                       tx.created_at ?? tx.settled_at ?? ''
                                     )}{' '}
                                     {tx.description}{' '}
-                                    {tx.amount > 0
-                                      ? formatDeltaMoney(tx.amount)
-                                      : `$${formatMoney(Math.abs(tx.amount))}`}
+                                    <TransactionAmount cents={tx.amount} />
                                     {tx.status === 'HELD' && (
                                       <span className="text-muted small ms-1">
                                         (Held)
