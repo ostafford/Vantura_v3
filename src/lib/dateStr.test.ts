@@ -4,7 +4,25 @@ import {
   addDaysToDateStr,
   daysBetweenDateStr,
   calendarPeriodBounds,
+  calendarMonthDayBounds,
 } from './dateStr'
+
+describe('calendarMonthDayBounds', () => {
+  it('gives the first and last day, leap February included', () => {
+    expect(calendarMonthDayBounds('2028-02')).toEqual({
+      first: '2028-02-01',
+      last: '2028-02-29',
+    })
+    expect(calendarMonthDayBounds('2026-02').last).toBe('2026-02-28')
+    expect(calendarMonthDayBounds('2026-12').last).toBe('2026-12-31')
+  })
+
+  it('rejects anything that is not a YYYY-MM month', () => {
+    for (const bad of ['2026-13', '2026-00', '2026-1', '2026-10-01', '']) {
+      expect(() => calendarMonthDayBounds(bad)).toThrow('Invalid month')
+    }
+  })
+})
 
 describe('normalizeDateStr', () => {
   it('trims a datetime string to its date part', () => {

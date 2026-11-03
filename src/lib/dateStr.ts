@@ -33,6 +33,24 @@ export function daysBetweenDateStr(a: string, b: string): number {
 }
 
 /**
+ * First and last day of a calendar month given as `YYYY-MM`, both inclusive,
+ * as `YYYY-MM-DD`. Throws on anything that isn't a real `YYYY-MM` month.
+ */
+export function calendarMonthDayBounds(month: string): {
+  first: string
+  last: string
+} {
+  const match = /^(\d{4})-(\d{2})$/.exec(month)
+  const m = match ? Number(match[2]) : 0
+  if (!match || m < 1 || m > 12) throw new Error(`Invalid month: ${month}`)
+  const lastDay = new Date(Date.UTC(Number(match[1]), m, 0)).getUTCDate()
+  return {
+    first: `${month}-01`,
+    last: `${month}-${String(lastDay).padStart(2, '0')}`,
+  }
+}
+
+/**
  * Calendar bounds for a display period relative to `now`, `offset` periods
  * away (0 = the current one, -1 = the previous, etc.). `from` is inclusive,
  * `to` is exclusive (the first day of the next period). Weeks start Monday.
