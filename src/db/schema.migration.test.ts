@@ -7,9 +7,9 @@
  * current `runMigrations` against it and asserts everything tied to the
  * feature is gone and nothing else is disturbed.
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
-import { runMigrations, SCHEMA_VERSION } from './schema'
+import { runMigrations, runSchema, SCHEMA_VERSION } from './schema'
 
 let SQL: SqlJsStatic
 
@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(48)
+    expect(SCHEMA_VERSION).toBe(51)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1159,6 +1159,166 @@ describe('v48 migration: dismissed suggestions re-keyed by description (#116)', 
       ['NO SUCH RAW TEXT', '2026-03-01'],
       ['PAYPAL *GYM, 4029357733', '2026-03-01'],
     ])
+    db.close()
+  })
+})
+
+describe('v49 migration: PAYDAY trackers move to MONTHLY (#192)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function buildV48(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`UPDATE app_settings SET value = '48' WHERE key = 'schema_version'`)
+    db.run(
+      `INSERT INTO categories (id, name, parent_id) VALUES ('cat-a', 'Cat A', NULL), ('cat-b', 'Cat B', NULL)`
+    )
+    db.run(
+      `INSERT INTO trackers (id, name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at) VALUES
+         (1, 'Pay cycle', 50000, 'PAYDAY', NULL, '2025-11-20', '2026-02-20', '2026-03-20', 1, '2025-11-20T00:00:00Z'),
+         (2, 'Weekly', 10000, 'WEEKLY', 1, '2026-01-05', '2026-03-09', '2026-03-16', 1, '2026-01-05T00:00:00Z'),
+         (3, 'Old pay cycle', 7000, 'PAYDAY', 15, '2025-06-01', '2025-09-15', '2025-10-15', 0, '2025-06-01T00:00:00Z')`
+    )
+    db.run(
+      `INSERT INTO tracker_config_history (id, tracker_id, effective_from, budget_amount, reset_frequency, created_at) VALUES
+         (10, 1, '2025-11-20', 40000, NULL, '2025-11-20T00:00:00Z'),
+         (11, 1, '2026-01-20', 50000, 'PAYDAY', '2026-01-20T00:00:00Z'),
+         (20, 2, '2026-01-05', 10000, 'WEEKLY', '2026-01-05T00:00:00Z')`
+    )
+    db.run(
+      `INSERT INTO tracker_config_history_categories (config_id, category_id) VALUES
+         (10, 'cat-a'), (11, 'cat-a'), (11, 'cat-b'), (20, 'cat-b')`
+    )
+    return db
+  }
+
+  it('rewrites PAYDAY trackers to MONTHLY day 1 with calendar-month reset dates, rewrites their config history, and leaves other trackers alone', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // Local mid-morning on 15 March 2026.
+    vi.setSystemTime(new Date(2026, 2, 15, 10, 0, 0))
+    const db = buildV48()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    const trackers = db.exec(
+      `SELECT id, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, budget_amount, is_active FROM trackers ORDER BY id`
+    )[0].values
+    expect(trackers).toEqual([
+      [1, 'MONTHLY', 1, '2025-11-20', '2026-03-01', '2026-04-01', 50000, 1],
+      [2, 'WEEKLY', 1, '2026-01-05', '2026-03-09', '2026-03-16', 10000, 1],
+      [3, 'MONTHLY', 1, '2025-06-01', '2026-03-01', '2026-04-01', 7000, 0],
+    ])
+
+    const history = db.exec(
+      `SELECT id, tracker_id, effective_from, budget_amount, reset_frequency FROM tracker_config_history ORDER BY id`
+    )[0].values
+    expect(history).toEqual([
+      [10, 1, '2025-11-20', 40000, null],
+      [11, 1, '2026-01-20', 50000, 'MONTHLY'],
+      [20, 2, '2026-01-05', 10000, 'WEEKLY'],
+    ])
+    const cats = db.exec(
+      `SELECT config_id, category_id FROM tracker_config_history_categories ORDER BY config_id, category_id`
+    )[0].values
+    expect(cats).toEqual([
+      [10, 'cat-a'],
+      [11, 'cat-a'],
+      [11, 'cat-b'],
+      [20, 'cat-b'],
+    ])
+    db.close()
+  })
+
+  it('rolls the next reset into the following year in December, by the local date', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 11, 31, 23, 30, 0))
+    const db = buildV48()
+
+    runMigrations(db)
+
+    const row = db.exec(
+      `SELECT last_reset_date, next_reset_date FROM trackers WHERE id = 1`
+    )[0].values[0]
+    expect(row).toEqual(['2026-12-01', '2027-01-01'])
+    db.close()
+  })
+})
+
+describe('v50 migration: Payday nomination settings removed (#194)', () => {
+  it('deletes the nominated pay source settings and leaves the pay amount, pay frequency and payday date alone', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES
+         ('schema_version', '49'),
+         ('payday_raw_text', 'SYNTHETIC EMPLOYER PTY LTD SALARY'),
+         ('payday_description', 'Synthetic Employer'),
+         ('pay_amount_cents', '250000'),
+         ('payday_frequency', 'FORTNIGHTLY'),
+         ('payday_day', '4'),
+         ('next_payday', '2026-11-12')`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'payday_raw_text')).toBeNull()
+    expect(readSetting(db, 'payday_description')).toBeNull()
+    expect(readSetting(db, 'pay_amount_cents')).toBe('250000')
+    expect(readSetting(db, 'payday_frequency')).toBe('FORTNIGHTLY')
+    expect(readSetting(db, 'payday_day')).toBe('4')
+    expect(readSetting(db, 'next_payday')).toBe('2026-11-12')
+    db.close()
+  })
+})
+
+describe('v51 migration: "Possible payday detected" notification removed (#186)', () => {
+  it('deletes its settings and its history rows, and leaves other notifications alone', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `CREATE TABLE notification_history (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         type TEXT NOT NULL,
+         title TEXT NOT NULL,
+         body TEXT NOT NULL,
+         link_path TEXT,
+         link_label TEXT,
+         created_at TEXT NOT NULL,
+         read_at TEXT
+       )`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES
+         ('schema_version', '50'),
+         ('notif_possible_payday', '0'),
+         ('notif_possible_payday_suggested_for', 'SYNTHETIC EMPLOYER SALARY'),
+         ('notif_payday', '1'),
+         ('notif_last_payday_date', '2026-10-30')`
+    )
+    db.run(
+      `INSERT INTO notification_history (type, title, body, created_at) VALUES
+         ('possible_payday', 'Possible payday detected', 'x', '2026-11-01T00:00:00Z'),
+         ('payday', 'Payday landed', 'y', '2026-11-01T00:00:00Z')`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'notif_possible_payday')).toBeNull()
+    expect(readSetting(db, 'notif_possible_payday_suggested_for')).toBeNull()
+    expect(readSetting(db, 'notif_payday')).toBe('1')
+    expect(readSetting(db, 'notif_last_payday_date')).toBe('2026-10-30')
+    expect(
+      db.exec(`SELECT type FROM notification_history ORDER BY id`)[0].values
+    ).toEqual([['payday']])
     db.close()
   })
 })

@@ -38,7 +38,7 @@ const { getReservedAmount } = await import('./balance')
 const { getEssentialsCoverage } = await import('./essentialsCoverage')
 const { getProjectedNetWorth } = await import('./netWorth')
 const {
-  regularsByPayday,
+  regularsByMonth,
   regularOccurrencesInMonth,
   dueSoonRegulars,
   linkedLiabilityRepayments,
@@ -381,13 +381,12 @@ describe('Regulars readers — characterisation (#159)', () => {
     `)
   })
 
-  it('Overdue / Next pay / Later grouping', () => {
-    const g = regularsByPayday()
+  it('Overdue / This month / Later grouping', () => {
+    const g = regularsByMonth()
     expect({
       overdue: brief(g.overdue),
-      nextPay: brief(g.nextPay),
+      thisMonth: brief(g.thisMonth),
       later: brief(g.later),
-      nextPayday: g.nextPayday,
     }).toMatchInlineSnapshot(`
       {
         "later": [
@@ -396,7 +395,10 @@ describe('Regulars readers — characterisation (#159)', () => {
           "2025-03-20 Car rego",
           "2025-04-02 Water",
         ],
-        "nextPay": [
+        "overdue": [
+          "2025-02-10 Concert",
+        ],
+        "thisMonth": [
           "2025-02-24 Gym",
           "2025-02-24 Spotify",
           "2025-02-25 Netflix",
@@ -406,19 +408,16 @@ describe('Regulars readers — characterisation (#159)', () => {
           "2025-02-28 Car loan",
           "2025-02-28 Phone",
         ],
-        "nextPayday": "2025-03-07",
-        "overdue": [
-          "2025-02-10 Concert",
-        ],
       }
     `)
   })
 
   it('grouping returns full rows (projected date, all fields)', () => {
-    expect(regularsByPayday().nextPay).toMatchInlineSnapshot(`
+    expect(regularsByMonth().thisMonth).toMatchInlineSnapshot(`
       [
         {
           "amount": 1500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -433,6 +432,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1299,
+          "bucket_id": 1,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -447,6 +447,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1599,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": "tv-and-music",
           "charge_type": "EXPENSE",
@@ -461,6 +462,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 18000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -475,6 +477,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 20000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -489,6 +492,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 80000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -503,6 +507,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 45000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -517,6 +522,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 4500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -530,37 +536,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "reminder_days_before": 10,
         },
       ]
-    `)
-  })
-
-  it('grouping with no payday configured', () => {
-    delete appSettings['next_payday']
-    const g = regularsByPayday()
-    expect({
-      overdue: brief(g.overdue),
-      nextPay: brief(g.nextPay),
-      later: brief(g.later),
-    }).toMatchInlineSnapshot(`
-      {
-        "later": [
-          "2025-02-24 Gym",
-          "2025-02-24 Spotify",
-          "2025-02-25 Netflix",
-          "2025-02-26 Electricity",
-          "2025-02-27 Card repayment",
-          "2025-02-28 Rent",
-          "2025-02-28 Car loan",
-          "2025-02-28 Phone",
-          "2025-03-10 Streaming",
-          "2025-03-15 Domain",
-          "2025-03-20 Car rego",
-          "2025-04-02 Water",
-        ],
-        "nextPay": [],
-        "overdue": [
-          "2025-02-10 Concert",
-        ],
-      }
     `)
   })
 
@@ -646,6 +621,7 @@ describe('Regulars readers — characterisation (#159)', () => {
       [
         {
           "amount": 1299,
+          "bucket_id": 1,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -660,6 +636,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1599,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": "tv-and-music",
           "charge_type": "EXPENSE",
@@ -674,6 +651,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 18000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -688,6 +666,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 80000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -702,6 +681,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 4500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -723,6 +703,7 @@ describe('Regulars readers — characterisation (#159)', () => {
       [
         {
           "amount": 45000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -740,10 +721,11 @@ describe('Regulars readers — characterisation (#159)', () => {
   })
 
   it('by id returns the stored, unprojected date', () => {
-    const phone = regularsByPayday().nextPay.find((r) => r.name === 'Phone')!
+    const phone = regularsByMonth().thisMonth.find((r) => r.name === 'Phone')!
     expect(regularById(phone.id)).toMatchInlineSnapshot(`
       {
         "amount": 4500,
+        "bucket_id": null,
         "cancel_by_date": null,
         "category_id": null,
         "charge_type": "EXPENSE",

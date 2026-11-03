@@ -64,7 +64,6 @@ export type NotifType =
   | 'tracker_pace'
   | 'spendable_low'
   | 'payday'
-  | 'possible_payday'
   | 'large_tx'
   | 'saver_milestone'
   | 'sync_stale'

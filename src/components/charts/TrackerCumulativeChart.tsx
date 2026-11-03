@@ -10,7 +10,11 @@ import {
   type NumberValue,
 } from 'd3'
 import type { TrackerTransactionTimelineRow } from '@/services/trackers'
-import { formatMoney } from '@/lib/format'
+import {
+  formatMoney,
+  formatSignedMoney,
+  formatTransactionAmount,
+} from '@/lib/format'
 import {
   estimateLeftAxisValueLabelSpace,
   estimateBottomAxisLabelSpace,
@@ -93,8 +97,8 @@ export function TrackerCumulativeChart({
     ) => {
       if (!tooltipEl || !container.parentElement) return
       setTooltipContent(tooltipEl, row.date, [
-        `${row.description || 'Transaction'}: $${formatMoney(row.amount)}`,
-        `Cumulative: $${formatMoney(row.cumulativeSpent)}`,
+        `${row.description || 'Transaction'}: ${formatTransactionAmount(row.amount)}`,
+        `Cumulative: ${formatSignedMoney(row.cumulativeSpent)}`,
       ])
       tooltipEl.style.display = 'block'
       positionTooltip(tooltipEl, container, event, 160, 52)

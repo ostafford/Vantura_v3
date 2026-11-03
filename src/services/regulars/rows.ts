@@ -30,6 +30,11 @@ export interface Regular {
   linked_manual_account_id: number | null
   /** Up `description` of the Regular's linked payments (docs/adr/0020). */
   match_description: string | null
+  /**
+   * Budget Plan bucket (`null` = not in a bucket). Membership only — it never
+   * decides where money counts.
+   */
+  bucket_id: number | null
 }
 
 type RegularTuple = [
@@ -45,6 +50,7 @@ type RegularTuple = [
   string,
   number | null,
   string | null,
+  number | null,
 ]
 
 /**
@@ -55,7 +61,7 @@ export function readRegulars(db: Database): Regular[] {
   const stmt = db.prepare(
     `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
       reminder_days_before, cancel_by_date, charge_type, linked_manual_account_id,
-      match_description
+      match_description, bucket_id
      FROM upcoming_charges ORDER BY id`
   )
   const rows: Regular[] = []
@@ -74,6 +80,7 @@ export function readRegulars(db: Database): Regular[] {
       charge_type: r[9] as Regular['charge_type'],
       linked_manual_account_id: r[10] ?? null,
       match_description: r[11] ?? null,
+      bucket_id: r[12] ?? null,
     })
   }
   stmt.free()

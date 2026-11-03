@@ -307,8 +307,7 @@ export function Help() {
                   <p className="mb-0">
                     Choose your pay frequency (weekly, fortnightly, or monthly)
                     and your next payday date. This drives the Spendable balance
-                    calculation, Payday tracker resets, and how Regulars are
-                    grouped.
+                    calculation.
                   </p>
                   <Tip>
                     You can optionally set your pay amount in Settings → Payday.
@@ -351,7 +350,7 @@ export function Help() {
                     </li>
                     <li>
                       <strong>Regulars</strong> — bills and subscriptions
-                      grouped by Next pay and Later
+                      grouped by Overdue, This month and Later
                     </li>
                   </ul>
                   <Tip>
@@ -425,13 +424,8 @@ export function Help() {
                     <li className="mb-1">
                       <strong>Fortnightly</strong> — resets every two weeks
                     </li>
-                    <li className="mb-1">
-                      <strong>Monthly</strong> — resets on the 1st of each month
-                    </li>
                     <li>
-                      <strong>Payday</strong> — resets on your next payday
-                      instead of a fixed calendar date; useful when you want
-                      your budget to align with your income cycle
+                      <strong>Monthly</strong> — resets on the 1st of each month
                     </li>
                   </ul>
 
@@ -487,12 +481,15 @@ export function Help() {
                   </SectionHeading>
                   <ul className="mb-0 ps-3">
                     <li className="mb-1">
-                      <strong>Next pay</strong> — charges due before your next
-                      payday
+                      <strong>Overdue</strong> — one-off charges whose date has
+                      passed
+                    </li>
+                    <li className="mb-1">
+                      <strong>This month</strong> — charges next due by the end
+                      of this calendar month
                     </li>
                     <li>
-                      <strong>Later</strong> — charges due after your next
-                      payday
+                      <strong>Later</strong> — charges next due after this month
                     </li>
                   </ul>
                 </>
@@ -699,22 +696,11 @@ export function Help() {
                   </p>
 
                   <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
-                  <p className="mb-1">
-                    Your payday frequency and date affect three things:
+                  <p className="mb-2">
+                    Your payday frequency and date affect{' '}
+                    <strong>Spendable</strong>: only charges due before your
+                    next payday are reserved in the calculation.
                   </p>
-                  <ul className="mb-2 ps-3">
-                    <li className="mb-1">
-                      <strong>Spendable</strong> — only charges due before your
-                      next payday are reserved in the calculation
-                    </li>
-                    <li className="mb-1">
-                      <strong>Payday trackers</strong> — reset on your next
-                      payday
-                    </li>
-                    <li>
-                      <strong>Regulars grouping</strong> — Next pay vs Later
-                    </li>
-                  </ul>
                   <Tip>
                     Set your <strong>pay amount</strong> here to enable the Free
                     Spending figure in Budget Plan and the post-payday

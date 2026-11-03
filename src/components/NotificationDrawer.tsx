@@ -44,7 +44,6 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
     color: 'var(--vantura-danger-text)',
   },
   payday: { icon: 'mdi-cash-check', color: 'var(--vantura-success-text)' },
-  possible_payday: { icon: 'mdi-cash-plus', color: 'var(--vantura-primary)' },
   large_tx: {
     icon: 'mdi-receipt-text-outline',
     color: 'var(--vantura-info-text)',
@@ -88,12 +87,7 @@ const SECTIONS = [
   {
     key: 'activity',
     label: 'Activity',
-    types: new Set([
-      'payday',
-      'possible_payday',
-      'large_tx',
-      'saver_milestone',
-    ]),
+    types: new Set(['payday', 'large_tx', 'saver_milestone']),
   },
   {
     key: 'system',

@@ -2,8 +2,7 @@
  * Trackers: CRUD and progress (spent in period per 05_Calculation_logic 5.1).
  */
 
-import { getDb, getAppSetting, schedulePersist } from '@/db'
-import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
+import { getDb, schedulePersist } from '@/db'
 import { localDateString, formatShortDate } from '@/lib/format'
 import {
   addDaysToDateStr,
@@ -11,17 +10,29 @@ import {
   normalizeDateStr,
   calendarPeriodBounds,
 } from '@/lib/dateStr'
+import { actualSpendingWhere } from '@/services/actualSpending'
 import {
   toPeriodCents,
   toDailyRateCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 
+/**
+ * Every tracker cadence, in display order, with its label — the one list the
+ * write-path check and the frequency pickers read.
+ */
+export const TRACKER_RESET_FREQUENCIES = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+] as const
+
 export type TrackerResetFrequency =
-  | 'WEEKLY'
-  | 'FORTNIGHTLY'
-  | 'MONTHLY'
-  | 'PAYDAY'
+  (typeof TRACKER_RESET_FREQUENCIES)[number]['value']
+
+/** Tracker cadences in display order. */
+export const TRACKER_RESET_FREQUENCY_ORDER: readonly TrackerResetFrequency[] =
+  TRACKER_RESET_FREQUENCIES.map((f) => f.value)
 
 export interface TrackerRow {
   id: number
@@ -108,39 +119,55 @@ export function getTrackerSpent(trackerId: number): number {
 }
 
 /**
- * Spent in a specific period (cents). Same filters as getTrackerSpent but with explicit bounds.
+ * The tracker-spend predicate: Actual spending (`actualSpending.ts`) in
+ * `categoryIds`, on local Display days from `fromDay` through `toDay`, both
+ * inclusive. Either bound may be omitted (open-ended). Never restate the
+ * Actual spending filters here — narrow the shared definition.
+ */
+function trackerSpendingWhere(
+  categoryIds: readonly string[],
+  window: { fromDay?: string; toDay?: string } = {}
+): { sql: string; params: string[] } {
+  return actualSpendingWhere(
+    {
+      from: window.fromDay ? normDate(window.fromDay) : undefined,
+      to: window.toDay ? normDate(window.toDay) : undefined,
+      categoryIds,
+    },
+    't'
+  )
+}
+
+/**
+ * Tracker windows are `[start, end)` days; Actual spending windows are
+ * inclusive local days. The last included day is the day before `end`.
+ */
+function lastDayBefore(exclusiveEnd: string): string {
+  return addDaysToDateStr(normDate(exclusiveEnd), -1)
+}
+
+/**
+ * Spent in a specific period `[periodStart, periodEnd)` (cents), against the
+ * tracker's current category set. Actual spending: signed net (refunds
+ * subtract), may be negative.
  */
 export function getTrackerSpentInPeriod(
   trackerId: number,
   periodStart: string,
   periodEnd: string
 ): number {
-  const db = getDb()
-  if (!db) return 0
-  const startNorm =
-    periodStart.length >= 10 ? periodStart.slice(0, 10) : periodStart
-  const endNorm = periodEnd.length >= 10 ? periodEnd.slice(0, 10) : periodEnd
-  const stmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
-     FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ?
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+  return getSpentForCategoriesInPeriod(
+    getTrackerCategoryIds(trackerId),
+    periodStart,
+    periodEnd
   )
-  stmt.bind([trackerId, startNorm, endNorm])
-  stmt.step()
-  const row = stmt.get()
-  stmt.free()
-  return row ? Number(row[0]) : 0
 }
 
 /**
  * Spent (cents) against an explicit category set over `[periodStart, periodEnd)`.
- * Same transaction filters as getTrackerSpentInPeriod, but the category set is
- * passed in rather than joined from tracker_categories — used by the #16 split
- * calc, where each period segment has its own historical category set.
+ * Actual spending narrowed to the set and window — signed net, never clamped.
+ * Used by the #16 split calc, where each period segment has its own
+ * historical category set.
  */
 export function getSpentForCategoriesInPeriod(
   categoryIds: string[],
@@ -149,16 +176,16 @@ export function getSpentForCategoriesInPeriod(
 ): number {
   const db = getDb()
   if (!db || categoryIds.length === 0) return 0
-  const placeholders = categoryIds.map(() => '?').join(',')
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: periodStart,
+    toDay: lastDayBefore(periodEnd),
+  })
   const stmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
+    `SELECT COALESCE(-SUM(t.amount), 0) as spent
      FROM transactions t
-     WHERE t.category_id IN (${placeholders})
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+     WHERE ${sql}`
   )
-  stmt.bind([...categoryIds, normDate(periodStart), normDate(periodEnd)])
+  stmt.bind(params)
   stmt.step()
   const row = stmt.get()
   stmt.free()
@@ -390,10 +417,6 @@ function stepBackOnePeriod(
   periodEnd: string
 ): string {
   const from = new Date(periodEnd + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    const prev = getPreviousPaydayDate(periodEnd)
-    return prev ?? periodEnd
-  }
   if (frequency === 'WEEKLY') {
     const d = new Date(from)
     d.setUTCDate(d.getUTCDate() - 7)
@@ -413,20 +436,6 @@ function stepBackOnePeriod(
     return d.toISOString().slice(0, 10)
   }
   return periodEnd
-}
-
-/** Previous payday date before fromDate, using app_settings payday_frequency and payday_day. */
-function getPreviousPaydayDate(fromDate: string): string | null {
-  const frequency = getAppSetting('payday_frequency')
-  const dayStr = getAppSetting('payday_day')
-  if (
-    frequency !== 'WEEKLY' &&
-    frequency !== 'FORTNIGHTLY' &&
-    frequency !== 'MONTHLY'
-  )
-    return null
-  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  return previousPaydayDate(fromDate, frequency as PaydayFrequency, paydayDay)
 }
 
 /** Period bounds for a tracker and period offset. 0 = current period, -1 = previous, etc. */
@@ -497,23 +506,6 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
   }
   stmt.free()
   return list
-}
-
-/**
- * Total budgeted across PAYDAY-frequency trackers, optionally excluding one tracker
- * (the one being edited, so its pending value can be added back separately).
- */
-export function calculatePaydayBudgetTotal(
-  trackers: Array<{
-    id: number
-    reset_frequency: string
-    budget_amount: number
-  }>,
-  excludeId?: number
-): number {
-  return trackers
-    .filter((t) => t.reset_frequency === 'PAYDAY' && t.id !== excludeId)
-    .reduce((sum, t) => sum + t.budget_amount, 0)
 }
 
 export interface TrackerDisplayPeriodData {
@@ -670,7 +662,11 @@ export type TrackerPeriodTransaction = {
   status: string
 }
 
-/** Spending rows for one category set over [start, end), newest first, capped at `limit`. */
+/**
+ * Actual spending rows (debits and refunds) for one category set over
+ * [start, end), newest first, capped at `limit`. `amount` is as stored, so the
+ * negated sum of the rows equals the spend.
+ */
 function readTrackerTxRows(
   db: NonNullable<ReturnType<typeof getDb>>,
   categoryIds: string[],
@@ -679,17 +675,17 @@ function readTrackerTxRows(
   limit: number
 ): TrackerPeriodTransaction[] {
   if (categoryIds.length === 0) return []
-  const placeholders = categoryIds.map(() => '?').join(',')
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: startNorm,
+    toDay: lastDayBefore(endNorm),
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     WHERE t.category_id IN (${placeholders})
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ?`
   )
-  stmt.bind([...categoryIds, startNorm, endNorm, limit])
+  stmt.bind([...params, limit])
   const rows: TrackerPeriodTransaction[] = []
   while (stmt.step()) {
     const r = stmt.get() as [
@@ -856,9 +852,6 @@ function getLastResetDate(
   fromDate: string
 ): string {
   const from = new Date(fromDate + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    return fromDate
-  }
   if (frequency === 'WEEKLY') {
     const targetUTCDay = resetDayToUTCDay(resetDay)
     const currentUTCDay = from.getUTCDay()
@@ -900,10 +893,6 @@ function getNextResetDate(
   fromDate: string
 ): string {
   const from = new Date(fromDate + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    return nextPayday ?? from.toISOString().slice(0, 10)
-  }
   let next: Date
   if (frequency === 'WEEKLY') {
     const targetUTCDay = resetDayToUTCDay(resetDay)
@@ -1013,7 +1002,8 @@ export function deleteTrackerConfigHistory(
 /**
  * Record the config-history effect of an `updateTracker` edit (#16, #38):
  * - frequency / reset-day change, transitional (the common case) → keep the
- *   timeline; stamp every existing row (`effective_from <= today`) with the OLD
+ *   timeline; stamp each untagged row (`effective_from <= today`, no
+ *   `reset_frequency` yet — the rows that had the OLD cadence) with the OLD
  *   cadence so the split prices the pre-transition part of the transitional
  *   period at that daily rate, then write a version effective tomorrow carrying
  *   the NEW cadence + budget + categories;
@@ -1066,9 +1056,12 @@ function maintainConfigHistoryOnEdit(args: {
       return
     }
     // Transitional: the pre-transition part of the current period is priced
-    // against the old cadence's daily rate.
+    // against the old cadence's daily rate. Only untagged rows had the old
+    // cadence (NULL = "the tracker's frequency", which was the old one); a row
+    // already tagged by an earlier change keeps the cadence it was written in.
     db.run(
-      `UPDATE tracker_config_history SET reset_frequency = ? WHERE tracker_id = ? AND effective_from <= ?`,
+      `UPDATE tracker_config_history SET reset_frequency = ?
+       WHERE tracker_id = ? AND effective_from <= ? AND reset_frequency IS NULL`,
       [existing.reset_frequency, id, today]
     )
     const hasBaseline = getTrackerConfigHistory(id).some(
@@ -1127,14 +1120,10 @@ function maintainConfigHistoryOnEdit(args: {
 }
 
 /**
- * Create tracker and set start_date, last_reset_date, next_reset_date.
- * For PAYDAY use app_settings next_payday; for others use period start (e.g. last Monday) so the tracker shows the full frequency window.
- */
-/**
  * Whether `resetDay` is valid for `resetFrequency` (#150): WEEKLY / FORTNIGHTLY
  * take an ISO weekday 1–7, MONTHLY a day of month 1–28 (the period maths is
- * only correct up to 28). PAYDAY ignores the value, so it may be null or any
- * day the form can write (1–28). An unknown frequency is never valid.
+ * only correct up to 28). An unknown frequency (including the removed PAYDAY,
+ * #192) is never valid.
  */
 export function isValidTrackerResetDay(
   resetFrequency: string,
@@ -1151,8 +1140,6 @@ export function isValidTrackerResetDay(
       return inRange(7)
     case 'MONTHLY':
       return inRange(28)
-    case 'PAYDAY':
-      return resetDay == null || inRange(28)
     default:
       return false
   }
@@ -1176,6 +1163,13 @@ function assertValidResetDay(
   resetFrequency: string,
   resetDay: number | null
 ): void {
+  if (
+    !(TRACKER_RESET_FREQUENCY_ORDER as readonly string[]).includes(
+      resetFrequency
+    )
+  ) {
+    throw new Error('INVALID_RESET_FREQUENCY')
+  }
   if (!isValidTrackerResetDay(resetFrequency, resetDay)) {
     throw new Error('INVALID_RESET_DAY')
   }
@@ -1194,17 +1188,10 @@ export function createTracker(
   assertCategoriesAvailable(categoryIds)
   const now = new Date().toISOString()
   const today = localDateString()
-  let lastReset: string
-  let nextReset: string
-  if (resetFrequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
-    nextReset = nextPayday
-    lastReset = getPreviousPaydayDate(nextPayday) ?? today
-  } else {
-    lastReset = getLastResetDate(resetFrequency, resetDay, today)
-    nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
-  }
+  // Period start (e.g. last Monday) so the tracker shows the full frequency
+  // window, not just from the creation day.
+  const lastReset = getLastResetDate(resetFrequency, resetDay, today)
+  const nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
   db.run(
     `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
@@ -1264,11 +1251,6 @@ export function updateTracker(
   if (!needsPeriodReset) {
     lastReset = existing!.last_reset_date
     nextReset = existing!.next_reset_date
-  } else if (resetFrequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
-    nextReset = nextPayday
-    lastReset = getPreviousPaydayDate(nextPayday) ?? today
   } else {
     lastReset = getLastResetDate(resetFrequency, resetDay, today)
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
@@ -1479,9 +1461,11 @@ export function getTrackerPeriodsInRange(
 export interface TrackerTransactionTimelineRow {
   id: string
   date: string
+  /** Signed cents as stored: a purchase is negative, a refund positive. */
   amount: number
   description: string
   status: string
+  /** Running spend through this row: purchases add, refunds subtract. */
   cumulativeSpent: number
 }
 
@@ -1492,26 +1476,20 @@ export function getTrackerTransactionTimeline(
   const db = getDb()
   if (!db) return []
   const limit = options?.limit ?? 1000
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) < ?'
-    params.push(options.dateTo)
-  }
-  params.push(limit)
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return []
+  // dateTo is exclusive here (a period end).
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo ? lastDayBefore(options.dateTo) : undefined,
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) ASC LIMIT ?`
   )
-  stmt.bind(params)
+  stmt.bind([...params, limit])
   const raw: Array<{
     id: string
     description: string
@@ -1541,13 +1519,13 @@ export function getTrackerTransactionTimeline(
   stmt.free()
   let cumulative = 0
   return raw.map((r) => {
-    const absAmount = Math.abs(r.amount)
-    cumulative += absAmount
+    // A purchase (negative) adds to spend, a refund subtracts.
+    cumulative -= r.amount
     const date = r.created_at ?? r.settled_at ?? ''
     return {
       id: r.id,
       date: date.slice(0, 10),
-      amount: absAmount,
+      amount: r.amount,
       description: r.description,
       status: r.status,
       cumulativeSpent: cumulative,
@@ -1556,7 +1534,8 @@ export function getTrackerTransactionTimeline(
 }
 
 /**
- * Paginated transactions for a tracker (for detail table). Ordered newest first.
+ * Paginated transactions for a tracker (for detail table). Ordered newest
+ * first. `amount` is as stored: a purchase is negative, a refund positive.
  */
 export function getTrackerTransactionsForTable(
   trackerId: number,
@@ -1577,27 +1556,20 @@ export function getTrackerTransactionsForTable(
   if (!db) return []
   const limit = options?.limit ?? 50
   const offset = options?.offset ?? 0
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter +=
-      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
-    params.push(options.dateTo)
-  }
-  params.push(limit, offset)
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return []
+  // dateTo is inclusive here (a picked day).
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo,
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ? OFFSET ?`
   )
-  stmt.bind(params)
+  stmt.bind([...params, limit, offset])
   const list: Array<{
     id: string
     date: string
@@ -1618,7 +1590,8 @@ export function getTrackerTransactionsForTable(
     list.push({
       id: r[0],
       date: date.slice(0, 10),
-      amount: Math.abs(r[4]),
+      // As stored: a purchase is negative, a refund positive.
+      amount: r[4],
       description: r[1],
       status: r[5],
     })
@@ -1636,22 +1609,14 @@ export function getTrackerTransactionsCount(
 ): number {
   const db = getDb()
   if (!db) return 0
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter +=
-      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
-    params.push(options.dateTo)
-  }
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return 0
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo,
+  })
   const stmt = db.prepare(
-    `SELECT COUNT(*) as n FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}`
+    `SELECT COUNT(*) as n FROM transactions t WHERE ${sql}`
   )
   stmt.bind(params)
   stmt.step()
@@ -1745,7 +1710,6 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
 export const __test__ = {
   daysBetween,
   stepBackOnePeriod,
-  getPreviousPaydayDate,
   getLastResetDate,
   getNextResetDate,
 }

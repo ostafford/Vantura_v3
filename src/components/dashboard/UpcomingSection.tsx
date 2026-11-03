@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from 'react-bootstrap'
 import {
-  regularsByPayday,
+  regularsByMonth,
   regularById,
   deleteRegular,
   daysUntilCharge,
@@ -107,8 +107,8 @@ export function UpcomingSection({
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
   const [settlementSearch, setSettlementSearch] = useState('')
 
-  const { overdue, nextPay, later, nextPayday } = useMemo(
-    () => regularsByPayday(),
+  const { overdue, thisMonth, later } = useMemo(
+    () => regularsByMonth(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt, today]
   )
@@ -263,21 +263,24 @@ export function UpcomingSection({
     setShowModal(true)
   }
 
-  const nextPayTotal = nextPay.reduce((s, c) => s + c.amount, 0)
+  const thisMonthTotal = thisMonth.reduce((s, c) => s + c.amount, 0)
   const laterTotal = later.reduce((s, c) => s + c.amount, 0)
-  const hasScheduled = nextPay.length > 0 || later.length > 0
+  const hasScheduled = thisMonth.length > 0 || later.length > 0
   const hasAny = overdue.length > 0 || hasScheduled
-  const totalCount = nextPay.length + later.length
+  const totalCount = thisMonth.length + later.length
   const isCapped = !showAll && totalCount > DEFAULT_VISIBLE_COUNT
-  // Next pay charges are more time-sensitive, so they claim the visible
+  // This month's charges are more time-sensitive, so they claim the visible
   // slots first; Later fills whatever's left of the default count.
-  const visibleNextPay = isCapped
-    ? nextPay.slice(0, DEFAULT_VISIBLE_COUNT)
-    : nextPay
+  const visibleThisMonth = isCapped
+    ? thisMonth.slice(0, DEFAULT_VISIBLE_COUNT)
+    : thisMonth
   const visibleLater = isCapped
-    ? later.slice(0, Math.max(0, DEFAULT_VISIBLE_COUNT - visibleNextPay.length))
+    ? later.slice(
+        0,
+        Math.max(0, DEFAULT_VISIBLE_COUNT - visibleThisMonth.length)
+      )
     : later
-  const hiddenCount = totalCount - visibleNextPay.length - visibleLater.length
+  const hiddenCount = totalCount - visibleThisMonth.length - visibleLater.length
 
   function reminderLabel(c: Regular): string | null {
     if (c.reminder_days_before == null || c.reminder_days_before < 0)
@@ -410,7 +413,7 @@ export function UpcomingSection({
             <HelpPopover
               id="upcoming-help"
               title="Regulars"
-              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into Next pay (before your next payday) and Later, each showing the face-value total of what's listed. Regulars marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for Regulars' total below is just that subset: weekly/fortnightly ones count each occurrence before your next payday, monthly-or-rarer ones count once in full, so it won't match the group totals above."
+              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into This month (due by the end of this calendar month) and Later, each showing the face-value total of what's listed. Regulars marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for Regulars' total below is just that subset: weekly/fortnightly ones count each occurrence before your next payday, monthly-or-rarer ones count once in full, so it won't match the group totals above."
               ariaLabel="What are Regulars?"
             />
           </div>
@@ -448,11 +451,6 @@ export function UpcomingSection({
           </div>
         </Card.Header>
         <Card.Body>
-          {nextPayday && (
-            <p className="small text-muted mb-2">
-              Next pay day — {formatShortDate(nextPayday)}
-            </p>
-          )}
           {!hasAny ? (
             <p className="text-muted small mb-0">
               No Regulars yet. Add one to track.
@@ -463,15 +461,15 @@ export function UpcomingSection({
               {hasScheduled &&
                 (isMobile ? (
                   <div className="upcoming-list-vertical">
-                    {visibleNextPay.length > 0 && (
+                    {visibleThisMonth.length > 0 && (
                       <div className="mb-3">
                         <div className="d-flex justify-content-between align-items-center mb-2">
-                          <strong>Next pay</strong>
+                          <strong>This month</strong>
                           <span className="text-danger fw-normal small">
-                            ${formatMoney(nextPayTotal)} total
+                            ${formatMoney(thisMonthTotal)} total
                           </span>
                         </div>
-                        {visibleNextPay.map((c) => {
+                        {visibleThisMonth.map((c) => {
                           const dueLabel = reminderLabel(c)
                           return (
                             <Card
@@ -603,20 +601,20 @@ export function UpcomingSection({
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleNextPay.length > 0 && (
+                      {visibleThisMonth.length > 0 && (
                         <>
                           <tr className="upcoming-section-header">
                             <td colSpan={4}>
                               <div className="d-flex justify-content-between align-items-center page-title">
-                                <strong>Next pay</strong>
+                                <strong>This month</strong>
                                 <span className="text-danger fw-normal">
-                                  ${formatMoney(nextPayTotal)}{' '}
+                                  ${formatMoney(thisMonthTotal)}{' '}
                                   <span className="text-muted">total</span>
                                 </span>
                               </div>
                             </td>
                           </tr>
-                          {visibleNextPay.map(renderDataRow)}
+                          {visibleThisMonth.map(renderDataRow)}
                         </>
                       )}
                       {visibleLater.length > 0 && (

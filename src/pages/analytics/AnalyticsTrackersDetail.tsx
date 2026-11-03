@@ -25,11 +25,13 @@ import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { getCategories } from '@/services/categories'
 import {
   formatMoney,
+  formatSignedMoney,
   formatDate,
   formatShortDate,
   formatShortDateWithYear,
 } from '@/lib/format'
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
+import { TransactionAmount } from '@/components/TransactionAmount'
 import { buildCalendarPeriodHistory } from './trackerPeriodHistory'
 import { TrackerHistoryChart } from '@/components/charts/TrackerHistoryChart'
 import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
@@ -127,12 +129,12 @@ export function AnalyticsTrackersDetail() {
   )
 
   // #17 — informational "came in under / over budget" for the most recently
-  // completed period. Only when there was real spend, so a pre-creation
-  // fabricated period can't read as a $0-spend "win".
+  // completed period. Only when there was real spend (net, so possibly
+  // negative), so a pre-creation fabricated period can't read as a $0-spend "win".
   const lastCompletedPeriod = useMemo(
     () =>
       effectivePeriodHistory.find(
-        (p) => p.periodOffset === -1 && p.spent > 0
+        (p) => p.periodOffset === -1 && p.spent !== 0
       ) ?? null,
     [effectivePeriodHistory]
   )
@@ -241,7 +243,8 @@ export function AnalyticsTrackersDetail() {
       budget,
       remaining: Math.max(0, budget - spent),
       overBy: Math.max(0, spent - budget),
-      progress: budget > 0 ? Math.min(100, (spent / budget) * 100) : 0,
+      progress:
+        budget > 0 ? Math.max(0, Math.min(100, (spent / budget) * 100)) : 0,
       daysLeft,
       totalDays,
       dailyAllowed,
@@ -358,7 +361,7 @@ export function AnalyticsTrackersDetail() {
                     <div>
                       <div className="small text-muted">Spent</div>
                       <div className="fw-semibold">
-                        ${formatMoney(paceStats.spent)}
+                        {formatSignedMoney(paceStats.spent)}
                       </div>
                     </div>
                     <div>
@@ -655,7 +658,7 @@ export function AnalyticsTrackersDetail() {
                               </Badge>
                             </td>
                             <td className="text-end">
-                              ${formatMoney(tx.amount)}
+                              <TransactionAmount cents={tx.amount} />
                             </td>
                           </tr>
                         ))}

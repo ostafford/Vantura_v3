@@ -9,7 +9,7 @@ import {
   type Selection,
 } from 'd3'
 import type { InsightsChartDatum, InsightsChartRow } from '@/types/charts'
-import { formatDollars } from '@/lib/format'
+import { formatDollars, formatSignedMoney } from '@/lib/format'
 import {
   estimateLeftAxisLabelSpace,
   estimateLeftAxisValueLabelSpace,
@@ -122,7 +122,7 @@ export function InsightsBarChart({
     const showTooltip = (datum: InsightsChartDatum, event: MouseEvent) => {
       if (!tooltipEl || !container.parentElement) return
       setTooltipContent(tooltipEl, datum.name, [
-        `$${formatDollars(datum.totalDollars)} spent`,
+        `${formatSignedMoney(Math.round(datum.totalDollars * 100))} spent`,
       ])
       tooltipEl.style.display = 'block'
       positionTooltip(tooltipEl, container, event, 120, 44)
@@ -133,6 +133,10 @@ export function InsightsBarChart({
     }
 
     const formatTickLabel = (key: string) => labelByKey[key] ?? key
+    // A category can net negative (refunds > purchases). The scale stays
+    // 0..maxDomain; only the bar's extent floors at zero — the tooltip and
+    // table keep the sign.
+    const barValue = (d: InsightsChartDatum) => Math.max(0, d.totalDollars)
 
     if (isMobile) {
       data.forEach((d, index) => {
@@ -193,12 +197,11 @@ export function InsightsBarChart({
           (d: InsightsChartDatum) =>
             (categoryScale(d.category_id) ?? 0) + (bandwidth - barSize) / 2
         )
-        .attr('y', (d: InsightsChartDatum) => valueScaleVert(d.totalDollars))
+        .attr('y', (d: InsightsChartDatum) => valueScaleVert(barValue(d)))
         .attr('width', barSize)
         .attr(
           'height',
-          (d: InsightsChartDatum) =>
-            innerHeight - valueScaleVert(d.totalDollars)
+          (d: InsightsChartDatum) => innerHeight - valueScaleVert(barValue(d))
         )
         .attr('fill', (_d: InsightsChartDatum, index: number) => {
           return `url(#insights-bar-grad-${index})`
@@ -284,7 +287,7 @@ export function InsightsBarChart({
           (d: InsightsChartDatum) =>
             (categoryScale(d.category_id) ?? 0) + (bandwidth - barSize) / 2
         )
-        .attr('width', (d: InsightsChartDatum) => valueScale(d.totalDollars))
+        .attr('width', (d: InsightsChartDatum) => valueScale(barValue(d)))
         .attr('height', barSize)
         .attr('fill', (_d: InsightsChartDatum, index: number) => {
           return `url(#insights-bar-grad-${index})`

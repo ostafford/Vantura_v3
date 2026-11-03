@@ -8,7 +8,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { TrackerPeriodHistoryRow } from '@/services/trackers'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -150,7 +150,7 @@ export function TrackerHistoryChart({
       const pct =
         row.budget > 0 ? Math.round((row.spent / row.budget) * 100) : 0
       setTooltipContent(tooltipEl, row.periodLabel, [
-        `Spent: $${formatMoney(row.spent)} (${pct}%)`,
+        `Spent: ${formatSignedMoney(row.spent)} (${pct}%)`,
         `Budget: $${formatMoney(row.budget)}`,
       ])
       tooltipEl.style.display = 'block'
@@ -164,7 +164,8 @@ export function TrackerHistoryChart({
     chartData.forEach((row, i) => {
       const label = displayLabels[i]
       const x = (xScale(label) ?? 0) + (bandwidth - barWidth) / 2
-      const spentY = yScale(Math.min(row.spent, maxVal))
+      // Net-negative spend (refunds > purchases) draws as an empty bar.
+      const spentY = yScale(Math.max(0, Math.min(row.spent, maxVal)))
       const spentBarHeight = innerHeight - spentY
 
       const gradId =

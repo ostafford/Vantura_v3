@@ -38,6 +38,17 @@ export function formatDeltaMoney(cents: number): string {
   return `$${formatMoney(0)}`
 }
 
+/**
+ * One transaction's amount, signed as stored, the way the Transactions page
+ * shows it: a purchase (negative) is `−$12.34`, anything else `+$12.34`.
+ * Pair with `text-success` on non-purchases (`<TransactionAmount>`).
+ */
+export function formatTransactionAmount(cents: number): string {
+  return cents < 0
+    ? `−$${formatMoney(Math.abs(cents))}`
+    : `+$${formatMoney(cents)}`
+}
+
 /** Format dollars for display (e.g. tooltips, axis labels). Use when value is already in dollars. */
 export function formatDollars(dollars: number): string {
   return Number.isFinite(dollars)

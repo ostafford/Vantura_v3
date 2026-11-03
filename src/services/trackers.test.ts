@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 const appSettings: Record<string, string> = {}
 
@@ -11,7 +11,6 @@ vi.mock('@/db', () => ({
 const {
   __test__,
   getPeriodBoundsForOffset,
-  calculatePaydayBudgetTotal,
   getTrackersDisplayPeriodData,
   isValidTrackerResetDay,
   resetDayForFrequency,
@@ -20,7 +19,6 @@ const {
 } = await import('./trackers')
 const { toPeriodCents } = await import('@/lib/monthlyEquivalent')
 const { formatShortDate } = await import('@/lib/format')
-const { calendarPeriodBounds } = await import('@/lib/dateStr')
 
 type ProgressRow = import('./trackers').TrackerWithProgress
 
@@ -45,13 +43,8 @@ function makeProgressRow(overrides: Partial<ProgressRow> = {}): ProgressRow {
     ...overrides,
   }
 }
-const {
-  daysBetween,
-  stepBackOnePeriod,
-  getPreviousPaydayDate,
-  getLastResetDate,
-  getNextResetDate,
-} = __test__
+const { daysBetween, stepBackOnePeriod, getLastResetDate, getNextResetDate } =
+  __test__
 
 function makeTrackerRow(
   overrides: Partial<import('./trackers').TrackerRow> = {}
@@ -87,10 +80,6 @@ describe('daysBetween', () => {
 })
 
 describe('getLastResetDate', () => {
-  it('PAYDAY returns fromDate unchanged', () => {
-    expect(getLastResetDate('PAYDAY', 1, '2026-03-15')).toBe('2026-03-15')
-  })
-
   it('WEEKLY finds the most recent occurrence of reset_day on or before fromDate', () => {
     // 2026-03-11 is a Wednesday. reset_day=1 (Monday) → last Monday is 2026-03-09.
     expect(getLastResetDate('WEEKLY', 1, '2026-03-11')).toBe('2026-03-09')
@@ -116,15 +105,6 @@ describe('getLastResetDate', () => {
 })
 
 describe('getNextResetDate', () => {
-  it('PAYDAY reads next_payday from app settings', () => {
-    appSettings.next_payday = '2026-04-01'
-    expect(getNextResetDate('PAYDAY', 1, '2026-03-15')).toBe('2026-04-01')
-  })
-
-  it('PAYDAY falls back to fromDate when next_payday is not configured', () => {
-    expect(getNextResetDate('PAYDAY', 1, '2026-03-15')).toBe('2026-03-15')
-  })
-
   it('WEEKLY steps forward to the next occurrence of reset_day, never returning the same date', () => {
     // 2026-03-09 is a Monday; reset_day=1 (Monday) → next Monday is 7 days later.
     expect(getNextResetDate('WEEKLY', 1, '2026-03-09')).toBe('2026-03-16')
@@ -140,22 +120,6 @@ describe('getNextResetDate', () => {
 
   it('MONTHLY rolls forward across a year boundary correctly', () => {
     expect(getNextResetDate('MONTHLY', 15, '2026-12-20')).toBe('2027-01-15')
-  })
-})
-
-describe('getPreviousPaydayDate', () => {
-  // Full edge-case coverage of the underlying math (WEEKLY/FORTNIGHTLY/MONTHLY,
-  // including the "last weekday" day-31 regression) lives in payday.test.ts
-  // against previousPaydayDate() directly. These only prove this wrapper reads
-  // app_settings (parsing payday_day, defaulting to 1 when unset) correctly.
-  it('returns null when payday_frequency is not configured', () => {
-    expect(getPreviousPaydayDate('2026-03-15')).toBeNull()
-  })
-
-  it('reads app_settings and delegates to payday.ts for the math', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '100'
-    expect(getPreviousPaydayDate('2026-03-31')).toBe('2026-02-27')
   })
 })
 
@@ -176,16 +140,6 @@ describe('stepBackOnePeriod', () => {
 
   it('MONTHLY defaults to day 1 when reset_day is out of the valid 1-28 range', () => {
     expect(stepBackOnePeriod('MONTHLY', null, '2026-03-15')).toBe('2026-02-01')
-  })
-
-  it('PAYDAY delegates to getPreviousPaydayDate using app settings', () => {
-    appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '15'
-    expect(stepBackOnePeriod('PAYDAY', null, '2026-03-15')).toBe('2026-02-15')
-  })
-
-  it('PAYDAY falls back to periodEnd when previous payday cannot be determined', () => {
-    expect(stepBackOnePeriod('PAYDAY', null, '2026-03-15')).toBe('2026-03-15')
   })
 })
 
@@ -231,62 +185,19 @@ describe('getPeriodBoundsForOffset', () => {
     const row = makeTrackerRow()
     expect(getPeriodBoundsForOffset(row, 1)).toBeNull()
   })
-
-  it('PAYDAY tracker walks back correctly using payday settings', () => {
-    appSettings.payday_frequency = 'FORTNIGHTLY'
-    appSettings.payday_day = '1'
-    const row = makeTrackerRow({
-      reset_frequency: 'PAYDAY',
-      reset_day: null,
-      last_reset_date: '2026-03-01',
-      next_reset_date: '2026-03-15',
-    })
-    expect(getPeriodBoundsForOffset(row, -1)).toEqual({
-      periodStart: '2026-02-15',
-      periodEnd: '2026-03-01',
-    })
-  })
-})
-
-describe('calculatePaydayBudgetTotal', () => {
-  it('returns 0 when there are no trackers', () => {
-    expect(calculatePaydayBudgetTotal([])).toBe(0)
-  })
-
-  it('sums budget_amount across PAYDAY-frequency trackers only', () => {
-    const trackers = [
-      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
-      { id: 2, reset_frequency: 'MONTHLY', budget_amount: 5000 },
-      { id: 3, reset_frequency: 'PAYDAY', budget_amount: 2500 },
-    ]
-    expect(calculatePaydayBudgetTotal(trackers)).toBe(12500)
-  })
-
-  it('returns 0 when no trackers are PAYDAY-frequency', () => {
-    const trackers = [
-      { id: 1, reset_frequency: 'WEEKLY', budget_amount: 10000 },
-      { id: 2, reset_frequency: 'MONTHLY', budget_amount: 5000 },
-    ]
-    expect(calculatePaydayBudgetTotal(trackers)).toBe(0)
-  })
-
-  it('excludes the tracker matching excludeId from the total', () => {
-    const trackers = [
-      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
-      { id: 2, reset_frequency: 'PAYDAY', budget_amount: 2500 },
-    ]
-    expect(calculatePaydayBudgetTotal(trackers, 1)).toBe(2500)
-  })
-
-  it('excludeId that matches no tracker leaves the total unchanged', () => {
-    const trackers = [
-      { id: 1, reset_frequency: 'PAYDAY', budget_amount: 10000 },
-    ]
-    expect(calculatePaydayBudgetTotal(trackers, 999)).toBe(10000)
-  })
 })
 
 describe('getTrackersDisplayPeriodData', () => {
+  // A fixed local mid-month, mid-year "now", so no assertion can straddle a
+  // month or year rollover while the test runs.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('passes a native-period tracker through with its own figures (#16-aware)', () => {
     const t = makeProgressRow({
       reset_frequency: 'MONTHLY',
@@ -329,9 +240,9 @@ describe('getTrackersDisplayPeriodData', () => {
     expect(d.spent).toBe(0)
     expect(d.remaining).toBe(d.budget)
     expect(d.progress).toBe(0)
-    const bounds = calendarPeriodBounds('MONTHLY')
-    expect(d.dateRangeLabel).toContain(' – ')
-    expect(d.dateRangeLabel.startsWith(formatShortDate(bounds.from))).toBe(true)
+    expect(d.dateRangeLabel).toBe(
+      `${formatShortDate('2026-06-01')} – ${formatShortDate('2026-06-30')}`
+    )
   })
 
   it('labels a non-native YEARLY period with the bare year', () => {
@@ -339,7 +250,7 @@ describe('getTrackersDisplayPeriodData', () => {
     const d = getTrackersDisplayPeriodData([t], 'YEARLY')[1]
     expect(d.isNativePeriod).toBe(false)
     // the non-native branch anchors on the local calendar date
-    expect(d.dateRangeLabel).toBe(String(new Date().getFullYear()))
+    expect(d.dateRangeLabel).toBe('2026')
   })
 
   it('threads one consistent local "today" through non-native bounds and daysLeft (#52)', () => {
@@ -408,9 +319,6 @@ describe('tracker reset_day validation (#150)', () => {
     ['FORTNIGHTLY', 4],
     ['MONTHLY', 1],
     ['MONTHLY', 28],
-    ['PAYDAY', null],
-    ['PAYDAY', 1],
-    ['PAYDAY', 28],
   ])('%s with reset_day %s is valid', (frequency, day) => {
     expect(isValidTrackerResetDay(frequency, day)).toBe(true)
   })
@@ -424,7 +332,9 @@ describe('tracker reset_day validation (#150)', () => {
     ['MONTHLY', 0],
     ['MONTHLY', 1.5],
     ['MONTHLY', null],
-    ['PAYDAY', 29],
+    ['PAYDAY', null],
+    ['PAYDAY', 1],
+    ['PAYDAY', 28],
     ['YEARLY', 1],
   ])('%s with reset_day %s is invalid', (frequency, day) => {
     expect(isValidTrackerResetDay(frequency, day)).toBe(false)
@@ -440,6 +350,20 @@ describe('tracker reset_day validation (#150)', () => {
     expect(() => updateTracker(1, 'Food', 30000, 'WEEKLY', 8, [])).toThrow(
       'INVALID_RESET_DAY'
     )
+  })
+})
+
+describe('PAYDAY reset frequency is gone (#192)', () => {
+  it('createTracker refuses a PAYDAY tracker', () => {
+    expect(() =>
+      createTracker('Food', 30000, 'PAYDAY' as never, 1, [])
+    ).toThrow('INVALID_RESET_FREQUENCY')
+  })
+
+  it('updateTracker refuses a PAYDAY tracker', () => {
+    expect(() =>
+      updateTracker(1, 'Food', 30000, 'PAYDAY' as never, 1, [])
+    ).toThrow('INVALID_RESET_FREQUENCY')
   })
 })
 

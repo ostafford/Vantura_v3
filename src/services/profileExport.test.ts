@@ -99,10 +99,86 @@ describe('profileExport', () => {
       ).toBe(true)
     })
 
-    it('payday_raw_text and payday_description are in SETTINGS_WHITELIST', () => {
-      const wl = new Set(SETTINGS_WHITELIST)
-      expect(wl.has('payday_raw_text')).toBe(true)
-      expect(wl.has('payday_description')).toBe(true)
+    it('leaves the nominated pay source out of an export (#194)', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getDb).mockReturnValue(null)
+      vi.mocked(db.getAppSetting).mockImplementation((key) => {
+        if (key === 'payday_raw_text') return 'SYNTHETIC EMPLOYER SALARY'
+        if (key === 'payday_description') return 'Synthetic Employer'
+        if (key === 'pay_amount_cents') return '250000'
+        return null
+      })
+
+      const payload = buildExportPayload()
+
+      expect(payload.settings).not.toHaveProperty('payday_raw_text')
+      expect(payload.settings).not.toHaveProperty('payday_description')
+      expect(payload.settings.pay_amount_cents).toBe('250000')
+    })
+
+    it('leaves the cut "Possible payday" notification settings out of an export (#186)', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getDb).mockReturnValue(null)
+      vi.mocked(db.getAppSetting).mockImplementation((key) => {
+        if (key === 'notif_possible_payday') return '0'
+        if (key === 'notif_possible_payday_suggested_for') return 'SYNTHETIC'
+        if (key === 'notif_payday') return '1'
+        return null
+      })
+
+      const payload = buildExportPayload()
+
+      expect(payload.settings).not.toHaveProperty('notif_possible_payday')
+      expect(payload.settings).not.toHaveProperty(
+        'notif_possible_payday_suggested_for'
+      )
+      expect(payload.settings.notif_payday).toBe('1')
+    })
+
+    it('silently skips the cut "Possible payday" notification settings on import (#186)', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      setAppSettingMock.mockClear()
+      expect(() =>
+        applySettings({
+          notif_possible_payday: '0',
+          notif_possible_payday_suggested_for: 'SYNTHETIC',
+          notif_payday: '1',
+        })
+      ).not.toThrow()
+      expect(setAppSettingMock).toHaveBeenCalledWith('notif_payday', '1')
+      for (const key of [
+        'notif_possible_payday',
+        'notif_possible_payday_suggested_for',
+      ]) {
+        expect(setAppSettingMock).not.toHaveBeenCalledWith(
+          key,
+          expect.anything()
+        )
+      }
+    })
+
+    it('silently skips the nominated pay source when importing an older export (#194)', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      setAppSettingMock.mockClear()
+      applySettings({
+        payday_raw_text: 'SYNTHETIC EMPLOYER SALARY',
+        payday_description: 'Synthetic Employer',
+        pay_amount_cents: '250000',
+      })
+      expect(setAppSettingMock).toHaveBeenCalledWith(
+        'pay_amount_cents',
+        '250000'
+      )
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
+        'payday_raw_text',
+        expect.anything()
+      )
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
+        'payday_description',
+        expect.anything()
+      )
     })
 
     it('lock_timeout_minutes and saver_account_order are in SETTINGS_WHITELIST', () => {
@@ -960,18 +1036,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
               reset_frequency: 'MONTHLY',
               reset_day: 28,
             }),
-            trackerExport({
-              id: 3,
-              name: 'P',
-              reset_frequency: 'PAYDAY',
-              reset_day: null,
-            }),
-            trackerExport({
-              id: 4,
-              name: 'P1',
-              reset_frequency: 'PAYDAY',
-              reset_day: 1,
-            }),
           ],
         }),
         ALL_ON
@@ -980,7 +1044,60 @@ describe('profile import writers: real-DB coverage (#36)', () => {
         readTrackers()
           .map((t) => t.name)
           .sort()
-      ).toEqual(['M', 'P', 'P1', 'W'])
+      ).toEqual(['M', 'W'])
+    })
+
+    it("imports an older export's PAYDAY tracker as MONTHLY day 1 on the current calendar month, with its config history as MONTHLY (#192)", () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 2, 15, 10, 0, 0))
+      try {
+        importPayloadWithOptions(
+          emptyPayload({
+            trackers: [
+              trackerExport({
+                id: 3,
+                name: 'P',
+                reset_frequency: 'PAYDAY',
+                reset_day: null,
+                start_date: '2025-11-20',
+                last_reset_date: '2026-02-20',
+                next_reset_date: '2026-03-20',
+              }),
+            ],
+            trackerConfigHistory: [
+              {
+                tracker_id: 3,
+                effective_from: '2025-11-20',
+                budget_amount: 40000,
+                category_ids: [],
+              },
+              {
+                tracker_id: 3,
+                effective_from: '2026-01-20',
+                budget_amount: 30000,
+                category_ids: [],
+                reset_frequency: 'PAYDAY',
+              },
+            ],
+          }),
+          ALL_ON
+        )
+      } finally {
+        vi.useRealTimers()
+      }
+      expect(
+        realDb.exec(
+          `SELECT name, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date FROM trackers`
+        )[0].values
+      ).toEqual([['P', 'MONTHLY', 1, '2025-11-20', '2026-03-01', '2026-04-01']])
+      expect(
+        realDb.exec(
+          `SELECT effective_from, budget_amount, reset_frequency FROM tracker_config_history ORDER BY effective_from`
+        )[0].values
+      ).toEqual([
+        ['2025-11-20', 40000, null],
+        ['2026-01-20', 30000, 'MONTHLY'],
+      ])
     })
 
     it('applies the budget plan before trackers so payload bucket_ids remap onto the freshly-inserted local buckets', () => {
@@ -1002,7 +1119,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     it('leaves existing data untouched for sections whose option is false', () => {
       realDb.run(
         `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-         VALUES ('Keep me', 9999, 'PAYDAY', NULL, '2026-01-01', '2026-02-01', '2026-03-01', 1, '2026-01-01')`
+         VALUES ('Keep me', 9999, 'MONTHLY', 1, '2026-01-01', '2026-02-01', '2026-03-01', 1, '2026-01-01')`
       )
 
       importPayloadWithOptions(

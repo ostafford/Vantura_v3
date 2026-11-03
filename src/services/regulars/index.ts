@@ -3,15 +3,16 @@
  * `@/services/regulars` only — never its internal files, and never SELECT
  * `upcoming_charges` elsewhere.
  *
- * Reads are projected here (docs/adr/0004): `regularsByPayday`,
+ * Reads are projected here (docs/adr/0004): `regularsByMonth`,
  * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
- * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`.
+ * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
+ * `linkedPaymentsInMonth`, `regularsInMonth`.
  * Two return stored rows by
  * design: `regularById` (the editor's anchor) and `linkedLiabilityRepayments`
  * (payment matching, #19).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`, `draft.ts`.
+ * `funding.ts`, `linkedPayments.ts`, `month.ts`, `draft.ts`.
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
@@ -19,7 +20,7 @@
  * the same write; `deleteRegular`; and `unlinkRegularsFromManualAccount`.
  */
 
-import { getDb, getAppSetting } from '@/db'
+import { getDb } from '@/db'
 import { localDateString } from '@/lib/format'
 import {
   readRegulars,
@@ -61,20 +62,27 @@ export {
   type DraftSourceSuggestion,
 } from './draft'
 export {
+  linkedPaymentsInMonth,
+  type LinkedPayment,
+  type RegularLinkedPayments,
+} from './linkedPayments'
+export { regularsInMonth, type RegularMonth } from './month'
+export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
 } from './projection'
 
-export interface RegularsByPayday {
+export interface RegularsByMonth {
   /**
    * `ONCE` charges whose date has passed with no future occurrence (`#18`). They
-   * need an explicit "was this paid?" resolution — they are kept out of `nextPay`
-   * so a past one-off doesn't inflate the "before next payday" total.
+   * need an explicit "was this paid?" resolution, so they are kept out of
+   * `thisMonth` and `later`.
    */
   overdue: Regular[]
-  nextPay: Regular[]
+  /** Next occurrence (on or after today) falls in the current calendar month. */
+  thisMonth: Regular[]
+  /** Next occurrence falls after the current calendar month. */
   later: Regular[]
-  nextPayday: string | null
 }
 
 export const __test__ = {
@@ -90,14 +98,19 @@ function readRegularsByStoredDate(
   return readRegulars(db).sort(byStoredDate)
 }
 
-export function regularsByPayday(): RegularsByPayday {
+/**
+ * Every Regular grouped by date as Overdue / This month / Later (#193), each
+ * at its next occurrence on or after today. Date only: paid status doesn't
+ * affect the grouping.
+ */
+export function regularsByMonth(): RegularsByMonth {
   const db = getDb()
-  if (!db) return { overdue: [], nextPay: [], later: [], nextPayday: null }
-  const nextPayday = getAppSetting('next_payday')
+  if (!db) return { overdue: [], thisMonth: [], later: [] }
   const overdue: Regular[] = []
-  const nextPay: Regular[] = []
+  const thisMonth: Regular[] = []
   const later: Regular[] = []
   const today = localDateString()
+  const currentMonth = today.slice(0, 7)
   const rows = readRegularsByStoredDate(db)
   for (const row of rows) {
     const nextOccurrence = firstOccurrenceOnOrAfter(
@@ -110,21 +123,21 @@ export function regularsByPayday(): RegularsByPayday {
       // A recurring charge with an exhausted / cancelled cycle is silently
       // dropped. A past ONCE charge has nowhere to roll to — surface it as
       // overdue (at its stored past date) for an explicit "was this paid?"
-      // resolution (#18), separate from the payday-relative groups.
+      // resolution (#18).
       if (row.frequency === 'ONCE') overdue.push({ ...row })
       continue
     }
     const projected = { ...row, next_charge_date: nextOccurrence }
-    if (nextPayday && projected.next_charge_date < nextPayday) {
-      nextPay.push(projected)
+    if (nextOccurrence.slice(0, 7) === currentMonth) {
+      thisMonth.push(projected)
     } else {
       later.push(projected)
     }
   }
   overdue.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
-  nextPay.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
+  thisMonth.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
   later.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
-  return { overdue, nextPay, later, nextPayday }
+  return { overdue, thisMonth, later }
 }
 
 /**

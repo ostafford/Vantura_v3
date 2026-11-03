@@ -8,7 +8,6 @@ import {
   Modal,
   Form,
   Collapse,
-  Alert,
   OverlayTrigger,
   Tooltip,
 } from 'react-bootstrap'
@@ -22,34 +21,23 @@ import {
   updateTracker,
   resetDayForFrequency,
   deleteTracker,
-  calculatePaydayBudgetTotal,
   getTrackersDisplayPeriodData,
   type TrackerResetFrequency,
+  TRACKER_RESET_FREQUENCIES,
+  TRACKER_RESET_FREQUENCY_ORDER,
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
-import { getPayAmountCents } from '@/services/balance'
-import { getAppSetting } from '@/db'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
-import { formatMoney, formatShortDate } from '@/lib/format'
+import { formatMoney, formatShortDate, formatSignedMoney } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { HelpPopover } from '@/components/HelpPopover'
+import { TransactionAmount } from '@/components/TransactionAmount'
 import type React from 'react'
 
-const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'PAYDAY', label: 'Payday' },
-]
-
-const FREQUENCY_ORDER: TrackerResetFrequency[] = [
-  'PAYDAY',
-  'WEEKLY',
-  'FORTNIGHTLY',
-  'MONTHLY',
-]
+const RESET_FREQUENCIES = TRACKER_RESET_FREQUENCIES
+const FREQUENCY_ORDER = TRACKER_RESET_FREQUENCY_ORDER
 
 function getTrackerProgressStyle(progress: number): {
   variant: 'primary' | 'warning' | 'danger' | 'success'
@@ -117,12 +105,6 @@ export function TrackersSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt]
   )
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const payAmountCents = useMemo(() => getPayAmountCents(), [refresh])
-  const totalPaydayBudgetCents = useMemo(
-    () => calculatePaydayBudgetTotal(trackers),
-    [trackers]
-  )
   const periodTxsByTrackerId = useMemo(() => {
     const map: Record<
       number,
@@ -134,10 +116,6 @@ export function TrackersSection({
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackers, refresh])
-  const paydayBudgetExceedsPay =
-    payAmountCents != null &&
-    payAmountCents > 0 &&
-    totalPaydayBudgetCents > payAmountCents
 
   // Effective budget/spend per display period (normalized when display period differs from native)
   const effectiveDataByTrackerId = useMemo(
@@ -182,12 +160,6 @@ export function TrackersSection({
       toast.error('Please fill in name, budget, and at least one category.')
       return
     }
-    if (frequency === 'PAYDAY' && !getAppSetting('next_payday')) {
-      toast.error(
-        'Payday not configured. Set up your pay schedule in Settings before adding a Payday tracker.'
-      )
-      return
-    }
     try {
       if (editingId != null) {
         updateTracker(
@@ -210,12 +182,6 @@ export function TrackersSection({
         toast.success('Tracker created.')
       }
     } catch (e) {
-      if (e instanceof Error && e.message === 'PAYDAY_NOT_CONFIGURED') {
-        toast.error(
-          'Payday not configured. Set up your pay schedule in Settings before adding a Payday tracker.'
-        )
-        return
-      }
       if (e instanceof Error && e.message === 'INVALID_RESET_DAY') {
         toast.error('Please choose a reset day for this frequency.')
         return
@@ -256,19 +222,6 @@ export function TrackersSection({
       ? Array.from({ length: 28 }, (_, i) => i + 1)
       : [1, 2, 3, 4, 5, 6, 7]
 
-  const budgetCentsForModal = Math.round(parseFloat(budget || '0') * 100)
-  const otherPaydayBudgetCents = calculatePaydayBudgetTotal(
-    trackers,
-    editingId ?? undefined
-  )
-  const newTotalPaydayCents = otherPaydayBudgetCents + budgetCentsForModal
-  const modalPaydayExceedsPay =
-    frequency === 'PAYDAY' &&
-    payAmountCents != null &&
-    payAmountCents > 0 &&
-    budgetCentsForModal > 0 &&
-    newTotalPaydayCents > payAmountCents
-
   const titleBlock = (
     <div className="d-flex align-items-center">
       <span className="page-title-icon" {...dragHandleProps}>
@@ -279,7 +232,7 @@ export function TrackersSection({
         <HelpPopover
           id="trackers-help"
           title="Trackers"
-          content="Set a budget and reset period for each tracker, then assign spending categories. The Weekly / Monthly / Yearly toggle rescales all amounts to that period — for example, a $200/month tracker shown in weekly view displays ~$46/week. Payday trackers reset on your next payday instead of a calendar date. For trend charts and history, go to Analytics → Trackers."
+          content="Set a budget and reset period for each tracker, then assign spending categories. The Weekly / Monthly / Yearly toggle rescales all amounts to that period — for example, a $200/month tracker shown in weekly view displays ~$46/week. For trend charts and history, go to Analytics → Trackers."
           ariaLabel="What are trackers?"
         />
       </div>
@@ -346,14 +299,6 @@ export function TrackersSection({
           </div>
         </Card.Header>
         <Card.Body>
-          {paydayBudgetExceedsPay && (
-            <Alert variant="warning" className="mb-3">
-              Total PAYDAY tracker budgets ($
-              {formatMoney(totalPaydayBudgetCents)}) exceed your pay amount ($
-              {formatMoney(payAmountCents!)}). Consider adjusting budgets or pay
-              amount in Settings.
-            </Alert>
-          )}
           {trackers.length === 0 ? (
             <p className="text-muted small mb-0">
               No trackers yet. Add one to get started.
@@ -460,7 +405,10 @@ export function TrackersSection({
                           </h6>
                         )}
                         <ProgressBar
-                          now={Math.min(100, effectiveData.progress)}
+                          now={Math.max(
+                            0,
+                            Math.min(100, effectiveData.progress)
+                          )}
                           variant={progressStyle.variant}
                           striped={progressStyle.striped}
                           animated={progressStyle.animated}
@@ -489,7 +437,7 @@ export function TrackersSection({
                         title="View transactions"
                       >
                         <small className="text-muted">
-                          ${formatMoney(effectiveData.spent)} of $
+                          {formatSignedMoney(effectiveData.spent)} of $
                           {formatMoney(effectiveData.budget)} spent
                           {effectiveData.wasAdjusted && (
                             <OverlayTrigger
@@ -531,8 +479,8 @@ export function TrackersSection({
                                     {formatShortDate(
                                       tx.created_at ?? tx.settled_at ?? ''
                                     )}{' '}
-                                    {tx.description} $
-                                    {formatMoney(Math.abs(tx.amount))}
+                                    {tx.description}{' '}
+                                    <TransactionAmount cents={tx.amount} />
                                     {tx.status === 'HELD' && (
                                       <span className="text-muted small ms-1">
                                         (Held)
@@ -621,35 +569,27 @@ export function TrackersSection({
                 ))}
               </Form.Select>
             </Form.Group>
-            {frequency !== 'PAYDAY' && (
-              <Form.Group className="mb-2">
-                <Form.Label htmlFor="tracker-edit-reset-day">
-                  Reset day
-                </Form.Label>
-                <Form.Select
-                  id="tracker-edit-reset-day"
-                  name="resetDay"
-                  value={resetDay}
-                  onChange={(e) => setResetDay(Number(e.target.value))}
-                >
-                  {resetDayOptions.map((d) => (
-                    <option key={d} value={d}>
-                      {frequency === 'MONTHLY'
-                        ? `${d}`
-                        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][
-                            d - 1
-                          ]}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            )}
-            {modalPaydayExceedsPay && (
-              <Alert variant="warning" className="mb-2">
-                Total PAYDAY budgets will be ${formatMoney(newTotalPaydayCents)}{' '}
-                (pay amount ${formatMoney(payAmountCents!)}).
-              </Alert>
-            )}
+            <Form.Group className="mb-2">
+              <Form.Label htmlFor="tracker-edit-reset-day">
+                Reset day
+              </Form.Label>
+              <Form.Select
+                id="tracker-edit-reset-day"
+                name="resetDay"
+                value={resetDay}
+                onChange={(e) => setResetDay(Number(e.target.value))}
+              >
+                {resetDayOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {frequency === 'MONTHLY'
+                      ? `${d}`
+                      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][
+                          d - 1
+                        ]}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
             <Form.Group className="mb-2">
               <Form.Label>Categories</Form.Label>
               <div

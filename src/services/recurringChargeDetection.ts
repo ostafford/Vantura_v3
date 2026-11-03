@@ -1,8 +1,8 @@
 /**
  * #20 — detect recurring debit patterns in sync history and offer them as
  * upcoming-charge *suggestions*. On demand, suggest-only — never auto-created
- * (ADR-0016). Mirrors `paydayDetection.ts` (group by fingerprint → median
- * interval → classify frequency), tightened for the noisier debit side.
+ * (ADR-0016). Groups by fingerprint → median interval → classify frequency,
+ * tightened for the noisier debit side.
  */
 import { getDb, schedulePersist } from '@/db'
 import { localDateString } from '@/lib/format'

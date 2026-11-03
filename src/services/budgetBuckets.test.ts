@@ -11,8 +11,13 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getBucketCardSummary, getBuckets, reorderBuckets } =
-  await import('./budgetBuckets')
+const {
+  getBucketCardSummary,
+  getBuckets,
+  getIncomeCents,
+  getMonthlyIncomeCents,
+  reorderBuckets,
+} = await import('./budgetBuckets')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -104,25 +109,6 @@ describe('getBucketCardSummary', () => {
     expect(summary.plannedCents).toBe(0)
   })
 
-  // Regression: a past bug hardcoded PAYDAY trackers to a MONTHLY period equivalent
-  // regardless of the user's actual payday_frequency setting, which under- or
-  // over-counted the bucket total for anyone paid WEEKLY/FORTNIGHTLY.
-  it('substitutes the real payday_frequency setting for PAYDAY trackers instead of assuming MONTHLY', () => {
-    appSettings.payday_frequency = 'FORTNIGHTLY'
-    insertTracker(26000, 'PAYDAY')
-    const summaryMonthly = getBucketCardSummary(1, 'MONTHLY')
-    // $260 every fortnight ≈ $260 × 26/12 per month ≈ $563.33 → rounds to 56333 cents,
-    // not the 26000 cents a MONTHLY-equivalent misread would produce.
-    expect(summaryMonthly.plannedCents).toBe(Math.round((26000 * 26) / 12))
-    expect(summaryMonthly.plannedCents).not.toBe(26000)
-  })
-
-  it('falls back to MONTHLY for PAYDAY trackers when payday_frequency is not configured', () => {
-    insertTracker(30000, 'PAYDAY')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(30000)
-  })
-
   it('combines upcoming charges, hypotheticals, and trackers in a single total', () => {
     insertUpcoming('Rent', 200000, 'MONTHLY')
     insertHypothetical('Maybe gym', 8000, 'MONTHLY')
@@ -164,5 +150,55 @@ describe('reorderBuckets', () => {
     expect(buckets.find((b) => b.id === 2)?.sort_order).toBe(0)
     expect(buckets.find((b) => b.id === 3)?.sort_order).toBe(1)
     expect(buckets.find((b) => b.id === 1)?.sort_order).toBe(2)
+  })
+})
+
+describe('getMonthlyIncomeCents', () => {
+  it.each([
+    ['WEEKLY', '120000', 520000],
+    ['FORTNIGHTLY', '240000', 520000],
+    ['MONTHLY', '500000', 500000],
+    ['WEEKLY', '100001', 433338],
+  ])('%s pay of %s cents is %i cents a month', (freq, pay, expected) => {
+    appSettings.payday_frequency = freq
+    appSettings.pay_amount_cents = pay
+    expect(getMonthlyIncomeCents()).toBe(expected)
+  })
+
+  it.each([[undefined], [''], ['abc'], ['0'], ['-5000']])(
+    'returns null when pay amount is %s',
+    (pay) => {
+      appSettings.payday_frequency = 'WEEKLY'
+      if (pay !== undefined) appSettings.pay_amount_cents = pay
+      expect(getMonthlyIncomeCents()).toBeNull()
+    }
+  )
+
+  it.each(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'])(
+    'per-period MONTHLY Income equals monthly Income for %s pay',
+    (freq) => {
+      appSettings.payday_frequency = freq
+      appSettings.pay_amount_cents = '123457'
+      expect(getIncomeCents('MONTHLY')).toBe(getMonthlyIncomeCents())
+    }
+  )
+
+  it.each([[undefined], [''], ['QUARTERLY'], ['PAYDAY']])(
+    'returns null (no Income) when Pay frequency is %s — never assumes monthly',
+    (freq) => {
+      appSettings.pay_amount_cents = '500000'
+      if (freq !== undefined) appSettings.payday_frequency = freq
+      expect(getMonthlyIncomeCents()).toBeNull()
+      for (const period of ['WEEKLY', 'MONTHLY', 'YEARLY'] as const) {
+        expect(getIncomeCents(period)).toBeNull()
+      }
+    }
+  )
+
+  it('converts a fortnightly pay into weekly and yearly Income', () => {
+    appSettings.payday_frequency = 'FORTNIGHTLY'
+    appSettings.pay_amount_cents = '240000'
+    expect(getIncomeCents('WEEKLY')).toBe(120000)
+    expect(getIncomeCents('YEARLY')).toBe(6240000)
   })
 })

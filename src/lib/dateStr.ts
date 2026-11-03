@@ -33,6 +33,24 @@ export function daysBetweenDateStr(a: string, b: string): number {
 }
 
 /**
+ * First and last day of a calendar month given as `YYYY-MM`, both inclusive,
+ * as `YYYY-MM-DD`. Throws on anything that isn't a real `YYYY-MM` month.
+ */
+export function calendarMonthDayBounds(month: string): {
+  first: string
+  last: string
+} {
+  const match = /^(\d{4})-(\d{2})$/.exec(month)
+  const m = match ? Number(match[2]) : 0
+  if (!match || m < 1 || m > 12) throw new Error(`Invalid month: ${month}`)
+  const lastDay = new Date(Date.UTC(Number(match[1]), m, 0)).getUTCDate()
+  return {
+    first: `${month}-01`,
+    last: `${month}-${String(lastDay).padStart(2, '0')}`,
+  }
+}
+
+/**
  * Calendar bounds for a display period relative to `now`, `offset` periods
  * away (0 = the current one, -1 = the previous, etc.). `from` is inclusive,
  * `to` is exclusive (the first day of the next period). Weeks start Monday.
@@ -64,5 +82,24 @@ export function calendarPeriodBounds(
   return {
     from: iso(new Date(Date.UTC(year, month + offset, 1))),
     to: iso(new Date(Date.UTC(year, month + offset + 1, 1))),
+  }
+}
+
+/**
+ * The 1st of the local calendar month containing `now`, and the 1st of the
+ * next one — a MONTHLY, reset-day-1 tracker's current period. Where a PAYDAY
+ * tracker lands when it moves to MONTHLY (#192).
+ */
+export function localCalendarMonthResetDates(now: Date = new Date()): {
+  lastReset: string
+  nextReset: string
+} {
+  const first = (y: number, m: number) =>
+    `${y}-${String(m + 1).padStart(2, '0')}-01`
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  return {
+    lastReset: first(y, m),
+    nextReset: m === 11 ? first(y + 1, 0) : first(y, m + 1),
   }
 }

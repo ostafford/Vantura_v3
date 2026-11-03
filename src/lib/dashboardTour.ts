@@ -63,7 +63,7 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     title: 'Trackers',
     description:
       'Set a <strong>budget</strong> and <strong>reset period</strong> per tracker, then assign spending categories.<br><br>' +
-      'Reset options: <strong>weekly</strong>, <strong>fortnightly</strong>, <strong>monthly</strong>, or <strong>payday</strong> cycle.<br><br>' +
+      'Reset options: <strong>weekly</strong>, <strong>fortnightly</strong>, or <strong>monthly</strong>.<br><br>' +
       'Use the <strong>+</strong> button to create your first tracker.',
     side: 'left',
     align: 'start',
@@ -73,7 +73,7 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     description:
       'Add <strong>bills and subscriptions</strong> you know are coming — rent, Netflix, insurance, etc.<br><br>' +
       'Each Regular reduces <strong>Spendable</strong> until its due date. Toggle <strong>Include in Spendable</strong> per Regular to control this.<br><br>' +
-      'Grouped into <strong>Next pay</strong> and <strong>Later</strong>.',
+      'Grouped into <strong>Overdue</strong>, <strong>This month</strong> and <strong>Later</strong>.',
     side: 'top',
     align: 'center',
   },

@@ -8,7 +8,15 @@
  * `splitPeriodIntoSegments` (the pure core) is tested array-in/array-out; the
  * DB wrapper, the write path and profile round-trip need a real sql.js DB.
  */
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import type { TrackerConfigVersion } from './trackers'
 
@@ -47,6 +55,12 @@ beforeEach(async () => {
   for (const key of Object.keys(appSettings)) delete appSettings[key]
   db.run(
     `INSERT INTO categories (id, name) VALUES ('groceries', 'Groceries'), ('dining', 'Dining')`
+  )
+  // Tracker spend is Actual spending (#188): it only counts transactions on
+  // the Spending account or a Saver.
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+     VALUES ('acc1', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01')`
   )
 })
 
@@ -243,7 +257,7 @@ describe('splitPeriodIntoSegments (pure core)', () => {
     ])
   })
 
-  it('prorates against the actual period length for a variable-length (PAYDAY) period', () => {
+  it('prorates against the actual period length for a non-standard-length period', () => {
     const segs = splitPeriodIntoSegments(
       '2026-03-01',
       '2026-03-15', // 14 days
@@ -501,11 +515,21 @@ describe('getTrackerTransactionsInPeriod (current period, split)', () => {
 })
 
 describe('updateTracker records config versions', () => {
-  const tomorrow = (() => {
+  // A fixed local "now" (Wed 4 Mar 2026, midday), so "tomorrow" can't change
+  // between an edit and its assertion.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 2, 4, 12, 0, 0))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+  /** Tomorrow by the (faked) clock, computed when the test runs. */
+  const tomorrow = () => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
     return localDateString(d)
-  })()
+  }
 
   it('a budget change writes a version effective tomorrow, keeping the genesis row', () => {
     const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
@@ -514,7 +538,7 @@ describe('updateTracker records config versions', () => {
     const history = getTrackerConfigHistory(id)
     expect(history).toHaveLength(2)
     expect(history[1]).toMatchObject({
-      effective_from: tomorrow,
+      effective_from: tomorrow(),
       budget_amount: 45000,
     })
     expect(history[1].category_ids).toEqual(['groceries'])
@@ -544,7 +568,7 @@ describe('updateTracker records config versions', () => {
     const history = getTrackerConfigHistory(id)
     expect(history).toHaveLength(2)
     expect(history[1]).toMatchObject({
-      effective_from: tomorrow,
+      effective_from: tomorrow(),
       budget_amount: 50000,
     })
     expect(history[1].category_ids.sort()).toEqual(['dining', 'groceries'])
@@ -577,10 +601,34 @@ describe('updateTracker records config versions', () => {
     })
     // new cadence + budget from tomorrow
     expect(history[history.length - 1]).toMatchObject({
-      effective_from: tomorrow,
+      effective_from: tomorrow(),
       budget_amount: 45000,
       reset_frequency: 'MONTHLY',
     })
+  })
+
+  it('a second frequency change stamps only the rows that had the old cadence (#186)', () => {
+    vi.setSystemTime(new Date(2026, 2, 2, 12, 0, 0)) // Mon 2 Mar
+    const id = createTracker('Food', 30000, 'WEEKLY', 1, ['groceries'])
+    vi.setSystemTime(new Date(2026, 2, 4, 12, 0, 0))
+    updateTracker(id, 'Food', 60000, 'FORTNIGHTLY', 1, ['groceries'])
+    vi.setSystemTime(new Date(2026, 2, 6, 12, 0, 0))
+    updateTracker(id, 'Food', 70000, 'FORTNIGHTLY', 1, ['groceries'])
+    vi.setSystemTime(new Date(2026, 2, 10, 12, 0, 0))
+    updateTracker(id, 'Food', 150000, 'MONTHLY', 1, ['groceries'])
+
+    expect(
+      getTrackerConfigHistory(id).map((v) => [
+        v.effective_from,
+        v.budget_amount,
+        v.reset_frequency,
+      ])
+    ).toEqual([
+      ['2026-03-02', 30000, 'WEEKLY'], // genesis keeps its own cadence
+      ['2026-03-05', 60000, 'FORTNIGHTLY'],
+      ['2026-03-07', 70000, 'FORTNIGHTLY'], // untagged: had the old cadence
+      ['2026-03-11', 150000, 'MONTHLY'],
+    ])
   })
 
   it('a reset-day-only change gets the same transitional treatment', () => {
@@ -591,7 +639,7 @@ describe('updateTracker records config versions', () => {
     expect(history.length).toBeGreaterThanOrEqual(2)
     expect(history[0].reset_frequency).toBe('WEEKLY')
     expect(history[history.length - 1]).toMatchObject({
-      effective_from: tomorrow,
+      effective_from: tomorrow(),
       reset_frequency: 'WEEKLY',
     })
   })
