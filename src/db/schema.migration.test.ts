@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(49)
+    expect(SCHEMA_VERSION).toBe(50)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1243,6 +1243,36 @@ describe('v49 migration: PAYDAY trackers move to MONTHLY (#192)', () => {
       `SELECT last_reset_date, next_reset_date FROM trackers WHERE id = 1`
     )[0].values[0]
     expect(row).toEqual(['2026-12-01', '2027-01-01'])
+    db.close()
+  })
+})
+
+describe('v50 migration: Payday nomination settings removed (#194)', () => {
+  it('deletes the nominated pay source settings and leaves the pay amount, pay frequency and payday date alone', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES
+         ('schema_version', '49'),
+         ('payday_raw_text', 'SYNTHETIC EMPLOYER PTY LTD SALARY'),
+         ('payday_description', 'Synthetic Employer'),
+         ('pay_amount_cents', '250000'),
+         ('payday_frequency', 'FORTNIGHTLY'),
+         ('payday_day', '4'),
+         ('next_payday', '2026-11-12')`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'payday_raw_text')).toBeNull()
+    expect(readSetting(db, 'payday_description')).toBeNull()
+    expect(readSetting(db, 'pay_amount_cents')).toBe('250000')
+    expect(readSetting(db, 'payday_frequency')).toBe('FORTNIGHTLY')
+    expect(readSetting(db, 'payday_day')).toBe('4')
+    expect(readSetting(db, 'next_payday')).toBe('2026-11-12')
     db.close()
   })
 })

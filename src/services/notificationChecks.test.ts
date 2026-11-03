@@ -140,29 +140,14 @@ describe('findFirstUnseenCredit', () => {
 describe('checkPaydayLanded', () => {
   it('does nothing when the payday notification type is disabled', () => {
     appSettings['notif_payday'] = '0'
-    appSettings['payday_raw_text'] = 'SALARY-CO'
+    appSettings['pay_amount_cents'] = '200000'
     insertTx({
       id: 't1',
       amount: 200000,
       settled_at: new Date().toISOString(),
-      raw_text: 'SALARY-CO',
     })
     checkPaydayLanded()
     expect(appSettings['notif_last_payday_date']).toBeUndefined()
-  })
-
-  it('raw_text match: allows a transfer to match (no transfer_account_id filter)', () => {
-    appSettings['payday_raw_text'] = 'SALARY-CO'
-    const today = new Date().toISOString()
-    insertTx({
-      id: 't1',
-      amount: 200000,
-      settled_at: today,
-      raw_text: 'SALARY-CO',
-      transfer_account_id: 'acc2',
-    })
-    checkPaydayLanded()
-    expect(appSettings['notif_last_payday_date']).toBe(today.slice(0, 10))
   })
 
   it('amount-heuristic fallback: excludes transfers via transfer_account_id filter', () => {
