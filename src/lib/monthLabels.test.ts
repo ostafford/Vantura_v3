@@ -5,7 +5,6 @@ import {
   monthNameLong,
   monthNarrativePriorLabel,
   previousCalendarMonth,
-  weekNarrativePriorLabel,
   yearNarrativePriorLabel,
 } from './monthLabels'
 
@@ -37,11 +36,6 @@ describe('monthLabels', () => {
 
   it('yearNarrativePriorLabel returns fallback for short string', () => {
     expect(yearNarrativePriorLabel('')).toBe(MONTH_LABEL_FALLBACK)
-  })
-
-  it('weekNarrativePriorLabel returns fallback for invalid ymd', () => {
-    expect(weekNarrativePriorLabel('')).toBe(MONTH_LABEL_FALLBACK)
-    expect(weekNarrativePriorLabel('not-a-date')).toBe(MONTH_LABEL_FALLBACK)
   })
 
   it('comparisonMonthPairLabels adds years when months cross a year boundary', () => {

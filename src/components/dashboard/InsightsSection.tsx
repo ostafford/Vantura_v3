@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
   Card,
@@ -117,13 +116,6 @@ export function InsightsSection({
 
   const navControls = (
     <>
-      <Link
-        to="/analytics/reports"
-        className="btn-icon"
-        aria-label="View insights analytics"
-      >
-        <i className="mdi mdi-chart-box" aria-hidden />
-      </Link>
       <OverlayTrigger
         placement="top"
         overlay={

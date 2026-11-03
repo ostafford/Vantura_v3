@@ -516,8 +516,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               <p className="text-muted small mb-3">
                 You&apos;re ready to start tracking your finances. Create
                 trackers to monitor spending, view Spendable to see your
-                safe-to-spend amount, and use Analytics for longer-term trends
-                and reports.
+                safe-to-spend amount, and use Analytics for longer-term trends.
               </p>
               <p className="text-muted small mb-3">
                 Vantura can remind you about upcoming bills and alert you when

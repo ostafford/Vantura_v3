@@ -12,7 +12,6 @@ import { AnalyticsLayout } from '@/pages/analytics/AnalyticsLayout'
 import { AnalyticsIndex } from '@/pages/analytics/AnalyticsIndex'
 import { AnalyticsTrackers } from '@/pages/analytics/AnalyticsTrackers'
 import { AnalyticsTrackersDetail } from '@/pages/analytics/AnalyticsTrackersDetail'
-import { AnalyticsReports } from '@/pages/analytics/AnalyticsReports'
 import { AnalyticsSavers } from '@/pages/analytics/AnalyticsSavers'
 import { AnalyticsNetWorth } from '@/pages/analytics/AnalyticsNetWorth'
 import { AnalyticsBudgetPlan } from '@/pages/analytics/AnalyticsBudgetPlan'
@@ -177,20 +176,6 @@ export const appRouter = createBrowserRouter(
               element: <Navigate to="/analytics" replace />,
             },
             {
-              path: 'insights',
-              element: <Navigate to="/analytics/reports" replace />,
-            },
-            {
-              path: 'reports',
-              element: <AnalyticsReports />,
-              handle: {
-                breadcrumbLabel: 'Reports',
-                pageTitle: 'Reports',
-                pageTitleIcon: 'mdi-file-chart',
-                noLayoutHeader: true,
-              } satisfies AppRouteHandle,
-            },
-            {
               path: 'net-worth',
               element: <AnalyticsNetWorth />,
               handle: {
@@ -198,10 +183,6 @@ export const appRouter = createBrowserRouter(
                 pageTitle: 'Net Worth',
                 pageTitleIcon: 'mdi-chart-timeline-variant',
               } satisfies AppRouteHandle,
-            },
-            {
-              path: 'monthly-review',
-              element: <Navigate to="/analytics/reports" replace />,
             },
           ],
         },

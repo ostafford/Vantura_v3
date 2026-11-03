@@ -32,12 +32,10 @@ const {
   getTrackersWithProgress,
   getTrackersWithProgressForPeriod,
   getTrackerPeriodHistory,
-  getTrackerPeriodsInRange,
   getTrackerTransactionsInPeriod,
   getTrackerTransactionTimeline,
   getTrackerTransactionsForTable,
   getTrackerTransactionsCount,
-  getTracker,
 } = await import('./trackers')
 
 beforeAll(async () => {
@@ -315,21 +313,5 @@ describe('tracker transaction lists include refunds', () => {
         dateTo: '2026-03-08',
       })
     ).toBe(2)
-  })
-})
-
-describe('period ranges', () => {
-  it('per-period slices net refunds', () => {
-    const id = weeklyGroceries()
-    addTx({ amount: -4000, createdAt: '2026-03-03T10:00:00+11:00' })
-    addTx({ amount: 1500, createdAt: '2026-03-04T10:00:00+11:00' })
-
-    const slices = getTrackerPeriodsInRange(
-      getTracker(id)!,
-      '2026-03-01',
-      '2026-04-01'
-    )
-    const current = slices.find((s) => s.periodStart === '2026-03-02')!
-    expect(current.spent).toBe(2500)
   })
 })

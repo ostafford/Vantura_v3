@@ -53,7 +53,7 @@ const ACTUAL_SPENDING = actualSpendingSql()
  */
 const MONEY_IN =
   "amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND category_id IS NULL"
-import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
+import { daysBetweenDateStr } from '@/lib/dateStr'
 import {
   buildMonthSpendingSeries,
   type MonthSpendingSeries,
@@ -62,7 +62,6 @@ import {
 import {
   formatWeekStartLabel,
   monthNarrativePriorLabel,
-  weekNarrativePriorLabel,
   yearNarrativePriorLabel,
 } from '@/lib/monthLabels'
 import { getCategoriesWithParent } from '@/services/categories'
@@ -93,8 +92,7 @@ function toDateOnly(d: Date): string {
  * comparison stays apples-to-apples: the previous period should span the
  * same number of days elapsed in the current one, never more than its own
  * natural length (shorter months, etc). All dates are local "YYYY-MM-DD".
- * Shared by getMonthComparison and getWeekComparison's elapsed-day capping —
- * each computes daysElapsed itself, from its own date representation.
+ * Used by getMonthComparison's elapsed-day capping.
  */
 function capPreviousPeriodEnd(
   previousStart: string,
@@ -547,7 +545,7 @@ export function getWeeklyCategoryBreakdownGrouped(
 
 /**
  * Spending by category for an arbitrary date range: Money Out split by Up
- * category (see `readCategoryTotals`). Used for Reports page.
+ * category (see `readCategoryTotals`). Used by getPeriodComparison.
  */
 export function getCategoryBreakdownForDateRange(
   dateFrom: string,
@@ -644,8 +642,8 @@ function fmtDayMonth(dateStr: string): string {
   return `${MONTH_ABBR[monthIdx]} ${day}`
 }
 
-/** Labels for period-over-period narratives (vs last month/year/week/range). */
-export type NarrativePeriod = 'month' | 'year' | 'week' | 'custom'
+/** Labels for period-over-period narratives (vs last month/year). */
+export type NarrativePeriod = 'month' | 'year'
 
 function narrativePriorLabel(
   p: NarrativePeriod,
@@ -657,14 +655,6 @@ function narrativePriorLabel(
       return monthNarrativePriorLabel(previousFrom, currentFrom)
     case 'year':
       return yearNarrativePriorLabel(previousFrom)
-    case 'week':
-      return weekNarrativePriorLabel(previousFrom)
-    case 'custom': {
-      // The preceding equal-length window has no calendar name — describe it
-      // by its span instead ("the preceding 14 days").
-      const n = daysBetweenDateStr(previousFrom, currentFrom)
-      return `the preceding ${n} day${n === 1 ? '' : 's'}`
-    }
     default:
       return monthNarrativePriorLabel(previousFrom, currentFrom)
   }
@@ -973,78 +963,6 @@ export function getYearComparison(year: number): MonthComparisonData {
   return { ...result, periodNote }
 }
 
-/**
- * Week-over-week KPI comparison (this ISO week vs previous week).
- *
- * When the current week is in progress, caps the previous week to the same
- * number of elapsed days so the comparison is apples-to-apples — mirrors
- * the equivalent capping in getMonthComparison.
- */
-export function getWeekComparison(weekOffset: number): MonthComparisonData {
-  const cur = getWeekRange(weekOffset)
-  const prev = getWeekRange(weekOffset - 1)
-
-  let effectivePreviousEnd = prev.endStr
-  if (weekOffset === 0) {
-    const daysElapsed = getDaysElapsedInWeek(cur, new Date(), weekOffset)
-    if (daysElapsed < 7) {
-      effectivePreviousEnd = capPreviousPeriodEnd(
-        prev.startStr,
-        daysElapsed,
-        prev.endStr
-      )
-    }
-  }
-
-  return getPeriodComparison(
-    cur.startStr,
-    cur.endStr,
-    prev.startStr,
-    effectivePreviousEnd,
-    'week'
-  )
-}
-
-/**
- * KPI comparison for an arbitrary custom date range (the Reports page's
- * custom-range mode). "Previous" is the equal-length window immediately
- * preceding `from` — the fourth caller anticipated by ADR-0007.
- *
- * Both dates are local "YYYY-MM-DD". If the range runs past today it is only
- * partially elapsed, so — mirroring getMonthComparison — the preceding window
- * is capped to the elapsed-day count (from..today) and a periodNote spells the
- * two windows out. A fully-past range compares against a full equal-length
- * window with no note.
- */
-export function getCustomRangeComparison(
-  from: string,
-  to: string
-): MonthComparisonData {
-  const todayStr = toDateOnly(new Date())
-
-  // Cap only when the range has started but not finished (today in [from, to)).
-  const isInProgress = todayStr >= from && todayStr < to
-  const effectiveTo = isInProgress ? todayStr : to
-
-  const lengthDays = daysBetweenDateStr(from, effectiveTo) + 1
-  const previousTo = addDaysToDateStr(from, -1)
-  const previousFrom = addDaysToDateStr(from, -lengthDays)
-
-  const result = getPeriodComparison(
-    from,
-    to,
-    previousFrom,
-    previousTo,
-    'custom'
-  )
-
-  const periodNote = isInProgress
-    ? `${fmtDayMonth(from)}–${fmtDayMonth(effectiveTo)} vs ${fmtDayMonth(previousFrom)}–${fmtDayMonth(previousTo)}`
-    : undefined
-
-  return { ...result, periodNote }
-}
-
 // ---------------------------------------------------------------------------
 // Month day-by-day series (current vs previous month)
 // ---------------------------------------------------------------------------
@@ -1094,85 +1012,6 @@ function getDailyMoneyInOutForRange(
   return input
 }
 
-/**
- * Per-calendar-day money in/out (cents) for transactions in [dateFrom, dateToInclusive].
- * Used for week view where grouping by day-of-month is invalid.
- */
-function getDailyMoneyInOutByDateInRange(
-  dateFrom: string,
-  dateToInclusive: string
-): Map<string, { moneyInCents: number; moneyOutCents: number }> {
-  const result = new Map<
-    string,
-    { moneyInCents: number; moneyOutCents: number }
-  >()
-  const db = getDb()
-  if (!db) return result
-
-  const stmt = db.prepare(
-    `SELECT ${displayDaySql()} AS d,
-       COALESCE(SUM(CASE WHEN ${MONEY_IN} THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
-     FROM transactions
-     WHERE ${DISPLAY_DAY_BETWEEN}
-     GROUP BY d
-     ORDER BY d`
-  )
-  stmt.bind([toDayBound(dateFrom), toDayBound(dateToInclusive)])
-
-  while (stmt.step()) {
-    const row = stmt.get() as [string | null, number, number]
-    const key = row[0]
-    if (!key) continue
-    result.set(key, {
-      moneyInCents: row[1] ?? 0,
-      moneyOutCents: row[2] ?? 0,
-    })
-  }
-  stmt.free()
-  return result
-}
-
-function toDateOnlyLocal(d: Date): string {
-  const y = d.getFullYear()
-  const m = d.getMonth() + 1
-  const day = d.getDate()
-  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-function buildWeekDailyInputFromRange(
-  week: WeekRange,
-  dailyMap: Map<string, { moneyInCents: number; moneyOutCents: number }>,
-  daysToInclude: number
-): MonthDailyInput {
-  const byDay: Record<number, { moneyInCents: number; moneyOutCents: number }> =
-    {}
-  const d = new Date(week.start)
-  for (let i = 1; i <= 7; i++) {
-    const key = toDateOnlyLocal(d)
-    const row = dailyMap.get(key)
-    byDay[i] = row ?? { moneyInCents: 0, moneyOutCents: 0 }
-    d.setDate(d.getDate() + 1)
-  }
-  return {
-    daysInMonth: Math.min(7, Math.max(1, daysToInclude)),
-    byDay,
-  }
-}
-
-function getDaysElapsedInWeek(
-  week: WeekRange,
-  now: Date,
-  weekOffset: number
-): number {
-  if (weekOffset !== 0) return 7
-  // Whole calendar days from Monday to today. daysBetweenDateStr anchors both
-  // ends at noon UTC, so a DST transition inside the week can't floor this one
-  // short (a flat 86_400_000 ms divide would).
-  const diff = daysBetweenDateStr(week.startStr, toDateOnly(now))
-  return Math.min(7, Math.max(1, diff + 1))
-}
-
 export interface MonthSeriesResult {
   series: MonthSpendingSeries
 }
@@ -1211,63 +1050,6 @@ export function getMonthDayByDaySeries(
   const maxDay = Math.max(series.maxDay, currentDays)
   if (maxDay !== series.maxDay) {
     // Extend points array with trailing days that have null values.
-    const existing = new Map(series.points.map((p) => [p.day, p]))
-    const points = []
-    for (let day = 1; day <= maxDay; day += 1) {
-      const found = existing.get(day)
-      if (found) {
-        points.push(found)
-      } else {
-        points.push({
-          day,
-          currentSpending: null,
-          previousSpending: null,
-          currentIncome: null,
-          previousIncome: null,
-          currentNet: null,
-          previousNet: null,
-        })
-      }
-    }
-    return {
-      series: {
-        points,
-        maxDay,
-      },
-    }
-  }
-
-  return { series }
-}
-
-/**
- * Mon–Sun cumulative series for the selected week vs the prior week.
- */
-export function getWeekDayByDaySeries(weekOffset: number): MonthSeriesResult {
-  const now = new Date()
-  const currentWeek = getWeekRange(weekOffset)
-  const previousWeek = getWeekRange(weekOffset - 1)
-
-  const curMap = getDailyMoneyInOutByDateInRange(
-    currentWeek.startStr,
-    currentWeek.endStr
-  )
-  const prevMap = getDailyMoneyInOutByDateInRange(
-    previousWeek.startStr,
-    previousWeek.endStr
-  )
-
-  const elapsed = getDaysElapsedInWeek(currentWeek, now, weekOffset)
-  const currentInput = buildWeekDailyInputFromRange(
-    currentWeek,
-    curMap,
-    elapsed
-  )
-  const previousInput = buildWeekDailyInputFromRange(previousWeek, prevMap, 7)
-
-  const series = buildMonthSpendingSeries(currentInput, previousInput)
-  const maxDay = Math.max(series.maxDay, 7)
-  if (maxDay !== series.maxDay) {
     const existing = new Map(series.points.map((p) => [p.day, p]))
     const points = []
     for (let day = 1; day <= maxDay; day += 1) {

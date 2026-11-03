@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { Card, Row, Col } from 'react-bootstrap'
-import { AnalyticsAtAGlanceSection } from '@/components/analytics/AnalyticsAtAGlanceSection'
 
 export function AnalyticsIndex() {
   return (
@@ -33,39 +32,6 @@ export function AnalyticsIndex() {
                     style={{ color: 'var(--vantura-primary)' }}
                   >
                     View trackers{' '}
-                    <i className="mdi mdi-chevron-right" aria-hidden />
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Link>
-        </Col>
-        <Col xs={12} md={6} lg={4}>
-          <Link
-            to="/analytics/reports"
-            className="text-decoration-none"
-            style={{ color: 'inherit' }}
-          >
-            <Card className="h-100">
-              <Card.Body className="d-flex align-items-start">
-                <span className="page-title-icon">
-                  <i
-                    className="mdi mdi-file-chart"
-                    style={{ fontSize: '1.25rem' }}
-                    aria-hidden
-                  />
-                </span>
-                <div>
-                  <h6 className="mb-1 fw-semibold">Reports</h6>
-                  <p className="mb-0 text-muted small">
-                    Category spending, weekly money in/out trends, and monthly
-                    reviews — all in one place.
-                  </p>
-                  <span
-                    className="small mt-1 d-inline-block"
-                    style={{ color: 'var(--vantura-primary)' }}
-                  >
-                    View reports{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
                   </span>
                 </div>
@@ -173,8 +139,6 @@ export function AnalyticsIndex() {
           </Link>
         </Col>
       </Row>
-
-      <AnalyticsAtAGlanceSection />
     </div>
   )
 }
