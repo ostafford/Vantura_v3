@@ -221,8 +221,32 @@ export function getUnassignedUpcoming(): BucketUpcomingItem[] {
   return list
 }
 
-/** Income per display period derived from pay_amount_cents + payday_frequency settings. */
+const PAYS_PER_MONTH: Record<string, number> = {
+  WEEKLY: 52 / 12,
+  FORTNIGHTLY: 26 / 12,
+  MONTHLY: 1,
+}
+
+/**
+ * Monthly Income: Pay amount × pays per month (52/12 weekly, 26/12
+ * fortnightly, 1 monthly). The same every month; needs no payday date.
+ * Null (not $0) when the pay amount is unset, non-numeric or ≤ 0, or the
+ * stored Pay frequency isn't one of the three supported cadences.
+ */
+export function getMonthlyIncomeCents(): number | null {
+  const raw = getAppSetting('pay_amount_cents')
+  if (raw == null || raw.trim() === '' || !/^\d+$/.test(raw.trim())) return null
+  const perPay = parseInt(raw, 10)
+  if (perPay <= 0) return null
+  const freq = getAppSetting('payday_frequency') ?? 'MONTHLY'
+  const mult = PAYS_PER_MONTH[freq]
+  if (mult === undefined) return null
+  return Math.round(perPay * mult)
+}
+
+/** Income per display period derived from pay_amount_cents + payday_frequency settings. MONTHLY delegates to getMonthlyIncomeCents. */
 export function getIncomeCents(period: BudgetDisplayPeriod): number | null {
+  if (period === 'MONTHLY') return getMonthlyIncomeCents()
   const db = getDb()
   if (!db) return null
   const raw = getAppSetting('pay_amount_cents')
