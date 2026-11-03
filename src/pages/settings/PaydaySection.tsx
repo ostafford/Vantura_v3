@@ -116,7 +116,7 @@ export function PaydaySection() {
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label htmlFor="settings-payday-pay-amount">
-            Pay amount ($)
+            Take-home pay amount ($)
           </Form.Label>
           <Form.Control
             id="settings-payday-pay-amount"
@@ -126,10 +126,11 @@ export function PaydaySection() {
             placeholder="Optional"
             value={paydayPayAmount}
             onChange={(e) => setPaydayPayAmount(e.target.value)}
-            aria-label="Pay amount per pay period (optional)"
           />
           <Form.Text className="text-muted">
-            Optional. Used for Spendable context and alerts.
+            What lands in your account each pay, after tax. Your monthly Income
+            is built from it, and it&apos;s used for Spendable context and
+            alerts.
           </Form.Text>
         </Form.Group>
         <Form.Group className="mb-3">
