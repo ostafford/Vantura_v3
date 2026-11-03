@@ -14,7 +14,10 @@ export function DashboardPrototype() {
   const variant = params.get('variant') ?? 'A'
   const f = getFixture({
     neg: params.get('headroom') === 'neg',
-    review: params.get('review') !== 'off',
+    review:
+      (['saved', 'over', 'off'] as const).find(
+        (v) => v === params.get('review')
+      ) ?? 'saved',
   })
   return (
     <div style={{ paddingBottom: 80 }}>
@@ -54,7 +57,8 @@ export function DashboardPrototype() {
           {
             param: 'review',
             options: [
-              { value: 'on', label: 'Review on' },
+              { value: 'saved', label: 'Review: saved' },
+              { value: 'over', label: 'Review: overspent' },
               { value: 'off', label: 'Review off' },
             ],
           },
