@@ -10,6 +10,8 @@ import {
   normalizeDateStr,
   calendarPeriodBounds,
 } from '@/lib/dateStr'
+import { actualSpendingWhere } from '@/services/actualSpending'
+import { displayDaySql } from '@/services/displayDay'
 import {
   toPeriodCents,
   toDailyRateCents,
@@ -103,39 +105,64 @@ export function getTrackerSpent(trackerId: number): number {
 }
 
 /**
- * Spent in a specific period (cents). Same filters as getTrackerSpent but with explicit bounds.
+ * The tracker-spend predicate: Actual spending (`actualSpending.ts`) in
+ * `categoryIds`, on local Display days from `fromDay` through `toDay`, both
+ * inclusive. Either bound may be omitted (open-ended). Never restate the
+ * Actual spending filters here — narrow the shared definition.
+ */
+function trackerSpendingWhere(
+  categoryIds: readonly string[],
+  window: { fromDay?: string; toDay?: string } = {}
+): { sql: string; params: string[] } {
+  const fromDay = window.fromDay && normDate(window.fromDay)
+  const toDay = window.toDay && normDate(window.toDay)
+  if (fromDay && toDay) {
+    return actualSpendingWhere({ from: fromDay, to: toDay, categoryIds }, 't')
+  }
+  const base = actualSpendingWhere({ categoryIds }, 't')
+  let sql = base.sql
+  const params = [...base.params]
+  if (fromDay) {
+    sql += ` AND ${displayDaySql('t')} >= ?`
+    params.push(fromDay)
+  }
+  if (toDay) {
+    sql += ` AND ${displayDaySql('t')} <= ?`
+    params.push(toDay)
+  }
+  return { sql, params }
+}
+
+/**
+ * Tracker windows are `[start, end)` days; Actual spending windows are
+ * inclusive local days. The last included day is the day before `end`.
+ */
+function lastDayBefore(exclusiveEnd: string): string {
+  return addDaysToDateStr(normDate(exclusiveEnd), -1)
+}
+
+/**
+ * Spent in a specific period `[periodStart, periodEnd)` (cents), against the
+ * tracker's current category set. Actual spending: signed net (refunds
+ * subtract), may be negative.
  */
 export function getTrackerSpentInPeriod(
   trackerId: number,
   periodStart: string,
   periodEnd: string
 ): number {
-  const db = getDb()
-  if (!db) return 0
-  const startNorm =
-    periodStart.length >= 10 ? periodStart.slice(0, 10) : periodStart
-  const endNorm = periodEnd.length >= 10 ? periodEnd.slice(0, 10) : periodEnd
-  const stmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
-     FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ?
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+  return getSpentForCategoriesInPeriod(
+    getTrackerCategoryIds(trackerId),
+    periodStart,
+    periodEnd
   )
-  stmt.bind([trackerId, startNorm, endNorm])
-  stmt.step()
-  const row = stmt.get()
-  stmt.free()
-  return row ? Number(row[0]) : 0
 }
 
 /**
  * Spent (cents) against an explicit category set over `[periodStart, periodEnd)`.
- * Same transaction filters as getTrackerSpentInPeriod, but the category set is
- * passed in rather than joined from tracker_categories — used by the #16 split
- * calc, where each period segment has its own historical category set.
+ * Actual spending narrowed to the set and window — signed net, never clamped.
+ * Used by the #16 split calc, where each period segment has its own
+ * historical category set.
  */
 export function getSpentForCategoriesInPeriod(
   categoryIds: string[],
@@ -144,16 +171,16 @@ export function getSpentForCategoriesInPeriod(
 ): number {
   const db = getDb()
   if (!db || categoryIds.length === 0) return 0
-  const placeholders = categoryIds.map(() => '?').join(',')
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: periodStart,
+    toDay: lastDayBefore(periodEnd),
+  })
   const stmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) as spent
+    `SELECT COALESCE(-SUM(t.amount), 0) as spent
      FROM transactions t
-     WHERE t.category_id IN (${placeholders})
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL`
+     WHERE ${sql}`
   )
-  stmt.bind([...categoryIds, normDate(periodStart), normDate(periodEnd)])
+  stmt.bind(params)
   stmt.step()
   const row = stmt.get()
   stmt.free()
@@ -630,7 +657,11 @@ export type TrackerPeriodTransaction = {
   status: string
 }
 
-/** Spending rows for one category set over [start, end), newest first, capped at `limit`. */
+/**
+ * Actual spending rows (debits and refunds) for one category set over
+ * [start, end), newest first, capped at `limit`. `amount` is as stored, so the
+ * negated sum of the rows equals the spend.
+ */
 function readTrackerTxRows(
   db: NonNullable<ReturnType<typeof getDb>>,
   categoryIds: string[],
@@ -639,17 +670,17 @@ function readTrackerTxRows(
   limit: number
 ): TrackerPeriodTransaction[] {
   if (categoryIds.length === 0) return []
-  const placeholders = categoryIds.map(() => '?').join(',')
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: startNorm,
+    toDay: lastDayBefore(endNorm),
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     WHERE t.category_id IN (${placeholders})
-       AND COALESCE(t.created_at, t.settled_at) >= ?
-       AND COALESCE(t.created_at, t.settled_at) < ?
-       AND t.amount < 0 AND t.transfer_account_id IS NULL
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ?`
   )
-  stmt.bind([...categoryIds, startNorm, endNorm, limit])
+  stmt.bind([...params, limit])
   const rows: TrackerPeriodTransaction[] = []
   while (stmt.step()) {
     const r = stmt.get() as [
@@ -1434,26 +1465,20 @@ export function getTrackerTransactionTimeline(
   const db = getDb()
   if (!db) return []
   const limit = options?.limit ?? 1000
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) < ?'
-    params.push(options.dateTo)
-  }
-  params.push(limit)
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return []
+  // dateTo is exclusive here (a period end).
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo ? lastDayBefore(options.dateTo) : undefined,
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) ASC LIMIT ?`
   )
-  stmt.bind(params)
+  stmt.bind([...params, limit])
   const raw: Array<{
     id: string
     description: string
@@ -1483,13 +1508,14 @@ export function getTrackerTransactionTimeline(
   stmt.free()
   let cumulative = 0
   return raw.map((r) => {
-    const absAmount = Math.abs(r.amount)
-    cumulative += absAmount
+    // Spend contribution: a debit adds, a refund subtracts.
+    const spend = -r.amount
+    cumulative += spend
     const date = r.created_at ?? r.settled_at ?? ''
     return {
       id: r.id,
       date: date.slice(0, 10),
-      amount: absAmount,
+      amount: spend,
       description: r.description,
       status: r.status,
       cumulativeSpent: cumulative,
@@ -1519,27 +1545,20 @@ export function getTrackerTransactionsForTable(
   if (!db) return []
   const limit = options?.limit ?? 50
   const offset = options?.offset ?? 0
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter +=
-      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
-    params.push(options.dateTo)
-  }
-  params.push(limit, offset)
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return []
+  // dateTo is inclusive here (a picked day).
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo,
+  })
   const stmt = db.prepare(
     `SELECT t.id, t.description, t.created_at, t.settled_at, t.amount, t.status
      FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}
+     WHERE ${sql}
      ORDER BY COALESCE(t.created_at, t.settled_at) DESC LIMIT ? OFFSET ?`
   )
-  stmt.bind(params)
+  stmt.bind([...params, limit, offset])
   const list: Array<{
     id: string
     date: string
@@ -1560,7 +1579,8 @@ export function getTrackerTransactionsForTable(
     list.push({
       id: r[0],
       date: date.slice(0, 10),
-      amount: Math.abs(r[4]),
+      // Spend contribution: a debit is positive, a refund negative.
+      amount: -r[4],
       description: r[1],
       status: r[5],
     })
@@ -1578,22 +1598,14 @@ export function getTrackerTransactionsCount(
 ): number {
   const db = getDb()
   if (!db) return 0
-  let dateFilter = ''
-  const params: (string | number)[] = [trackerId]
-  if (options?.dateFrom) {
-    dateFilter += ' AND COALESCE(t.created_at, t.settled_at) >= ?'
-    params.push(options.dateFrom)
-  }
-  if (options?.dateTo) {
-    dateFilter +=
-      " AND COALESCE(t.created_at, t.settled_at) < DATE(?, '+1 day')"
-    params.push(options.dateTo)
-  }
+  const categoryIds = getTrackerCategoryIds(trackerId)
+  if (categoryIds.length === 0) return 0
+  const { sql, params } = trackerSpendingWhere(categoryIds, {
+    fromDay: options?.dateFrom,
+    toDay: options?.dateTo,
+  })
   const stmt = db.prepare(
-    `SELECT COUNT(*) as n FROM transactions t
-     INNER JOIN tracker_categories tc ON t.category_id = tc.category_id
-     WHERE tc.tracker_id = ? AND t.amount < 0 AND t.transfer_account_id IS NULL
-     ${dateFilter}`
+    `SELECT COUNT(*) as n FROM transactions t WHERE ${sql}`
   )
   stmt.bind(params)
   stmt.step()
