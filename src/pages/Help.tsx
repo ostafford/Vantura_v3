@@ -351,7 +351,7 @@ export function Help() {
                     </li>
                     <li>
                       <strong>Regulars</strong> — bills and subscriptions
-                      grouped by Next pay and Later
+                      grouped by Overdue, This month and Later
                     </li>
                   </ul>
                   <Tip>
@@ -487,12 +487,15 @@ export function Help() {
                   </SectionHeading>
                   <ul className="mb-0 ps-3">
                     <li className="mb-1">
-                      <strong>Next pay</strong> — charges due before your next
-                      payday
+                      <strong>Overdue</strong> — one-off charges whose date has
+                      passed
+                    </li>
+                    <li className="mb-1">
+                      <strong>This month</strong> — charges next due by the end
+                      of this calendar month
                     </li>
                     <li>
-                      <strong>Later</strong> — charges due after your next
-                      payday
+                      <strong>Later</strong> — charges next due after this month
                     </li>
                   </ul>
                 </>
@@ -700,19 +703,16 @@ export function Help() {
 
                   <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
                   <p className="mb-1">
-                    Your payday frequency and date affect three things:
+                    Your payday frequency and date affect two things:
                   </p>
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
                       <strong>Spendable</strong> — only charges due before your
                       next payday are reserved in the calculation
                     </li>
-                    <li className="mb-1">
+                    <li>
                       <strong>Payday trackers</strong> — reset on your next
                       payday
-                    </li>
-                    <li>
-                      <strong>Regulars grouping</strong> — Next pay vs Later
                     </li>
                   </ul>
                   <Tip>

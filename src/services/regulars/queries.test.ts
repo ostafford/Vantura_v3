@@ -28,7 +28,7 @@ vi.mock('@/db', () => ({
 }))
 
 const {
-  regularsByPayday,
+  regularsByMonth,
   regularOccurrencesInMonth,
   dueSoonRegulars,
   reservedBeforePayday,
@@ -106,18 +106,51 @@ const names = (rows: Array<{ name: string }>) => rows.map((r) => r.name)
 const dated = (rows: Array<{ name: string; next_charge_date: string }>) =>
   rows.map((r) => `${r.next_charge_date} ${r.name}`)
 
-describe('regularsByPayday', () => {
-  it('Next pay is strictly before payday: a Regular due on payday is Later', () => {
-    add({ name: 'Day before', frequency: 'ONCE', date: '2025-03-06' })
-    add({ name: 'On payday', frequency: 'ONCE', date: '2025-03-07' })
-    const g = regularsByPayday()
-    expect(names(g.nextPay)).toEqual(['Day before'])
-    expect(names(g.later)).toEqual(['On payday'])
+describe('regularsByMonth', () => {
+  it('This month runs to the last day of the calendar month; the 1st of next month is Later', () => {
+    add({ name: 'Last day', frequency: 'ONCE', date: '2025-02-28' })
+    add({ name: 'First of next', frequency: 'ONCE', date: '2025-03-01' })
+    const g = regularsByMonth()
+    expect(names(g.thisMonth)).toEqual(['Last day'])
+    expect(names(g.later)).toEqual(['First of next'])
+  })
+
+  it('a Regular due today is This month', () => {
+    add({ name: 'Today', frequency: 'ONCE', date: '2025-02-23' })
+    expect(names(regularsByMonth().thisMonth)).toEqual(['Today'])
+  })
+
+  it('groups by the next occurrence on or after today, not the stored date', () => {
+    // Stored 10 Jan, monthly: next occurrence 10 Mar (10 Feb has passed) → Later.
+    add({ name: 'Gym', frequency: 'MONTHLY', date: '2025-01-10' })
+    // Stored 25 Jan, monthly: next occurrence 25 Feb → This month.
+    add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-25' })
+    const g = regularsByMonth()
+    expect(dated(g.thisMonth)).toEqual(['2025-02-25 Phone'])
+    expect(dated(g.later)).toEqual(['2025-03-10 Gym'])
+  })
+
+  it('does not read the next-payday setting', () => {
+    appSettings['next_payday'] = '2025-02-25'
+    add({ name: 'After payday', frequency: 'ONCE', date: '2025-02-27' })
+    add({ name: 'Next month', frequency: 'ONCE', date: '2025-03-03' })
+    const g = regularsByMonth()
+    expect(names(g.thisMonth)).toEqual(['After payday'])
+    expect(names(g.later)).toEqual(['Next month'])
+    expect(g).not.toHaveProperty('nextPayday')
+  })
+
+  it('a past ONCE is Overdue, in neither This month nor Later', () => {
+    add({ name: 'Rego', frequency: 'ONCE', date: '2025-02-20' })
+    const g = regularsByMonth()
+    expect(names(g.overdue)).toEqual(['Rego'])
+    expect(g.thisMonth).toHaveLength(0)
+    expect(g.later).toHaveLength(0)
   })
 
   it('returns projected dates, never the stored anchor', () => {
     add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-31' })
-    expect(dated(regularsByPayday().nextPay)).toEqual(['2025-02-28 Phone'])
+    expect(dated(regularsByMonth().thisMonth)).toEqual(['2025-02-28 Phone'])
   })
 })
 

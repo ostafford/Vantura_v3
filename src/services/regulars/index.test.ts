@@ -19,7 +19,7 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { regularById, linkedLiabilityRepayments, regularsByPayday } =
+const { regularById, linkedLiabilityRepayments, regularsByMonth } =
   await import('./index')
 const { localDateString } = await import('@/lib/format')
 
@@ -348,7 +348,7 @@ describe('regularById / linkedLiabilityRepayments', () => {
   })
 })
 
-describe('regularsByPayday — overdue ONCE charges (#18)', () => {
+describe('regularsByMonth — overdue ONCE charges (#18)', () => {
   beforeAll(async () => {
     SQL = await initSqlJs()
   })
@@ -387,8 +387,7 @@ describe('regularsByPayday — overdue ONCE charges (#18)', () => {
     )
   }
 
-  it('routes a past ONCE charge to `overdue`, never to nextPay/later, and keeps it out of those totals', () => {
-    appSettings['next_payday'] = daysFromToday(10)
+  it('routes a past ONCE charge to `overdue`, never to thisMonth/later, and keeps it out of those totals', () => {
     insert({
       name: 'Rego',
       frequency: 'ONCE',
@@ -401,26 +400,25 @@ describe('regularsByPayday — overdue ONCE charges (#18)', () => {
       amount: 200000,
     })
 
-    const { overdue, nextPay, later } = regularsByPayday()
+    const { overdue, thisMonth, later } = regularsByMonth()
 
     expect(overdue.map((c) => c.name)).toEqual(['Rego'])
-    expect([...nextPay, ...later].map((c) => c.name)).toEqual(['Rent'])
+    expect([...thisMonth, ...later].map((c) => c.name)).toEqual(['Rent'])
   })
 
-  it('a Jan 31 monthly charge due Mar 31 is Later when payday is Mar 30, not pulled into Next pay (#145)', () => {
+  it('a Jan 31 monthly charge projects to Mar 31, the last day of March, and is This month (#145)', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 2, 20, 12, 0, 0)) // 20 Mar 2026, local
     try {
-      appSettings['next_payday'] = '2026-03-30'
       insert({
         name: 'Rent',
         frequency: 'MONTHLY',
         nextChargeDate: '2026-01-31',
       })
 
-      const { nextPay, later } = regularsByPayday()
-      expect(nextPay).toHaveLength(0)
-      expect(later.map((c) => [c.name, c.next_charge_date])).toEqual([
+      const { thisMonth, later } = regularsByMonth()
+      expect(later).toHaveLength(0)
+      expect(thisMonth.map((c) => [c.name, c.next_charge_date])).toEqual([
         ['Rent', '2026-03-31'],
       ])
     } finally {
@@ -433,7 +431,7 @@ describe('regularsByPayday — overdue ONCE charges (#18)', () => {
     insert({ name: 'A', frequency: 'ONCE', nextChargeDate: daysFromToday(-30) })
     insert({ name: 'C', frequency: 'ONCE', nextChargeDate: daysFromToday(-1) })
 
-    expect(regularsByPayday().overdue.map((c) => c.name)).toEqual([
+    expect(regularsByMonth().overdue.map((c) => c.name)).toEqual([
       'A',
       'B',
       'C',
@@ -441,16 +439,15 @@ describe('regularsByPayday — overdue ONCE charges (#18)', () => {
   })
 
   it('a future ONCE charge is scheduled, not overdue', () => {
-    appSettings['next_payday'] = daysFromToday(10)
     insert({
       name: 'Insurance',
       frequency: 'ONCE',
       nextChargeDate: daysFromToday(4),
     })
 
-    const { overdue, nextPay } = regularsByPayday()
+    const { overdue, thisMonth, later } = regularsByMonth()
     expect(overdue).toHaveLength(0)
-    expect(nextPay.map((c) => c.name)).toEqual(['Insurance'])
+    expect([...thisMonth, ...later].map((c) => c.name)).toEqual(['Insurance'])
   })
 
   it('a recurring charge past its cancel_by_date is dropped, not shown as overdue', () => {
@@ -461,9 +458,9 @@ describe('regularsByPayday — overdue ONCE charges (#18)', () => {
       cancelByDate: daysFromToday(-30),
     })
 
-    const { overdue, nextPay, later } = regularsByPayday()
+    const { overdue, thisMonth, later } = regularsByMonth()
     expect(overdue).toHaveLength(0)
-    expect(nextPay).toHaveLength(0)
+    expect(thisMonth).toHaveLength(0)
     expect(later).toHaveLength(0)
   })
 })
