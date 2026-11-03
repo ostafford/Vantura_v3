@@ -46,7 +46,6 @@ function SumCard({
   icon,
   label,
   cents,
-  big,
   children,
 }: {
   tone: string
@@ -55,7 +54,6 @@ function SumCard({
   icon: string
   label: string
   cents: number
-  big?: boolean
   children?: React.ReactNode
 }) {
   return (
@@ -68,7 +66,7 @@ function SumCard({
         }}
       >
         <div
-          className="px-3 py-3 d-flex justify-content-between align-items-center gap-2 flex-wrap"
+          className="px-3 py-3 d-flex justify-content-between align-items-center gap-2"
           style={{
             background: `color-mix(in srgb, ${tone} 14%, transparent)`,
             borderTop: `4px solid ${tone}`,
@@ -76,13 +74,14 @@ function SumCard({
         >
           <div
             className="d-flex align-items-center gap-2"
-            style={{ fontSize: '0.8rem' }}
+            style={{ fontSize: '0.95rem', minWidth: 0 }}
           >
             <span
               className="d-inline-flex align-items-center justify-content-center"
               style={{
-                width: 22,
-                height: 22,
+                width: 24,
+                height: 24,
+                flexShrink: 0,
                 borderRadius: 6,
                 background: tone,
                 color: '#fff',
@@ -98,10 +97,10 @@ function SumCard({
             </span>
           </div>
           <div
-            className="fw-bold ms-auto text-end"
+            className="fw-bold text-end flex-shrink-0"
             style={{
               whiteSpace: 'nowrap',
-              fontSize: big ? '2.2rem' : '1.6rem',
+              fontSize: '1.6rem',
               lineHeight: 1.2,
               color: level === 'off' ? undefined : ink,
             }}
@@ -258,7 +257,6 @@ export function VariantD({ f }: { f: DashFixture }) {
           icon={neg ? 'mdi-alert-outline' : 'mdi-check'}
           label="Headroom"
           cents={h.headroom}
-          big
         >
           <div style={{ color: neg ? danger : muted }}>
             {neg
