@@ -45,6 +45,7 @@ import { ComparisonVisual } from '@/components/atAGlance/ComparisonVisual'
 import { PageBreadcrumb } from '@/components/PageBreadcrumb'
 import {
   formatMoney,
+  formatSignedMoney,
   formatDeltaMoney,
   formatDollars,
   formatDate,
@@ -1007,7 +1008,7 @@ export function AnalyticsReports() {
                                 </span>
                                 <div className="d-flex align-items-center gap-2">
                                   <span className="small text-muted">
-                                    ${formatMoney(spent)} total
+                                    {formatSignedMoney(spent)} total
                                   </span>
                                   {hasDelta && spendDelta !== null && (
                                     <span
@@ -1041,7 +1042,7 @@ export function AnalyticsReports() {
                                           color: trackerBarColor(p.progress),
                                         }}
                                       >
-                                        ${formatMoney(p.spent)}
+                                        {formatSignedMoney(p.spent)}
                                       </span>
                                       <span className="text-muted">
                                         {' '}
@@ -1050,7 +1051,7 @@ export function AnalyticsReports() {
                                     </span>
                                   </div>
                                   <ProgressBar
-                                    now={Math.min(100, p.progress)}
+                                    now={Math.max(0, Math.min(100, p.progress))}
                                     {...getProgressVariant(p.progress)}
                                     label={`${Math.round(p.progress)}%`}
                                     style={{ height: 13 }}
@@ -1087,13 +1088,13 @@ export function AnalyticsReports() {
                                         : 'var(--vantura-success-on-tooltip)',
                                     }}
                                   >
-                                    ${formatMoney(spent)}
+                                    {formatSignedMoney(spent)}
                                   </span>{' '}
                                   spent · ${formatMoney(budget)} budget
                                 </div>
                                 {prevSpent !== null && prevMonthBounds && (
                                   <div style={{ opacity: 0.75 }}>
-                                    ${formatMoney(prevSpent)} in{' '}
+                                    {formatSignedMoney(prevSpent)} in{' '}
                                     {prevMonthBounds.label}
                                   </div>
                                 )}
@@ -1127,7 +1128,7 @@ export function AnalyticsReports() {
                                         color: trackerBarColor(progress),
                                       }}
                                     >
-                                      ${formatMoney(spent)}
+                                      {formatSignedMoney(spent)}
                                     </span>
                                     <span className="text-muted">
                                       {' '}
@@ -1146,7 +1147,7 @@ export function AnalyticsReports() {
                                 </div>
                               </div>
                               <ProgressBar
-                                now={Math.min(100, progress)}
+                                now={Math.max(0, Math.min(100, progress))}
                                 {...getProgressVariant(progress)}
                                 label={`${Math.round(progress)}%`}
                                 style={{ height: 13 }}
@@ -1218,7 +1219,7 @@ export function AnalyticsReports() {
                                   </span>
                                 </div>
                                 <div className="small text-muted mb-3">
-                                  ${formatMoney(spent)} total
+                                  {formatSignedMoney(spent)} total
                                   {hasDelta && spendDelta !== null && (
                                     <span
                                       className="ms-2 fw-medium"
@@ -1243,7 +1244,7 @@ export function AnalyticsReports() {
                                             color: trackerBarColor(p.progress),
                                           }}
                                         >
-                                          ${formatMoney(p.spent)}
+                                          {formatSignedMoney(p.spent)}
                                         </span>
                                         <span className="text-muted">
                                           {' '}
@@ -1252,7 +1253,10 @@ export function AnalyticsReports() {
                                       </span>
                                     </div>
                                     <ProgressBar
-                                      now={Math.min(100, p.progress)}
+                                      now={Math.max(
+                                        0,
+                                        Math.min(100, p.progress)
+                                      )}
                                       {...getProgressVariant(p.progress)}
                                       label={`${Math.round(p.progress)}%`}
                                       style={{ height: 13 }}
@@ -1290,13 +1294,13 @@ export function AnalyticsReports() {
                                           : 'var(--vantura-success-on-tooltip)',
                                       }}
                                     >
-                                      ${formatMoney(spent)}
+                                      {formatSignedMoney(spent)}
                                     </span>{' '}
                                     spent · ${formatMoney(budget)} budget
                                   </div>
                                   {prevSpent !== null && prevMonthBounds && (
                                     <div style={{ opacity: 0.75 }}>
-                                      ${formatMoney(prevSpent)} in{' '}
+                                      {formatSignedMoney(prevSpent)} in{' '}
                                       {prevMonthBounds.label}
                                     </div>
                                   )}
@@ -1357,7 +1361,7 @@ export function AnalyticsReports() {
                                   </span>
                                 </div>
                                 <ProgressBar
-                                  now={Math.min(100, progress)}
+                                  now={Math.max(0, Math.min(100, progress))}
                                   {...getProgressVariant(progress)}
                                   label={`${Math.round(progress)}%`}
                                   style={{ height: 13 }}
@@ -1367,7 +1371,7 @@ export function AnalyticsReports() {
                                   <span
                                     style={{ color: trackerBarColor(progress) }}
                                   >
-                                    ${formatMoney(spent)} spent
+                                    {formatSignedMoney(spent)} spent
                                   </span>
                                   <span className="text-muted">
                                     {' '}

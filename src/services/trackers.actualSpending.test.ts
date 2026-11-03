@@ -237,7 +237,10 @@ describe('tracker transaction lists include refunds', () => {
   it('the current-period list adds up to the tracker’s spend', () => {
     const id = weeklyGroceries()
     addTx({ amount: -5000, createdAt: '2026-03-03T10:00:00+11:00' })
-    const refund = addTx({ amount: 1200, createdAt: '2026-03-04T10:00:00+11:00' })
+    const refund = addTx({
+      amount: 1200,
+      createdAt: '2026-03-04T10:00:00+11:00',
+    })
     addTx({
       amount: -60,
       createdAt: '2026-03-03T10:00:00+11:00',

@@ -30,7 +30,12 @@ import { getCategories } from '@/services/categories'
 import { getPayAmountCents } from '@/services/balance'
 import { getAppSetting } from '@/db'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
-import { formatMoney, formatShortDate } from '@/lib/format'
+import {
+  formatMoney,
+  formatShortDate,
+  formatSignedMoney,
+  formatDeltaMoney,
+} from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
@@ -460,7 +465,10 @@ export function TrackersSection({
                           </h6>
                         )}
                         <ProgressBar
-                          now={Math.min(100, effectiveData.progress)}
+                          now={Math.max(
+                            0,
+                            Math.min(100, effectiveData.progress)
+                          )}
                           variant={progressStyle.variant}
                           striped={progressStyle.striped}
                           animated={progressStyle.animated}
@@ -489,7 +497,7 @@ export function TrackersSection({
                         title="View transactions"
                       >
                         <small className="text-muted">
-                          ${formatMoney(effectiveData.spent)} of $
+                          {formatSignedMoney(effectiveData.spent)} of $
                           {formatMoney(effectiveData.budget)} spent
                           {effectiveData.wasAdjusted && (
                             <OverlayTrigger
@@ -531,8 +539,10 @@ export function TrackersSection({
                                     {formatShortDate(
                                       tx.created_at ?? tx.settled_at ?? ''
                                     )}{' '}
-                                    {tx.description} $
-                                    {formatMoney(Math.abs(tx.amount))}
+                                    {tx.description}{' '}
+                                    {tx.amount > 0
+                                      ? formatDeltaMoney(tx.amount)
+                                      : `$${formatMoney(Math.abs(tx.amount))}`}
                                     {tx.status === 'HELD' && (
                                       <span className="text-muted small ms-1">
                                         (Held)
