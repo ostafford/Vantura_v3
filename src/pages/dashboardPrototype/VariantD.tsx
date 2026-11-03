@@ -62,6 +62,7 @@ function SumCard({
         className="flex-grow-1 overflow-hidden"
         style={{
           flexBasis: 0,
+          containerType: 'inline-size',
           borderColor: `color-mix(in srgb, ${tone} 45%, transparent)`,
         }}
       >
@@ -74,7 +75,7 @@ function SumCard({
         >
           <div
             className="d-flex align-items-center gap-2"
-            style={{ fontSize: '0.95rem', minWidth: 0 }}
+            style={{ fontSize: 'clamp(0.78rem, 4.2cqi, 0.95rem)', minWidth: 0 }}
           >
             <span
               className="d-inline-flex align-items-center justify-content-center"
@@ -100,7 +101,7 @@ function SumCard({
             className="fw-bold text-end flex-shrink-0"
             style={{
               whiteSpace: 'nowrap',
-              fontSize: '1.6rem',
+              fontSize: 'clamp(1.05rem, 8cqi, 1.6rem)',
               lineHeight: 1.2,
               color: level === 'off' ? undefined : ink,
             }}
