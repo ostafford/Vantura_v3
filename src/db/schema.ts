@@ -5,7 +5,7 @@
 
 import type { Database } from 'sql.js'
 
-const SCHEMA_VERSION = 48
+const SCHEMA_VERSION = 49
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1352,6 +1352,40 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['48']
+    )
+  }
+  // #192: the PAYDAY tracker reset option is gone. PAYDAY trackers become
+  // MONTHLY, reset day 1, on the current calendar month (local date): last
+  // reset = the 1st of this month, next reset = the 1st of next month. Their
+  // config-history rows become MONTHLY too; effective dates and category sets
+  // are unchanged. Past periods re-show as calendar months (agreed in #178).
+  if (version < 49) {
+    const now = new Date()
+    const ym = (y: number, m: number) =>
+      `${y}-${String(m + 1).padStart(2, '0')}-01`
+    const thisMonthStart = ym(now.getFullYear(), now.getMonth())
+    const nextMonthStart =
+      now.getMonth() === 11
+        ? ym(now.getFullYear() + 1, 0)
+        : ym(now.getFullYear(), now.getMonth() + 1)
+    if (tableExists(database, 'trackers')) {
+      database.run(
+        `UPDATE trackers
+           SET reset_frequency = 'MONTHLY', reset_day = 1,
+               last_reset_date = ?, next_reset_date = ?
+         WHERE reset_frequency = 'PAYDAY'`,
+        [thisMonthStart, nextMonthStart]
+      )
+    }
+    if (tableExists(database, 'tracker_config_history')) {
+      database.run(
+        `UPDATE tracker_config_history SET reset_frequency = 'MONTHLY'
+         WHERE reset_frequency = 'PAYDAY'`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['49']
     )
   }
 }
