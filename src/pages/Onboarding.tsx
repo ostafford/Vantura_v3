@@ -410,7 +410,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               </Form.Group>
               <Form.Group className="mb-2">
                 <Form.Label htmlFor="onboarding-payday-pay-amount">
-                  Pay amount ($)
+                  Take-home pay amount ($)
                 </Form.Label>
                 <Form.Control
                   id="onboarding-payday-pay-amount"
@@ -421,8 +421,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                   placeholder="Optional"
                   value={paydayPayAmount}
                   onChange={(e) => setPaydayPayAmount(e.target.value)}
-                  aria-label="Pay amount per pay period (optional)"
                 />
+                <Form.Text className="text-muted">
+                  What lands in your account each pay, after tax.
+                </Form.Text>
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label htmlFor="onboarding-next-payday">
