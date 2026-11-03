@@ -24,6 +24,7 @@ import {
   getTracker,
   getTrackerConfigHistory,
   getTrackersList,
+  TRACKER_RESET_FREQUENCY_ORDER,
   type TrackerConfigVersion,
 } from '@/services/trackers'
 
@@ -37,9 +38,11 @@ export interface TrackerMonthLine {
   /**
    * Monthly equivalent of each config version's budget, weighted by the days
    * of the month that version was in effect (cents). A day before the
-   * Tracker's first config version plans nothing.
+   * Tracker's first config version plans nothing. `null` — no planned figure
+   * — when a version in effect this month is in a cadence Vantura can't price
+   * (not a tracker reset frequency): the read declines rather than guess.
    */
-  plannedCents: number
+  plannedCents: number | null
   /**
    * Actual spending in the category set in effect on each transaction's
    * Display date, Linked payments excluded. Positive = money out; may be
@@ -142,7 +145,9 @@ function daysOf(first: string, last: string): string[] {
  * Every active Tracker with its planned figure and its config in effect per
  * day ("config as of day D" = the version with the greatest
  * `effective_from <= D`, docs/adr/0014). A version's budget is denominated in
- * its own `reset_frequency`, or the Tracker's when that is null (#38).
+ * its own `reset_frequency`, or the Tracker's when that is null (#38). A
+ * cadence that isn't a tracker reset frequency can't be priced, so the
+ * Tracker gets no planned figure for the month (its actual still counts).
  */
 function readTrackersInMonth(days: string[]): TrackerInMonth[] {
   const out: TrackerInMonth[] = []
@@ -152,6 +157,7 @@ function readTrackersInMonth(days: string[]): TrackerInMonth[] {
     const history = getTrackerConfigHistory(id)
     const versionByDay = new Map<string, TrackerConfigVersion | null>()
     let weighted = 0
+    let unpriceable = false
     for (const day of days) {
       let version: TrackerConfigVersion | null = null
       for (const v of history) {
@@ -160,18 +166,23 @@ function readTrackersInMonth(days: string[]): TrackerInMonth[] {
       }
       versionByDay.set(day, version)
       if (version) {
-        weighted += toPeriodCents(
-          version.budget_amount,
-          version.reset_frequency ?? tracker.reset_frequency,
-          'MONTHLY'
-        )
+        const cadence = version.reset_frequency ?? tracker.reset_frequency
+        if (
+          !(TRACKER_RESET_FREQUENCY_ORDER as readonly string[]).includes(
+            cadence
+          )
+        ) {
+          unpriceable = true
+          continue
+        }
+        weighted += toPeriodCents(version.budget_amount, cadence, 'MONTHLY')
       }
     }
     out.push({
       line: {
         trackerId: id,
         bucketId: tracker.bucket_id,
-        plannedCents: Math.round(weighted / days.length),
+        plannedCents: unpriceable ? null : Math.round(weighted / days.length),
         actualCents: 0,
       },
       versionByDay,
@@ -260,6 +271,11 @@ export function getMonthAttribution(month: string): MonthAttribution {
         : trackers.filter((t) =>
             t.versionByDay.get(tx.day)?.category_ids.includes(tx.categoryId!)
           )
+    // Exactly one owner takes it. Two Trackers claiming the same category on
+    // the same day (ADR 0003 forbids sharing a category, but a back-dated
+    // config row can overlap another Tracker's last days) is ambiguous, so
+    // both decline and it goes to Unplanned — the same fail-safe as a payment
+    // inside two Regulars' bands linking to neither (ADR 0020).
     if (owners.length === 1) owners[0].line.actualCents -= tx.amount
     else unplanned.push(tx)
   }

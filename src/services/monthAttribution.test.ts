@@ -795,6 +795,48 @@ describe('Tracker lines', () => {
     ])
   })
 
+  it('declines to plan a Tracker whose cadence it doesn’t know, but still counts its actual', () => {
+    // Unknown cadences can't be priced; planning $0 would be a guess.
+    const unknownTracker = addTracker({
+      frequency: 'BIMONTHLY',
+      history: [{ from: '2026-09-01', budget: 20000, categories: ['fuel'] }],
+    })
+    const unknownVersion = addTracker({
+      history: [
+        { from: '2026-09-01', budget: 31000, categories: ['groceries'] },
+        {
+          from: '2026-10-20',
+          budget: 31000,
+          categories: ['groceries'],
+          frequency: 'BIMONTHLY',
+        },
+      ],
+    })
+    addTx({ amount: -6000, category: 'fuel' })
+    addTx({ amount: -1000, category: 'groceries' })
+
+    const lines = read('2026-10').trackers
+    expect(lines).toEqual([
+      {
+        trackerId: unknownTracker,
+        bucketId: null,
+        plannedCents: null,
+        actualCents: 6000,
+      },
+      {
+        trackerId: unknownVersion,
+        bucketId: null,
+        plannedCents: null,
+        actualCents: 1000,
+      },
+    ])
+    // A month the unknown version isn't in effect is priced as usual.
+    expect(
+      read('2026-09').trackers.find((t) => t.trackerId === unknownVersion)
+        ?.plannedCents
+    ).toBe(31000)
+  })
+
   it('sends spending claimed by two Trackers’ configs on the same day to Unplanned', () => {
     // ADR 0003 forbids sharing a category, but a back-dated genesis row can
     // overlap another Tracker's last days with it. Neither takes it.
