@@ -1,6 +1,6 @@
 // PROTOTYPE — throwaway. Wayfinder ticket #181: Dashboard after the cuts.
 // Three variants, switchable via ?variant=A|B|C|D on the existing / route;
-// fixture data only. ?headroom=pos|neg, ?review=saved|over|off.
+// fixture data only. ?headroom=pos|neg, ?review=saved|over|off, ?ink=off|figures|all (D only).
 import { useSearchParams } from 'react-router-dom'
 import { PrototypeSwitcher } from '@/components/prototype/PrototypeSwitcher'
 import { getFixture } from './fixture'
@@ -52,6 +52,14 @@ export function DashboardPrototype() {
             options: [
               { value: 'pos', label: 'Headroom +' },
               { value: 'neg', label: 'Headroom −' },
+            ],
+          },
+          {
+            param: 'ink',
+            options: [
+              { value: 'off', label: 'Text: plain' },
+              { value: 'figures', label: 'Text: figures' },
+              { value: 'all', label: 'Text: all' },
             ],
           },
           {
