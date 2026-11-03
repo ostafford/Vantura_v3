@@ -158,7 +158,7 @@ export function MonthSummarySection({
                 {(metric === 'spending'
                   ? 'Spending'
                   : metric === 'income'
-                    ? 'Income'
+                    ? 'Money in'
                     : 'Net') +
                   ` ${monthPairLabels.currentLabel} vs ${monthPairLabels.previousLabel}`}
               </div>
@@ -182,7 +182,7 @@ export function MonthSummarySection({
                 onClick={() => setMetric('income')}
                 aria-pressed={metric === 'income'}
               >
-                Income
+                Money in
               </button>
               <button
                 type="button"
