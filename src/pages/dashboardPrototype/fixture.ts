@@ -40,7 +40,7 @@ export interface DashFixture {
 
 export function getFixture(opts: {
   neg: boolean
-  review: boolean
+  review: 'saved' | 'over' | 'off'
 }): DashFixture {
   const accounts: Account[] = [
     {
