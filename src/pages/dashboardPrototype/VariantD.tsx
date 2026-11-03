@@ -68,7 +68,7 @@ function SumCard({
         }}
       >
         <div
-          className="px-3 pt-3 pb-2"
+          className="px-3 py-3 d-flex justify-content-between align-items-center gap-2 flex-wrap"
           style={{
             background: `color-mix(in srgb, ${tone} 14%, transparent)`,
             borderTop: `4px solid ${tone}`,
@@ -98,8 +98,9 @@ function SumCard({
             </span>
           </div>
           <div
-            className="fw-bold"
+            className="fw-bold ms-auto text-end"
             style={{
+              whiteSpace: 'nowrap',
               fontSize: big ? '2.2rem' : '1.6rem',
               lineHeight: 1.2,
               color: level === 'off' ? undefined : ink,
@@ -127,7 +128,10 @@ function RegularRow({ t }: { t: ToGo }) {
   const overdue = t.status === 'overdue'
   return (
     <div className="d-flex justify-content-between align-items-center py-1 gap-2">
-      <span className="d-flex align-items-center gap-2">
+      <span
+        className="d-flex align-items-center flex-wrap"
+        style={{ minWidth: 0, columnGap: '0.5rem', rowGap: '0.15rem' }}
+      >
         <i
           className="mdi mdi-calendar-sync-outline"
           style={{ color: TO_GO }}
@@ -135,8 +139,10 @@ function RegularRow({ t }: { t: ToGo }) {
         />
         <Name>{t.name}</Name>
         <span
-          className="px-2 rounded-pill"
+          className="px-2 rounded-pill d-inline-flex align-items-center"
           style={{
+            whiteSpace: 'nowrap',
+            lineHeight: 1.6,
             fontSize: '0.68rem',
             background: overdue
               ? 'color-mix(in srgb, var(--vantura-danger) 18%, transparent)'
@@ -147,7 +153,9 @@ function RegularRow({ t }: { t: ToGo }) {
           {overdue ? 'overdue · Mark paid' : `${t.day} Nov`}
         </span>
       </span>
-      <Fig cents={t.cents} />
+      <span className="flex-shrink-0">
+        <Fig cents={t.cents} />
+      </span>
     </div>
   )
 }
