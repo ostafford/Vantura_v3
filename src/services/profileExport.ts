@@ -18,6 +18,7 @@ import {
   PASSPHRASE_MIN_LENGTH,
 } from '@/lib/crypto'
 import { SCHEMA_VERSION } from '@/db/schema'
+import { localCalendarMonthResetDates } from '@/lib/dateStr'
 import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 
 /** Export format version for the encrypted payload */
@@ -796,21 +797,28 @@ export function replaceTrackers(
     ) {
       continue
     }
-    const resetDay = t.reset_day != null ? t.reset_day : null
+    // An older export's PAYDAY tracker moves to MONTHLY, reset day 1, on the
+    // current calendar month — the same rule as the v49 migration (#192).
+    const wasPayday = t.reset_frequency === 'PAYDAY'
+    const resetFrequency = wasPayday ? 'MONTHLY' : t.reset_frequency
+    const resetDay = wasPayday ? 1 : t.reset_day != null ? t.reset_day : null
     // Refuse rather than clamp: the throw rolls back the whole import (#150).
-    if (!isValidTrackerResetDay(t.reset_frequency, resetDay)) {
+    if (!isValidTrackerResetDay(resetFrequency, resetDay)) {
       throw new Error(IMPORT_ERROR_INVALID_TRACKER_RESET)
     }
     const startDate =
       typeof t.start_date === 'string' && t.start_date.length >= 10
         ? t.start_date.slice(0, 10)
         : now.slice(0, 10)
-    const lastReset =
-      typeof t.last_reset_date === 'string' && t.last_reset_date.length >= 10
+    const monthReset = wasPayday ? localCalendarMonthResetDates() : null
+    const lastReset = monthReset
+      ? monthReset.lastReset
+      : typeof t.last_reset_date === 'string' && t.last_reset_date.length >= 10
         ? t.last_reset_date.slice(0, 10)
         : startDate
-    const nextReset =
-      typeof t.next_reset_date === 'string' && t.next_reset_date.length >= 10
+    const nextReset = monthReset
+      ? monthReset.nextReset
+      : typeof t.next_reset_date === 'string' && t.next_reset_date.length >= 10
         ? t.next_reset_date.slice(0, 10)
         : startDate
     const isActive = typeof t.is_active === 'number' ? t.is_active : 1
@@ -825,7 +833,7 @@ export function replaceTrackers(
       [
         t.name,
         t.budget_amount,
-        t.reset_frequency,
+        resetFrequency,
         resetDay,
         startDate,
         lastReset,
@@ -885,7 +893,11 @@ export function replaceTrackers(
       ch.effective_from.slice(0, 10),
       ch.budget_amount,
       catIds,
-      typeof ch.reset_frequency === 'string' ? ch.reset_frequency : null
+      ch.reset_frequency === 'PAYDAY'
+        ? 'MONTHLY' // #192, as in the v49 migration
+        : typeof ch.reset_frequency === 'string'
+          ? ch.reset_frequency
+          : null
     )
     trackersWithHistory.add(newTrackerId)
   }

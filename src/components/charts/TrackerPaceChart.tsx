@@ -10,7 +10,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { TrackerTransactionTimelineRow } from '@/services/trackers'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -145,7 +145,7 @@ export function TrackerPaceChart({
     const areaGen = area<ChartPoint>()
       .x((d) => xScale(d.date))
       .y0(innerHeight)
-      .y1((d) => yScale(Math.min(d.cumulativeSpent, maxVal)))
+      .y1((d) => yScale(Math.max(0, Math.min(d.cumulativeSpent, maxVal))))
 
     g.append('path')
       .datum(chartPoints)
@@ -156,7 +156,7 @@ export function TrackerPaceChart({
     // Spending line
     const lineGen = line<ChartPoint>()
       .x((d) => xScale(d.date))
-      .y((d) => yScale(Math.min(d.cumulativeSpent, maxVal)))
+      .y((d) => yScale(Math.max(0, Math.min(d.cumulativeSpent, maxVal))))
 
     g.append('path')
       .datum(chartPoints)
@@ -174,15 +174,17 @@ export function TrackerPaceChart({
       .join('circle')
       .attr('class', 'point')
       .attr('cx', (d) => xScale(d.date))
-      .attr('cy', (d) => yScale(Math.min(d.cumulativeSpent, maxVal)))
+      .attr('cy', (d) =>
+        yScale(Math.max(0, Math.min(d.cumulativeSpent, maxVal)))
+      )
       .attr('r', 3)
       .attr('fill', spendColor)
       .style('cursor', 'pointer')
       .on('mouseover', function (event: MouseEvent, d) {
         if (!tooltipEl || !container.parentElement) return
         setTooltipContent(tooltipEl, d.row!.date, [
-          `${d.row!.description || 'Transaction'}: $${formatMoney(d.row!.amount)}`,
-          `Cumulative: $${formatMoney(d.row!.cumulativeSpent)}`,
+          `${d.row!.description || 'Transaction'}: ${formatSignedMoney(d.row!.amount)}`,
+          `Cumulative: ${formatSignedMoney(d.row!.cumulativeSpent)}`,
         ])
         tooltipEl.style.display = 'block'
         positionTooltip(tooltipEl, container, event, 160, 52)

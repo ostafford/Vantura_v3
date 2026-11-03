@@ -48,6 +48,12 @@ beforeEach(async () => {
   db.run(
     `INSERT INTO categories (id, name) VALUES ('groceries', 'Groceries'), ('dining', 'Dining')`
   )
+  // Tracker spend is Actual spending (#188): it only counts transactions on
+  // the Spending account or a Saver.
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+     VALUES ('acc1', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01')`
+  )
 })
 
 // ─── pure core: splitPeriodIntoSegments ──────────────────────────────────────
@@ -243,7 +249,7 @@ describe('splitPeriodIntoSegments (pure core)', () => {
     ])
   })
 
-  it('prorates against the actual period length for a variable-length (PAYDAY) period', () => {
+  it('prorates against the actual period length for a non-standard-length period', () => {
     const segs = splitPeriodIntoSegments(
       '2026-03-01',
       '2026-03-15', // 14 days

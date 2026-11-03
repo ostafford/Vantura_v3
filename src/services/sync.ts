@@ -15,19 +15,14 @@ import {
   type UpCategory,
   type UpTag,
 } from '@/api/upBank'
-import {
-  isMonthlyLastWeekday,
-  monthlyPaydayDate,
-  previousPaydayDate,
-  type PaydayFrequency,
-} from '@/lib/payday'
+import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'
 
 /**
  * If stored next_payday is in the past, advance it using payday_frequency and payday_day.
- * Call on app init and at start of each sync so PAYDAY trackers and reserved amount use current value.
+ * Call on app init and at start of each sync so the reserved amount uses the current value.
  */
 export function advanceNextPaydayIfNeeded(): void {
   const frequency = getAppSetting('payday_frequency')
@@ -343,24 +338,9 @@ function upsertCategory(cat: UpCategory): void {
   )
 }
 
-/** The payday before nextPayday, computed from payday settings. */
-function prevPaydayDate(nextPayday: string): string | null {
-  const frequency = getAppSetting('payday_frequency')
-  const dayStr = getAppSetting('payday_day')
-  if (
-    frequency !== 'WEEKLY' &&
-    frequency !== 'FORTNIGHTLY' &&
-    frequency !== 'MONTHLY'
-  )
-    return null
-  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  return previousPaydayDate(nextPayday, frequency as PaydayFrequency, paydayDay)
-}
-
 /**
  * Advance tracker reset dates where the local date >= next_reset_date.
  * Loops until all trackers are current (handles multiple missed periods).
- * For PAYDAY frequency uses app_settings next_payday; skips if not configured.
  */
 export function recalculateTrackers(): void {
   const db = getDb()
@@ -373,7 +353,6 @@ export function recalculateTrackers(): void {
     // Local calendar date, like next_reset_date itself: a tracker due today
     // resets at local midnight, not 00:00 UTC (#148).
     const today = localDateString()
-    const nextPayday = getAppSetting('next_payday')
     const stmt = db.prepare(
       `SELECT id, reset_frequency, next_reset_date FROM trackers WHERE is_active = 1`
     )
@@ -383,47 +362,28 @@ export function recalculateTrackers(): void {
       const freq = row[1]
       const nextReset = row[2] as string
       if (!nextReset || today < nextReset.slice(0, 10)) continue
-      if (freq === 'PAYDAY') {
-        if (!nextPayday) continue
-        const nextPaydayNorm =
-          nextPayday.length > 10 ? nextPayday.slice(0, 10) : nextPayday
-        // If next_payday itself is stuck in the past (e.g. a caller ran
-        // recalculateTrackers() without first calling
-        // advanceNextPaydayIfNeeded(), or payday settings were cleared),
-        // this would recompute the exact same target every outer pass —
-        // guard on an actual change so the loop can't spin forever on a
-        // no-op "update".
-        const lastPaydayNorm = prevPaydayDate(nextPaydayNorm) ?? nextPaydayNorm
-        const nextResetNorm =
-          nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
-        if (nextPaydayNorm === nextResetNorm) continue
-        changed = true
-        db.run(
-          `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
-          [lastPaydayNorm, nextPaydayNorm, id]
-        )
+      const prev = new Date(nextReset + 'T12:00:00Z')
+      let next: Date
+      if (freq === 'WEEKLY')
+        next = new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000)
+      else if (freq === 'FORTNIGHTLY')
+        next = new Date(prev.getTime() + 14 * 24 * 60 * 60 * 1000)
+      else if (freq === 'MONTHLY') {
+        next = new Date(prev)
+        next.setUTCMonth(next.getUTCMonth() + 1)
       } else {
-        const prev = new Date(nextReset + 'T12:00:00Z')
-        let next: Date
-        if (freq === 'WEEKLY')
-          next = new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000)
-        else if (freq === 'FORTNIGHTLY')
-          next = new Date(prev.getTime() + 14 * 24 * 60 * 60 * 1000)
-        else if (freq === 'MONTHLY') {
-          next = new Date(prev)
-          next.setUTCMonth(next.getUTCMonth() + 1)
-        } else {
-          continue
-        }
-        changed = true
-        const lastNorm =
-          nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
-        const nextNorm = next.toISOString().slice(0, 10)
-        db.run(
-          `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
-          [lastNorm, nextNorm, id]
-        )
+        // Unknown frequency (including a leftover PAYDAY row, #192): can't
+        // advance, so don't mark a change or the loop would never end.
+        continue
       }
+      changed = true
+      const lastNorm =
+        nextReset.length >= 10 ? nextReset.slice(0, 10) : nextReset
+      const nextNorm = next.toISOString().slice(0, 10)
+      db.run(
+        `UPDATE trackers SET last_reset_date = ?, next_reset_date = ? WHERE id = ?`,
+        [lastNorm, nextNorm, id]
+      )
     }
     stmt.free()
     if (changed) anyChanged = true
@@ -547,8 +507,4 @@ export async function performFullSync(
   setAppSetting('last_sync', new Date().toISOString())
   recalculateTrackers()
   progressCallback({ phase: 'done' })
-}
-
-export const __test__ = {
-  prevPaydayDate,
 }

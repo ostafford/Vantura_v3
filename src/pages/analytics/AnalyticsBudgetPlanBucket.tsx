@@ -67,8 +67,6 @@ function frequencyLabel(frequency: string): string {
       return 'Yearly'
     case 'ONCE':
       return 'Once'
-    case 'PAYDAY':
-      return 'Payday'
     default:
       return frequency
   }

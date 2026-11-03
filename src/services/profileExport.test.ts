@@ -960,18 +960,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
               reset_frequency: 'MONTHLY',
               reset_day: 28,
             }),
-            trackerExport({
-              id: 3,
-              name: 'P',
-              reset_frequency: 'PAYDAY',
-              reset_day: null,
-            }),
-            trackerExport({
-              id: 4,
-              name: 'P1',
-              reset_frequency: 'PAYDAY',
-              reset_day: 1,
-            }),
           ],
         }),
         ALL_ON
@@ -980,7 +968,60 @@ describe('profile import writers: real-DB coverage (#36)', () => {
         readTrackers()
           .map((t) => t.name)
           .sort()
-      ).toEqual(['M', 'P', 'P1', 'W'])
+      ).toEqual(['M', 'W'])
+    })
+
+    it("imports an older export's PAYDAY tracker as MONTHLY day 1 on the current calendar month, with its config history as MONTHLY (#192)", () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(2026, 2, 15, 10, 0, 0))
+      try {
+        importPayloadWithOptions(
+          emptyPayload({
+            trackers: [
+              trackerExport({
+                id: 3,
+                name: 'P',
+                reset_frequency: 'PAYDAY',
+                reset_day: null,
+                start_date: '2025-11-20',
+                last_reset_date: '2026-02-20',
+                next_reset_date: '2026-03-20',
+              }),
+            ],
+            trackerConfigHistory: [
+              {
+                tracker_id: 3,
+                effective_from: '2025-11-20',
+                budget_amount: 40000,
+                category_ids: [],
+              },
+              {
+                tracker_id: 3,
+                effective_from: '2026-01-20',
+                budget_amount: 30000,
+                category_ids: [],
+                reset_frequency: 'PAYDAY',
+              },
+            ],
+          }),
+          ALL_ON
+        )
+      } finally {
+        vi.useRealTimers()
+      }
+      expect(
+        realDb.exec(
+          `SELECT name, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date FROM trackers`
+        )[0].values
+      ).toEqual([['P', 'MONTHLY', 1, '2025-11-20', '2026-03-01', '2026-04-01']])
+      expect(
+        realDb.exec(
+          `SELECT effective_from, budget_amount, reset_frequency FROM tracker_config_history ORDER BY effective_from`
+        )[0].values
+      ).toEqual([
+        ['2025-11-20', 40000, null],
+        ['2026-01-20', 30000, 'MONTHLY'],
+      ])
     })
 
     it('applies the budget plan before trackers so payload bucket_ids remap onto the freshly-inserted local buckets', () => {
@@ -1002,7 +1043,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     it('leaves existing data untouched for sections whose option is false', () => {
       realDb.run(
         `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
-         VALUES ('Keep me', 9999, 'PAYDAY', NULL, '2026-01-01', '2026-02-01', '2026-03-01', 1, '2026-01-01')`
+         VALUES ('Keep me', 9999, 'MONTHLY', 1, '2026-01-01', '2026-02-01', '2026-03-01', 1, '2026-01-01')`
       )
 
       importPayloadWithOptions(

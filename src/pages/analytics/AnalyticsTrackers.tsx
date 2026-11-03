@@ -8,7 +8,7 @@ import {
   type TrackerResetFrequency,
 } from '@/services/trackers'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 
@@ -16,11 +16,9 @@ const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },
   { value: 'FORTNIGHTLY', label: 'Fortnightly' },
   { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'PAYDAY', label: 'Payday' },
 ]
 
 const FREQUENCY_ORDER: TrackerResetFrequency[] = [
-  'PAYDAY',
   'WEEKLY',
   'FORTNIGHTLY',
   'MONTHLY',
@@ -166,7 +164,7 @@ export function AnalyticsTrackers() {
                             <strong>{t.name}</strong>
                             <div className="d-flex gap-1 mt-1 flex-wrap align-items-center">
                               <span className="small text-muted">
-                                ${formatMoney(effectiveData.spent)} of $
+                                {formatSignedMoney(effectiveData.spent)} of $
                                 {formatMoney(effectiveData.budget)} spent
                               </span>
                               {effectiveData.wasAdjusted && (
@@ -194,7 +192,10 @@ export function AnalyticsTrackers() {
                         </div>
                         <div className="mt-2">
                           <ProgressBar
-                            now={Math.min(100, effectiveData.progress)}
+                            now={Math.max(
+                              0,
+                              Math.min(100, effectiveData.progress)
+                            )}
                             {...getTrackerProgressStyle(effectiveData.progress)}
                             style={{ height: 8 }}
                           />

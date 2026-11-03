@@ -84,3 +84,22 @@ export function calendarPeriodBounds(
     to: iso(new Date(Date.UTC(year, month + offset + 1, 1))),
   }
 }
+
+/**
+ * The 1st of the local calendar month containing `now`, and the 1st of the
+ * next one — a MONTHLY, reset-day-1 tracker's current period. Where a PAYDAY
+ * tracker lands when it moves to MONTHLY (#192).
+ */
+export function localCalendarMonthResetDates(now: Date = new Date()): {
+  lastReset: string
+  nextReset: string
+} {
+  const first = (y: number, m: number) =>
+    `${y}-${String(m + 1).padStart(2, '0')}-01`
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  return {
+    lastReset: first(y, m),
+    nextReset: m === 11 ? first(y + 1, 0) : first(y, m + 1),
+  }
+}
