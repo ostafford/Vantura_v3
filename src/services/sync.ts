@@ -15,10 +15,7 @@ import {
   type UpCategory,
   type UpTag,
 } from '@/api/upBank'
-import {
-  isMonthlyLastWeekday,
-  monthlyPaydayDate,
-} from '@/lib/payday'
+import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 import { writeNetWorthSnapshot } from '@/services/netWorth'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'

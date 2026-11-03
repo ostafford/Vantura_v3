@@ -153,5 +153,4 @@ describe('recalculateTrackers — resets at local midnight (#148)', () => {
     recalculateTrackers()
     expect(resetDates()).toEqual(['2026-10-27', '2026-11-03'])
   })
-
 })

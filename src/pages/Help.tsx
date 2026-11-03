@@ -307,8 +307,7 @@ export function Help() {
                   <p className="mb-0">
                     Choose your pay frequency (weekly, fortnightly, or monthly)
                     and your next payday date. This drives the Spendable balance
-                    calculation, Payday tracker resets, and how Regulars are
-                    grouped.
+                    calculation and how Regulars are grouped.
                   </p>
                   <Tip>
                     You can optionally set your pay amount in Settings → Payday.
@@ -425,13 +424,8 @@ export function Help() {
                     <li className="mb-1">
                       <strong>Fortnightly</strong> — resets every two weeks
                     </li>
-                    <li className="mb-1">
-                      <strong>Monthly</strong> — resets on the 1st of each month
-                    </li>
                     <li>
-                      <strong>Payday</strong> — resets on your next payday
-                      instead of a fixed calendar date; useful when you want
-                      your budget to align with your income cycle
+                      <strong>Monthly</strong> — resets on the 1st of each month
                     </li>
                   </ul>
 
@@ -700,16 +694,12 @@ export function Help() {
 
                   <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
                   <p className="mb-1">
-                    Your payday frequency and date affect three things:
+                    Your payday frequency and date affect two things:
                   </p>
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
                       <strong>Spendable</strong> — only charges due before your
                       next payday are reserved in the calculation
-                    </li>
-                    <li className="mb-1">
-                      <strong>Payday trackers</strong> — reset on your next
-                      payday
                     </li>
                     <li>
                       <strong>Regulars grouping</strong> — Next pay vs Later

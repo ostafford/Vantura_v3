@@ -16,11 +16,9 @@ const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },
   { value: 'FORTNIGHTLY', label: 'Fortnightly' },
   { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'PAYDAY', label: 'Payday' },
 ]
 
 const FREQUENCY_ORDER: TrackerResetFrequency[] = [
-  'PAYDAY',
   'WEEKLY',
   'FORTNIGHTLY',
   'MONTHLY',

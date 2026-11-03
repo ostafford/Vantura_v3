@@ -243,7 +243,7 @@ describe('splitPeriodIntoSegments (pure core)', () => {
     ])
   })
 
-  it('prorates against the actual period length for a variable-length (PAYDAY) period', () => {
+  it('prorates against the actual period length for a non-standard-length period', () => {
     const segs = splitPeriodIntoSegments(
       '2026-03-01',
       '2026-03-15', // 14 days

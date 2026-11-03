@@ -63,7 +63,7 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     title: 'Trackers',
     description:
       'Set a <strong>budget</strong> and <strong>reset period</strong> per tracker, then assign spending categories.<br><br>' +
-      'Reset options: <strong>weekly</strong>, <strong>fortnightly</strong>, <strong>monthly</strong>, or <strong>payday</strong> cycle.<br><br>' +
+      'Reset options: <strong>weekly</strong>, <strong>fortnightly</strong>, or <strong>monthly</strong>.<br><br>' +
       'Use the <strong>+</strong> button to create your first tracker.',
     side: 'left',
     align: 'start',

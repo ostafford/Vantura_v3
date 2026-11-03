@@ -109,8 +109,8 @@ export function PaydaySection() {
   return (
     <>
       <p className="small text-muted mb-3">
-        Used for your spendable balance, PAYDAY trackers, and budget planning.
-        Update when your pay cycle changes.
+        Used for your spendable balance and budget planning. Update when your
+        pay cycle changes.
       </p>
       <Form onSubmit={handlePaydaySubmit}>
         <div
@@ -291,8 +291,7 @@ export function PaydaySection() {
             aria-label="Pay amount per pay period (optional)"
           />
           <Form.Text className="text-muted">
-            Optional. Used for Spendable context, alerts, and PAYDAY tracker
-            warnings.
+            Optional. Used for Spendable context and alerts.
           </Form.Text>
         </Form.Group>
         <Form.Group className="mb-3">

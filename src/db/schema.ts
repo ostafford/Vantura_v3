@@ -4,6 +4,7 @@
  */
 
 import type { Database } from 'sql.js'
+import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
 const SCHEMA_VERSION = 49
 
@@ -1360,21 +1361,14 @@ export function runMigrations(database: Database): void {
   // config-history rows become MONTHLY too; effective dates and category sets
   // are unchanged. Past periods re-show as calendar months (agreed in #178).
   if (version < 49) {
-    const now = new Date()
-    const ym = (y: number, m: number) =>
-      `${y}-${String(m + 1).padStart(2, '0')}-01`
-    const thisMonthStart = ym(now.getFullYear(), now.getMonth())
-    const nextMonthStart =
-      now.getMonth() === 11
-        ? ym(now.getFullYear() + 1, 0)
-        : ym(now.getFullYear(), now.getMonth() + 1)
+    const { lastReset, nextReset } = localCalendarMonthResetDates()
     if (tableExists(database, 'trackers')) {
       database.run(
         `UPDATE trackers
            SET reset_frequency = 'MONTHLY', reset_day = 1,
                last_reset_date = ?, next_reset_date = ?
          WHERE reset_frequency = 'PAYDAY'`,
-        [thisMonthStart, nextMonthStart]
+        [lastReset, nextReset]
       )
     }
     if (tableExists(database, 'tracker_config_history')) {
