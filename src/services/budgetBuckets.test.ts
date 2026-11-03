@@ -182,4 +182,23 @@ describe('getMonthlyIncomeCents', () => {
       expect(getIncomeCents('MONTHLY')).toBe(getMonthlyIncomeCents())
     }
   )
+
+  it.each([[undefined], [''], ['QUARTERLY'], ['PAYDAY']])(
+    'returns null (no Income) when Pay frequency is %s — never assumes monthly',
+    (freq) => {
+      appSettings.pay_amount_cents = '500000'
+      if (freq !== undefined) appSettings.payday_frequency = freq
+      expect(getMonthlyIncomeCents()).toBeNull()
+      for (const period of ['WEEKLY', 'MONTHLY', 'YEARLY'] as const) {
+        expect(getIncomeCents(period)).toBeNull()
+      }
+    }
+  )
+
+  it('converts a fortnightly pay into weekly and yearly Income', () => {
+    appSettings.payday_frequency = 'FORTNIGHTLY'
+    appSettings.pay_amount_cents = '240000'
+    expect(getIncomeCents('WEEKLY')).toBe(120000)
+    expect(getIncomeCents('YEARLY')).toBe(6240000)
+  })
 })

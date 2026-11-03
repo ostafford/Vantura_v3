@@ -1,5 +1,6 @@
 import { getDb, getAppSetting, schedulePersist } from '@/db'
 import {
+  monthlyEquivalentMultiplier,
   toPeriodCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
@@ -221,38 +222,44 @@ export function getUnassignedUpcoming(): BucketUpcomingItem[] {
   return list
 }
 
-const PAYS_PER_MONTH: Record<string, number> = {
-  WEEKLY: 52 / 12,
-  FORTNIGHTLY: 26 / 12,
-  MONTHLY: 1,
-}
+/** The Pay frequencies Income supports. */
+const PAY_FREQUENCIES: readonly string[] = ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY']
 
 /**
- * Monthly Income: Pay amount × pays per month (52/12 weekly, 26/12
- * fortnightly, 1 monthly). The same every month; needs no payday date.
- * Null (not $0) when the pay amount is unset, non-numeric or ≤ 0, or the
- * stored Pay frequency isn't one of the three supported cadences.
+ * The stored pay — amount per pay (cents) and Pay frequency — or null when
+ * either is unusable: the amount unset, non-numeric or ≤ 0, or the frequency
+ * unset or not one of `PAY_FREQUENCIES`. An unset frequency is never assumed
+ * to be monthly.
  */
-export function getMonthlyIncomeCents(): number | null {
+function readPay(): { perPay: number; frequency: string } | null {
   const raw = getAppSetting('pay_amount_cents')
   if (raw == null || raw.trim() === '' || !/^\d+$/.test(raw.trim())) return null
   const perPay = parseInt(raw, 10)
   if (perPay <= 0) return null
-  const freq = getAppSetting('payday_frequency') ?? 'MONTHLY'
-  const mult = PAYS_PER_MONTH[freq]
-  if (mult === undefined) return null
-  return Math.round(perPay * mult)
+  const frequency = getAppSetting('payday_frequency')
+  if (frequency == null || !PAY_FREQUENCIES.includes(frequency)) return null
+  return { perPay, frequency }
 }
 
-/** Income per display period derived from pay_amount_cents + payday_frequency settings. MONTHLY delegates to getMonthlyIncomeCents. */
+/**
+ * Monthly Income: Pay amount × pays per month (52/12 weekly, 26/12
+ * fortnightly, 1 monthly — `monthlyEquivalentMultiplier`). The same every
+ * month; needs no payday date. Null (not $0) when the pay amount or Pay
+ * frequency is unusable (see `readPay`).
+ */
+export function getMonthlyIncomeCents(): number | null {
+  const pay = readPay()
+  if (!pay) return null
+  return Math.round(pay.perPay * monthlyEquivalentMultiplier(pay.frequency))
+}
+
+/**
+ * Income per display period from the stored pay. MONTHLY delegates to
+ * getMonthlyIncomeCents. Null under the same conditions (see `readPay`).
+ */
 export function getIncomeCents(period: BudgetDisplayPeriod): number | null {
   if (period === 'MONTHLY') return getMonthlyIncomeCents()
-  const db = getDb()
-  if (!db) return null
-  const raw = getAppSetting('pay_amount_cents')
-  if (raw == null || raw === '') return null
-  const perPay = parseInt(raw, 10)
-  if (Number.isNaN(perPay) || perPay <= 0) return null
-  const paydayFreq = getAppSetting('payday_frequency') ?? 'MONTHLY'
-  return toPeriodCents(perPay, paydayFreq, period)
+  const pay = readPay()
+  if (!pay) return null
+  return toPeriodCents(pay.perPay, pay.frequency, period)
 }
