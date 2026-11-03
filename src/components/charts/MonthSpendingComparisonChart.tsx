@@ -17,7 +17,7 @@ import type {
   MonthSpendingSeriesPoint,
   MonthMetric,
 } from '@/lib/monthSpendingSeries'
-import { formatDollars, formatMoney } from '@/lib/format'
+import { formatDollars, formatSignedMoney } from '@/lib/format'
 import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -381,17 +381,17 @@ export function MonthSpendingComparisonChart({
       if (showPrevious) {
         const v = point[previousKey] as number | null
         tooltipLines.push(
-          `${previousLineLabel}: ${v == null ? 'No data' : `$${formatMoney(v)}`}`
+          `${previousLineLabel}: ${v == null ? 'No data' : formatSignedMoney(v)}`
         )
       }
       if (showCurrent) {
         const v = point[currentKey] as number | null
         tooltipLines.push(
-          `${currentLineLabel}: ${v == null ? 'No data' : `$${formatMoney(v)}`}`
+          `${currentLineLabel}: ${v == null ? 'No data' : formatSignedMoney(v)}`
         )
       }
       if (avg != null) {
-        tooltipLines.push(`Average: $${formatMoney(avg)}`)
+        tooltipLines.push(`Average: ${formatSignedMoney(avg)}`)
       }
 
       const dayTitle = formatTitleResolved(point.day)

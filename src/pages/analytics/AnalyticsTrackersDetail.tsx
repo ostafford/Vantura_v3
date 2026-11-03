@@ -393,7 +393,7 @@ export function AnalyticsTrackersDetail() {
                     </span>
                     <span>·</span>
                     <span>
-                      Spending ${formatMoney(paceStats.dailyActual)}/day
+                      Spending {formatSignedMoney(paceStats.dailyActual)}/day
                     </span>
                     <span>·</span>
                     <span>

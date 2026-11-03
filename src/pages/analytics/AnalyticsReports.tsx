@@ -50,6 +50,7 @@ import {
   formatDeltaMoney,
   formatDate,
 } from '@/lib/format'
+import { sharesOfTotal } from '@/lib/spendingPercent'
 import {
   monthNameLong,
   previousCalendarMonth,
@@ -189,7 +190,9 @@ function SpendingCategoryList({
 }) {
   const navigate = useNavigate()
   const [showAll, setShowAll] = useState(false)
-  const totalDollars = chartData.reduce((s, d) => s + d.totalDollars, 0)
+  // Null when any category nets negative or the total isn't positive (#197).
+  // `visible` is a prefix of chartData, so its index lines up.
+  const shares = sharesOfTotal(chartData.map((d) => d.totalDollars))
   const maxDollars = chartData[0]?.totalDollars ?? 1
   const visible = showAll
     ? chartData
@@ -198,15 +201,12 @@ function SpendingCategoryList({
 
   return (
     <div>
-      {visible.map((d) => {
+      {visible.map((d, i) => {
         // A category can net negative (refunds > purchases): its bar floors
         // at zero width; the figure beside it keeps the sign.
         const barWidth =
           maxDollars > 0 ? Math.max(0, (d.totalDollars / maxDollars) * 100) : 0
-        const pctOfTotal =
-          totalDollars > 0
-            ? Math.round((d.totalDollars / totalDollars) * 100)
-            : 0
+        const pctOfTotal = shares?.[i]
 
         return (
           <div key={d.category_id} className="mb-3">
@@ -245,12 +245,14 @@ function SpendingCategoryList({
               <span className="small fw-semibold">
                 {formatSignedMoney(Math.round(d.totalDollars * 100))}
               </span>
-              <span
-                className="small text-muted"
-                style={{ minWidth: 32, textAlign: 'right' }}
-              >
-                {pctOfTotal}%
-              </span>
+              {pctOfTotal != null && (
+                <span
+                  className="small text-muted"
+                  style={{ minWidth: 32, textAlign: 'right' }}
+                >
+                  {pctOfTotal}%
+                </span>
+              )}
             </div>
             <div
               style={{
@@ -847,7 +849,7 @@ export function AnalyticsReports() {
                 />
                 <KpiCell
                   label="Money out"
-                  value={`$${formatMoney(moneyOut)}`}
+                  value={formatSignedMoney(moneyOut)}
                   valueClass="text-danger"
                   delta={
                     comparison?.hasPreviousData
@@ -1506,7 +1508,13 @@ export function AnalyticsReports() {
                   })
                 })()}
                 <div className="pt-2 border-top d-flex justify-content-between fw-medium small">
-                  <span>Total upcoming</span>
+                  {/* Names the filter it adds up; the Upcoming tile counts
+                      every frequency (#198). */}
+                  <span>
+                    {chargeFreqFilter
+                      ? `${formatFrequency(chargeFreqFilter)} total`
+                      : 'Total upcoming'}
+                  </span>
                   <span>
                     $
                     {formatMoney(
