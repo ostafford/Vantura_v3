@@ -5,7 +5,15 @@
  * returned as-is. Exercised through the tracker service reads a caller uses.
  * Synthetic data only.
  */
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 
 let SQL: SqlJsStatic
@@ -37,8 +45,14 @@ beforeAll(async () => {
 })
 
 let txCounter = 0
+const ORIGINAL_TZ = process.env.TZ
 
 beforeEach(async () => {
+  // Frozen inside the fixtures' current period (Mon 2 – Sun 8 Mar 2026), in an
+  // AU zone, so "today" never drifts past the period the fixtures pin.
+  process.env.TZ = 'Australia/Sydney'
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-03-05T12:00:00+11:00'))
   const { runSchema } = await import('@/db/schema')
   db = new SQL.Database()
   runSchema(db)
@@ -54,6 +68,12 @@ beforeEach(async () => {
             ('acc-joint', '2Up', 'TRANSACTIONAL', 0, ?, ?, 'JOINT')`,
     [now, now, now, now, now, now]
   )
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ
+  else process.env.TZ = ORIGINAL_TZ
 })
 
 interface TxSeed {
@@ -265,7 +285,7 @@ describe('tracker transaction lists include refunds', () => {
     expect(list.reduce((s, r) => s - r.amount, 0)).toBe(prev.spent)
   })
 
-  it('the analytics timeline and table net refunds and count them', () => {
+  it('the analytics timeline and table show each row as stored, net refunds and count them', () => {
     const id = weeklyGroceries()
     addTx({ amount: -4000, createdAt: '2026-03-03T10:00:00+11:00' })
     addTx({ amount: 1000, createdAt: '2026-03-04T10:00:00+11:00' })
@@ -279,14 +299,16 @@ describe('tracker transaction lists include refunds', () => {
       dateFrom: '2026-03-02',
       dateTo: '2026-03-09',
     })
-    expect(timeline.map((r) => r.amount)).toEqual([4000, -1000])
+    // Row amounts carry the stored sign, like the Transactions page: a
+    // purchase is negative, a refund positive.
+    expect(timeline.map((r) => r.amount)).toEqual([-4000, 1000])
     expect(timeline[timeline.length - 1].cumulativeSpent).toBe(3000)
 
     const table = getTrackerTransactionsForTable(id, {
       dateFrom: '2026-03-02',
       dateTo: '2026-03-08',
     })
-    expect(table.map((r) => r.amount).sort()).toEqual([-1000, 4000])
+    expect(table.map((r) => r.amount)).toEqual([1000, -4000])
     expect(
       getTrackerTransactionsCount(id, {
         dateFrom: '2026-03-02',

@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(50)
+    expect(SCHEMA_VERSION).toBe(51)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1273,6 +1273,52 @@ describe('v50 migration: Payday nomination settings removed (#194)', () => {
     expect(readSetting(db, 'payday_frequency')).toBe('FORTNIGHTLY')
     expect(readSetting(db, 'payday_day')).toBe('4')
     expect(readSetting(db, 'next_payday')).toBe('2026-11-12')
+    db.close()
+  })
+})
+
+describe('v51 migration: "Possible payday detected" notification removed (#186)', () => {
+  it('deletes its settings and its history rows, and leaves other notifications alone', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `CREATE TABLE notification_history (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         type TEXT NOT NULL,
+         title TEXT NOT NULL,
+         body TEXT NOT NULL,
+         link_path TEXT,
+         link_label TEXT,
+         created_at TEXT NOT NULL,
+         read_at TEXT
+       )`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES
+         ('schema_version', '50'),
+         ('notif_possible_payday', '0'),
+         ('notif_possible_payday_suggested_for', 'SYNTHETIC EMPLOYER SALARY'),
+         ('notif_payday', '1'),
+         ('notif_last_payday_date', '2026-10-30')`
+    )
+    db.run(
+      `INSERT INTO notification_history (type, title, body, created_at) VALUES
+         ('possible_payday', 'Possible payday detected', 'x', '2026-11-01T00:00:00Z'),
+         ('payday', 'Payday landed', 'y', '2026-11-01T00:00:00Z')`
+    )
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'notif_possible_payday')).toBeNull()
+    expect(readSetting(db, 'notif_possible_payday_suggested_for')).toBeNull()
+    expect(readSetting(db, 'notif_payday')).toBe('1')
+    expect(readSetting(db, 'notif_last_payday_date')).toBe('2026-10-30')
+    expect(
+      db.exec(`SELECT type FROM notification_history ORDER BY id`)[0].values
+    ).toEqual([['payday']])
     db.close()
   })
 })

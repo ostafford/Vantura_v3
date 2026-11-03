@@ -608,85 +608,6 @@ function checkSyncStale(): void {
   showNotification('Data may be out of date', body)
 }
 
-// ─── 9. Possible payday suggestion ───────────────────────────────────────────
-
-/**
- * Look for a recurring large credit that just appeared after a sync and
- * suggest it as the user's pay. (Nominating a pay source was cut in #194, so
- * this no longer stops once one is nominated.)
- *
- * Guard: fires once per unique payee (stored as notif_possible_payday_suggested_for).
- */
-function checkPossiblePayday(): void {
-  if (!getNotifTypeEnabled('possible_payday')) return
-
-  const db = getDb()
-  if (!db) return
-
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 2)
-  const cutoffIso = cutoff.toISOString()
-
-  // Find the largest qualifying credit in the last 2 days that has appeared
-  // at least twice historically (confirming it's a recurring payment, not a one-off).
-  // Threshold: $500 AUD minimum — below that it's unlikely to be a salary payment.
-  const MIN_CENTS = 50000
-  const stmt = db.prepare(
-    `SELECT
-       t.description,
-       COALESCE(t.raw_text, t.description) AS match_key,
-       t.amount
-     FROM transactions t
-     JOIN accounts a ON t.account_id = a.id
-     WHERE a.account_type = 'TRANSACTIONAL'
-       AND t.amount >= ?
-       AND t.transfer_account_id IS NULL
-       AND t.is_round_up = 0
-       AND COALESCE(t.settled_at, t.created_at) >= ?
-       AND (
-         SELECT COUNT(*)
-         FROM transactions t2
-         WHERE COALESCE(t2.raw_text, t2.description) = COALESCE(t.raw_text, t.description)
-           AND t2.amount > 0
-           AND t2.transfer_account_id IS NULL
-       ) >= 2
-     ORDER BY t.amount DESC
-     LIMIT 1`
-  )
-  stmt.bind([MIN_CENTS, cutoffIso])
-
-  let candidate: {
-    description: string
-    matchKey: string
-    amount: number
-  } | null = null
-  if (stmt.step()) {
-    const r = stmt.get() as [string, string, number]
-    candidate = { description: r[0], matchKey: r[1], amount: r[2] }
-  }
-  stmt.free()
-
-  if (!candidate) return
-
-  // Don't re-suggest the same payee we've already flagged
-  if (
-    hasFiredForValue('notif_possible_payday_suggested_for', candidate.matchKey)
-  )
-    return
-
-  markFiredForValue('notif_possible_payday_suggested_for', candidate.matchKey)
-
-  const body = `$${formatMoney(candidate.amount)} received from "${candidate.description}" — this looks like a recurring payment. Set it as your pay source so Vantura can track your spending cycle.`
-  addNotificationToHistory(
-    'possible_payday',
-    'Possible payday detected',
-    body,
-    '/settings#payday',
-    'Set up payday'
-  )
-  showNotification('Possible payday detected', body)
-}
-
 // ─── On-demand: ensure bills_due sidebar entries exist ───────────────────────
 
 /**
@@ -757,7 +678,6 @@ export function runNotificationChecks(): void {
   checkTrackerOverspent()
   checkTrackerPace()
   checkPaydayLanded()
-  checkPossiblePayday()
   checkLargeTransaction()
   checkSaverMilestones()
   checkSyncStale()

@@ -31,6 +31,7 @@ import {
   formatShortDateWithYear,
 } from '@/lib/format'
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
+import { TransactionAmount } from '@/components/TransactionAmount'
 import { buildCalendarPeriodHistory } from './trackerPeriodHistory'
 import { TrackerHistoryChart } from '@/components/charts/TrackerHistoryChart'
 import { TrackerPaceChart } from '@/components/charts/TrackerPaceChart'
@@ -657,7 +658,7 @@ export function AnalyticsTrackersDetail() {
                               </Badge>
                             </td>
                             <td className="text-end">
-                              {formatSignedMoney(tx.amount)}
+                              <TransactionAmount cents={tx.amount} />
                             </td>
                           </tr>
                         ))}

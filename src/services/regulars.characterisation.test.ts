@@ -417,6 +417,7 @@ describe('Regulars readers — characterisation (#159)', () => {
       [
         {
           "amount": 1500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -431,6 +432,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1299,
+          "bucket_id": 1,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -445,6 +447,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1599,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": "tv-and-music",
           "charge_type": "EXPENSE",
@@ -459,6 +462,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 18000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -473,6 +477,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 20000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -487,6 +492,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 80000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -501,6 +507,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 45000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -515,6 +522,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 4500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -613,6 +621,7 @@ describe('Regulars readers — characterisation (#159)', () => {
       [
         {
           "amount": 1299,
+          "bucket_id": 1,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -627,6 +636,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 1599,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": "tv-and-music",
           "charge_type": "EXPENSE",
@@ -641,6 +651,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 18000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -655,6 +666,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 80000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -669,6 +681,7 @@ describe('Regulars readers — characterisation (#159)', () => {
         },
         {
           "amount": 4500,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "EXPENSE",
@@ -690,6 +703,7 @@ describe('Regulars readers — characterisation (#159)', () => {
       [
         {
           "amount": 45000,
+          "bucket_id": null,
           "cancel_by_date": null,
           "category_id": null,
           "charge_type": "LIABILITY_REPAYMENT",
@@ -711,6 +725,7 @@ describe('Regulars readers — characterisation (#159)', () => {
     expect(regularById(phone.id)).toMatchInlineSnapshot(`
       {
         "amount": 4500,
+        "bucket_id": null,
         "cancel_by_date": null,
         "category_id": null,
         "charge_type": "EXPENSE",

@@ -53,12 +53,6 @@ const NOTIF_TYPES: {
     setup: { label: 'Payday settings', to: '/settings#payday' },
   },
   {
-    key: 'possible_payday',
-    label: 'Possible payday detected',
-    desc: 'When a recurring credit looks like it might be your salary, before you link a source',
-    setup: { label: 'Payday settings', to: '/settings#payday' },
-  },
-  {
     key: 'large_tx',
     label: 'Large transaction',
     desc: 'Unexpected debits above the threshold you set',
@@ -96,7 +90,6 @@ const NOTIF_GROUPS: { label: string; icon: string; keys: NotifType[] }[] = [
       'tracker_pace',
       'spendable_low',
       'payday',
-      'possible_payday',
       'large_tx',
     ],
   },
@@ -122,7 +115,6 @@ export function NotificationsSection() {
           'tracker_pace',
           'spendable_low',
           'payday',
-          'possible_payday',
           'large_tx',
           'saver_milestone',
           'sync_stale',

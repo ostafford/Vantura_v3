@@ -11,14 +11,28 @@ import {
   calendarPeriodBounds,
 } from '@/lib/dateStr'
 import { actualSpendingWhere } from '@/services/actualSpending'
-import { displayDaySql } from '@/services/displayDay'
 import {
   toPeriodCents,
   toDailyRateCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 
-export type TrackerResetFrequency = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
+/**
+ * Every tracker cadence, in display order, with its label — the one list the
+ * write-path check and the frequency pickers read.
+ */
+export const TRACKER_RESET_FREQUENCIES = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+] as const
+
+export type TrackerResetFrequency =
+  (typeof TRACKER_RESET_FREQUENCIES)[number]['value']
+
+/** Tracker cadences in display order. */
+export const TRACKER_RESET_FREQUENCY_ORDER: readonly TrackerResetFrequency[] =
+  TRACKER_RESET_FREQUENCIES.map((f) => f.value)
 
 export interface TrackerRow {
   id: number
@@ -114,23 +128,14 @@ function trackerSpendingWhere(
   categoryIds: readonly string[],
   window: { fromDay?: string; toDay?: string } = {}
 ): { sql: string; params: string[] } {
-  const fromDay = window.fromDay && normDate(window.fromDay)
-  const toDay = window.toDay && normDate(window.toDay)
-  if (fromDay && toDay) {
-    return actualSpendingWhere({ from: fromDay, to: toDay, categoryIds }, 't')
-  }
-  const base = actualSpendingWhere({ categoryIds }, 't')
-  let sql = base.sql
-  const params = [...base.params]
-  if (fromDay) {
-    sql += ` AND ${displayDaySql('t')} >= ?`
-    params.push(fromDay)
-  }
-  if (toDay) {
-    sql += ` AND ${displayDaySql('t')} <= ?`
-    params.push(toDay)
-  }
-  return { sql, params }
+  return actualSpendingWhere(
+    {
+      from: window.fromDay ? normDate(window.fromDay) : undefined,
+      to: window.toDay ? normDate(window.toDay) : undefined,
+      categoryIds,
+    },
+    't'
+  )
 }
 
 /**
@@ -997,7 +1002,8 @@ export function deleteTrackerConfigHistory(
 /**
  * Record the config-history effect of an `updateTracker` edit (#16, #38):
  * - frequency / reset-day change, transitional (the common case) → keep the
- *   timeline; stamp every existing row (`effective_from <= today`) with the OLD
+ *   timeline; stamp each untagged row (`effective_from <= today`, no
+ *   `reset_frequency` yet — the rows that had the OLD cadence) with the OLD
  *   cadence so the split prices the pre-transition part of the transitional
  *   period at that daily rate, then write a version effective tomorrow carrying
  *   the NEW cadence + budget + categories;
@@ -1050,9 +1056,12 @@ function maintainConfigHistoryOnEdit(args: {
       return
     }
     // Transitional: the pre-transition part of the current period is priced
-    // against the old cadence's daily rate.
+    // against the old cadence's daily rate. Only untagged rows had the old
+    // cadence (NULL = "the tracker's frequency", which was the old one); a row
+    // already tagged by an earlier change keeps the cadence it was written in.
     db.run(
-      `UPDATE tracker_config_history SET reset_frequency = ? WHERE tracker_id = ? AND effective_from <= ?`,
+      `UPDATE tracker_config_history SET reset_frequency = ?
+       WHERE tracker_id = ? AND effective_from <= ? AND reset_frequency IS NULL`,
       [existing.reset_frequency, id, today]
     )
     const hasBaseline = getTrackerConfigHistory(id).some(
@@ -1155,9 +1164,9 @@ function assertValidResetDay(
   resetDay: number | null
 ): void {
   if (
-    resetFrequency !== 'WEEKLY' &&
-    resetFrequency !== 'FORTNIGHTLY' &&
-    resetFrequency !== 'MONTHLY'
+    !(TRACKER_RESET_FREQUENCY_ORDER as readonly string[]).includes(
+      resetFrequency
+    )
   ) {
     throw new Error('INVALID_RESET_FREQUENCY')
   }
@@ -1452,9 +1461,11 @@ export function getTrackerPeriodsInRange(
 export interface TrackerTransactionTimelineRow {
   id: string
   date: string
+  /** Signed cents as stored: a purchase is negative, a refund positive. */
   amount: number
   description: string
   status: string
+  /** Running spend through this row: purchases add, refunds subtract. */
   cumulativeSpent: number
 }
 
@@ -1508,14 +1519,13 @@ export function getTrackerTransactionTimeline(
   stmt.free()
   let cumulative = 0
   return raw.map((r) => {
-    // Spend contribution: a debit adds, a refund subtracts.
-    const spend = -r.amount
-    cumulative += spend
+    // A purchase (negative) adds to spend, a refund subtracts.
+    cumulative -= r.amount
     const date = r.created_at ?? r.settled_at ?? ''
     return {
       id: r.id,
       date: date.slice(0, 10),
-      amount: spend,
+      amount: r.amount,
       description: r.description,
       status: r.status,
       cumulativeSpent: cumulative,
@@ -1524,7 +1534,8 @@ export function getTrackerTransactionTimeline(
 }
 
 /**
- * Paginated transactions for a tracker (for detail table). Ordered newest first.
+ * Paginated transactions for a tracker (for detail table). Ordered newest
+ * first. `amount` is as stored: a purchase is negative, a refund positive.
  */
 export function getTrackerTransactionsForTable(
   trackerId: number,
@@ -1579,8 +1590,8 @@ export function getTrackerTransactionsForTable(
     list.push({
       id: r[0],
       date: date.slice(0, 10),
-      // Spend contribution: a debit is positive, a refund negative.
-      amount: -r[4],
+      // As stored: a purchase is negative, a refund positive.
+      amount: r[4],
       description: r[1],
       status: r[5],
     })

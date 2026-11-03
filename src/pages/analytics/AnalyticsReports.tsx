@@ -24,6 +24,7 @@ import {
   getTrackerPeriodsInRange,
   type TrackerPeriodSlice,
   type TrackerResetFrequency,
+  TRACKER_RESET_FREQUENCY_ORDER,
 } from '@/services/trackers'
 import { regularOccurrencesInMonth, type Regular } from '@/services/regulars'
 import {
@@ -47,7 +48,6 @@ import {
   formatMoney,
   formatSignedMoney,
   formatDeltaMoney,
-  formatDollars,
   formatDate,
 } from '@/lib/format'
 import {
@@ -199,8 +199,10 @@ function SpendingCategoryList({
   return (
     <div>
       {visible.map((d) => {
+        // A category can net negative (refunds > purchases): its bar floors
+        // at zero width; the figure beside it keeps the sign.
         const barWidth =
-          maxDollars > 0 ? (d.totalDollars / maxDollars) * 100 : 0
+          maxDollars > 0 ? Math.max(0, (d.totalDollars / maxDollars) * 100) : 0
         const pctOfTotal =
           totalDollars > 0
             ? Math.round((d.totalDollars / totalDollars) * 100)
@@ -241,7 +243,7 @@ function SpendingCategoryList({
                 {d.name}
               </span>
               <span className="small fw-semibold">
-                ${formatDollars(d.totalDollars)}
+                {formatSignedMoney(Math.round(d.totalDollars * 100))}
               </span>
               <span
                 className="small text-muted"
@@ -617,9 +619,9 @@ export function AnalyticsReports() {
     .map((c) => c.category_name)
     .join(', ')
 
-  const availableFrequencies = useMemo(() => {
+  const availableFrequencies = useMemo<string[]>(() => {
     const seen = new Set(trackers.map((t) => t.reset_frequency.toUpperCase()))
-    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'].filter((f) => seen.has(f))
+    return TRACKER_RESET_FREQUENCY_ORDER.filter((f) => seen.has(f))
   }, [trackers])
 
   useEffect(() => {

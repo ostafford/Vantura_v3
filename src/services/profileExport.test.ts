@@ -116,6 +116,48 @@ describe('profileExport', () => {
       expect(payload.settings.pay_amount_cents).toBe('250000')
     })
 
+    it('leaves the cut "Possible payday" notification settings out of an export (#186)', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getDb).mockReturnValue(null)
+      vi.mocked(db.getAppSetting).mockImplementation((key) => {
+        if (key === 'notif_possible_payday') return '0'
+        if (key === 'notif_possible_payday_suggested_for') return 'SYNTHETIC'
+        if (key === 'notif_payday') return '1'
+        return null
+      })
+
+      const payload = buildExportPayload()
+
+      expect(payload.settings).not.toHaveProperty('notif_possible_payday')
+      expect(payload.settings).not.toHaveProperty(
+        'notif_possible_payday_suggested_for'
+      )
+      expect(payload.settings.notif_payday).toBe('1')
+    })
+
+    it('silently skips the cut "Possible payday" notification settings on import (#186)', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      setAppSettingMock.mockClear()
+      expect(() =>
+        applySettings({
+          notif_possible_payday: '0',
+          notif_possible_payday_suggested_for: 'SYNTHETIC',
+          notif_payday: '1',
+        })
+      ).not.toThrow()
+      expect(setAppSettingMock).toHaveBeenCalledWith('notif_payday', '1')
+      for (const key of [
+        'notif_possible_payday',
+        'notif_possible_payday_suggested_for',
+      ]) {
+        expect(setAppSettingMock).not.toHaveBeenCalledWith(
+          key,
+          expect.anything()
+        )
+      }
+    })
+
     it('silently skips the nominated pay source when importing an older export (#194)', async () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)

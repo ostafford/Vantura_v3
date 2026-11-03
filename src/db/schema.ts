@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 50
+const SCHEMA_VERSION = 51
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1393,6 +1393,23 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['50']
+    )
+  }
+  // #186 — the "Possible payday detected" notification is cut. Remove its
+  // toggle, its once-per-payee guard, and its history rows.
+  if (version < 51) {
+    database.run(
+      `DELETE FROM app_settings
+        WHERE key IN ('notif_possible_payday', 'notif_possible_payday_suggested_for')`
+    )
+    if (tableExists(database, 'notification_history')) {
+      database.run(
+        `DELETE FROM notification_history WHERE type = 'possible_payday'`
+      )
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['51']
     )
   }
 }

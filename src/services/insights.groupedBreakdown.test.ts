@@ -48,6 +48,10 @@ beforeEach(async () => {
   db = new SQL.Database()
   runSchema(db)
   txCounter = 0
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, ownership_type)
+     VALUES ('acc-1', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01', 'INDIVIDUAL')`
+  )
 
   // Real Up Bank taxonomy shape: 4 parents, a handful of children each.
   insertCategory('home', 'Home', null)
@@ -160,7 +164,7 @@ describe('getWeeklyCategoryBreakdownGrouped', () => {
     expect(getWeeklyCategoryBreakdownGrouped(weekRange)).toEqual([])
   })
 
-  it('excludes transfers and non-categorizable transactions, matching Money Out', () => {
+  it('excludes transfers and counts non-categorizable debits, matching Money Out (#186)', () => {
     insertSpend('groceries', 5000)
     db.run(
       `INSERT INTO transactions (id, account_id, status, description, is_categorizable, category_id, amount, created_at, transfer_account_id)
@@ -174,7 +178,7 @@ describe('getWeeklyCategoryBreakdownGrouped', () => {
     const sections = getWeeklyCategoryBreakdownGrouped(weekRange)
     const home = sections.find((s) => s.parentName === 'Home')
     expect(home?.rows.find((r) => r.category_id === 'groceries')?.total).toBe(
-      5000
+      6000
     )
   })
 })
