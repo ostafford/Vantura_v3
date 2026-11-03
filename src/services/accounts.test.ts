@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import {
   getCurrentSaverGoal,
@@ -9,6 +9,7 @@ import {
   reconcileSaverGoalAchievement,
   getSaverInterestBetween,
   getAccountById,
+  getSaverMonthlyFlow,
 } from './accounts'
 
 vi.mock('@/db', () => ({
@@ -187,5 +188,45 @@ describe('saver goal history + interest', () => {
       )
     ).toBe(410)
     expect(getSaverInterestBetween('other-saver', null, null)).toBe(0)
+  })
+})
+
+describe('saver monthly flow counts every Round Up row (#202)', () => {
+  let SQL: SqlJsStatic
+  let db: Database
+  const SAVER = 'saver-1'
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 20, 12))
+    SQL = await initSqlJs()
+    const { runSchema } = await import('@/db/schema')
+    db = new SQL.Database()
+    runSchema(db)
+    db.run(
+      `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+       VALUES (?, 'Annual bills', 'SAVER', 0, '2026-01-01', '2026-01-01'),
+              ('spending', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01')`,
+      [SAVER]
+    )
+    const mod = await import('@/db')
+    vi.mocked(mod.getDb).mockReturnValue(db as never)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('includes a Round Up credit with no transfer account in the month it landed', () => {
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, description, amount, transfer_account_id, transaction_type, created_at)
+       VALUES ('t-transfer', ?, 'SETTLED', 'Transfer in', 50000, 'spending', NULL, '2026-10-15T12:00:00+11:00'),
+              ('t-roundup', ?, 'SETTLED', 'Round Up', 120, NULL, 'Round Up', '2026-10-15T13:00:00+11:00')`,
+      [SAVER, SAVER]
+    )
+    const october = getSaverMonthlyFlow(SAVER, 1)
+    expect(october).toEqual([
+      { monthLabel: "Oct '26", flowCents: -50120, txCount: 2 },
+    ])
   })
 })

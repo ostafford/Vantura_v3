@@ -14,7 +14,8 @@
  * - Savers: Net movement to/from any saver account (Loose Change, Investing, etc.).
  *   Computed from the SAVER account side: negated SUM(amount) for transactions whose
  *   account_id is a SAVER and either transfer_account_id IS NOT NULL (explicit transfer) or
- *   round_up_parent_id IS NOT NULL (round-up credit). Negating flips the sign so that a credit
+ *   transaction_type = 'Round Up' (a Round Up row, which may carry no transfer account; Up
+ *   never sets round_up_parent_id on the saver side, #177/#202). Negating flips the sign so that a credit
  *   into a saver (positive amount) yields a negative saverChanges value (saving), and a debit
  *   out of a saver yields a positive value (withdrawal).
  *
@@ -233,7 +234,7 @@ function insightsForDays(startDay: string, endDay: string): WeeklyInsightsData {
   const saverChanges = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
-     AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
+     AND (transfer_account_id IS NOT NULL OR transaction_type = 'Round Up')
      AND ${DISPLAY_DAY_BETWEEN}`,
     [startDay, endDay]
   )
@@ -355,8 +356,10 @@ export function getMonthlyInsights(
     startDay,
     endDay
   )
-  // Round-up saver credits are identified by transaction_type = 'Round Up'.
-  // is_round_up and round_up_parent_id are not set on the saver side in Up Bank's API.
+  // Round-up saver credits are identified by transaction_type = 'Round Up' —
+  // the same rule saverChanges uses, so self-contributed (saverChanges −
+  // saverRoundUps) removes exactly what was added (#202). is_round_up and
+  // round_up_parent_id are not set on the saver side in Up Bank's API.
   const stmt = db.prepare(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')

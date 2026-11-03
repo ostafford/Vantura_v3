@@ -474,3 +474,21 @@ describe('Money in leaves out refunds, so Net counts a refund once (#200)', () =
     expect(labels.some((l) => l.includes('Income'))).toBe(false)
   })
 })
+
+describe('Savers movement counts every Round Up row on a Saver (#202)', () => {
+  it('counts a Round Up credit with no transfer account in both saverChanges and saverRoundUps, so self-contributed leaves it out exactly', () => {
+    // $500 moved in by the user, plus a $1.20 Round Up row Up sent with no
+    // transfer account. Credits into a Saver read negative (saving).
+    addTx({
+      amount: 50000,
+      account: 'acc-saver',
+      transferAccount: 'acc-spending',
+    })
+    addTx({ amount: 120, account: 'acc-saver', transactionType: 'Round Up' })
+
+    const { saverChanges, saverRoundUps } = getMonthlyInsights(2026, 10)
+    expect(saverChanges).toBe(-50120)
+    expect(saverRoundUps).toBe(-120)
+    expect(saverChanges - saverRoundUps).toBe(-50000)
+  })
+})
