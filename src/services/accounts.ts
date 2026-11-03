@@ -473,6 +473,8 @@ const MONTH_ABBR = [
 /**
  * Per-saver monthly net flow for the last `monthsBack` calendar months (oldest first).
  * Months with no activity have flowCents = 0 so gaps are visible in the chart.
+ * Flow is transfers plus Round Up rows (`transaction_type = 'Round Up'`, which may
+ * carry no transfer account) — the same rule as saverChanges (#202).
  */
 export function getSaverMonthlyFlow(
   saverId: string,
@@ -499,7 +501,7 @@ export function getSaverMonthlyFlow(
             COUNT(*) AS tx_count
      FROM transactions
      WHERE account_id = ?
-       AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
+       AND (transfer_account_id IS NOT NULL OR transaction_type = 'Round Up')
        AND COALESCE(created_at, settled_at) >= ?
      GROUP BY ym
      ORDER BY ym`
