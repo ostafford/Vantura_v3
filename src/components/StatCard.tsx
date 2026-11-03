@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Card, OverlayTrigger, Tooltip } from 'react-bootstrap'
-import { formatMoney } from '@/lib/format'
+import { formatSignedMoney } from '@/lib/format'
 
 type ColorVariant = 'primary' | 'danger' | 'info' | 'success'
 
@@ -8,7 +8,7 @@ export interface StatCardProps {
   title: string
   value: number
   subtitle?: ReactNode
-  /** When set, shown instead of $formatMoney(value). Use for non-currency values (e.g. counts). */
+  /** When set, shown instead of formatSignedMoney(value). Use for non-currency values (e.g. counts). */
   displayValue?: ReactNode
   gradient: ColorVariant
   /** Accepts plain strings or formatted JSX for richer multi-line tooltips. */
@@ -28,7 +28,7 @@ export function StatCard({
   tooltip,
 }: StatCardProps) {
   const valueContent =
-    displayValue != null ? displayValue : `$${formatMoney(value)}`
+    displayValue != null ? displayValue : formatSignedMoney(value)
 
   const titleContent = (
     <>

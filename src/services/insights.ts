@@ -26,7 +26,8 @@
  */
 
 import { getDb } from '@/db'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
+import { changePercent } from '@/lib/spendingPercent'
 import {
   displayDaySql,
   displayDayBetweenSql,
@@ -604,10 +605,10 @@ function fmtCentsDelta(cents: number): string {
   return formatMoney(Math.abs(cents))
 }
 
+/** ` (12%)`, or nothing when the change has no defined percentage (#197). */
 function fmtPct(delta: number, base: number): string {
-  if (base === 0 || Math.abs(delta) < 1) return ''
-  const pct = Math.round((Math.abs(delta) / Math.abs(base)) * 100)
-  return pct > 0 ? ` (${pct}%)` : ''
+  const pct = changePercent(base + delta, base)
+  return pct != null && pct > 0 ? ` (${pct}%)` : ''
 }
 
 const MONTH_ABBR = [
@@ -772,7 +773,7 @@ export function getPeriodComparison(
       currentTopCategory.category_id !== previousTopCategory.category_id
     ) {
       narratives.push({
-        label: `Top category shifted from ${previousTopCategory.category_name} ($${fmtCentsDelta(previousTopCategory.total)}) to ${currentTopCategory.category_name} ($${fmtCentsDelta(currentTopCategory.total)})`,
+        label: `Top category shifted from ${previousTopCategory.category_name} (${formatSignedMoney(previousTopCategory.total)}) to ${currentTopCategory.category_name} (${formatSignedMoney(currentTopCategory.total)})`,
         type: 'opportunity',
       })
     }

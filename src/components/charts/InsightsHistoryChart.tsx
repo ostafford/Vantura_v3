@@ -8,7 +8,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { InsightsHistoryRow } from '@/services/insights'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import {
   estimateLeftAxisValueLabelSpace,
   estimateBottomAxisLabelSpace,
@@ -88,7 +88,7 @@ export function InsightsHistoryChart({
       if (!tooltipEl || !container.parentElement) return
       setTooltipContent(tooltipEl, row.weekLabel, [
         `Money In: $${formatMoney(row.moneyIn)}`,
-        `Money Out: $${formatMoney(row.moneyOut)}`,
+        `Money Out: ${formatSignedMoney(row.moneyOut)}`,
       ])
       tooltipEl.style.display = 'block'
       positionTooltip(tooltipEl, container, event, 160, 52)

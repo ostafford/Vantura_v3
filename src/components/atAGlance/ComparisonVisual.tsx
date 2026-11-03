@@ -1,5 +1,6 @@
 import { OverlayTrigger, Tooltip } from 'react-bootstrap'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
+import { changePercent } from '@/lib/spendingPercent'
 import type { MonthComparisonData, MonthDelta } from '@/services/insights'
 
 // ── Sentiment helpers ─────────────────────────────────────────────────────────
@@ -31,10 +32,9 @@ function fmtAbs(cents: number) {
   return `$${formatMoney(Math.abs(cents))}`
 }
 
-function fmtPct(delta: number, base: number): string | null {
-  if (Math.abs(base) < 1) return null
-  const pct = Math.round((Math.abs(delta) / Math.abs(base)) * 100)
-  return pct > 0 ? `${pct}%` : null
+function fmtPct(current: number, previous: number): string | null {
+  const pct = changePercent(current, previous)
+  return pct != null && pct > 0 ? `${pct}%` : null
 }
 
 // ── Change tile ───────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function ChangeTile({
     delta.direction === 'up' ? '+' : delta.direction === 'down' ? '−' : ''
   const arrow =
     delta.direction === 'up' ? '↑' : delta.direction === 'down' ? '↓' : '→'
-  const pct = fmtPct(delta.delta, delta.previous)
+  const pct = fmtPct(delta.current, delta.previous)
 
   return (
     <div
@@ -73,12 +73,14 @@ function ChangeTile({
         {label}
       </div>
       <div className="fw-bold" style={{ fontSize: '1.15rem', color }}>
-        {sign}
-        {fmtAbs(delta.delta)}
+        {`${sign}${fmtAbs(delta.delta)}`}
       </div>
       <div style={{ fontSize: '0.72rem', color }}>
-        {arrow}
-        {pct ? ` ${pct}` : ''}
+        {/* No percentage (zero or negative month): name the starting
+            figure instead, so the arrow never stands alone. */}
+        {pct
+          ? `${arrow} ${pct}`
+          : `${arrow} from ${formatSignedMoney(delta.previous)}`}
       </div>
     </div>
   )
@@ -106,7 +108,9 @@ function ProgressBarRow({
 
   const rawPct = (current / previous) * 100
   const barWidth = Math.max(Math.min(rawPct, 100), 0)
-  const displayPct = Math.round(rawPct)
+  // Spending can net negative (#186): the bar floors at empty and, with no
+  // defined ratio, shows no percentage (#197).
+  const displayPct = current > 0 ? Math.round(rawPct) : null
   const isOver = rawPct > 100
 
   let barColor: string
@@ -176,7 +180,7 @@ function ProgressBarRow({
             pointerEvents: 'none',
           }}
         >
-          {displayPct}%
+          {displayPct != null ? `${displayPct}%` : null}
         </span>
       </div>
     </div>
@@ -202,10 +206,10 @@ function ProgressBarRow({
       overlay={
         <Tooltip>
           <div style={{ fontWeight: 600, color: currentTooltipColor }}>
-            {currentLabel}: {fmtAbs(current)}
+            {currentLabel}: {formatSignedMoney(current)}
           </div>
           <div style={{ fontWeight: 600, color: previousTooltipColor }}>
-            {priorLabel}: {fmtAbs(previous)}
+            {priorLabel}: {formatSignedMoney(previous)}
           </div>
         </Tooltip>
       }

@@ -1,4 +1,4 @@
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import type { MonthDelta } from '@/services/insights'
 
 /** Shared helper: build the two-line tooltip content for a MonthDelta. */
@@ -17,6 +17,7 @@ export function buildDeltaTooltip(
   return {
     amount: fmt(delta.delta),
     line1rest: `${isUp ? 'more' : 'less'} than ${vsPriorLabel}`,
-    line2: `${vsPriorLabel} total: ${fmt(delta.previous)}`,
+    // The previous total can net negative (#197); the change above is a size.
+    line2: `${vsPriorLabel} total: ${isCount ? fmt(delta.previous) : formatSignedMoney(delta.previous)}`,
   }
 }

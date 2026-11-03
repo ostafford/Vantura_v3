@@ -8,7 +8,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { CategoryBreakdownHistoryRow } from '@/services/insights'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import {
   estimateLeftAxisValueLabelSpace,
   estimateBottomAxisLabelSpace,
@@ -88,7 +88,7 @@ export function CategoryTrendChart({
       if (!tooltipEl || !container.parentElement) return
       setTooltipContent(tooltipEl, categoryName, [
         `${row.weekLabel}`,
-        `Spent: $${formatMoney(row.total)}`,
+        `Spent: ${formatSignedMoney(row.total)}`,
       ])
       tooltipEl.style.display = 'block'
       positionTooltip(tooltipEl, container, event, 140, 44)

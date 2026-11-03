@@ -1,4 +1,4 @@
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import type { MonthComparisonData } from '@/services/insights'
 import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadge'
 
@@ -27,7 +27,7 @@ export function ComparisonKpis({
       <div>
         <span className="small text-muted">Money out</span>
         <div className="fw-medium text-danger">
-          ${formatMoney(comparison.moneyOut.current)}
+          {formatSignedMoney(comparison.moneyOut.current)}
         </div>
         {comparison.hasPreviousData && (
           <ComparisonDeltaBadge
@@ -52,8 +52,8 @@ export function ComparisonKpis({
         <div>
           <span className="small text-muted">Top category</span>
           <div className="fw-medium">
-            {comparison.currentTopCategory.category_name} ($
-            {formatMoney(comparison.currentTopCategory.total)})
+            {comparison.currentTopCategory.category_name} (
+            {formatSignedMoney(comparison.currentTopCategory.total)})
           </div>
         </div>
       )}
