@@ -106,6 +106,7 @@ describe('blankDraft → saveRegular', () => {
       charge_type: 'EXPENSE',
       linked_manual_account_id: null,
       match_description: null,
+      bucket_id: null,
     })
   })
 
@@ -259,7 +260,11 @@ describe('draftFromTransaction → saveRegular (#147, #153)', () => {
       ...draftFromTransaction(rentTx, 'MONTHLY'),
       bucketId: bills,
     })
-    const withoutId = (id: number) => ({ ...regularById(id)!, id: 0 })
+    const withoutId = (id: number) => ({
+      ...regularById(id)!,
+      id: 0,
+      bucket_id: null,
+    })
     const dashboard = withoutId(fromDashboard)
     expect(withoutId(fromBudgetPlan)).toEqual(dashboard)
     expect(dashboard.match_description).toBe('Rent')

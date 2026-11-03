@@ -9,7 +9,8 @@
  *   (`linkedPaymentsInMonth`), or `null` — no actual figure — when it has no
  *   `match_description`.
  * - **not paid** (linked Regulars only): an occurrence in the month and no
- *   Linked payment in the month, or an overdue `ONCE` (see `isOverdueOnceIn`).
+ *   Linked payment in the month, or an overdue `ONCE` with no Linked payment
+ *   from its own month through this one (see `isOverdueOnceIn`).
  *
  * Regulars use their current amount, description and frequency for the whole
  * month; a deleted Regular isn't listed. Computed on every call.
@@ -18,12 +19,16 @@
 import { getDb } from '@/db'
 import { calendarMonthDayBounds } from '@/lib/dateStr'
 import { localDateString } from '@/lib/format'
-import { linkedPaymentsInMonth, type LinkedPayment } from './linkedPayments'
+import {
+  linkedPaymentsBetween,
+  linkedPaymentsInMonth,
+  type LinkedPayment,
+} from './linkedPayments'
 import {
   firstOccurrenceOnOrAfter,
   getProjectedOccurrencesInRange,
 } from './projection'
-import { readRegularBucketIds, readRegulars, type Regular } from './rows'
+import { readRegulars, type Regular } from './rows'
 
 export interface RegularMonth {
   regularId: number
@@ -66,20 +71,36 @@ function isOverdueOnceIn(row: Regular, month: string, today: string): boolean {
   )
 }
 
+/**
+ * True when `row` has a Linked payment dated anywhere from the first day of
+ * `fromMonth` through the last day of `toMonth`.
+ */
+function paidBetween(
+  row: Regular,
+  fromMonth: string,
+  toMonth: string
+): boolean {
+  const { first } = calendarMonthDayBounds(fromMonth)
+  const { last } = calendarMonthDayBounds(toMonth)
+  const link = linkedPaymentsBetween(first, last).find(
+    (l) => l.regularId === row.id
+  )
+  return !!link && link.linked && link.payments.length > 0
+}
+
 /** Every Regular, in id order, with its planned vs actual for `month` (`YYYY-MM`). */
 export function regularsInMonth(month: string): RegularMonth[] {
   const { first, last } = calendarMonthDayBounds(month)
   const db = getDb()
   if (!db) return []
   const today = localDateString()
-  const buckets = readRegularBucketIds(db)
   const linked = new Map(
     linkedPaymentsInMonth(month).map((l) => [l.regularId, l])
   )
   return readRegulars(db).map((row) => {
     const occurrences = getProjectedOccurrencesInRange(row, first, last)
     const plannedCents = occurrences.reduce((sum, o) => sum + o.amount, 0)
-    const bucketId = buckets.get(row.id) ?? null
+    const bucketId = row.bucket_id
     const link = linked.get(row.id)
     if (!link || !link.linked) {
       return {
@@ -99,7 +120,9 @@ export function regularsInMonth(month: string): RegularMonth[] {
       actualCents: link.payments.reduce((sum, p) => sum - p.amount, 0),
       notPaid:
         unpaid &&
-        (occurrences.length > 0 || isOverdueOnceIn(row, month, today)),
+        (occurrences.length > 0 ||
+          (isOverdueOnceIn(row, month, today) &&
+            !paidBetween(row, row.next_charge_date.slice(0, 7), month))),
       payments: link.payments,
     }
   })

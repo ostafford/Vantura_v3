@@ -17,7 +17,7 @@ import type { Database } from 'sql.js'
 import { getDb } from '@/db'
 import { calendarMonthDayBounds } from '@/lib/dateStr'
 import { actualSpendingWhere } from '@/services/actualSpending'
-import { displayDaySql } from '../displayDay'
+import { displayDaySql } from '@/services/displayDay'
 import { readRegulars, type Regular } from './rows'
 
 export interface LinkedPayment {
@@ -52,7 +52,7 @@ function withinBand(debitCents: number, regularAmount: number): boolean {
  * Linked payments are always debits) in `[start, end]` whose description is
  * one of `descriptions`.
  */
-function readDebitsInMonth(
+function readDebitsBetween(
   db: Database,
   descriptions: string[],
   start: string,
@@ -92,14 +92,26 @@ function readDebitsInMonth(
  * Regular isn't listed. Empty when the DB isn't ready.
  */
 export function linkedPaymentsInMonth(month: string): RegularLinkedPayments[] {
-  const { first: start, last: end } = calendarMonthDayBounds(month)
+  const { first, last } = calendarMonthDayBounds(month)
+  return linkedPaymentsBetween(first, last)
+}
+
+/**
+ * Every Regular, in id order, with its Linked payments whose Display date falls
+ * in `[start, end]` (`YYYY-MM-DD`, inclusive), oldest first. Same rule as
+ * `linkedPaymentsInMonth`, over any span of days.
+ */
+export function linkedPaymentsBetween(
+  start: string,
+  end: string
+): RegularLinkedPayments[] {
   const db = getDb()
   if (!db) return []
   const regulars = readRegulars(db)
   const linkable = regulars.filter(
     (r): r is Regular & { match_description: string } => !!r.match_description
   )
-  const debits = readDebitsInMonth(
+  const debits = readDebitsBetween(
     db,
     [...new Set(linkable.map((r) => r.match_description))],
     start,

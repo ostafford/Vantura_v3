@@ -523,6 +523,55 @@ describe('Regular lines', () => {
     }
   })
 
+  it('does not flag a ONCE paid in its own month as not paid in later months', () => {
+    // Due and paid in Aug; the stored date has passed, so it would otherwise
+    // read as overdue in Sep and Oct.
+    const regularId = addRegular({
+      amount: 15000,
+      matchDescription: 'Synthetic Repair',
+      frequency: 'ONCE',
+      date: '2026-08-20',
+    })
+    addTx({
+      amount: -15000,
+      description: 'Synthetic Repair',
+      category: 'utilities',
+      day: '2026-08-21',
+    })
+
+    const aug = read('2026-08').regulars.find((r) => r.regularId === regularId)!
+    expect(aug.actualCents).toBe(15000)
+    expect(aug.notPaid).toBe(false)
+    for (const month of ['2026-09', '2026-10']) {
+      const line = read(month).regulars.find((r) => r.regularId === regularId)!
+      expect(line.actualCents).toBe(0)
+      expect(line.notPaid).toBe(false)
+    }
+  })
+
+  it('stops flagging an overdue ONCE from the month it is finally paid', () => {
+    // Due 20 Aug, unpaid in Aug, paid late on 5 Sep.
+    const regularId = addRegular({
+      amount: 15000,
+      matchDescription: 'Synthetic Repair',
+      frequency: 'ONCE',
+      date: '2026-08-20',
+    })
+    addTx({
+      amount: -15000,
+      description: 'Synthetic Repair',
+      category: 'utilities',
+      day: '2026-09-05',
+    })
+
+    const notPaid = (month: string) =>
+      read(month).regulars.find((r) => r.regularId === regularId)!.notPaid
+
+    expect(notPaid('2026-08')).toBe(true)
+    expect(notPaid('2026-09')).toBe(false)
+    expect(notPaid('2026-10')).toBe(false)
+  })
+
   it('plans forward only from the stored date in its creation month', () => {
     // Weekly from Wed 14 Oct: 14, 21, 28 Oct — never 7 Oct or earlier.
     const regularId = addRegular({
