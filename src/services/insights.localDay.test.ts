@@ -56,6 +56,11 @@ beforeEach(async () => {
   const { runSchema } = await import('@/db/schema')
   db = new SQL.Database()
   runSchema(db)
+  // Money out counts only Spending/Saver accounts (Actual spending, #187)
+  db.run(
+    `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at, ownership_type)
+     VALUES ('acc-1', 'Spending', 'TRANSACTIONAL', 0, '2026-01-01', '2026-01-01', 'INDIVIDUAL')`
+  )
   txCounter = 0
 })
 

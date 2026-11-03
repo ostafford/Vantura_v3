@@ -11,8 +11,13 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getBucketCardSummary, getBuckets, reorderBuckets } =
-  await import('./budgetBuckets')
+const {
+  getBucketCardSummary,
+  getBuckets,
+  getIncomeCents,
+  getMonthlyIncomeCents,
+  reorderBuckets,
+} = await import('./budgetBuckets')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -146,4 +151,35 @@ describe('reorderBuckets', () => {
     expect(buckets.find((b) => b.id === 3)?.sort_order).toBe(1)
     expect(buckets.find((b) => b.id === 1)?.sort_order).toBe(2)
   })
+})
+
+describe('getMonthlyIncomeCents', () => {
+  it.each([
+    ['WEEKLY', '120000', 520000],
+    ['FORTNIGHTLY', '240000', 520000],
+    ['MONTHLY', '500000', 500000],
+    ['WEEKLY', '100001', 433338],
+  ])('%s pay of %s cents is %i cents a month', (freq, pay, expected) => {
+    appSettings.payday_frequency = freq
+    appSettings.pay_amount_cents = pay
+    expect(getMonthlyIncomeCents()).toBe(expected)
+  })
+
+  it.each([[undefined], [''], ['abc'], ['0'], ['-5000']])(
+    'returns null when pay amount is %s',
+    (pay) => {
+      appSettings.payday_frequency = 'WEEKLY'
+      if (pay !== undefined) appSettings.pay_amount_cents = pay
+      expect(getMonthlyIncomeCents()).toBeNull()
+    }
+  )
+
+  it.each(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'])(
+    'per-period MONTHLY Income equals monthly Income for %s pay',
+    (freq) => {
+      appSettings.payday_frequency = freq
+      appSettings.pay_amount_cents = '123457'
+      expect(getIncomeCents('MONTHLY')).toBe(getMonthlyIncomeCents())
+    }
+  )
 })

@@ -31,7 +31,7 @@ const {
   saveRegular,
   deleteRegular,
   regularById,
-  regularsByPayday,
+  regularsByMonth,
 } = await import('./index')
 type RegularDraft = import('./index').RegularDraft
 
@@ -67,8 +67,8 @@ function bucketOf(id: number): unknown {
 
 /** The row the Dashboard list shows (projected), as the editor opens it. */
 function shownRow(id: number) {
-  const { nextPay, later } = regularsByPayday()
-  const row = [...nextPay, ...later].find((r) => r.id === id)
+  const { thisMonth, later } = regularsByMonth()
+  const row = [...thisMonth, ...later].find((r) => r.id === id)
   if (!row) throw new Error(`Regular ${id} not shown`)
   return row
 }
