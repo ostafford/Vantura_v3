@@ -305,6 +305,19 @@ describe('Actual spending narrows by category set and window (#187)', () => {
   })
 })
 
+describe('Actual spending takes a one-sided window (#186)', () => {
+  it('narrows by `from` only or `to` only, each bound inclusive', async () => {
+    const { getActualSpending } = await import('./actualSpending')
+    addTx({ amount: -100, createdAt: '2026-10-14T23:55:00+11:00' })
+    addTx({ amount: -200, createdAt: '2026-10-15T00:05:00+11:00' })
+    addTx({ amount: -400, createdAt: '2026-10-16T12:00:00+11:00' })
+
+    expect(getActualSpending({ from: '2026-10-15' }).spentCents).toBe(600)
+    expect(getActualSpending({ to: '2026-10-15' }).spentCents).toBe(300)
+    expect(getActualSpending({}).spentCents).toBe(700)
+  })
+})
+
 describe('Category breakdowns are Actual spending (#186)', () => {
   // Mon 12 – Sun 18 Oct 2026 holds the 15th.
   const week = {

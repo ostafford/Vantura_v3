@@ -11,7 +11,6 @@ import {
   calendarPeriodBounds,
 } from '@/lib/dateStr'
 import { actualSpendingWhere } from '@/services/actualSpending'
-import { displayDaySql } from '@/services/displayDay'
 import {
   toPeriodCents,
   toDailyRateCents,
@@ -114,23 +113,14 @@ function trackerSpendingWhere(
   categoryIds: readonly string[],
   window: { fromDay?: string; toDay?: string } = {}
 ): { sql: string; params: string[] } {
-  const fromDay = window.fromDay && normDate(window.fromDay)
-  const toDay = window.toDay && normDate(window.toDay)
-  if (fromDay && toDay) {
-    return actualSpendingWhere({ from: fromDay, to: toDay, categoryIds }, 't')
-  }
-  const base = actualSpendingWhere({ categoryIds }, 't')
-  let sql = base.sql
-  const params = [...base.params]
-  if (fromDay) {
-    sql += ` AND ${displayDaySql('t')} >= ?`
-    params.push(fromDay)
-  }
-  if (toDay) {
-    sql += ` AND ${displayDaySql('t')} <= ?`
-    params.push(toDay)
-  }
-  return { sql, params }
+  return actualSpendingWhere(
+    {
+      from: window.fromDay ? normDate(window.fromDay) : undefined,
+      to: window.toDay ? normDate(window.toDay) : undefined,
+      categoryIds,
+    },
+    't'
+  )
 }
 
 /**

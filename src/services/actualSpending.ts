@@ -23,7 +23,7 @@
  */
 
 import { getDb } from '@/db'
-import { displayDayBetweenSql } from '@/services/displayDay'
+import { displayDayBetweenSql, displayDaySql } from '@/services/displayDay'
 
 /**
  * SQL predicate for the Actual spending definition, with no bound parameters.
@@ -43,7 +43,10 @@ export function actualSpendingSql(alias?: string): string {
     AND (${p}amount < 0 OR (${p}amount > 0 AND ${p}category_id IS NOT NULL)))`
 }
 
-/** How a reader narrows Actual spending. Omitted fields don't narrow. */
+/**
+ * How a reader narrows Actual spending. Omitted fields don't narrow, so a
+ * window may be open at either end.
+ */
 export interface ActualSpendingScope {
   /** First local day of the window, `YYYY-MM-DD`, inclusive (Display date). */
   from?: string
@@ -70,8 +73,12 @@ export function actualSpendingWhere(
   if (scope.from !== undefined && scope.to !== undefined) {
     clauses.push(displayDayBetweenSql(alias))
     params.push(scope.from.slice(0, 10), scope.to.slice(0, 10))
-  } else if (scope.from !== undefined || scope.to !== undefined) {
-    throw new Error('Actual spending window needs both `from` and `to`')
+  } else if (scope.from !== undefined) {
+    clauses.push(`${displayDaySql(alias)} >= ?`)
+    params.push(scope.from.slice(0, 10))
+  } else if (scope.to !== undefined) {
+    clauses.push(`${displayDaySql(alias)} <= ?`)
+    params.push(scope.to.slice(0, 10))
   }
   if (scope.categoryIds !== undefined) {
     if (scope.categoryIds.length === 0) {
