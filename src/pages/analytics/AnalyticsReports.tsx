@@ -98,7 +98,6 @@ const FREQUENCY_LABELS: Record<string, string> = {
   WEEKLY: 'Weekly',
   FORTNIGHTLY: 'Fortnightly',
   MONTHLY: 'Monthly',
-  PAYDAY: 'Payday',
 }
 
 function trackerBarColor(progress: number): string {
@@ -620,9 +619,7 @@ export function AnalyticsReports() {
 
   const availableFrequencies = useMemo(() => {
     const seen = new Set(trackers.map((t) => t.reset_frequency.toUpperCase()))
-    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY', 'PAYDAY'].filter((f) =>
-      seen.has(f)
-    )
+    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'].filter((f) => seen.has(f))
   }, [trackers])
 
   useEffect(() => {

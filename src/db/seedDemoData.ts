@@ -93,7 +93,7 @@ export function seedDemoData(): void {
   if (!db) throw new Error('Database not ready')
 
   // Payday: MONTHLY on the 15th. Derive next_payday correctly so the dashboard
-  // "reserved until" date and PAYDAY tracker period match the payday_day setting.
+  // "reserved until" date matches the payday_day setting.
   const today = new Date()
   const payDayNum = 15
   let nextPayDateObj = new Date(
@@ -105,16 +105,6 @@ export function seedDemoData(): void {
     )
   }
   const nextPayday = nextPayDateObj.toISOString().slice(0, 10)
-  // Last payday = one month before next payday (used for PAYDAY tracker period start)
-  const lastPaydayStr = new Date(
-    Date.UTC(
-      nextPayDateObj.getUTCFullYear(),
-      nextPayDateObj.getUTCMonth() - 1,
-      payDayNum
-    )
-  )
-    .toISOString()
-    .slice(0, 10)
 
   setAppSetting('payday_frequency', 'MONTHLY')
   setAppSetting('payday_day', '15')
@@ -624,7 +614,7 @@ export function seedDemoData(): void {
     )
   })
 
-  // Trackers: MONTHLY, WEEKLY, FORTNIGHTLY, PAYDAY for full frequency coverage
+  // Trackers: MONTHLY, WEEKLY, FORTNIGHTLY for full frequency coverage
   const todayStr = new Date().toISOString().slice(0, 10)
   const lastResetStr = firstOfCurrentMonthUTC()
   const nextResetStr = firstOfNextMonthUTC()
@@ -722,19 +712,17 @@ export function seedDemoData(): void {
     [tracker4Id, catEntertainment]
   )
 
-  // PAYDAY tracker: period aligned to the monthly payday on the 15th.
-  // This demonstrates the PAYDAY frequency and shows a different period tab on the dashboard.
   run(
     `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       'Transport',
       15000,
-      'PAYDAY',
-      null,
-      lastPaydayStr,
-      lastPaydayStr,
-      nextPayday,
+      'MONTHLY',
+      1,
+      lastResetStr,
+      lastResetStr,
+      nextResetStr,
       NOW,
     ]
   )
