@@ -38,8 +38,6 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'payday_day',
   'next_payday',
   'pay_amount_cents',
-  'payday_raw_text',
-  'payday_description',
   'spendable_alert_below_cents',
   'spendable_alert_below_pct_pay',
   'dashboard_tour_completed',

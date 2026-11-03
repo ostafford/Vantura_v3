@@ -395,35 +395,21 @@ function checkPaydayLanded(): void {
   cutoff.setDate(cutoff.getDate() - 2)
   const cutoffIso = cutoff.toISOString()
 
-  const paydayRawText = getAppSetting('payday_raw_text')
+  // Amount heuristic: a non-transfer credit of at least 80% of the pay
+  // amount. Requires pay_amount_cents to be set. (The nominated pay source
+  // that used to narrow this to one raw_text was cut in #194.)
+  const payAmtRaw = getAppSetting('pay_amount_cents')
+  if (!payAmtRaw) return
+  const payAmt = parseInt(payAmtRaw, 10)
+  if (Number.isNaN(payAmt) || payAmt <= 0) return
 
-  let detected: { amount: number; date: string; description: string } | null
-
-  if (paydayRawText) {
-    // Precise match: the user identified their salary source in Settings.
-    // Match on raw_text (the bank's internal reference) which is stable across pays.
-    detected = findFirstUnseenCredit(
-      db,
-      'AND t.raw_text = ? AND t.amount > 0 AND COALESCE(t.settled_at, t.created_at) >= ?',
-      [paydayRawText, cutoffIso],
-      lastFiredDate
-    )
-  } else {
-    // Fallback: no salary source identified yet — use amount heuristic.
-    // Requires pay_amount_cents to be set.
-    const payAmtRaw = getAppSetting('pay_amount_cents')
-    if (!payAmtRaw) return
-    const payAmt = parseInt(payAmtRaw, 10)
-    if (Number.isNaN(payAmt) || payAmt <= 0) return
-
-    const minAmt = Math.round(payAmt * 0.8)
-    detected = findFirstUnseenCredit(
-      db,
-      'AND t.amount >= ? AND t.transfer_account_id IS NULL AND COALESCE(t.settled_at, t.created_at) >= ?',
-      [minAmt, cutoffIso],
-      lastFiredDate
-    )
-  }
+  const minAmt = Math.round(payAmt * 0.8)
+  const detected = findFirstUnseenCredit(
+    db,
+    'AND t.amount >= ? AND t.transfer_account_id IS NULL AND COALESCE(t.settled_at, t.created_at) >= ?',
+    [minAmt, cutoffIso],
+    lastFiredDate
+  )
 
   if (!detected) return
 
@@ -625,16 +611,14 @@ function checkSyncStale(): void {
 // ─── 9. Possible payday suggestion ───────────────────────────────────────────
 
 /**
- * When no payday source has been identified, look for a recurring large credit
- * that just appeared after a sync and suggest the user set it as their pay source.
+ * Look for a recurring large credit that just appeared after a sync and
+ * suggest it as the user's pay. (Nominating a pay source was cut in #194, so
+ * this no longer stops once one is nominated.)
  *
  * Guard: fires once per unique payee (stored as notif_possible_payday_suggested_for).
- * Won't re-suggest the same merchant unless the user clears their payday settings.
  */
 function checkPossiblePayday(): void {
   if (!getNotifTypeEnabled('possible_payday')) return
-  // Only runs when the user hasn't identified their salary source yet
-  if (getAppSetting('payday_raw_text')) return
 
   const db = getDb()
   if (!db) return
