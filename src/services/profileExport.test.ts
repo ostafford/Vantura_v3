@@ -99,10 +99,44 @@ describe('profileExport', () => {
       ).toBe(true)
     })
 
-    it('payday_raw_text and payday_description are in SETTINGS_WHITELIST', () => {
-      const wl = new Set(SETTINGS_WHITELIST)
-      expect(wl.has('payday_raw_text')).toBe(true)
-      expect(wl.has('payday_description')).toBe(true)
+    it('leaves the nominated pay source out of an export (#194)', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getDb).mockReturnValue(null)
+      vi.mocked(db.getAppSetting).mockImplementation((key) => {
+        if (key === 'payday_raw_text') return 'SYNTHETIC EMPLOYER SALARY'
+        if (key === 'payday_description') return 'Synthetic Employer'
+        if (key === 'pay_amount_cents') return '250000'
+        return null
+      })
+
+      const payload = buildExportPayload()
+
+      expect(payload.settings).not.toHaveProperty('payday_raw_text')
+      expect(payload.settings).not.toHaveProperty('payday_description')
+      expect(payload.settings.pay_amount_cents).toBe('250000')
+    })
+
+    it('silently skips the nominated pay source when importing an older export (#194)', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      setAppSettingMock.mockClear()
+      applySettings({
+        payday_raw_text: 'SYNTHETIC EMPLOYER SALARY',
+        payday_description: 'Synthetic Employer',
+        pay_amount_cents: '250000',
+      })
+      expect(setAppSettingMock).toHaveBeenCalledWith(
+        'pay_amount_cents',
+        '250000'
+      )
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
+        'payday_raw_text',
+        expect.anything()
+      )
+      expect(setAppSettingMock).not.toHaveBeenCalledWith(
+        'payday_description',
+        expect.anything()
+      )
     })
 
     it('lock_timeout_minutes and saver_account_order are in SETTINGS_WHITELIST', () => {

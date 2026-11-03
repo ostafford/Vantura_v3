@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 49
+const SCHEMA_VERSION = 50
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1380,6 +1380,19 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['49']
+    )
+  }
+  // #194 — Payday nomination and payday detection are cut. Remove the
+  // nominated pay source (raw text + description). Pay amount, pay frequency
+  // and the payday date settings are left alone (#195 owns the payday date).
+  if (version < 50) {
+    database.run(
+      `DELETE FROM app_settings
+        WHERE key IN ('payday_raw_text', 'payday_description')`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['50']
     )
   }
 }
