@@ -22,8 +22,13 @@ vi.mock('@/db', () => ({
   getAppSetting: () => null,
 }))
 
-const { getInsightsForDateRange, getMonthlyInsights } =
-  await import('./insights')
+const {
+  getInsightsForDateRange,
+  getMonthlyInsights,
+  getMonthComparison,
+  getMonthDayByDaySeries,
+  getYearMonthlyTotals,
+} = await import('./insights')
 
 const ORIGINAL_TZ = process.env.TZ
 let txCounter = 0
@@ -384,5 +389,88 @@ describe('Category breakdowns are Actual spending (#186)', () => {
       ['2026-10-05', 0],
       ['2026-10-12', -1000],
     ])
+  })
+})
+
+describe('Money in leaves out refunds, so Net counts a refund once (#200)', () => {
+  it('a $30 refund changes Net by $30, not $60', () => {
+    // September: pay and a $50 shop. October: the same, plus a $30 refund.
+    addTx({
+      amount: 300000,
+      createdAt: '2026-09-15T12:00:00+10:00',
+      settledAt: null,
+    })
+    addTx({
+      amount: -5000,
+      category: 'groceries',
+      createdAt: '2026-09-16T12:00:00+10:00',
+      settledAt: null,
+    })
+    addTx({ amount: 300000 })
+    addTx({ amount: -5000, category: 'groceries' })
+    addTx({ amount: 3000, category: 'groceries' })
+
+    const comparison = getMonthComparison('2026-10-01', '2026-10-31')
+
+    expect(comparison.netDelta.delta).toBe(3000)
+  })
+
+  it('Money in for a window leaves out a categorised refund but keeps pay, interest and money from people', () => {
+    addTx({ amount: 300000 }) // pay
+    addTx({ amount: 125, account: 'acc-saver' }) // interest
+    addTx({ amount: 2000 }) // money from a person
+    addTx({ amount: -5000, category: 'groceries' })
+    addTx({ amount: 3000, category: 'groceries' }) // refund
+
+    const october = getInsightsForDateRange('2026-10-01', '2026-10-31')
+
+    expect(october.moneyIn).toBe(302125)
+  })
+
+  it("the month chart's Money in leaves out a refund on its day", () => {
+    addTx({ amount: 300000, createdAt: '2026-10-15T12:00:00+11:00' })
+    addTx({
+      amount: -5000,
+      category: 'groceries',
+      createdAt: '2026-10-20T12:00:00+11:00',
+    })
+    addTx({
+      amount: 3000,
+      category: 'groceries',
+      createdAt: '2026-10-20T13:00:00+11:00',
+    })
+
+    const { points } = getMonthDayByDaySeries('2026-10-01', '2026-10-31').series
+    const day20 = points.find((p) => p.day === 20)
+
+    expect(day20?.currentIncome).toBe(300000)
+    expect(day20?.currentNet).toBe(298000)
+  })
+
+  it("the year's monthly totals leave out a refund from its month's Money in", () => {
+    addTx({ amount: 300000 })
+    addTx({ amount: -5000, category: 'groceries' })
+    addTx({ amount: 3000, category: 'groceries' })
+
+    const october = getYearMonthlyTotals(2026).find((m) => m.month === 10)
+
+    expect(october?.moneyIn).toBe(300000)
+  })
+
+  it('the narratives call it Money in, never Income', () => {
+    addTx({
+      amount: 300000,
+      createdAt: '2026-09-15T12:00:00+10:00',
+      settledAt: null,
+    })
+    addTx({ amount: 310000 })
+
+    const labels = getMonthComparison(
+      '2026-10-01',
+      '2026-10-31'
+    ).narratives.map((n) => n.label)
+
+    expect(labels.some((l) => l.startsWith('Money in is up $100'))).toBe(true)
+    expect(labels.some((l) => l.includes('Income'))).toBe(false)
   })
 })

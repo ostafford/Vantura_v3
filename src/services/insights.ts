@@ -3,9 +3,10 @@
  *
  * Term definitions (aligned with Up Bank app and product intent):
  *
- * - Money In: Real income only (salary, refunds, etc.). Excludes internal transfers
- *   (e.g. from a saver back to spending). Filter: amount > 0 AND not a transfer
- *   (transfer_account_id IS NULL) AND source = 'up'.
+ * - Money In: Up money that arrived with no Up category (pay, interest, money
+ *   from people). Excludes internal transfers (e.g. from a saver back to
+ *   spending) and categorised positives, which are refunds that Money Out
+ *   already subtracts (#200). Filter: `MONEY_IN` below.
  *
  * - Money Out: total Actual spending (#187) — the one definition in
  *   `actualSpending.ts`. Debits net of categorised refunds; signed, never clamped.
@@ -43,6 +44,14 @@ import {
 const DISPLAY_DAY_BETWEEN = displayDayBetweenSql()
 /** Actual spending predicate (#187) — Money Out's one definition. */
 const ACTUAL_SPENDING = actualSpendingSql()
+/**
+ * Money In predicate (#200): Up-sourced positives that aren't own-account
+ * transfers and have no Up category. A categorised positive is a refund, which
+ * Actual spending already subtracts, so leaving it out here means Net counts
+ * each refund once.
+ */
+const MONEY_IN =
+  "amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND category_id IS NULL"
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
 import {
   buildMonthSpendingSeries,
@@ -215,7 +224,7 @@ function insightsForDays(startDay: string, endDay: string): WeeklyInsightsData {
   // Money In: real income; exclude internal transfers
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND ${DISPLAY_DAY_BETWEEN}`,
+     WHERE ${MONEY_IN} AND ${DISPLAY_DAY_BETWEEN}`,
     [startDay, endDay]
   )
   // Money Out = Actual spending (#187); Charges = its debits
@@ -725,7 +734,7 @@ export function getPeriodComparison(
   if (hasPreviousData) {
     if (moneyIn.direction === 'up') {
       narratives.push({
-        label: `Income is up $${fmtCentsDelta(moneyIn.delta)}${fmtPct(moneyIn.delta, moneyIn.previous)} vs ${prior}`,
+        label: `Money in is up $${fmtCentsDelta(moneyIn.delta)}${fmtPct(moneyIn.delta, moneyIn.previous)} vs ${prior}`,
         type: 'win',
       })
     }
@@ -780,7 +789,7 @@ export function getPeriodComparison(
 
     if (moneyIn.direction === 'down') {
       narratives.push({
-        label: `Income is down $${fmtCentsDelta(Math.abs(moneyIn.delta))}${fmtPct(moneyIn.delta, moneyIn.previous)} vs ${prior}`,
+        label: `Money in is down $${fmtCentsDelta(Math.abs(moneyIn.delta))}${fmtPct(moneyIn.delta, moneyIn.previous)} vs ${prior}`,
         type: 'opportunity',
       })
     }
@@ -1046,7 +1055,7 @@ function getDailyMoneyInOutForRange(
 
   const stmt = db.prepare(
     `SELECT CAST(substr(${displayDaySql()}, 9, 2) AS INTEGER) AS day,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN ${MONEY_IN} THEN amount ELSE 0 END), 0) AS money_in,
        COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
@@ -1099,7 +1108,7 @@ function getDailyMoneyInOutByDateInRange(
 
   const stmt = db.prepare(
     `SELECT ${displayDaySql()} AS d,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN ${MONEY_IN} THEN amount ELSE 0 END), 0) AS money_in,
        COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
@@ -1314,7 +1323,7 @@ export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
 
   const stmt = db.prepare(
     `SELECT CAST(substr(${displayDaySql()}, 6, 2) AS INTEGER) AS m,
-       COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
+       COALESCE(SUM(CASE WHEN ${MONEY_IN} THEN amount ELSE 0 END), 0) AS money_in,
        COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
