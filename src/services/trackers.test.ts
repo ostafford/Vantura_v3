@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 const appSettings: Record<string, string> = {}
 
@@ -19,7 +19,6 @@ const {
 } = await import('./trackers')
 const { toPeriodCents } = await import('@/lib/monthlyEquivalent')
 const { formatShortDate } = await import('@/lib/format')
-const { calendarPeriodBounds } = await import('@/lib/dateStr')
 
 type ProgressRow = import('./trackers').TrackerWithProgress
 
@@ -189,6 +188,16 @@ describe('getPeriodBoundsForOffset', () => {
 })
 
 describe('getTrackersDisplayPeriodData', () => {
+  // A fixed local mid-month, mid-year "now", so no assertion can straddle a
+  // month or year rollover while the test runs.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('passes a native-period tracker through with its own figures (#16-aware)', () => {
     const t = makeProgressRow({
       reset_frequency: 'MONTHLY',
@@ -231,9 +240,9 @@ describe('getTrackersDisplayPeriodData', () => {
     expect(d.spent).toBe(0)
     expect(d.remaining).toBe(d.budget)
     expect(d.progress).toBe(0)
-    const bounds = calendarPeriodBounds('MONTHLY')
-    expect(d.dateRangeLabel).toContain(' – ')
-    expect(d.dateRangeLabel.startsWith(formatShortDate(bounds.from))).toBe(true)
+    expect(d.dateRangeLabel).toBe(
+      `${formatShortDate('2026-06-01')} – ${formatShortDate('2026-06-30')}`
+    )
   })
 
   it('labels a non-native YEARLY period with the bare year', () => {
@@ -241,7 +250,7 @@ describe('getTrackersDisplayPeriodData', () => {
     const d = getTrackersDisplayPeriodData([t], 'YEARLY')[1]
     expect(d.isNativePeriod).toBe(false)
     // the non-native branch anchors on the local calendar date
-    expect(d.dateRangeLabel).toBe(String(new Date().getFullYear()))
+    expect(d.dateRangeLabel).toBe('2026')
   })
 
   it('threads one consistent local "today" through non-native bounds and daysLeft (#52)', () => {

@@ -5,7 +5,15 @@
  * returned as-is. Exercised through the tracker service reads a caller uses.
  * Synthetic data only.
  */
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 
 let SQL: SqlJsStatic
@@ -37,8 +45,14 @@ beforeAll(async () => {
 })
 
 let txCounter = 0
+const ORIGINAL_TZ = process.env.TZ
 
 beforeEach(async () => {
+  // Frozen inside the fixtures' current period (Mon 2 – Sun 8 Mar 2026), in an
+  // AU zone, so "today" never drifts past the period the fixtures pin.
+  process.env.TZ = 'Australia/Sydney'
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-03-05T12:00:00+11:00'))
   const { runSchema } = await import('@/db/schema')
   db = new SQL.Database()
   runSchema(db)
@@ -54,6 +68,12 @@ beforeEach(async () => {
             ('acc-joint', '2Up', 'TRANSACTIONAL', 0, ?, ?, 'JOINT')`,
     [now, now, now, now, now, now]
   )
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ
+  else process.env.TZ = ORIGINAL_TZ
 })
 
 interface TxSeed {

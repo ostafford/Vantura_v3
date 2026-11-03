@@ -1,4 +1,12 @@
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest'
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 
 let SQL: SqlJsStatic
@@ -33,7 +41,18 @@ beforeAll(async () => {
   SQL = await initSqlJs()
 })
 
+const ORIGINAL_TZ = process.env.TZ
+/**
+ * The frozen "now" as Up Bank stamps it — local AU offset — so "today" is the
+ * same local day whether read via `localDateString()` or a timestamp's first
+ * ten characters, at any wall-clock time the suite runs.
+ */
+const NOW_LOCAL = '2026-10-20T12:00:00+11:00'
+
 beforeEach(async () => {
+  process.env.TZ = 'Australia/Sydney'
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(NOW_LOCAL))
   const { runSchema } = await import('@/db/schema')
   db = new SQL.Database()
   runSchema(db)
@@ -44,6 +63,12 @@ beforeEach(async () => {
     `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
      VALUES ('acc1', 'Everyday', 'TRANSACTIONAL', 500000, '2026-01-01', '2026-01-01')`
   )
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ
+  else process.env.TZ = ORIGINAL_TZ
 })
 
 function insertTx(opts: {
@@ -144,7 +169,7 @@ describe('checkPaydayLanded', () => {
     insertTx({
       id: 't1',
       amount: 200000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
     })
     checkPaydayLanded()
     expect(appSettings['notif_last_payday_date']).toBeUndefined()
@@ -152,7 +177,7 @@ describe('checkPaydayLanded', () => {
 
   it('amount-heuristic fallback: excludes transfers via transfer_account_id filter', () => {
     appSettings['pay_amount_cents'] = '200000'
-    const today = new Date().toISOString()
+    const today = NOW_LOCAL
     insertTx({
       id: 't1',
       amount: 200000,
@@ -165,14 +190,14 @@ describe('checkPaydayLanded', () => {
 
   it('amount-heuristic fallback: matches a non-transfer credit at or above 80% of pay amount', () => {
     appSettings['pay_amount_cents'] = '200000'
-    const today = new Date().toISOString()
+    const today = NOW_LOCAL
     insertTx({ id: 't1', amount: 160000, settled_at: today })
     checkPaydayLanded()
     expect(appSettings['notif_last_payday_date']).toBe(today.slice(0, 10))
   })
 
   it('amount-heuristic fallback: does nothing when pay_amount_cents is not configured', () => {
-    insertTx({ id: 't1', amount: 200000, settled_at: new Date().toISOString() })
+    insertTx({ id: 't1', amount: 200000, settled_at: NOW_LOCAL })
     checkPaydayLanded()
     expect(appSettings['notif_last_payday_date']).toBeUndefined()
   })
@@ -239,7 +264,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -262,7 +287,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -292,7 +317,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -313,7 +338,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -332,7 +357,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -369,7 +394,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -389,7 +414,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
@@ -410,7 +435,7 @@ describe('checkLiabilityRepayments', () => {
     insertTx({
       id: 'pay1',
       amount: -250_000,
-      settled_at: new Date().toISOString(),
+      settled_at: NOW_LOCAL,
       description: LOAN_PAYMENT,
     })
 
