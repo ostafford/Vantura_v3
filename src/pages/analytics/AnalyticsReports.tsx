@@ -24,6 +24,7 @@ import {
   getTrackerPeriodsInRange,
   type TrackerPeriodSlice,
   type TrackerResetFrequency,
+  TRACKER_RESET_FREQUENCY_ORDER,
 } from '@/services/trackers'
 import { regularOccurrencesInMonth, type Regular } from '@/services/regulars'
 import {
@@ -618,9 +619,9 @@ export function AnalyticsReports() {
     .map((c) => c.category_name)
     .join(', ')
 
-  const availableFrequencies = useMemo(() => {
+  const availableFrequencies = useMemo<string[]>(() => {
     const seen = new Set(trackers.map((t) => t.reset_frequency.toUpperCase()))
-    return ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'].filter((f) => seen.has(f))
+    return TRACKER_RESET_FREQUENCY_ORDER.filter((f) => seen.has(f))
   }, [trackers])
 
   useEffect(() => {

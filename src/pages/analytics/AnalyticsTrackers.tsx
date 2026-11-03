@@ -6,23 +6,16 @@ import {
   getTrackersWithProgressForPeriod,
   getTrackersDisplayPeriodData,
   type TrackerResetFrequency,
+  TRACKER_RESET_FREQUENCIES,
+  TRACKER_RESET_FREQUENCY_ORDER,
 } from '@/services/trackers'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 
-const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-]
-
-const FREQUENCY_ORDER: TrackerResetFrequency[] = [
-  'WEEKLY',
-  'FORTNIGHTLY',
-  'MONTHLY',
-]
+const RESET_FREQUENCIES = TRACKER_RESET_FREQUENCIES
+const FREQUENCY_ORDER = TRACKER_RESET_FREQUENCY_ORDER
 
 const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
   { value: 'WEEKLY', label: 'Weekly' },

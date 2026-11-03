@@ -23,6 +23,8 @@ import {
   deleteTracker,
   getTrackersDisplayPeriodData,
   type TrackerResetFrequency,
+  TRACKER_RESET_FREQUENCIES,
+  TRACKER_RESET_FREQUENCY_ORDER,
 } from '@/services/trackers'
 import { getCategories } from '@/services/categories'
 import { type BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
@@ -34,17 +36,8 @@ import { HelpPopover } from '@/components/HelpPopover'
 import { TransactionAmount } from '@/components/TransactionAmount'
 import type React from 'react'
 
-const RESET_FREQUENCIES: { value: TrackerResetFrequency; label: string }[] = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-]
-
-const FREQUENCY_ORDER: TrackerResetFrequency[] = [
-  'WEEKLY',
-  'FORTNIGHTLY',
-  'MONTHLY',
-]
+const RESET_FREQUENCIES = TRACKER_RESET_FREQUENCIES
+const FREQUENCY_ORDER = TRACKER_RESET_FREQUENCY_ORDER
 
 function getTrackerProgressStyle(progress: number): {
   variant: 'primary' | 'warning' | 'danger' | 'success'

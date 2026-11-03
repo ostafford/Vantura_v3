@@ -17,7 +17,22 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 
-export type TrackerResetFrequency = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
+/**
+ * Every tracker cadence, in display order, with its label — the one list the
+ * write-path check and the frequency pickers read.
+ */
+export const TRACKER_RESET_FREQUENCIES = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+] as const
+
+export type TrackerResetFrequency =
+  (typeof TRACKER_RESET_FREQUENCIES)[number]['value']
+
+/** Tracker cadences in display order. */
+export const TRACKER_RESET_FREQUENCY_ORDER: readonly TrackerResetFrequency[] =
+  TRACKER_RESET_FREQUENCIES.map((f) => f.value)
 
 export interface TrackerRow {
   id: number
@@ -1149,9 +1164,9 @@ function assertValidResetDay(
   resetDay: number | null
 ): void {
   if (
-    resetFrequency !== 'WEEKLY' &&
-    resetFrequency !== 'FORTNIGHTLY' &&
-    resetFrequency !== 'MONTHLY'
+    !(TRACKER_RESET_FREQUENCY_ORDER as readonly string[]).includes(
+      resetFrequency
+    )
   ) {
     throw new Error('INVALID_RESET_FREQUENCY')
   }
