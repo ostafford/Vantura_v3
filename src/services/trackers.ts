@@ -2,8 +2,7 @@
  * Trackers: CRUD and progress (spent in period per 05_Calculation_logic 5.1).
  */
 
-import { getDb, getAppSetting, schedulePersist } from '@/db'
-import { previousPaydayDate, type PaydayFrequency } from '@/lib/payday'
+import { getDb, schedulePersist } from '@/db'
 import { localDateString, formatShortDate } from '@/lib/format'
 import {
   addDaysToDateStr,
@@ -17,11 +16,7 @@ import {
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
 
-export type TrackerResetFrequency =
-  | 'WEEKLY'
-  | 'FORTNIGHTLY'
-  | 'MONTHLY'
-  | 'PAYDAY'
+export type TrackerResetFrequency = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
 
 export interface TrackerRow {
   id: number
@@ -390,10 +385,6 @@ function stepBackOnePeriod(
   periodEnd: string
 ): string {
   const from = new Date(periodEnd + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    const prev = getPreviousPaydayDate(periodEnd)
-    return prev ?? periodEnd
-  }
   if (frequency === 'WEEKLY') {
     const d = new Date(from)
     d.setUTCDate(d.getUTCDate() - 7)
@@ -413,20 +404,6 @@ function stepBackOnePeriod(
     return d.toISOString().slice(0, 10)
   }
   return periodEnd
-}
-
-/** Previous payday date before fromDate, using app_settings payday_frequency and payday_day. */
-function getPreviousPaydayDate(fromDate: string): string | null {
-  const frequency = getAppSetting('payday_frequency')
-  const dayStr = getAppSetting('payday_day')
-  if (
-    frequency !== 'WEEKLY' &&
-    frequency !== 'FORTNIGHTLY' &&
-    frequency !== 'MONTHLY'
-  )
-    return null
-  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-  return previousPaydayDate(fromDate, frequency as PaydayFrequency, paydayDay)
 }
 
 /** Period bounds for a tracker and period offset. 0 = current period, -1 = previous, etc. */
@@ -497,23 +474,6 @@ export function getTrackersWithProgress(): TrackerWithProgress[] {
   }
   stmt.free()
   return list
-}
-
-/**
- * Total budgeted across PAYDAY-frequency trackers, optionally excluding one tracker
- * (the one being edited, so its pending value can be added back separately).
- */
-export function calculatePaydayBudgetTotal(
-  trackers: Array<{
-    id: number
-    reset_frequency: string
-    budget_amount: number
-  }>,
-  excludeId?: number
-): number {
-  return trackers
-    .filter((t) => t.reset_frequency === 'PAYDAY' && t.id !== excludeId)
-    .reduce((sum, t) => sum + t.budget_amount, 0)
 }
 
 export interface TrackerDisplayPeriodData {
@@ -856,9 +816,6 @@ function getLastResetDate(
   fromDate: string
 ): string {
   const from = new Date(fromDate + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    return fromDate
-  }
   if (frequency === 'WEEKLY') {
     const targetUTCDay = resetDayToUTCDay(resetDay)
     const currentUTCDay = from.getUTCDay()
@@ -900,10 +857,6 @@ function getNextResetDate(
   fromDate: string
 ): string {
   const from = new Date(fromDate + 'T12:00:00Z')
-  if (frequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    return nextPayday ?? from.toISOString().slice(0, 10)
-  }
   let next: Date
   if (frequency === 'WEEKLY') {
     const targetUTCDay = resetDayToUTCDay(resetDay)
@@ -1127,14 +1080,10 @@ function maintainConfigHistoryOnEdit(args: {
 }
 
 /**
- * Create tracker and set start_date, last_reset_date, next_reset_date.
- * For PAYDAY use app_settings next_payday; for others use period start (e.g. last Monday) so the tracker shows the full frequency window.
- */
-/**
  * Whether `resetDay` is valid for `resetFrequency` (#150): WEEKLY / FORTNIGHTLY
  * take an ISO weekday 1–7, MONTHLY a day of month 1–28 (the period maths is
- * only correct up to 28). PAYDAY ignores the value, so it may be null or any
- * day the form can write (1–28). An unknown frequency is never valid.
+ * only correct up to 28). An unknown frequency (including the removed PAYDAY,
+ * #192) is never valid.
  */
 export function isValidTrackerResetDay(
   resetFrequency: string,
@@ -1151,8 +1100,6 @@ export function isValidTrackerResetDay(
       return inRange(7)
     case 'MONTHLY':
       return inRange(28)
-    case 'PAYDAY':
-      return resetDay == null || inRange(28)
     default:
       return false
   }
@@ -1176,6 +1123,13 @@ function assertValidResetDay(
   resetFrequency: string,
   resetDay: number | null
 ): void {
+  if (
+    resetFrequency !== 'WEEKLY' &&
+    resetFrequency !== 'FORTNIGHTLY' &&
+    resetFrequency !== 'MONTHLY'
+  ) {
+    throw new Error('INVALID_RESET_FREQUENCY')
+  }
   if (!isValidTrackerResetDay(resetFrequency, resetDay)) {
     throw new Error('INVALID_RESET_DAY')
   }
@@ -1194,17 +1148,10 @@ export function createTracker(
   assertCategoriesAvailable(categoryIds)
   const now = new Date().toISOString()
   const today = localDateString()
-  let lastReset: string
-  let nextReset: string
-  if (resetFrequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
-    nextReset = nextPayday
-    lastReset = getPreviousPaydayDate(nextPayday) ?? today
-  } else {
-    lastReset = getLastResetDate(resetFrequency, resetDay, today)
-    nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
-  }
+  // Period start (e.g. last Monday) so the tracker shows the full frequency
+  // window, not just from the creation day.
+  const lastReset = getLastResetDate(resetFrequency, resetDay, today)
+  const nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
   db.run(
     `INSERT INTO trackers (name, budget_amount, reset_frequency, reset_day, start_date, last_reset_date, next_reset_date, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
@@ -1264,11 +1211,6 @@ export function updateTracker(
   if (!needsPeriodReset) {
     lastReset = existing!.last_reset_date
     nextReset = existing!.next_reset_date
-  } else if (resetFrequency === 'PAYDAY') {
-    const nextPayday = getAppSetting('next_payday')
-    if (!nextPayday) throw new Error('PAYDAY_NOT_CONFIGURED')
-    nextReset = nextPayday
-    lastReset = getPreviousPaydayDate(nextPayday) ?? today
   } else {
     lastReset = getLastResetDate(resetFrequency, resetDay, today)
     nextReset = getNextResetDate(resetFrequency, resetDay, lastReset)
@@ -1745,7 +1687,6 @@ export function getTrackersForPicker(): TrackerPickerItem[] {
 export const __test__ = {
   daysBetween,
   stepBackOnePeriod,
-  getPreviousPaydayDate,
   getLastResetDate,
   getNextResetDate,
 }
