@@ -7,8 +7,8 @@
  *   (e.g. from a saver back to spending). Filter: amount > 0 AND not a transfer
  *   (transfer_account_id IS NULL) AND source = 'up'.
  *
- * - Money Out: Spending only (purchases, charges). Excludes internal transfers out
- *   (e.g. to a saver). Filter: amount < 0 AND not a transfer.
+ * - Money Out: total Actual spending (#187) — the one definition in
+ *   `actualSpending.ts`. Debits net of categorised refunds; signed, never clamped.
  *
  * - Savers: Net movement to/from any saver account (Loose Change, Investing, etc.).
  *   Computed from the SAVER account side: negated SUM(amount) for transactions whose
@@ -17,11 +17,11 @@
  *   into a saver (positive amount) yields a negative saverChanges value (saving), and a debit
  *   out of a saver yields a positive value (withdrawal).
  *
- * - Charges: Count of spending transactions. Same rules as Money Out (negative, non-transfer).
+ * - Charges: Count of the debits in Money Out (refunds aren't charges).
  *   One charge per purchase (e.g. Coles, ALDI).
  *
- * - Category chart: Spending by category (same as Money Out), no transfers. Same filter as
- *   Money Out, grouped by category_id.
+ * - Category chart: Spending by category, no transfers: debits only, categorisable rows,
+ *   grouped by category_id. Not yet on the Actual spending definition.
  */
 
 import { getDb } from '@/db'
@@ -31,10 +31,13 @@ import {
   displayDayBetweenSql,
   toDayBound,
 } from '@/services/displayDay'
+import { actualSpendingSql, getActualSpending } from '@/services/actualSpending'
 
 /** Local-day window predicates (#149) — bind two `YYYY-MM-DD` days. */
 const DISPLAY_DAY_BETWEEN = displayDayBetweenSql()
 const DISPLAY_DAY_BETWEEN_T = displayDayBetweenSql('t')
+/** Actual spending predicate (#187) — Money Out's one definition. */
+const ACTUAL_SPENDING = actualSpendingSql()
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
 import {
   buildMonthSpendingSeries,
@@ -202,17 +205,10 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
     [startStr, endStr]
   )
   // Money Out + Charges share the same filter — one query returns both
-  const spendingStmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN}`
-  )
-  spendingStmt.bind([startStr, endStr])
-  spendingStmt.step()
-  const spendingRow = spendingStmt.get()
-  spendingStmt.free()
-  const moneyOut = spendingRow ? Number(spendingRow[0]) : 0
-  const charges = spendingRow ? Number(spendingRow[1]) : 0
+  // Money Out = Actual spending (#187); Charges = its debits
+  const spending = getActualSpending({ from: startStr, to: endStr })
+  const moneyOut = spending.spentCents
+  const charges = spending.debitCount
   // Savers: read from the saver account side and negate so credits (saving) are negative
   const saverChanges = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
@@ -308,17 +304,10 @@ export function getMonthlyInsights(
     [startDay, endDay]
   )
 
-  const spendingStmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN}`
-  )
-  spendingStmt.bind([startDay, endDay])
-  spendingStmt.step()
-  const spendingRow = spendingStmt.get()
-  spendingStmt.free()
-  const moneyOut = spendingRow ? Number(spendingRow[0]) : 0
-  const charges = spendingRow ? Number(spendingRow[1]) : 0
+  // Money Out = Actual spending (#187); Charges = its debits
+  const spending = getActualSpending({ from: startDay, to: endDay })
+  const moneyOut = spending.spentCents
+  const charges = spending.debitCount
 
   const saverChanges = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
@@ -611,17 +600,10 @@ export function getInsightsForDateRange(
     [startStr, endStr]
   )
   // Money Out + Charges share the same filter — one query returns both
-  const spendingStmt = db.prepare(
-    `SELECT COALESCE(SUM(ABS(amount)), 0), COUNT(*) FROM transactions
-     WHERE amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN}`
-  )
-  spendingStmt.bind([startStr, endStr])
-  spendingStmt.step()
-  const spendingRow = spendingStmt.get()
-  spendingStmt.free()
-  const moneyOut = spendingRow ? Number(spendingRow[0]) : 0
-  const charges = spendingRow ? Number(spendingRow[1]) : 0
+  // Money Out = Actual spending (#187); Charges = its debits
+  const spending = getActualSpending({ from: startStr, to: endStr })
+  const moneyOut = spending.spentCents
+  const charges = spending.debitCount
   const saverChanges = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
@@ -1125,7 +1107,7 @@ function getDailyMoneyInOutForRange(
   const stmt = db.prepare(
     `SELECT CAST(substr(${displayDaySql()}, 9, 2) AS INTEGER) AS day,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
      GROUP BY day
@@ -1178,7 +1160,7 @@ function getDailyMoneyInOutByDateInRange(
   const stmt = db.prepare(
     `SELECT ${displayDaySql()} AS d,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
      GROUP BY d
@@ -1393,7 +1375,7 @@ export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
   const stmt = db.prepare(
     `SELECT CAST(substr(${displayDaySql()}, 6, 2) AS INTEGER) AS m,
        COALESCE(SUM(CASE WHEN amount > 0 AND transfer_account_id IS NULL AND source = 'up' THEN amount ELSE 0 END), 0) AS money_in,
-       COALESCE(SUM(CASE WHEN amount < 0 AND transfer_account_id IS NULL AND is_categorizable = 1 THEN ABS(amount) ELSE 0 END), 0) AS money_out
+       COALESCE(SUM(CASE WHEN ${ACTUAL_SPENDING} THEN -amount ELSE 0 END), 0) AS money_out
      FROM transactions
      WHERE ${DISPLAY_DAY_BETWEEN}
      GROUP BY m
