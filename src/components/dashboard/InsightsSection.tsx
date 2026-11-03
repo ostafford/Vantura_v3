@@ -18,7 +18,7 @@ import {
 import {
   formatMoney,
   formatShortDateFromDate,
-  formatDollars,
+  formatSignedMoney,
 } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
@@ -270,7 +270,7 @@ export function InsightsSection({
                     <tr key={d.category_id}>
                       <td>{d.name}</td>
                       <td className="text-end">
-                        ${formatDollars(d.totalDollars)}
+                        {formatSignedMoney(Math.round(d.totalDollars * 100))}
                       </td>
                     </tr>
                   ))}

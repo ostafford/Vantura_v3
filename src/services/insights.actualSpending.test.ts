@@ -304,3 +304,72 @@ describe('Actual spending narrows by category set and window (#187)', () => {
     ).toBe(0)
   })
 })
+
+describe('Category breakdowns are Actual spending (#186)', () => {
+  // Mon 12 – Sun 18 Oct 2026 holds the 15th.
+  const week = {
+    start: new Date(2026, 9, 12),
+    end: new Date(2026, 9, 18, 23, 59, 59, 999),
+    startStr: '2026-10-12',
+    endStr: '2026-10-18',
+  }
+
+  function seedMixedWeek() {
+    db.run(`INSERT INTO categories (id, name) VALUES ('takeaway', 'Takeaway')`)
+    addTx({ amount: -5000, category: 'groceries' })
+    addTx({ amount: 800, category: 'groceries' }) // refund nets
+    addTx({ amount: -1500, isCategorizable: 0 }) // uncategorised debit counts
+    addTx({ amount: -2000, account: 'acc-saver', category: 'takeaway' })
+    addTx({ amount: 3000, category: 'takeaway' }) // takeaway nets negative
+    addTx({ amount: -40, transactionType: 'Round Up' }) // excluded
+    addTx({ amount: -9000, transferAccount: 'acc-saver' }) // excluded
+    addTx({ amount: 250000 }) // pay, excluded
+    addTx({ amount: -3000, account: 'acc-joint', category: 'groceries' }) // excluded
+  }
+
+  const totals = (rows: { category_id: string | null; total: number }[]) =>
+    Object.fromEntries(rows.map((r) => [r.category_id ?? 'none', r.total]))
+
+  it('the date-range breakdown nets refunds, keeps negatives and sums to Money out', async () => {
+    const { getCategoryBreakdownForDateRange } = await import('./insights')
+    seedMixedWeek()
+    const rows = getCategoryBreakdownForDateRange('2026-10-01', '2026-10-31')
+    expect(totals(rows)).toEqual({
+      groceries: 4200,
+      none: 1500,
+      takeaway: -1000,
+    })
+    expect(rows.map((r) => r.category_id)).toEqual([
+      'groceries',
+      null,
+      'takeaway',
+    ])
+    expect(rows.reduce((s, r) => s + r.total, 0)).toBe(moneyOutForOctober())
+  })
+
+  it('the weekly grouped breakdown sums to the week’s Money out', async () => {
+    const { getWeeklyCategoryBreakdownGrouped, getWeeklyInsights } =
+      await import('./insights')
+    seedMixedWeek()
+    const rows = getWeeklyCategoryBreakdownGrouped(week).flatMap((s) => s.rows)
+    expect(totals(rows)).toEqual({
+      groceries: 4200,
+      none: 1500,
+      takeaway: -1000,
+    })
+    expect(rows.reduce((s, r) => s + r.total, 0)).toBe(
+      getWeeklyInsights(week).moneyOut
+    )
+  })
+
+  it('a category’s weekly history is its net Actual spending', async () => {
+    const { getCategoryBreakdownHistory } = await import('./insights')
+    vi.setSystemTime(new Date(2026, 9, 16, 12, 0, 0))
+    seedMixedWeek()
+    const history = getCategoryBreakdownHistory('takeaway', 2)
+    expect(history.map((h) => [h.weekStart, h.total])).toEqual([
+      ['2026-10-05', 0],
+      ['2026-10-12', -1000],
+    ])
+  })
+})

@@ -20,8 +20,9 @@
  * - Charges: Count of the debits in Money Out (refunds aren't charges).
  *   One charge per purchase (e.g. Coles, ALDI).
  *
- * - Category chart: Spending by category, no transfers: debits only, categorisable rows,
- *   grouped by category_id. Not yet on the Actual spending definition.
+ * - Category breakdowns: Money Out split by Up category — net Actual spending per
+ *   category_id (refunds net; uncategorised debits are one row). Signed, never
+ *   clamped, so a category can be negative and the rows sum to Money Out.
  */
 
 import { getDb } from '@/db'
@@ -31,11 +32,14 @@ import {
   displayDayBetweenSql,
   toDayBound,
 } from '@/services/displayDay'
-import { actualSpendingSql, getActualSpending } from '@/services/actualSpending'
+import {
+  actualSpendingSql,
+  actualSpendingWhere,
+  getActualSpending,
+} from '@/services/actualSpending'
 
 /** Local-day window predicates (#149) — bind two `YYYY-MM-DD` days. */
 const DISPLAY_DAY_BETWEEN = displayDayBetweenSql()
-const DISPLAY_DAY_BETWEEN_T = displayDayBetweenSql('t')
 /** Actual spending predicate (#187) — Money Out's one definition. */
 const ACTUAL_SPENDING = actualSpendingSql()
 import { addDaysToDateStr, daysBetweenDateStr } from '@/lib/dateStr'
@@ -185,9 +189,18 @@ export interface WeeklyInsightsData {
  * for definitions of moneyIn, moneyOut, saverChanges, and charges.
  */
 export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
+  const { startStr, endStr } = weekRange ?? getWeekRange()
+  return insightsForDays(startStr, endStr)
+}
+
+/**
+ * Money In, Money Out, Savers and Charges for the local days `[startDay,
+ * endDay]` (`YYYY-MM-DD`, inclusive) — the one block every insights window
+ * reads. See the file-level comment for each term.
+ */
+function insightsForDays(startDay: string, endDay: string): WeeklyInsightsData {
   const db = getDb()
   if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
-  const { startStr, endStr } = weekRange ?? getWeekRange()
 
   const runOne = (sql: string, params: (string | number)[]): number => {
     const stmt = db.prepare(sql)
@@ -202,28 +215,68 @@ export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
   const moneyIn = runOne(
     `SELECT COALESCE(SUM(amount), 0) FROM transactions
      WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND ${DISPLAY_DAY_BETWEEN}`,
-    [startStr, endStr]
+    [startDay, endDay]
   )
-  // Money Out + Charges share the same filter — one query returns both
   // Money Out = Actual spending (#187); Charges = its debits
-  const spending = getActualSpending({ from: startStr, to: endStr })
-  const moneyOut = spending.spentCents
-  const charges = spending.debitCount
+  const spending = getActualSpending({ from: startDay, to: endDay })
   // Savers: read from the saver account side and negate so credits (saving) are negative
   const saverChanges = runOne(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
      AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
      AND ${DISPLAY_DAY_BETWEEN}`,
-    [startStr, endStr]
+    [startDay, endDay]
   )
-  return { moneyIn, moneyOut, saverChanges, charges }
+  return {
+    moneyIn,
+    moneyOut: spending.spentCents,
+    saverChanges,
+    charges: spending.debitCount,
+  }
 }
 
 export interface CategoryBreakdownRow {
-  category_id: string
+  /** Up category; `null` for the uncategorised debits' row. */
+  category_id: string | null
   category_name: string
+  /** Net Actual spending (cents), positive = money out. May be negative. */
   total: number
+}
+
+/**
+ * Net Actual spending per Up category over the local days `[startDay,
+ * endDay]`, biggest first. Uncategorised debits share one row. Signed, never
+ * clamped; the rows sum to Money Out for the same window.
+ */
+function readCategoryTotals(
+  startDay: string,
+  endDay: string
+): CategoryBreakdownRow[] {
+  const db = getDb()
+  if (!db) return []
+  const { sql, params } = actualSpendingWhere(
+    { from: startDay, to: endDay },
+    't'
+  )
+  const stmt = db.prepare(
+    `SELECT t.category_id, c.name, COALESCE(-SUM(t.amount), 0) as total
+     FROM transactions t
+     LEFT JOIN categories c ON t.category_id = c.id
+     WHERE ${sql}
+     GROUP BY t.category_id ORDER BY total DESC, t.category_id`
+  )
+  stmt.bind(params)
+  const list: CategoryBreakdownRow[] = []
+  while (stmt.step()) {
+    const row = stmt.get() as [string | null, string | null, number]
+    list.push({
+      category_id: row[0] ?? null,
+      category_name: row[1] ?? 'Uncategorised',
+      total: row[2],
+    })
+  }
+  stmt.free()
+  return list
 }
 
 /**
@@ -283,48 +336,28 @@ export function getMonthlyInsights(
       charges: 0,
     }
 
-  const runOne = (sql: string, params: (string | number)[]): number => {
-    const stmt = db.prepare(sql)
-    stmt.bind(params)
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    return row ? Number(row[0]) : 0
-  }
-
   const startDate = new Date(year, month - 1, 1, 0, 0, 0, 0)
   const endDate = new Date(year, month - 1 + 1, 0, 23, 59, 59, 999)
   const startDay = toDateOnly(startDate)
   const endDay = toDateOnly(endDate)
 
-  const moneyIn = runOne(
-    `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up'
-     AND ${DISPLAY_DAY_BETWEEN}`,
-    [startDay, endDay]
-  )
-
-  // Money Out = Actual spending (#187); Charges = its debits
-  const spending = getActualSpending({ from: startDay, to: endDay })
-  const moneyOut = spending.spentCents
-  const charges = spending.debitCount
-
-  const saverChanges = runOne(
-    `SELECT COALESCE(-SUM(amount), 0) FROM transactions
-     WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
-     AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
-     AND ${DISPLAY_DAY_BETWEEN}`,
-    [startDay, endDay]
+  const { moneyIn, moneyOut, saverChanges, charges } = insightsForDays(
+    startDay,
+    endDay
   )
   // Round-up saver credits are identified by transaction_type = 'Round Up'.
   // is_round_up and round_up_parent_id are not set on the saver side in Up Bank's API.
-  const saverRoundUps = runOne(
+  const stmt = db.prepare(
     `SELECT COALESCE(-SUM(amount), 0) FROM transactions
      WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
      AND transaction_type = 'Round Up'
-     AND ${DISPLAY_DAY_BETWEEN}`,
-    [startDay, endDay]
+     AND ${DISPLAY_DAY_BETWEEN}`
   )
+  stmt.bind([startDay, endDay])
+  stmt.step()
+  const row = stmt.get()
+  stmt.free()
+  const saverRoundUps = row ? Number(row[0]) : 0
 
   return { moneyIn, moneyOut, saverChanges, saverRoundUps, charges }
 }
@@ -360,36 +393,14 @@ export function getCategoryBreakdownHistory(
 }
 
 /**
- * Spending by category for the week. Same definition as Money Out (spending only, no transfers),
- * grouped by category. Used for the Weekly Insights bar chart.
+ * Spending by category for the week: Money Out split by Up category (see
+ * `readCategoryTotals`).
  */
 export function getWeeklyCategoryBreakdown(
   weekRange?: WeekRange
 ): CategoryBreakdownRow[] {
-  const db = getDb()
-  if (!db) return []
   const { startStr, endStr } = weekRange ?? getWeekRange()
-  // Same filter as Money Out: spending only, no internal transfers
-  const stmt = db.prepare(
-    `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
-     FROM transactions t
-     LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN_T}
-     GROUP BY t.category_id ORDER BY total DESC LIMIT 15`
-  )
-  stmt.bind([startStr, endStr])
-  const list: CategoryBreakdownRow[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [string, string | null, number]
-    list.push({
-      category_id: row[0],
-      category_name: row[1] ?? 'Uncategorised',
-      total: row[2],
-    })
-  }
-  stmt.free()
-  return list
+  return readCategoryTotals(startStr, endStr)
 }
 
 /** One category's row inside a Weekly Insights group section. */
@@ -440,28 +451,8 @@ const PARENT_DISPLAY_ORDER = ['Home', 'Transport', 'Good Life', 'Personal']
 export function getWeeklyCategoryBreakdownGrouped(
   weekRange?: WeekRange
 ): CategoryGroupSection[] {
-  const db = getDb()
-  if (!db) return []
   const { startStr, endStr } = weekRange ?? getWeekRange()
-  const stmt = db.prepare(
-    `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
-     FROM transactions t
-     LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN_T}
-     GROUP BY t.category_id ORDER BY total DESC`
-  )
-  stmt.bind([startStr, endStr])
-  const raw: CategoryBreakdownRow[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [string, string | null, number]
-    raw.push({
-      category_id: row[0],
-      category_name: row[1] ?? 'Uncategorised',
-      total: row[2],
-    })
-  }
-  stmt.free()
+  const raw = readCategoryTotals(startStr, endStr)
   if (raw.length === 0) return []
 
   const individual = raw.slice(0, MAX_INDIVIDUAL_CATEGORIES)
@@ -542,35 +533,14 @@ export function getWeeklyCategoryBreakdownGrouped(
 }
 
 /**
- * Spending by category for an arbitrary date range. Same filter as Money Out.
- * Used for Reports page.
+ * Spending by category for an arbitrary date range: Money Out split by Up
+ * category (see `readCategoryTotals`). Used for Reports page.
  */
 export function getCategoryBreakdownForDateRange(
   dateFrom: string,
   dateTo: string
 ): CategoryBreakdownRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT t.category_id, c.name, COALESCE(SUM(ABS(t.amount)), 0) as total
-     FROM transactions t
-     LEFT JOIN categories c ON t.category_id = c.id
-     WHERE t.amount < 0 AND t.transfer_account_id IS NULL AND t.is_categorizable = 1
-     AND ${DISPLAY_DAY_BETWEEN_T}
-     GROUP BY t.category_id ORDER BY total DESC LIMIT 20`
-  )
-  stmt.bind([toDayBound(dateFrom), toDayBound(dateTo)])
-  const list: CategoryBreakdownRow[] = []
-  while (stmt.step()) {
-    const row = stmt.get() as [string, string | null, number]
-    list.push({
-      category_id: row[0],
-      category_name: row[1] ?? 'Uncategorised',
-      total: row[2],
-    })
-  }
-  stmt.free()
-  return list
+  return readCategoryTotals(toDayBound(dateFrom), toDayBound(dateTo))
 }
 
 /**
@@ -580,38 +550,7 @@ export function getInsightsForDateRange(
   dateFrom: string,
   dateTo: string
 ): WeeklyInsightsData {
-  const db = getDb()
-  if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
-  const startStr = toDayBound(dateFrom)
-  const endStr = toDayBound(dateTo)
-
-  const runOne = (sql: string, params: (string | number)[]): number => {
-    const stmt = db.prepare(sql)
-    stmt.bind(params)
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    return row ? Number(row[0]) : 0
-  }
-
-  const moneyIn = runOne(
-    `SELECT COALESCE(SUM(amount), 0) FROM transactions
-     WHERE amount > 0 AND transfer_account_id IS NULL AND source = 'up' AND ${DISPLAY_DAY_BETWEEN}`,
-    [startStr, endStr]
-  )
-  // Money Out + Charges share the same filter — one query returns both
-  // Money Out = Actual spending (#187); Charges = its debits
-  const spending = getActualSpending({ from: startStr, to: endStr })
-  const moneyOut = spending.spentCents
-  const charges = spending.debitCount
-  const saverChanges = runOne(
-    `SELECT COALESCE(-SUM(amount), 0) FROM transactions
-     WHERE account_id IN (SELECT id FROM accounts WHERE account_type = 'SAVER')
-     AND (transfer_account_id IS NOT NULL OR round_up_parent_id IS NOT NULL)
-     AND ${DISPLAY_DAY_BETWEEN}`,
-    [startStr, endStr]
-  )
-  return { moneyIn, moneyOut, saverChanges, charges }
+  return insightsForDays(toDayBound(dateFrom), toDayBound(dateTo))
 }
 
 // ---------------------------------------------------------------------------
