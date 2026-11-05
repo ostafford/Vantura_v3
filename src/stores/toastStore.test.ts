@@ -60,4 +60,19 @@ describe('toastStore', () => {
     // @ts-expect-error error() has no options parameter
     toast.error('x', { persistent: true })
   })
+
+  it('success() can carry an action, and the next toast drops it', () => {
+    const onClick = () => {}
+    toast.success('Marked paid.', { action: { label: 'Undo', onClick } })
+    expect(toastStore.getState().action).toEqual({ label: 'Undo', onClick })
+    toast.success('Saved.')
+    expect(toastStore.getState().action).toBeNull()
+  })
+
+  it('gives each toast a new id, so a repeat restarts the dismiss timer', () => {
+    toast.success('Saved.')
+    const first = toastStore.getState().id
+    toast.success('Saved.')
+    expect(toastStore.getState().id).toBe(first + 1)
+  })
 })

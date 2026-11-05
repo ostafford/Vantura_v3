@@ -88,6 +88,46 @@ export function getOnHandCents(): number {
   return v ? Number(v[0]) : 0
 }
 
+export interface OnHandAccount {
+  id: string
+  display_name: string
+  account_type: 'TRANSACTIONAL' | 'SAVER'
+  balance: number
+}
+
+/**
+ * Every account counted in On hand: the Spending account(s) first, then the
+ * switched-on Savers, each by name. Their balances sum to `getOnHandCents()`.
+ */
+export function getOnHandAccounts(): OnHandAccount[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, display_name, account_type, balance FROM accounts
+     WHERE ${ON_HAND_ELIGIBLE}
+       AND (account_type = 'TRANSACTIONAL'
+            OR (account_type = 'SAVER' AND counts_on_hand = 1))
+     ORDER BY account_type = 'SAVER', display_name COLLATE NOCASE, id`
+  )
+  const out: OnHandAccount[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      string,
+      OnHandAccount['account_type'],
+      number,
+    ]
+    out.push({
+      id: r[0],
+      display_name: r[1],
+      account_type: r[2],
+      balance: r[3],
+    })
+  }
+  stmt.free()
+  return out
+}
+
 export interface OnHandSaver {
   id: string
   display_name: string
