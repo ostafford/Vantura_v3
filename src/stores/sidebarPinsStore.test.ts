@@ -10,9 +10,9 @@ vi.mock('@/db', () => ({
 const mockGet = vi.mocked(getAppSetting)
 
 const VALID: PinnedNavItem = {
-  path: '/analytics/reports',
-  label: 'Reports',
-  icon: 'mdi-file-chart',
+  path: '/analytics/savers',
+  label: 'Savers',
+  icon: 'mdi-piggy-bank',
 }
 
 describe('sidebarPinsStore.hydrateFromDb', () => {
@@ -52,5 +52,20 @@ describe('sidebarPinsStore.hydrateFromDb', () => {
     mockGet.mockReturnValue('[not json')
     sidebarPinsStore.getState().hydrateFromDb()
     expect(sidebarPinsStore.getState().pins).toEqual([])
+  })
+
+  it('drops a stored pin whose page can no longer be pinned, so it never renders (#205)', () => {
+    mockGet.mockReturnValue(
+      JSON.stringify([
+        {
+          path: '/analytics/reports',
+          label: 'Reports',
+          icon: 'mdi-file-chart',
+        },
+        VALID,
+      ])
+    )
+    sidebarPinsStore.getState().hydrateFromDb()
+    expect(sidebarPinsStore.getState().pins).toEqual([VALID])
   })
 })

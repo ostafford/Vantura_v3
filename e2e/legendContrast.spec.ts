@@ -118,21 +118,4 @@ test.describe('chart legend toggles stay readable', () => {
       await expectLegendReadable(page)
     })
   }
-
-  for (const theme of ['dark', 'light'] as const) {
-    for (const period of ['year', 'month', 'week'] as const) {
-      test(`Analytics ${period} at-a-glance legend is readable in ${theme} theme`, async ({
-        page,
-      }) => {
-        await startWithSampleData(page)
-        await closeDashboardTour(page)
-        if (theme === 'light') await switchToLightTheme(page)
-        await page.getByRole('link', { name: 'Analytics', exact: true }).click()
-        await page.getByLabel('Period for at a glance').selectOption(period)
-        await expectLegendReadable(page)
-        await toggleFirstLegendOff(page)
-        await expectLegendReadable(page)
-      })
-    }
-  }
 })

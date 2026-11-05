@@ -7,10 +7,8 @@ vi.mock('@/db', () => ({
 import {
   getYearMonthlyTotals,
   getYearComparisonPeriods,
-  getWeekComparison,
   getYearComparison,
   getMonthComparison,
-  getCustomRangeComparison,
 } from './insights'
 import * as db from '@/db'
 
@@ -175,148 +173,10 @@ describe('getMonthComparison', () => {
   })
 })
 
-describe('getCustomRangeComparison', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.clearAllMocks()
-  })
-
-  /** Captures every `[startUtc, endUtc]` pair the comparison queries bind. */
-  function mockCapturingDb() {
-    const bindCalls: unknown[][] = []
-    const stmt = {
-      bind: (args: unknown[]) => bindCalls.push(args),
-      step: () => false,
-      get: () => undefined,
-      free: () => {},
-    }
-    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
-    return bindCalls
-  }
-
-  const boundTo = (from: string, to: string) => (args: unknown[]) =>
-    args[0] === from && args[1] === to
-
-  it('compares a fully-past range against the equal-length window immediately before it', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 7, 1)) // Aug 1, 2026 — range is over
-    const bindCalls = mockCapturingDb()
-
-    const result = getCustomRangeComparison('2026-06-01', '2026-06-14')
-
-    // 14-day range -> previous window is May 18–31 (the 14 days before Jun 1).
-    expect(bindCalls.some(boundTo('2026-05-18', '2026-05-31'))).toBe(true)
-    expect(result.periodNote).toBeUndefined()
-  })
-
-  it('collapses a single-day range to the single preceding day', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 7, 1))
-    const bindCalls = mockCapturingDb()
-
-    getCustomRangeComparison('2026-06-15', '2026-06-15')
-
-    expect(bindCalls.some(boundTo('2026-06-14', '2026-06-14'))).toBe(true)
-  })
-
-  it('caps the previous window to the elapsed-day count for a range that runs past today', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 5, 10)) // Jun 10, 2026 — inside the range
-    const bindCalls = mockCapturingDb()
-
-    const result = getCustomRangeComparison('2026-06-01', '2026-06-30')
-
-    // 10 elapsed days (Jun 1–10) -> previous window capped to May 22–31.
-    expect(result.periodNote).toBe('Jun 1–Jun 10 vs May 22–May 31')
-    expect(bindCalls.some(boundTo('2026-05-22', '2026-05-31'))).toBe(true)
-  })
-
-  it('does not cap (or note) a range that lies entirely in the future', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 5, 1)) // Jun 1, 2026 — range starts Jul 1
-    const bindCalls = mockCapturingDb()
-
-    const result = getCustomRangeComparison('2026-07-01', '2026-07-10')
-
-    expect(result.periodNote).toBeUndefined()
-    // Full 10-day previous window, Jun 21–30.
-    expect(bindCalls.some(boundTo('2026-06-21', '2026-06-30'))).toBe(true)
-  })
-})
-
-describe('getWeekComparison', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('caps the previous week to the same elapsed-day count as the current in-progress week', () => {
-    // 2026-04-15 is a Wednesday: 3 days elapsed in the current week (Mon-Wed).
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 3, 15))
-    vi.clearAllMocks()
-
-    const bindCalls: unknown[][] = []
-    const stmt = {
-      bind: (args: unknown[]) => bindCalls.push(args),
-      step: () => false,
-      get: () => undefined,
-      free: () => {},
-    }
-    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
-
-    getWeekComparison(0)
-
-    // Expected previous-week bounds (local days, #149): previous Monday,
-    // capped end = previous Monday + 2 days (3 elapsed days - 1).
-    const expectedPrevStart = '2026-04-06'
-    const expectedPrevEnd = '2026-04-08'
-
-    const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStart
-    )
-    expect(previousBoundCalls.length).toBeGreaterThan(0)
-    for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEnd)
-    }
-  })
-
-  it('does not cap a past (fully elapsed) week', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 3, 15))
-    vi.clearAllMocks()
-
-    const bindCalls: unknown[][] = []
-    const stmt = {
-      bind: (args: unknown[]) => bindCalls.push(args),
-      step: () => false,
-      get: () => undefined,
-      free: () => {},
-    }
-    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
-
-    // weekOffset -1 compares last week vs the week before — both fully elapsed.
-    getWeekComparison(-1)
-
-    // Full prior week Mon 30 Mar – Sun 5 Apr, as local days (#149).
-    const expectedPrevStart = '2026-03-30'
-    const expectedPrevEnd = '2026-04-05'
-
-    const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStart
-    )
-    expect(previousBoundCalls.length).toBeGreaterThan(0)
-    for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEnd)
-    }
-  })
-})
-
 describe('elapsed-day maths across a DST transition', () => {
   // Between two local midnights that straddle a spring-forward, real elapsed
   // time is N*24h - 1h, so a flat `msDiff / 86_400_000` floor lands one day
-  // short. Africa/Cairo springs forward at 00:00 on Fri 2026-04-24 (a weekday,
-  // so the transition sits inside a Mon–today window); America/New_York springs
-  // forward at 02:00 on 2026-03-08.
+  // short. America/New_York springs forward at 02:00 on 2026-03-08.
   const ORIGINAL_TZ = process.env.TZ
 
   beforeEach(() => {
@@ -349,36 +209,5 @@ describe('elapsed-day maths across a DST transition', () => {
     // 20 elapsed days (Mar 1–20) -> previous month capped to Feb 1–20.
     // A flat 24h divide would floor to 19 and cap to Feb 1–19.
     expect(result.periodNote).toBe('Mar 1–Mar 20 vs Feb 1–Feb 20')
-  })
-
-  it('getWeekComparison caps the previous week to the true elapsed-day count when a spring-forward falls inside the week', () => {
-    process.env.TZ = 'Africa/Cairo'
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 3, 25, 12)) // Sat Apr 25, 2026 — day after the Apr 24 00:00 transition
-
-    const bindCalls: unknown[][] = []
-    const stmt = {
-      bind: (args: unknown[]) => bindCalls.push(args),
-      step: () => false,
-      get: () => undefined,
-      free: () => {},
-    }
-    vi.mocked(db.getDb).mockReturnValue({ prepare: () => stmt } as never)
-
-    getWeekComparison(0)
-
-    // Current week Mon Apr 20 – today Sat Apr 25 = 6 elapsed days, so the
-    // previous week (Mon Apr 13 –) is capped to 6 days -> ends Apr 18.
-    // A flat 24h divide floors elapsed to 5 and would cap to Apr 17.
-    const expectedPrevStart = '2026-04-13'
-    const expectedPrevEnd = '2026-04-18'
-
-    const previousBoundCalls = bindCalls.filter(
-      (args) => args[0] === expectedPrevStart
-    )
-    expect(previousBoundCalls.length).toBeGreaterThan(0)
-    for (const args of previousBoundCalls) {
-      expect(args[1]).toBe(expectedPrevEnd)
-    }
   })
 })

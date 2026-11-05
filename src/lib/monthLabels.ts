@@ -12,18 +12,6 @@ function isValidCalendarYearMonth(year: number, month: number): boolean {
   )
 }
 
-function localDateFromYmd(ymd: string): Date | null {
-  if (ymd.length < 10) return null
-  const y = parseInt(ymd.slice(0, 4), 10)
-  const m = parseInt(ymd.slice(5, 7), 10)
-  const d = parseInt(ymd.slice(8, 10), 10)
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d))
-    return null
-  const date = new Date(y, m - 1, d)
-  if (Number.isNaN(date.getTime())) return null
-  return date
-}
-
 export function monthNameLong(year: number, month: number): string {
   if (!isValidCalendarYearMonth(year, month)) return MONTH_LABEL_FALLBACK
   const date = new Date(year, month - 1, 1)
@@ -127,14 +115,4 @@ export function formatWeekStartLabel(d: Date): string {
   } catch {
     return MONTH_LABEL_FALLBACK
   }
-}
-
-/** Prior week phrase for narratives (week containing `previousFrom`). Accepts both "YYYY-MM-DD" and full UTC ISO strings. */
-export function weekNarrativePriorLabel(previousFrom: string): string {
-  if (previousFrom.length < 10) return MONTH_LABEL_FALLBACK
-  const date = previousFrom.includes('T')
-    ? new Date(previousFrom)
-    : localDateFromYmd(previousFrom)
-  if (!date || Number.isNaN(date.getTime())) return MONTH_LABEL_FALLBACK
-  return formatWeekStartLabel(date)
 }

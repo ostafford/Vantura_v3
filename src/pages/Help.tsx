@@ -237,8 +237,7 @@ export function Help() {
                       glance, Weekly insights, Trackers, Regulars
                     </li>
                     <li className="mb-1">
-                      <strong>Analytics</strong> — Trackers, Reports, Savers,
-                      Budget Plan
+                      <strong>Analytics</strong> — Trackers, Savers, Budget Plan
                     </li>
                     <li className="mb-1">
                       <strong>Transactions</strong> — filter, search, and browse
@@ -508,12 +507,6 @@ export function Help() {
                   <p className="mb-2">
                     Spending trends per tracker, budget vs actual spend across
                     periods, and full transaction history for each tracker.
-                  </p>
-
-                  <SectionHeading icon="mdi-file-chart">Reports</SectionHeading>
-                  <p className="mb-2">
-                    Category spending over any date range, monthly spending
-                    comparisons, and tracker spend summaries.
                   </p>
 
                   <SectionHeading icon="mdi-piggy-bank">Savers</SectionHeading>

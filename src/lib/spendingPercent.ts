@@ -18,18 +18,6 @@ export function changePercent(
 }
 
 /**
- * Each value's rounded share of the total, as whole percents, in input order.
- * Null when any value is negative or the total isn't positive: shares of a
- * total with negative parts read as 150% / −50%.
- */
-export function sharesOfTotal(values: number[]): number[] | null {
-  if (values.some((v) => v < 0)) return null
-  const total = values.reduce((s, v) => s + v, 0)
-  if (total <= 0) return null
-  return values.map((v) => Math.round((v / total) * 100))
-}
-
-/**
  * Rounded percent of a tracker's budget spent, as a whole percent. Not
  * clamped: overspending reads above 100%. Null when spend is zero or negative
  * (refunds met or exceeded purchases) or the budget isn't positive (#201).

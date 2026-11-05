@@ -11,7 +11,6 @@ export interface PinnedNavItem {
 export const PINNABLE_ANALYTICS_PAGES: PinnedNavItem[] = [
   { path: '/analytics', label: 'Analytics', icon: 'mdi-chart-box' },
   { path: '/analytics/trackers', label: 'Trackers', icon: 'mdi-chart-line' },
-  { path: '/analytics/reports', label: 'Reports', icon: 'mdi-file-chart' },
   { path: '/analytics/savers', label: 'Savers', icon: 'mdi-piggy-bank' },
   {
     path: '/analytics/budget',
@@ -34,6 +33,8 @@ interface SidebarPinsState {
 
 const PINS_KEY = 'sidebar_pins'
 
+const PINNABLE_PATHS = new Set(PINNABLE_ANALYTICS_PAGES.map((p) => p.path))
+
 function isPinnedNavItem(value: unknown): value is PinnedNavItem {
   return (
     typeof value === 'object' &&
@@ -51,7 +52,14 @@ function loadPins(): PinnedNavItem[] {
       const parsed = JSON.parse(raw) as unknown
       // Keep the valid entries and drop only the malformed ones — a single
       // bad pin (e.g. from a future required field) must not wipe the list.
-      return Array.isArray(parsed) ? parsed.filter(isPinnedNavItem) : null
+      // A pin for a page that can no longer be pinned (a cut page, #205) is
+      // dropped too, so it never renders as a dead link.
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (p): p is PinnedNavItem =>
+              isPinnedNavItem(p) && PINNABLE_PATHS.has(p.path)
+          )
+        : null
     },
     []
   )

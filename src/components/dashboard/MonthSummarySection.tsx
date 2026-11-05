@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { Card, OverlayTrigger, Tooltip as BSTooltip } from 'react-bootstrap'
 import {
@@ -73,13 +72,6 @@ export function MonthSummarySection({
           </div>
         </div>
         <div className="d-flex gap-2 align-items-center">
-          <Link
-            to={`/analytics/reports?year=${year}&month=${month}`}
-            className="btn-icon"
-            aria-label="View monthly review"
-          >
-            <i className="mdi mdi-chart-box" aria-hidden />
-          </Link>
           <OverlayTrigger
             placement="top"
             overlay={

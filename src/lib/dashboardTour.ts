@@ -120,7 +120,7 @@ export function startDashboardTour(
       popover: {
         title: 'Navigation',
         description:
-          'Use the sidebar to explore <strong>Analytics</strong> (deeper trends and reports), <strong>Transactions</strong>, and <strong>Settings</strong>.<br><br>' +
+          'Use the sidebar to explore <strong>Analytics</strong> (deeper trends), <strong>Transactions</strong>, and <strong>Settings</strong>.<br><br>' +
           'Each section has an <strong>ⓘ</strong> icon for quick in-context help. The user guide and changelog are in <strong>Settings → About</strong>.',
         side: 'right' as SideType,
         align: 'start' as AlignType,
