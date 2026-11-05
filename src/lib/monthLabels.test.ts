@@ -3,9 +3,7 @@ import {
   comparisonMonthPairLabels,
   MONTH_LABEL_FALLBACK,
   monthNameLong,
-  monthNarrativePriorLabel,
   previousCalendarMonth,
-  yearNarrativePriorLabel,
 } from './monthLabels'
 
 describe('monthLabels', () => {
@@ -25,29 +23,9 @@ describe('monthLabels', () => {
     expect(r.previousLabel).toBe(MONTH_LABEL_FALLBACK)
   })
 
-  it('monthNarrativePriorLabel returns fallback for malformed dates', () => {
-    expect(monthNarrativePriorLabel('', '2026-01-01')).toBe(
-      MONTH_LABEL_FALLBACK
-    )
-    expect(monthNarrativePriorLabel('bad', '2026-01-01')).toBe(
-      MONTH_LABEL_FALLBACK
-    )
-  })
-
-  it('yearNarrativePriorLabel returns fallback for short string', () => {
-    expect(yearNarrativePriorLabel('')).toBe(MONTH_LABEL_FALLBACK)
-  })
-
   it('comparisonMonthPairLabels adds years when months cross a year boundary', () => {
-    const { currentLabel, previousLabel, vsPriorShort } =
-      comparisonMonthPairLabels(2026, 1)
+    const { currentLabel, previousLabel } = comparisonMonthPairLabels(2026, 1)
     expect(currentLabel).toMatch(/2026/)
     expect(previousLabel).toMatch(/2025/)
-    expect(vsPriorShort).toBe(previousLabel)
-  })
-
-  it('monthNarrativePriorLabel includes year when prior month is in another year', () => {
-    const s = monthNarrativePriorLabel('2025-12-01', '2026-01-01')
-    expect(s).toMatch(/2025/)
   })
 })

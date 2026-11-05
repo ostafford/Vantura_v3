@@ -44,7 +44,7 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     title: 'Month at a glance',
     description:
       'Day-by-day spending for the <strong>current month</strong>, compared to the previous month.<br><br>' +
-      'Key metrics and a narrative summary sit below the chart.<br><br>' +
+      '<strong>Money in</strong> and <strong>money out</strong> for the month sit above the chart.<br><br>' +
       'Use the <strong>arrows</strong> to browse other months.',
     side: 'top',
     align: 'center',

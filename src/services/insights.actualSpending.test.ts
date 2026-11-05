@@ -25,7 +25,6 @@ vi.mock('@/db', () => ({
 const {
   getInsightsForDateRange,
   getMonthlyInsights,
-  getMonthComparison,
   getMonthDayByDaySeries,
   getYearMonthlyTotals,
 } = await import('./insights')
@@ -312,41 +311,6 @@ describe('Actual spending takes a one-sided window (#186)', () => {
   })
 })
 
-describe('Category breakdowns are Actual spending (#186)', () => {
-  function seedMixedOctoberByCategory() {
-    db.run(`INSERT INTO categories (id, name) VALUES ('takeaway', 'Takeaway')`)
-    addTx({ amount: -5000, category: 'groceries' })
-    addTx({ amount: 800, category: 'groceries' }) // refund nets
-    addTx({ amount: -1500, isCategorizable: 0 }) // uncategorised debit counts
-    addTx({ amount: -2000, account: 'acc-saver', category: 'takeaway' })
-    addTx({ amount: 3000, category: 'takeaway' }) // takeaway nets negative
-    addTx({ amount: -40, transactionType: 'Round Up' }) // excluded
-    addTx({ amount: -9000, transferAccount: 'acc-saver' }) // excluded
-    addTx({ amount: 250000 }) // pay, excluded
-    addTx({ amount: -3000, account: 'acc-joint', category: 'groceries' }) // excluded
-  }
-
-  const totals = (rows: { category_id: string | null; total: number }[]) =>
-    Object.fromEntries(rows.map((r) => [r.category_id ?? 'none', r.total]))
-
-  it('the date-range breakdown nets refunds, keeps negatives and sums to Money out', async () => {
-    const { getCategoryBreakdownForDateRange } = await import('./insights')
-    seedMixedOctoberByCategory()
-    const rows = getCategoryBreakdownForDateRange('2026-10-01', '2026-10-31')
-    expect(totals(rows)).toEqual({
-      groceries: 4200,
-      none: 1500,
-      takeaway: -1000,
-    })
-    expect(rows.map((r) => r.category_id)).toEqual([
-      'groceries',
-      null,
-      'takeaway',
-    ])
-    expect(rows.reduce((s, r) => s + r.total, 0)).toBe(moneyOutForOctober())
-  })
-})
-
 describe('Money in leaves out refunds, so Net counts a refund once (#200)', () => {
   it('a $30 refund changes Net by $30, not $60', () => {
     // September: pay and a $50 shop. October: the same, plus a $30 refund.
@@ -365,9 +329,14 @@ describe('Money in leaves out refunds, so Net counts a refund once (#200)', () =
     addTx({ amount: -5000, category: 'groceries' })
     addTx({ amount: 3000, category: 'groceries' })
 
-    const comparison = getMonthComparison('2026-10-01', '2026-10-31')
+    const net = (from: string, to: string) => {
+      const { moneyIn, moneyOut } = getInsightsForDateRange(from, to)
+      return moneyIn - moneyOut
+    }
 
-    expect(comparison.netDelta.delta).toBe(3000)
+    expect(
+      net('2026-10-01', '2026-10-31') - net('2026-09-01', '2026-09-30')
+    ).toBe(3000)
   })
 
   it('Money in for a window leaves out a categorised refund but keeps pay, interest and money from people', () => {
@@ -410,23 +379,6 @@ describe('Money in leaves out refunds, so Net counts a refund once (#200)', () =
     const october = getYearMonthlyTotals(2026).find((m) => m.month === 10)
 
     expect(october?.moneyIn).toBe(300000)
-  })
-
-  it('the narratives call it Money in, never Income', () => {
-    addTx({
-      amount: 300000,
-      createdAt: '2026-09-15T12:00:00+10:00',
-      settledAt: null,
-    })
-    addTx({ amount: 310000 })
-
-    const labels = getMonthComparison(
-      '2026-10-01',
-      '2026-10-31'
-    ).narratives.map((n) => n.label)
-
-    expect(labels.some((l) => l.startsWith('Money in is up $100'))).toBe(true)
-    expect(labels.some((l) => l.includes('Income'))).toBe(false)
   })
 })
 
