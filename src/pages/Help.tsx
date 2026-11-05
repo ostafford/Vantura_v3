@@ -337,7 +337,7 @@ export function Help() {
                     <li className="mb-1">
                       <strong>Month at a glance</strong> — day-by-day spending
                       for the current calendar month vs the previous month, with
-                      key metrics and a narrative summary
+                      the month&apos;s money in and money out
                     </li>
                     <li className="mb-1">
                       <strong>Trackers</strong> — budget progress and days

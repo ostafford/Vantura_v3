@@ -46,14 +46,10 @@ export function previousCalendarMonth(
 export function comparisonMonthPairLabels(
   currentYear: number,
   currentMonth: number
-): { currentLabel: string; previousLabel: string; vsPriorShort: string } {
+): { currentLabel: string; previousLabel: string } {
   if (!isValidCalendarYearMonth(currentYear, currentMonth)) {
     const fb = MONTH_LABEL_FALLBACK
-    return {
-      currentLabel: fb,
-      previousLabel: fb,
-      vsPriorShort: fb,
-    }
+    return { currentLabel: fb, previousLabel: fb }
   }
   const prev = previousCalendarMonth(currentYear, currentMonth)
   const crossYear = prev.year !== currentYear
@@ -61,42 +57,5 @@ export function comparisonMonthPairLabels(
   const prevName = monthNameLong(prev.year, prev.month)
   const currentLabel = crossYear ? `${curName} ${currentYear}` : curName
   const previousLabel = crossYear ? `${prevName} ${prev.year}` : prevName
-  return {
-    currentLabel,
-    previousLabel,
-    vsPriorShort: previousLabel,
-  }
-}
-
-/** Prior period phrase for month narratives (e.g. "March" or "December 2025"). */
-export function monthNarrativePriorLabel(
-  previousFrom: string,
-  currentFrom: string
-): string {
-  if (previousFrom.length < 10 || currentFrom.length < 10) {
-    return MONTH_LABEL_FALLBACK
-  }
-  const py = parseInt(previousFrom.slice(0, 4), 10)
-  const pm = parseInt(previousFrom.slice(5, 7), 10)
-  const cy = parseInt(currentFrom.slice(0, 4), 10)
-  if (
-    !Number.isFinite(py) ||
-    !Number.isFinite(pm) ||
-    !Number.isFinite(cy) ||
-    !isValidCalendarYearMonth(py, pm)
-  ) {
-    return MONTH_LABEL_FALLBACK
-  }
-  const name = monthNameLong(py, pm)
-  if (name === MONTH_LABEL_FALLBACK) return MONTH_LABEL_FALLBACK
-  if (py !== cy) return `${name} ${py}`
-  return name
-}
-
-/** Prior calendar year for YoY narratives (e.g. "2024"). */
-export function yearNarrativePriorLabel(previousFrom: string): string {
-  if (previousFrom.length < 4) return MONTH_LABEL_FALLBACK
-  const y = parseInt(previousFrom.slice(0, 4), 10)
-  if (!Number.isFinite(y)) return MONTH_LABEL_FALLBACK
-  return String(y)
+  return { currentLabel, previousLabel }
 }

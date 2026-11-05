@@ -2,17 +2,16 @@ import { useState, useMemo } from 'react'
 import { useStore } from 'zustand'
 import { Card, OverlayTrigger, Tooltip as BSTooltip } from 'react-bootstrap'
 import {
-  getMonthComparison,
+  getInsightsForDateRange,
   getMonthDayByDaySeries,
   getMonthBoundsForOffset,
 } from '@/services/insights'
+import { formatMoney, formatSignedMoney } from '@/lib/format'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import type { MonthMetric } from '@/lib/monthSpendingSeries'
 import { MonthSpendingComparisonChart } from '@/components/charts/MonthSpendingComparisonChart'
 import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
-import { ComparisonKpis } from '@/components/atAGlance/ComparisonKpis'
-import { ComparisonNarratives } from '@/components/atAGlance/ComparisonNarratives'
 import { comparisonMonthPairLabels, monthNameLong } from '@/lib/monthLabels'
 import type React from 'react'
 
@@ -34,8 +33,8 @@ export function MonthSummarySection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [monthOffset, today]
   )
-  const comparison = useMemo(
-    () => getMonthComparison(from, to),
+  const totals = useMemo(
+    () => getInsightsForDateRange(from, to),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [from, to, lastSyncCompletedAt, today]
   )
@@ -122,18 +121,20 @@ export function MonthSummarySection({
         </div>
       </Card.Header>
       <Card.Body className="py-3">
-        <ComparisonKpis
-          comparison={comparison}
-          vsPriorLabel={monthPairLabels.vsPriorShort}
-        />
-
-        {comparison.periodNote && (
-          <div className="small text-muted mt-1">{comparison.periodNote}</div>
-        )}
-
-        {comparison.hasPreviousData && comparison.narratives.length > 0 && (
-          <ComparisonNarratives narratives={comparison.narratives} />
-        )}
+        <div className="d-flex flex-wrap gap-3 align-items-start">
+          <div>
+            <span className="small text-muted">Money in</span>
+            <div className="fw-medium text-success">
+              ${formatMoney(totals.moneyIn)}
+            </div>
+          </div>
+          <div>
+            <span className="small text-muted">Money out</span>
+            <div className="fw-medium text-danger">
+              {formatSignedMoney(totals.moneyOut)}
+            </div>
+          </div>
+        </div>
 
         <div className="mt-3 pt-3 border-top">
           <div className="d-flex justify-content-between align-items-center mb-2 gap-3">
