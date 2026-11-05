@@ -527,10 +527,9 @@ export function Help() {
                     Budget Plan
                   </SectionHeading>
                   <p className="mb-0">
-                    Group your expenses into buckets, see Income vs Committed vs
-                    Free Spending, and test affordability with hypothetical
-                    expenses. See <strong>Help → Budget Plan</strong> for full
-                    details.
+                    Group your expenses into buckets and see Income vs Committed
+                    vs Free Spending. See <strong>Help → Budget Plan</strong>{' '}
+                    for full details.
                   </p>
                 </>
               )}
@@ -558,9 +557,8 @@ export function Help() {
                       bucket&apos;s total
                     </li>
                     <li>
-                      <strong>Hypothetical lines</strong> — &quot;what if I add
-                      this expense?&quot; scenarios kept separate from real
-                      data; marked with a flask icon and removable any time
+                      <strong>Trackers</strong> — assign them to a bucket so
+                      their budget counts toward that bucket&apos;s total
                     </li>
                   </ul>
 

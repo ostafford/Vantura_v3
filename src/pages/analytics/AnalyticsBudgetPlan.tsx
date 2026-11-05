@@ -242,9 +242,8 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
       </Modal.Header>
       <Modal.Body>
         <p>
-          Delete <strong>{bucket?.name}</strong>? Regulars will become
-          unassigned. Variable budget lines, hypotheticals, and pinned
-          transactions will be permanently removed.
+          Delete <strong>{bucket?.name}</strong>? Its Regulars and Trackers will
+          become unassigned.
         </p>
       </Modal.Body>
       <Modal.Footer>
@@ -372,15 +371,6 @@ export function AnalyticsBudgetPlan() {
     [bucketSummaries]
   )
 
-  const totalHypotheticalCents = useMemo(
-    () =>
-      Object.values(bucketSummaries).reduce(
-        (sum, s) => sum + s.hypotheticalCents,
-        0
-      ),
-    [bucketSummaries]
-  )
-
   const freeSpendingCents =
     incomeCents != null ? incomeCents - totalOutgoingCents : null
 
@@ -426,9 +416,8 @@ export function AnalyticsBudgetPlan() {
               className="text-muted mb-1"
               style={{ maxWidth: 480, margin: '0 auto' }}
             >
-              Each bucket holds your Regulars, pinned recurring transactions,
-              and any variable spending estimates you set — broken down by week,
-              month, or year.
+              Each bucket holds your Regulars and Trackers — broken down by
+              week, month, or year.
             </p>
             <p
               className="text-muted mb-4"
@@ -479,7 +468,7 @@ export function AnalyticsBudgetPlan() {
           <HelpPopover
             id="budget-plan-help"
             title="Budget Plan"
-            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and optional hypothetical lines (for 'what if?' scenarios). The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
+            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
             ariaLabel="How does Budget Plan work?"
           />
         </div>
@@ -505,10 +494,7 @@ export function AnalyticsBudgetPlan() {
       <Row className="g-3 mb-4">
         {buckets.map((b) => {
           const hex = getBucketColor(b.id, mode)
-          const summary = bucketSummaries[b.id] ?? {
-            plannedCents: 0,
-            hypotheticalCents: 0,
-          }
+          const summary = bucketSummaries[b.id] ?? { plannedCents: 0 }
 
           return (
             <Col
@@ -579,22 +565,6 @@ export function AnalyticsBudgetPlan() {
                               /{periodLabel.toLowerCase()}
                             </span>
                           </div>
-                          {summary.hypotheticalCents > 0 && (
-                            <div
-                              className="mt-1 d-flex align-items-center gap-1"
-                              style={{ fontSize: '0.7rem' }}
-                            >
-                              <i
-                                className="mdi mdi-flask-outline"
-                                style={{ color: 'var(--bs-warning)' }}
-                                aria-hidden
-                              />
-                              <span className="text-muted">
-                                incl. ${formatMoney(summary.hypotheticalCents)}{' '}
-                                hypothetical
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
@@ -709,21 +679,6 @@ export function AnalyticsBudgetPlan() {
                   </span>
                 )}
               </div>
-              {totalHypotheticalCents > 0 && (
-                <div
-                  className="mt-1 d-flex align-items-center justify-content-center gap-1"
-                  style={{ fontSize: '0.7rem' }}
-                >
-                  <i
-                    className="mdi mdi-flask-outline"
-                    style={{ color: 'var(--bs-warning)' }}
-                    aria-hidden
-                  />
-                  <span className="text-muted">
-                    incl. ${formatMoney(totalHypotheticalCents)} hypothetical
-                  </span>
-                </div>
-              )}
             </Col>
             <Col xs={12} sm={4}>
               <div className="text-muted small mb-1">

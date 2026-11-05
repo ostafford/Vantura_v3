@@ -21,8 +21,11 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 
-/** Export format version for the encrypted payload */
-const EXPORT_PAYLOAD_VERSION = 9
+/**
+ * Export format version for the encrypted payload. v10 (#204): the
+ * `budgetHypotheticals` section is no longer written.
+ */
+const EXPORT_PAYLOAD_VERSION = 10
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -78,7 +81,6 @@ export interface ExportPayload {
   trackerConfigHistory?: TrackerConfigHistoryExportRow[]
   upcomingCharges: UpcomingChargeExportRow[]
   budgetBuckets: BudgetBucketExportRow[]
-  budgetHypotheticals: BudgetHypotheticalExportRow[]
   /** #34 — Net Worth manual accounts. Absent in payloads from before v5. */
   manualAccounts?: ManualAccountExportRow[]
   /** #34 — Net Worth daily snapshot history. Absent in payloads from before v5. */
@@ -149,14 +151,6 @@ export interface BudgetBucketExportRow {
   name: string
   icon: string
   sort_order: number
-}
-
-export interface BudgetHypotheticalExportRow {
-  bucket_id: number
-  name: string
-  amount_cents: number
-  frequency: string
-  is_hypothetical: number
 }
 
 /**
@@ -397,28 +391,6 @@ function collectBudgetBuckets(): BudgetBucketExportRow[] {
   return rows
 }
 
-function collectBudgetHypotheticals(): BudgetHypotheticalExportRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT bucket_id, name, amount_cents, frequency, is_hypothetical
-     FROM budget_hypotheticals ORDER BY bucket_id, id`
-  )
-  const rows: BudgetHypotheticalExportRow[] = []
-  while (stmt.step()) {
-    const r = stmt.get() as [number, string, number, string, number]
-    rows.push({
-      bucket_id: r[0],
-      name: r[1],
-      amount_cents: r[2],
-      frequency: r[3],
-      is_hypothetical: r[4],
-    })
-  }
-  stmt.free()
-  return rows
-}
-
 function collectManualAccounts(): ManualAccountExportRow[] {
   const db = getDb()
   if (!db) return []
@@ -496,7 +468,6 @@ export function buildExportPayload(): ExportPayload {
   const trackerConfigHistory = collectTrackerConfigHistory()
   const upcomingCharges = collectUpcomingCharges()
   const budgetBuckets = collectBudgetBuckets()
-  const budgetHypotheticals = collectBudgetHypotheticals()
   const manualAccounts = collectManualAccounts()
   const netWorthSnapshots = collectNetWorthSnapshots()
   const saverGoals = collectSaverGoals()
@@ -511,7 +482,6 @@ export function buildExportPayload(): ExportPayload {
     trackerConfigHistory,
     upcomingCharges,
     budgetBuckets,
-    budgetHypotheticals,
     manualAccounts,
     netWorthSnapshots,
     saverGoals,
@@ -664,6 +634,40 @@ function categoryExists(
   return found
 }
 
+/**
+ * Sections an older export may carry for features Vantura has since cut.
+ * They're never imported; the importer skips them and says so rather than
+ * refusing the file (#170). Each later cut adds its section here.
+ */
+const CUT_SECTIONS: readonly {
+  key: string
+  singular: string
+  plural: string
+}[] = [
+  {
+    key: 'budgetHypotheticals',
+    singular: 'hypothetical line',
+    plural: 'hypothetical lines',
+  },
+]
+
+/**
+ * The notice the import step shows for an older export's cut sections, e.g.
+ * "Skipped 2 hypothetical lines. Vantura no longer has them." Null when the
+ * file carries none (or only empty ones).
+ */
+export function describeSkippedSections(payload: ExportPayload): string | null {
+  const legacy = payload as unknown as Record<string, unknown>
+  const notices: string[] = []
+  for (const section of CUT_SECTIONS) {
+    const rows = legacy[section.key]
+    if (!Array.isArray(rows) || rows.length === 0) continue
+    const noun = rows.length === 1 ? section.singular : section.plural
+    notices.push(`Skipped ${rows.length} ${noun}. Vantura no longer has them.`)
+  }
+  return notices.length > 0 ? notices.join(' ') : null
+}
+
 /** Options for selective import; each section controls whether to overwrite that data. */
 export interface ImportOptions {
   settings: boolean
@@ -686,13 +690,12 @@ export function applySettings(settings: Record<string, string>): void {
 }
 
 /**
- * Replace budget_buckets and budget_hypotheticals with imported data.
+ * Replace budget_buckets with imported data.
  * Returns a map of old bucket ID → new bucket ID for use by replaceTrackers
  * and replaceUpcomingCharges.
  */
 export function replaceBudgetPlan(
-  budgetBuckets: BudgetBucketExportRow[],
-  budgetHypotheticals: BudgetHypotheticalExportRow[]
+  budgetBuckets: BudgetBucketExportRow[]
 ): Map<number, number> {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
@@ -711,7 +714,6 @@ export function replaceBudgetPlan(
   }
   existingBucketsStmt.free()
 
-  db.run(`DELETE FROM budget_hypotheticals`)
   db.run(`DELETE FROM budget_buckets`)
 
   const now = new Date().toISOString()
@@ -746,26 +748,6 @@ export function replaceBudgetPlan(
   db.run(
     `DELETE FROM budget_transaction_anchors WHERE bucket_id NOT IN (SELECT id FROM budget_buckets)`
   )
-
-  const hypsArr = Array.isArray(budgetHypotheticals) ? budgetHypotheticals : []
-  for (const h of hypsArr) {
-    if (
-      typeof h.name !== 'string' ||
-      typeof h.amount_cents !== 'number' ||
-      typeof h.frequency !== 'string'
-    ) {
-      continue
-    }
-    const newBucketId = bucketIdMap.get(h.bucket_id)
-    if (newBucketId == null) continue
-    const isHyp = typeof h.is_hypothetical === 'number' ? h.is_hypothetical : 0
-    db.run(
-      `INSERT INTO budget_hypotheticals
-         (bucket_id, name, amount_cents, frequency, is_hypothetical, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [newBucketId, h.name, h.amount_cents, h.frequency, isHyp, now]
-    )
-  }
 
   return bucketIdMap
 }
@@ -1242,10 +1224,7 @@ export function importPayloadWithOptions(
     // Budget plan must be imported before trackers/charges so the ID map is ready.
     let bucketIdMap = new Map<number, number>()
     if (options.budgetPlan) {
-      bucketIdMap = replaceBudgetPlan(
-        payload.budgetBuckets ?? [],
-        payload.budgetHypotheticals ?? []
-      )
+      bucketIdMap = replaceBudgetPlan(payload.budgetBuckets ?? [])
     }
 
     if (options.trackers) {

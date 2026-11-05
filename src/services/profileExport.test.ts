@@ -15,6 +15,7 @@ import {
   replaceNetWorth,
   replaceSaverGoals,
   importPayloadWithOptions,
+  describeSkippedSections,
   IMPORT_ERROR_INVALID_FILE,
   IMPORT_ERROR_INVALID_TRACKER_RESET,
   IMPORT_ERROR_WRONG_PASSPHRASE,
@@ -44,7 +45,6 @@ const EMPTY_PAYLOAD: ExportPayload = {
   trackerCategories: [],
   upcomingCharges: [],
   budgetBuckets: [],
-  budgetHypotheticals: [],
 }
 
 describe('profileExport', () => {
@@ -203,15 +203,6 @@ describe('profileExport', () => {
             sort_order: 0,
           },
         ],
-        budgetHypotheticals: [
-          {
-            bucket_id: 1,
-            name: 'Lunch',
-            amount_cents: 2000,
-            frequency: 'WEEKLY',
-            is_hypothetical: 0,
-          },
-        ],
       }
       const wrapper = await encryptExportPayload(payload, 'test-passphrase')
       expect(wrapper.salt).toBeDefined()
@@ -225,7 +216,6 @@ describe('profileExport', () => {
       expect(decrypted.trackerCategories).toEqual(payload.trackerCategories)
       expect(decrypted.upcomingCharges).toEqual(payload.upcomingCharges)
       expect(decrypted.budgetBuckets).toEqual(payload.budgetBuckets)
-      expect(decrypted.budgetHypotheticals).toEqual(payload.budgetHypotheticals)
     })
 
     it('decryptImportFile throws IMPORT_ERROR_WRONG_PASSPHRASE on wrong passphrase', async () => {
@@ -297,7 +287,6 @@ describe('profileExport', () => {
       expect(payload.trackerCategories).toEqual([])
       expect(payload.upcomingCharges).toEqual([])
       expect(payload.budgetBuckets).toEqual([])
-      expect(payload.budgetHypotheticals).toEqual([])
       expect(payload.settings).toEqual({})
     })
 
@@ -486,7 +475,7 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
     const imported: BudgetBucketExportRow[] = [
       { id: 999, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
     ]
-    const bucketIdMap = replaceBudgetPlan(imported, [])
+    const bucketIdMap = replaceBudgetPlan(imported)
     const newBillsId = bucketIdMap.get(999)
 
     expect(newBillsId).toBeDefined()
@@ -501,7 +490,7 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
     const imported: BudgetBucketExportRow[] = [
       { id: 999, name: 'Entertainment', icon: 'mdi-wallet', sort_order: 0 },
     ]
-    replaceBudgetPlan(imported, [])
+    replaceBudgetPlan(imported)
 
     expect(anchorBucketIds()).toEqual([])
   })
@@ -516,7 +505,7 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
     const imported: BudgetBucketExportRow[] = [
       { id: 1, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
     ]
-    const bucketIdMap = replaceBudgetPlan(imported, [])
+    const bucketIdMap = replaceBudgetPlan(imported)
     const newBillsId = bucketIdMap.get(1)
 
     expect(anchorBucketIds()).toEqual([newBillsId])
@@ -597,7 +586,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       trackerCategories: [],
       upcomingCharges: [],
       budgetBuckets: [],
-      budgetHypotheticals: [],
       ...over,
     }
   }
@@ -617,6 +605,81 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     budgetPlan: false,
     netWorth: false,
   }
+
+  // ── #204: Hypothetical lines are cut ────────────────────────────────────
+
+  it('exports no hypothetical-lines section (#204)', () => {
+    realDb.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at)
+       VALUES ('Household', 'mdi-home', 0, '2026-01-01')`
+    )
+    const payload = buildExportPayload()
+    expect(payload.budgetBuckets.map((b) => b.name)).toEqual(['Household'])
+    expect(Object.keys(payload)).not.toContain('budgetHypotheticals')
+  })
+
+  /** A v9-or-earlier payload, which still carries hypothetical lines. */
+  function olderExportWithHypotheticals(): ExportPayload {
+    return {
+      ...emptyPayload({
+        version: 9,
+        budgetBuckets: [
+          { id: 3, name: 'Household', icon: 'mdi-home', sort_order: 0 },
+        ],
+      }),
+      budgetHypotheticals: [
+        {
+          bucket_id: 3,
+          name: 'Maybe gym',
+          amount_cents: 8000,
+          frequency: 'MONTHLY',
+          is_hypothetical: 1,
+        },
+        {
+          bucket_id: 3,
+          name: 'Maybe streaming',
+          amount_cents: 1500,
+          frequency: 'MONTHLY',
+          is_hypothetical: 1,
+        },
+      ],
+    } as ExportPayload
+  }
+
+  it('imports an older export that still has hypothetical lines, skipping them (#204)', () => {
+    importPayloadWithOptions(olderExportWithHypotheticals(), ALL_ON)
+    expect(
+      realDb.exec(`SELECT name, icon FROM budget_buckets`)[0].values
+    ).toEqual([['Household', 'mdi-home']])
+  })
+
+  describe('describeSkippedSections (#204)', () => {
+    it('names the hypothetical lines an older export carries, since they are not imported', () => {
+      expect(describeSkippedSections(olderExportWithHypotheticals())).toBe(
+        'Skipped 2 hypothetical lines. Vantura no longer has them.'
+      )
+    })
+
+    it('uses the singular for one line', () => {
+      const payload = olderExportWithHypotheticals() as ExportPayload & {
+        budgetHypotheticals: unknown[]
+      }
+      payload.budgetHypotheticals = payload.budgetHypotheticals.slice(0, 1)
+      expect(describeSkippedSections(payload)).toBe(
+        'Skipped 1 hypothetical line. Vantura no longer has them.'
+      )
+    })
+
+    it('is null when nothing is skipped: a current export, or an empty section', () => {
+      expect(describeSkippedSections(emptyPayload())).toBeNull()
+      expect(
+        describeSkippedSections({
+          ...emptyPayload(),
+          budgetHypotheticals: [],
+        } as ExportPayload)
+      ).toBeNull()
+    })
+  })
 
   function readTrackers(): Array<{
     id: number
@@ -1403,7 +1466,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(9)
+      expect(payload.version).toBe(10)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1696,7 +1759,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(9)
+      expect(payload.version).toBe(10)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',

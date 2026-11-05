@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 51
+const SCHEMA_VERSION = 52
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -177,16 +177,6 @@ const DDL_STATEMENTS = [
     icon TEXT NOT NULL DEFAULT 'mdi-wallet',
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS budget_hypotheticals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bucket_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    amount_cents INTEGER NOT NULL,
-    frequency TEXT NOT NULL,
-    is_hypothetical INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE
   )`,
   `CREATE TABLE IF NOT EXISTS saver_balance_snapshots (
     saver_id TEXT NOT NULL,
@@ -1410,6 +1400,15 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['51']
+    )
+  }
+  // #204 — Hypothetical lines are cut. Drop their table; buckets and the
+  // Regulars and Trackers assigned to them are untouched.
+  if (version < 52) {
+    database.run(`DROP TABLE IF EXISTS budget_hypotheticals`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['52']
     )
   }
 }
