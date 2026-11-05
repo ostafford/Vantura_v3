@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(53)
+    expect(SCHEMA_VERSION).toBe(54)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1278,7 +1278,11 @@ describe('v50 migration: Payday nomination settings removed (#194)', () => {
 })
 
 describe('v51 migration: "Possible payday detected" notification removed (#186)', () => {
-  it('deletes its settings and its history rows, and leaves other notifications alone', () => {
+  // runMigrations runs the whole ladder, and v54 (#208) since removes every
+  // other notification setting and the history table, so v51's "leaves the
+  // other notifications alone" is no longer observable here. What still is:
+  // its own keys go and a non-notification setting survives.
+  it('deletes its settings and keeps unrelated ones', () => {
     const db = new SQL.Database()
     db.run(
       `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
@@ -1300,13 +1304,11 @@ describe('v51 migration: "Possible payday detected" notification removed (#186)'
          ('schema_version', '50'),
          ('notif_possible_payday', '0'),
          ('notif_possible_payday_suggested_for', 'SYNTHETIC EMPLOYER SALARY'),
-         ('notif_payday', '1'),
-         ('notif_last_payday_date', '2026-10-30')`
+         ('pay_amount_cents', '250000')`
     )
     db.run(
       `INSERT INTO notification_history (type, title, body, created_at) VALUES
-         ('possible_payday', 'Possible payday detected', 'x', '2026-11-01T00:00:00Z'),
-         ('payday', 'Payday landed', 'y', '2026-11-01T00:00:00Z')`
+         ('possible_payday', 'Possible payday detected', 'x', '2026-11-01T00:00:00Z')`
     )
 
     runMigrations(db)
@@ -1314,11 +1316,7 @@ describe('v51 migration: "Possible payday detected" notification removed (#186)'
     expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
     expect(readSetting(db, 'notif_possible_payday')).toBeNull()
     expect(readSetting(db, 'notif_possible_payday_suggested_for')).toBeNull()
-    expect(readSetting(db, 'notif_payday')).toBe('1')
-    expect(readSetting(db, 'notif_last_payday_date')).toBe('2026-10-30')
-    expect(
-      db.exec(`SELECT type FROM notification_history ORDER BY id`)[0].values
-    ).toEqual([['payday']])
+    expect(readSetting(db, 'pay_amount_cents')).toBe('250000')
     db.close()
   })
 })
@@ -1458,6 +1456,88 @@ describe('v53 migration: Weekly Insights section removed (#206)', () => {
     expect(readSetting(db, 'dashboard_section_order')).toBe(clean)
     expect(readSetting(db, 'dashboard_section_sizes')).toBe('not json')
     expect(readSetting(db, 'dashboard_section_visibility')).toBeNull()
+    db.close()
+  })
+})
+
+describe('v54 migration: Notifications removed (#208)', () => {
+  const tableExists = (db: Database, name: string) =>
+    db.exec(`SELECT 1 FROM sqlite_master WHERE name = ?`, [name]).length > 0
+
+  it('drops notification_history and every notification setting, and keeps the rest', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `CREATE TABLE notification_history (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         type TEXT NOT NULL,
+         title TEXT NOT NULL,
+         body TEXT NOT NULL,
+         link_path TEXT,
+         link_label TEXT,
+         created_at TEXT NOT NULL,
+         read_at TEXT
+       )`
+    )
+    db.run(
+      `CREATE INDEX idx_notification_history_created_at ON notification_history(created_at)`
+    )
+    db.run(
+      `INSERT INTO notification_history (type, title, body, created_at)
+       VALUES ('payday', 'Payday landed', 'x', '2026-11-01T00:00:00Z')`
+    )
+    const notificationKeys = [
+      'notifications_enabled',
+      'last_notification_date',
+      'notif_bills',
+      'notif_payday',
+      'notif_large_tx_threshold_cents',
+      'notif_last_bills_date',
+      'notif_last_payday_date',
+      'notif_large_tx_last_check_iso',
+      'notif_large_tx_last_check_ids',
+      'notif_to_3',
+      'notif_tp_3',
+      'notif_sm_saver-1_50',
+      'notif_bill_settled_7_2026-11-01',
+      'liab_repay_7_2026-11-15',
+      'liab_repay_backfilled',
+    ]
+    // Near misses: LIKE's `_` must not act as a wildcard.
+    const keptKeys = [
+      'pay_amount_cents',
+      'dismissed_due_soon_date',
+      'notifXbills',
+      'liabXrepay_7',
+      'last_sync',
+    ]
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '53')`
+    )
+    for (const key of [...notificationKeys, ...keptKeys]) {
+      db.run(`INSERT INTO app_settings (key, value) VALUES (?, 'v')`, [key])
+    }
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(tableExists(db, 'notification_history')).toBe(false)
+    expect(tableExists(db, 'idx_notification_history_created_at')).toBe(false)
+    for (const key of notificationKeys) {
+      expect(readSetting(db, key), key).toBeNull()
+    }
+    for (const key of keptKeys) {
+      expect(readSetting(db, key), key).toBe('v')
+    }
+    db.close()
+  })
+
+  it('creates no notification_history table on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(tableExists(db, 'notification_history')).toBe(false)
     db.close()
   })
 })

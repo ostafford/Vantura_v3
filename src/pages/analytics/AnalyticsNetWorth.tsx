@@ -705,7 +705,8 @@ export function AnalyticsNetWorth() {
 
   const hasApproximate = staleAccounts.length > 0
 
-  // Deep link from the "Liability payment detected" notification (#19):
+  // Deep link once sent by the "Liability payment detected" notification (#19,
+  // cut in #208; nothing links here now, and the page goes with #209):
   // /analytics/net-worth?repay=<chargeId> opens the linked account's quick-update
   // modal prefilled with (current balance − configured charge amount), clamped
   // at 0. The user confirms or edits — nothing is written until they save. The

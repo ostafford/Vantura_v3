@@ -717,21 +717,12 @@ export function Help() {
                   <p className="mb-2">
                     Export your settings to an encrypted, passphrase-protected
                     file and import it on another device. Includes appearance,
-                    payday schedule, notification preferences, lock timeout,
-                    trackers, Regulars, and Budget Plan buckets.{' '}
+                    payday schedule, lock timeout, trackers, Regulars, and
+                    Budget Plan buckets.{' '}
                     <em>
                       Transactions, account data, and API tokens are never
                       exported.
                     </em>
-                  </p>
-
-                  <SectionHeading icon="mdi-bell-outline">
-                    Notifications
-                  </SectionHeading>
-                  <p className="mb-2">
-                    Enable browser notifications for bill reminders —
-                    you&apos;ll be notified when a Regular is due soon (within
-                    its reminder window). Requires browser permission.
                   </p>
 
                   <SectionHeading icon="mdi-shield-lock-outline">

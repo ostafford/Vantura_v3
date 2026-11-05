@@ -28,7 +28,7 @@ export interface SpendableAlert {
   value: number
   /**
    * Resolved dollar floor in cents, or null for a `pct` alert when no pay amount
-   * is set — in that state the alert is dormant (card stays neutral, no notification).
+   * is set — in that state the alert is dormant (the card stays neutral).
    */
   thresholdCents: number | null
 }
@@ -39,8 +39,7 @@ export interface SpendableAlert {
  * Since schema v38 (#14) at most one of the two `app_settings` keys is ever
  * non-zero: a `spendable_alert_below_cents` dollar floor OR a
  * `spendable_alert_below_pct_pay` percent-of-pay floor, never both. This is the
- * single source of truth for the Dashboard card's red state and the
- * `spendable_low` notification. If both keys are somehow non-zero (e.g. a
+ * single source of truth for the Dashboard card's red state. If both keys are somehow non-zero (e.g. a
  * profile imported from a pre-v38 export), the dollar floor wins — matching the
  * migration's tie-break.
  */

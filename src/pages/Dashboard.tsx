@@ -43,11 +43,6 @@ import {
   type DashboardSectionSize,
 } from '@/lib/dashboardSections'
 import { daysUntilCharge, dueSoonRegulars } from '@/services/regulars'
-import {
-  runNotificationChecks,
-  ensureBillsDueNotifications,
-} from '@/services/notificationChecks'
-import { notificationStore } from '@/stores/notificationStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { toast } from '@/stores/toastStore'
 const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
@@ -297,9 +292,7 @@ export function Dashboard() {
   const handleDismissBanner = useCallback(() => {
     setAppSetting('dismissed_due_soon_date', today)
     setBannerDismissedOn(today)
-    ensureBillsDueNotifications(dueSoon)
-    notificationStore.getState().refreshUnreadCount()
-  }, [dueSoon, today])
+  }, [today])
 
   const scrollToUpcoming = useCallback(() => {
     const el = document.getElementById('dashboard-section-upcoming')
@@ -441,12 +434,6 @@ export function Dashboard() {
       return () => clearTimeout(t)
     }
   }, [sectionOrder, sectionVisibility])
-
-  useEffect(() => {
-    runNotificationChecks()
-    ensureBillsDueNotifications(dueSoonRegulars())
-    notificationStore.getState().refreshUnreadCount()
-  }, [])
 
   useEffect(() => {
     setSectionOrder(getDashboardSectionOrder())
@@ -665,10 +652,9 @@ export function Dashboard() {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted mb-3" style={{ fontSize: '0.85rem' }}>
-            Alert when Spendable drops below a floor — the card turns red and a
-            notification fires. Choose <strong>one</strong>: a dollar amount or
-            a percentage of your pay. Leave the chosen field empty or 0 to
-            disable the alert.
+            Alert when Spendable drops below a floor — the card turns red.
+            Choose <strong>one</strong>: a dollar amount or a percentage of your
+            pay. Leave the chosen field empty or 0 to disable the alert.
           </p>
           <div className="d-flex align-items-center gap-2 mb-3">
             <Form.Check

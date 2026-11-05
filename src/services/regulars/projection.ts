@@ -72,7 +72,7 @@ export function nthOccurrence(
  * fall back to `today`. Returns `YYYY-MM-DD`.
  *
  * On-or-after is the same boundary as `firstOccurrenceOnOrAfter`, which the
- * list, Reserved and notifications use, so the date the create form shows is
+ * list and Reserved use, so the date the create form shows is
  * the date the list shows once the Regular is saved (#163). A cycle that falls
  * today is shown as due today, even if today's payment already settled.
  *

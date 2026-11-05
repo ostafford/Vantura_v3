@@ -47,6 +47,21 @@ const EMPTY_PAYLOAD: ExportPayload = {
   budgetBuckets: [],
 }
 
+const NOTIFICATION_KEYS = [
+  'notifications_enabled',
+  'notif_bills',
+  'notif_tracker_overspent',
+  'notif_tracker_pace',
+  'notif_spendable_low',
+  'notif_payday',
+  'notif_large_tx',
+  'notif_saver_milestone',
+  'notif_sync_stale',
+  'notif_large_tx_threshold_cents',
+  'notif_possible_payday',
+  'notif_possible_payday_suggested_for',
+]
+
 describe('profileExport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -74,22 +89,10 @@ describe('profileExport', () => {
       }
     })
 
-    it('notification preference keys are in SETTINGS_WHITELIST', () => {
-      const notifKeys = [
-        'notifications_enabled',
-        'notif_bills',
-        'notif_tracker_overspent',
-        'notif_tracker_pace',
-        'notif_spendable_low',
-        'notif_payday',
-        'notif_large_tx',
-        'notif_saver_milestone',
-        'notif_sync_stale',
-        'notif_large_tx_threshold_cents',
-      ]
+    it('no notification key is in SETTINGS_WHITELIST (#208)', () => {
       const wl = new Set(SETTINGS_WHITELIST)
-      for (const key of notifKeys) {
-        expect(wl.has(key), `${key} missing from whitelist`).toBe(true)
+      for (const key of NOTIFICATION_KEYS) {
+        expect(wl.has(key), `${key} still whitelisted`).toBe(false)
       }
     })
 
@@ -116,41 +119,36 @@ describe('profileExport', () => {
       expect(payload.settings.pay_amount_cents).toBe('250000')
     })
 
-    it('leaves the cut "Possible payday" notification settings out of an export (#186)', async () => {
+    it('leaves every notification setting out of an export (#208)', async () => {
       const db = await import('@/db')
       vi.mocked(db.getDb).mockReturnValue(null)
       vi.mocked(db.getAppSetting).mockImplementation((key) => {
-        if (key === 'notif_possible_payday') return '0'
-        if (key === 'notif_possible_payday_suggested_for') return 'SYNTHETIC'
-        if (key === 'notif_payday') return '1'
+        if (NOTIFICATION_KEYS.includes(key)) return '1'
+        if (key === 'pay_amount_cents') return '250000'
         return null
       })
 
       const payload = buildExportPayload()
 
-      expect(payload.settings).not.toHaveProperty('notif_possible_payday')
-      expect(payload.settings).not.toHaveProperty(
-        'notif_possible_payday_suggested_for'
-      )
-      expect(payload.settings.notif_payday).toBe('1')
+      for (const key of NOTIFICATION_KEYS) {
+        expect(payload.settings).not.toHaveProperty(key)
+      }
+      expect(payload.settings.pay_amount_cents).toBe('250000')
     })
 
-    it('silently skips the cut "Possible payday" notification settings on import (#186)', async () => {
+    it('imports no notification setting from an older export (#208)', async () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)
       setAppSettingMock.mockClear()
-      expect(() =>
-        applySettings({
-          notif_possible_payday: '0',
-          notif_possible_payday_suggested_for: 'SYNTHETIC',
-          notif_payday: '1',
-        })
-      ).not.toThrow()
-      expect(setAppSettingMock).toHaveBeenCalledWith('notif_payday', '1')
-      for (const key of [
-        'notif_possible_payday',
-        'notif_possible_payday_suggested_for',
-      ]) {
+      applySettings({
+        ...Object.fromEntries(NOTIFICATION_KEYS.map((key) => [key, '1'])),
+        pay_amount_cents: '250000',
+      })
+      expect(setAppSettingMock).toHaveBeenCalledWith(
+        'pay_amount_cents',
+        '250000'
+      )
+      for (const key of NOTIFICATION_KEYS) {
         expect(setAppSettingMock).not.toHaveBeenCalledWith(
           key,
           expect.anything()
@@ -309,8 +307,8 @@ describe('profileExport', () => {
       expect(payload.settings.payday_frequency).toBe('MONTHLY')
       expect(payload.settings.api_token_encrypted).toBeUndefined()
       expect(payload.settings.lock_timeout_minutes).toBe('10')
-      expect(payload.settings.notifications_enabled).toBe('1')
-      expect(payload.settings.notif_large_tx_threshold_cents).toBe('50000')
+      expect(payload.settings.notifications_enabled).toBeUndefined()
+      expect(payload.settings.notif_large_tx_threshold_cents).toBeUndefined()
     })
   })
 
@@ -416,30 +414,6 @@ describe('profileExport', () => {
       expect(setAppSettingMock).not.toHaveBeenCalledWith(
         'saver_goal_date_abc123',
         expect.anything()
-      )
-    })
-
-    it('applySettings passes through notification preference keys', async () => {
-      const db = await import('@/db')
-      const setAppSettingMock = vi.mocked(db.setAppSetting)
-      applySettings({
-        notifications_enabled: '1',
-        notif_large_tx: '0',
-        notif_large_tx_threshold_cents: '30000',
-        lock_timeout_minutes: '15',
-      })
-      expect(setAppSettingMock).toHaveBeenCalledWith(
-        'notifications_enabled',
-        '1'
-      )
-      expect(setAppSettingMock).toHaveBeenCalledWith('notif_large_tx', '0')
-      expect(setAppSettingMock).toHaveBeenCalledWith(
-        'notif_large_tx_threshold_cents',
-        '30000'
-      )
-      expect(setAppSettingMock).toHaveBeenCalledWith(
-        'lock_timeout_minutes',
-        '15'
       )
     })
   })
@@ -671,7 +645,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     ).toEqual([['Household', 'mdi-home']])
   })
 
-  describe('describeSkippedSections (#204)', () => {
+  describe('describeSkippedSections (#204, #208)', () => {
     it('names the hypothetical lines an older export carries, since they are not imported', () => {
       expect(describeSkippedSections(olderExportWithHypotheticals())).toBe(
         'Skipped 2 hypothetical lines. Vantura no longer has them.'
@@ -685,6 +659,24 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       payload.budgetHypotheticals = payload.budgetHypotheticals.slice(0, 1)
       expect(describeSkippedSections(payload)).toBe(
         'Skipped 1 hypothetical line. Vantura no longer has them.'
+      )
+    })
+
+    it('says the notification settings were skipped when an older export carries any (#208)', () => {
+      expect(
+        describeSkippedSections({
+          ...emptyPayload(),
+          settings: { notif_bills: '1', pay_amount_cents: '250000' },
+        })
+      ).toBe('Skipped your notification settings. Vantura no longer has them.')
+    })
+
+    it('lists every skipped kind together', () => {
+      const payload = olderExportWithHypotheticals()
+      payload.settings = { ...payload.settings, notifications_enabled: '1' }
+      expect(describeSkippedSections(payload)).toBe(
+        'Skipped 2 hypothetical lines. Vantura no longer has them. ' +
+          'Skipped your notification settings. Vantura no longer has them.'
       )
     })
 
@@ -1484,7 +1476,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(10)
+      expect(payload.version).toBe(11)
       expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
         'Mortgage',
         'Shares',
@@ -1777,7 +1769,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(10)
+      expect(payload.version).toBe(11)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',

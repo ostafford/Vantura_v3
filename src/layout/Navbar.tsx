@@ -5,13 +5,11 @@ import { useStore } from 'zustand'
 import { uiStore } from '@/stores/uiStore'
 import { sessionStore } from '@/stores/sessionStore'
 import { syncStore } from '@/stores/syncStore'
-import { notificationStore } from '@/stores/notificationStore'
 import { getAppSetting } from '@/db'
 import { runSync } from '@/services/syncRunner'
 import { toast } from '@/stores/toastStore'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { VanturaLogo } from '@/components/VanturaLogo'
-import { isNotificationSupported } from '@/lib/notifications'
 
 interface NavbarProps {
   sidebarCollapsed: boolean
@@ -38,8 +36,6 @@ export function Navbar({
   sidebarMobileOpen = false,
 }: NavbarProps) {
   const setSidebarMobileOpen = useStore(uiStore, (s) => s.setSidebarMobileOpen)
-  const unreadCount = useStore(notificationStore, (s) => s.unreadCount)
-  const openDrawer = useStore(notificationStore, (s) => s.openDrawer)
   const [lastSync, setLastSync] = useState<string | null>(null)
   // Shared flag, so an auto-sync in flight also disables this button.
   const syncing = useStore(syncStore, (s) => s.syncing)
@@ -116,28 +112,6 @@ export function Navbar({
       <div className="navbar-menu-wrapper">
         <div className="ms-auto d-flex flex-column align-items-end gap-1">
           <div className="d-flex align-items-center gap-2">
-            {isNotificationSupported() && (
-              <button
-                type="button"
-                className="notif-bell"
-                onClick={openDrawer}
-                aria-label={
-                  unreadCount > 0
-                    ? `Notifications — ${unreadCount} unread`
-                    : 'Notifications'
-                }
-              >
-                <i
-                  className={`mdi ${unreadCount > 0 ? 'mdi-bell' : 'mdi-bell-outline'}`}
-                  aria-hidden
-                />
-                {unreadCount > 0 && (
-                  <span className="notif-bell__badge" aria-hidden>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
-            )}
             <Button
               className="btn-gradient-primary"
               size="sm"

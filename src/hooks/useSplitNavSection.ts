@@ -10,7 +10,8 @@ export type UseSplitNavSectionArgs = {
 
 /**
  * Shared split-nav pattern: URL hash, localStorage persistence, browser back/forward,
- * and validation when section list changes (e.g. Settings notifications).
+ * and validation when the section list changes (a stored section that no
+ * longer exists falls back to the default).
  */
 export function useSplitNavSection({
   storageKey,

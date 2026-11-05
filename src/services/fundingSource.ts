@@ -1,10 +1,10 @@
 /**
  * Linked payments: which synced payments belong to a Regular, and so which
- * account actually pays it (docs/adr/0020, amending docs/adr/0019). Shared by
- * the notification checks (bill-settled clearing, liability-repayment
- * prompts, `src/services/notificationChecks.ts`) and the Essentials-era
- * Reserved formula branch — the rule must agree everywhere on what counts as
- * "paid" and by which account.
+ * account actually pays it (docs/adr/0020, amending docs/adr/0019). Used by
+ * the Essentials-era Reserved formula branch. The notification checks that
+ * also used it (bill-settled clearing, liability-repayment prompts) were cut
+ * in #208; `hasLinkedPayment` has no caller until the paid check is rebuilt
+ * (#211).
  */
 
 import type { Database } from 'sql.js'
@@ -38,7 +38,7 @@ const LINKED_AMOUNT_TOLERANCE = 0.2
  *
  * Omit `windowStartStr` when the question is "which account currently pays
  * this?" rather than "did this specific cycle settle?" (the latter is what
- * the notification checks use a window for).
+ * a window is for).
  */
 export function findLinkedPayment(
   db: Database,

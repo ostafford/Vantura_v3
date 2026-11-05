@@ -1,12 +1,10 @@
 import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 import { Form } from 'react-bootstrap'
-import { isNotificationSupported } from '@/lib/notifications'
 import { AboutSection } from './settings/AboutSection'
 import { AppearanceSection } from './settings/AppearanceSection'
 import { PaydaySection } from './settings/PaydaySection'
 import { EssentialsSection } from './settings/EssentialsSection'
 import { DashboardSectionOrderForm } from './settings/DashboardSectionOrderForm'
-import { NotificationsSection } from './settings/NotificationsSection'
 import { SecuritySection } from './settings/SecuritySection'
 import { DataSection } from './settings/DataSection'
 
@@ -20,7 +18,6 @@ function getSettingsSectionKeys(): string[] {
     'payday',
     'essentials',
     'dashboard-sections',
-    ...(isNotificationSupported() ? (['notifications'] as const) : []),
     'security',
     'data',
   ]
@@ -32,7 +29,6 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   payday: 'Payday',
   essentials: 'Essentials',
   'dashboard-sections': 'Dashboard sections',
-  notifications: 'Notifications',
   security: 'Security',
   data: 'Data',
 }
@@ -43,7 +39,6 @@ const SETTINGS_SECTION_ICONS: Record<string, string> = {
   payday: 'mdi-calendar-today',
   essentials: 'mdi-piggy-bank-outline',
   'dashboard-sections': 'mdi-view-dashboard-outline',
-  notifications: 'mdi-bell-outline',
   security: 'mdi-shield-lock-outline',
   data: 'mdi-database-outline',
 }
@@ -158,8 +153,6 @@ export function Settings() {
                   <DashboardSectionOrderForm />
                 </>
               )}
-              {activeSection === 'notifications' &&
-                isNotificationSupported() && <NotificationsSection />}
               {activeSection === 'security' && <SecuritySection />}
               {activeSection === 'data' && <DataSection />}
             </div>
