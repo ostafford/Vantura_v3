@@ -8,11 +8,10 @@ A local-first financial insights app for Up Bank customers. All data stays on yo
 
 ## Features
 
-- **Dashboard** — Spendable up front, with Available and Forecast beside it, plus reorderable sections: Month at a glance, Weekly insights, Trackers, and Regulars.
+- **Dashboard** — Spendable up front, with Available and Forecast beside it, plus reorderable sections: Month at a glance, Trackers, and Regulars.
 - **Spendable balance** — Safe-to-spend amount: your available balance minus the Regulars due before your next payday, each counted in full (never prorated).
 - **Trackers** — Budget categories with weekly, fortnightly, monthly, or payday reset cycles. Progress bar, days to reset, and transaction list per tracker.
 - **Regulars** — Bills and subscriptions with frequency, due date, and optional Spendable deduction. Vantura can also find them in your transaction history.
-- **Weekly insights** — Money in, money out, saver movement, and category breakdown for any week.
 - **Month at a glance** — Day-by-day spending chart vs. the previous month, with key metrics and narrative summary.
 - **Analytics** — Deeper trends across Trackers, Reports, and Savers.
 - **Savers** — Track Up Bank saver accounts with goal amounts, target dates, contribution history, and drag-to-reorder cards.

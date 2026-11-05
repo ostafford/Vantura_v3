@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(52)
+    expect(SCHEMA_VERSION).toBe(53)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1383,6 +1383,81 @@ describe('v52 migration: Hypothetical lines cut (#204)', () => {
     const db = new SQL.Database()
     runSchema(db)
     expect(tableExists(db, 'budget_hypotheticals')).toBe(false)
+    db.close()
+  })
+})
+
+describe('v53 migration: Weekly Insights section removed (#206)', () => {
+  function seed(settings: Record<string, string>): Database {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '52')`
+    )
+    for (const [key, value] of Object.entries(settings)) {
+      db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [
+        key,
+        value,
+      ])
+    }
+    return db
+  }
+
+  it('strips insights from the order, sizes and visibility, and the other sections keep theirs', () => {
+    const db = seed({
+      dashboard_section_order: JSON.stringify([
+        'upcoming',
+        'insights',
+        'month_summary',
+        'trackers',
+      ]),
+      dashboard_section_sizes: JSON.stringify({
+        month_summary: 'medium',
+        insights: 'large',
+        trackers: 'small',
+        upcoming: 'large',
+      }),
+      dashboard_section_visibility: JSON.stringify({
+        month_summary: true,
+        insights: true,
+        trackers: false,
+        upcoming: true,
+      }),
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(JSON.parse(readSetting(db, 'dashboard_section_order')!)).toEqual([
+      'upcoming',
+      'month_summary',
+      'trackers',
+    ])
+    expect(JSON.parse(readSetting(db, 'dashboard_section_sizes')!)).toEqual({
+      month_summary: 'medium',
+      trackers: 'small',
+      upcoming: 'large',
+    })
+    expect(
+      JSON.parse(readSetting(db, 'dashboard_section_visibility')!)
+    ).toEqual({ month_summary: true, trackers: false, upcoming: true })
+    db.close()
+  })
+
+  it('leaves the keys alone when they are unset, already clean or not valid JSON', () => {
+    const clean = JSON.stringify(['trackers', 'month_summary', 'upcoming'])
+    const db = seed({
+      dashboard_section_order: clean,
+      dashboard_section_sizes: 'not json',
+    })
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'dashboard_section_order')).toBe(clean)
+    expect(readSetting(db, 'dashboard_section_sizes')).toBe('not json')
+    expect(readSetting(db, 'dashboard_section_visibility')).toBeNull()
     db.close()
   })
 })

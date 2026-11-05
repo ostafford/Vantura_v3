@@ -100,19 +100,3 @@ export function yearNarrativePriorLabel(previousFrom: string): string {
   if (!Number.isFinite(y)) return MONTH_LABEL_FALLBACK
   return String(y)
 }
-
-/** Single date, compact (week picker / legends). */
-export function formatWeekStartLabel(d: Date): string {
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) {
-    return MONTH_LABEL_FALLBACK
-  }
-  try {
-    return d.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  } catch {
-    return MONTH_LABEL_FALLBACK
-  }
-}

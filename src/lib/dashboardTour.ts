@@ -25,7 +25,6 @@ export function shouldShowDashboardTour(): boolean {
 // Maps each section ID to its data-tour attribute value in the DOM
 const SECTION_TOUR_ATTRS: Record<DashboardSectionId, string> = {
   month_summary: 'month-summary',
-  insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
 }
@@ -47,15 +46,6 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
       'Day-by-day spending for the <strong>current month</strong>, compared to the previous month.<br><br>' +
       'Key metrics and a narrative summary sit below the chart.<br><br>' +
       'Use the <strong>arrows</strong> to browse other months.',
-    side: 'top',
-    align: 'center',
-  },
-  insights: {
-    title: 'Weekly insights',
-    description:
-      '<strong>Money in</strong>, <strong>money out</strong>, saver movement, and transaction count for the selected week.<br><br>' +
-      'Use the <strong>arrows</strong> to browse previous weeks.<br><br>' +
-      'The bar chart breaks spending down by <strong>category</strong>.',
     side: 'top',
     align: 'center',
   },
@@ -108,13 +98,13 @@ export function startDashboardTour(
       },
     },
 
-    // Steps 3–6 — Dashboard sections in the user's current order
+    // Steps 3–5 — Dashboard sections in the user's current order
     ...sectionOrder.map((id) => ({
       element: `[data-tour="${SECTION_TOUR_ATTRS[id]}"]`,
       popover: SECTION_POPOVERS[id],
     })),
 
-    // Step 7 — Navigation (sidebar)
+    // Step 6 — Navigation (sidebar)
     {
       element: '[data-tour="sidebar-nav"]',
       popover: {
@@ -127,7 +117,7 @@ export function startDashboardTour(
       },
     },
 
-    // Step 8 — Lock + completion
+    // Step 7 — Lock + completion
     {
       element: '[data-tour="sidebar-lock"]',
       popover: {

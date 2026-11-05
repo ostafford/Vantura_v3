@@ -23,13 +23,8 @@ vi.mock('@/db', () => ({
   getAppSetting: () => null,
 }))
 
-const {
-  getWeekRange,
-  getWeeklyInsights,
-  getMonthlyInsights,
-  getInsightsForDateRange,
-  getYearMonthlyTotals,
-} = await import('./insights')
+const { getMonthlyInsights, getInsightsForDateRange, getYearMonthlyTotals } =
+  await import('./insights')
 const { getFilteredTransactions } = await import('./transactions')
 
 const ORIGINAL_TZ = process.env.TZ
@@ -70,7 +65,7 @@ afterEach(() => {
   else process.env.TZ = ORIGINAL_TZ
 })
 
-/** Spend either side of the local Mon 2 – Sun 8 Nov 2026 week. */
+/** Spend either side of the local days Mon 2 – Sun 8 Nov 2026. */
 function seedWeekEdges() {
   insertTx('2026-11-01T20:00:00+11:00', -1000) // previous Sunday evening
   insertTx('2026-11-02T05:00:00+11:00', -2000) // this Monday, early
@@ -79,14 +74,7 @@ function seedWeekEdges() {
 }
 
 describe('Insights windows are local calendar days (#149)', () => {
-  it('weekly: counts Mon 05:00 and Sun 20:00 local, not the previous Sunday evening', () => {
-    seedWeekEdges()
-    const data = getWeeklyInsights(getWeekRange(0))
-    expect(data.moneyOut).toBe(6000)
-    expect(data.charges).toBe(2)
-  })
-
-  it('date range: same local-day bounds for an arbitrary range', () => {
+  it('date range: counts Mon 05:00 and Sun 20:00 local, not the previous Sunday evening', () => {
     seedWeekEdges()
     expect(getInsightsForDateRange('2026-11-02', '2026-11-08').moneyOut).toBe(
       6000

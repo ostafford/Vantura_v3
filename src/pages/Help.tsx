@@ -234,7 +234,7 @@ export function Help() {
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
                       <strong>Dashboard</strong> — balance cards, Month at a
-                      glance, Weekly insights, Trackers, Regulars
+                      glance, Trackers, Regulars
                     </li>
                     <li className="mb-1">
                       <strong>Analytics</strong> — Trackers, Savers, Budget Plan
@@ -338,10 +338,6 @@ export function Help() {
                       <strong>Month at a glance</strong> — day-by-day spending
                       for the current calendar month vs the previous month, with
                       key metrics and a narrative summary
-                    </li>
-                    <li className="mb-1">
-                      <strong>Weekly insights</strong> — money in, money out,
-                      and category spending for the selected week
                     </li>
                     <li className="mb-1">
                       <strong>Trackers</strong> — budget progress and days

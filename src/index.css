@@ -286,35 +286,6 @@
 [data-theme='light'] .pwa-update-banner {
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
 }
-/* Pastel fill backgrounds: dark-tinted → white-tinted in light mode */
-[data-theme='light'] .bg-pastel-success {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-success) 48%, white) 0%,
-    color-mix(in srgb, var(--vantura-success) 38%, white) 100%
-  );
-}
-[data-theme='light'] .bg-pastel-danger {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-danger) 48%, white) 0%,
-    color-mix(in srgb, var(--vantura-danger) 38%, white) 100%
-  );
-}
-[data-theme='light'] .bg-pastel-info {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-info) 48%, white) 0%,
-    color-mix(in srgb, var(--vantura-info) 38%, white) 100%
-  );
-}
-[data-theme='light'] .bg-pastel-primary {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-primary) 48%, white) 0%,
-    color-mix(in srgb, var(--vantura-primary) 38%, white) 100%
-  );
-}
 /* Auth screen gradient — light bg tinted by accent */
 [data-theme='light'] .auth-full-bg {
   background: linear-gradient(
@@ -994,41 +965,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .bg-gradient-info .text-white,
 .bg-gradient-danger .text-white {
   color: var(--vantura-text-on-gradient) !important;
-}
-
-/* Pastel fill classes — compact StatCard (Money In / Out / Savers / Charges)
-   Gradient: 15% lighter at top-left → 15% deeper at bottom-right for soft depth */
-.bg-pastel-success {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-success) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-success) 82%, #13131c) 100%
-  );
-  color: rgba(26, 26, 46, 0.82);
-}
-.bg-pastel-danger {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-danger) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-danger) 82%, #13131c) 100%
-  );
-  color: rgba(26, 26, 46, 0.82);
-}
-.bg-pastel-info {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-info) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-info) 82%, #13131c) 100%
-  );
-  color: rgba(26, 26, 46, 0.82);
-}
-.bg-pastel-primary {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--vantura-primary) 82%, white) 0%,
-    color-mix(in srgb, var(--vantura-primary) 82%, #13131c) 100%
-  );
-  color: rgba(26, 26, 46, 0.82);
 }
 
 /* Balance zone (ticket #15): Spendable hero + Available / Forecast mini-tiles.
