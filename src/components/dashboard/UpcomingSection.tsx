@@ -14,6 +14,8 @@ import {
   regularsByMonth,
   regularById,
   deleteRegular,
+  markOccurrencePaid,
+  unmarkOccurrencePaid,
   daysUntilCharge,
   blankDraft,
   draftFromRegular,
@@ -210,17 +212,39 @@ export function UpcomingSection({
     onUpcomingChange?.()
   }
 
-  // Resolve an overdue ONCE charge (#18). "Paid" and "Remove" both hard-delete —
-  // a one-off has no next cycle to roll to and Vantura keeps no charge history
-  // (the bank transaction in Transactions is the record). "Reschedule" just
-  // reopens the edit form so the user can set a new future date.
-  function resolveOverdue(c: Regular, paid: boolean) {
-    deleteRegular(c.id)
+  function changed() {
     setRefresh((r) => r + 1)
     onUpcomingChange?.()
-    toast.success(
-      paid ? `"${c.name}" marked paid and removed.` : `"${c.name}" removed.`
-    )
+  }
+
+  // Overdue "Paid" (#217) records a paid mark on that occurrence and never
+  // deletes the Regular, ONCE included (#183 decision 6). Undo removes the mark.
+  function markOverduePaid(c: Regular) {
+    const date = c.next_charge_date
+    if (!markOccurrencePaid(c.id, date)) {
+      toast.error(`Couldn’t mark "${c.name}" paid.`)
+      changed()
+      return
+    }
+    changed()
+    toast.success(`"${c.name}" marked paid`, {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          unmarkOccurrencePaid(c.id, date)
+          changed()
+        },
+      },
+    })
+  }
+
+  // "Remove" (not paid) on an overdue ONCE still hard-deletes (#18). It isn't
+  // offered on a recurring Regular, where it would delete every future
+  // occurrence; deleting one stays in its edit form, which confirms.
+  function removeOverdueOnce(c: Regular) {
+    deleteRegular(c.id)
+    changed()
+    toast.success(`"${c.name}" removed.`)
   }
 
   // Prefill the form from a picked past transaction (#22). Picking one also
@@ -333,8 +357,9 @@ export function UpcomingSection({
           <strong>Overdue — was this paid?</strong>
         </div>
         <p className="small text-muted mb-2">
-          One-off charges whose date has passed. Resolve each so it stops
-          showing here and stops counting toward your totals.
+          Regulars due earlier this month with no payment seen, and one-offs
+          whose date has passed. Resolve each so it stops showing here and stops
+          counting toward your totals.
         </p>
         {overdue.map((c) => {
           const categoryName = c.category_id
@@ -357,7 +382,7 @@ export function UpcomingSection({
                   <Button
                     size="sm"
                     variant="success"
-                    onClick={() => resolveOverdue(c, true)}
+                    onClick={() => markOverduePaid(c)}
                   >
                     <i className="mdi mdi-check me-1" aria-hidden />
                     Paid
@@ -367,15 +392,17 @@ export function UpcomingSection({
                     variant="outline-secondary"
                     onClick={() => openEdit(c)}
                   >
-                    Reschedule
+                    {c.frequency === 'ONCE' ? 'Reschedule' : 'Edit'}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline-danger"
-                    onClick={() => resolveOverdue(c, false)}
-                  >
-                    Remove
-                  </Button>
+                  {c.frequency === 'ONCE' && (
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
+                      onClick={() => removeOverdueOnce(c)}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </div>
               </Card.Body>
             </Card>

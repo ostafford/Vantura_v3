@@ -359,21 +359,22 @@ describe('Regulars readers — characterisation (#159)', () => {
     }).toMatchInlineSnapshot(`
       {
         "later": [
-          "2025-03-10 Streaming",
           "2025-03-15 Domain",
           "2025-03-20 Car rego",
           "2025-04-02 Water",
         ],
         "overdue": [
+          "2025-02-03 Gym",
+          "2025-02-05 Trial",
+          "2025-02-10 Streaming",
           "2025-02-10 Concert",
+          "2025-02-14 Rent",
         ],
         "thisMonth": [
-          "2025-02-24 Gym",
           "2025-02-24 Spotify",
           "2025-02-25 Netflix",
           "2025-02-26 Electricity",
           "2025-02-27 Card repayment",
-          "2025-02-28 Rent",
           "2025-02-28 Car loan",
           "2025-02-28 Phone",
         ],
@@ -384,19 +385,6 @@ describe('Regulars readers — characterisation (#159)', () => {
   it('grouping returns full rows (projected date, all fields)', () => {
     expect(regularsByMonth().thisMonth).toMatchInlineSnapshot(`
       [
-        {
-          "amount": 1500,
-          "bucket_id": null,
-          "cancel_by_date": null,
-          "category_id": null,
-          "frequency": "WEEKLY",
-          "id": 2,
-          "is_reserved": 1,
-          "match_description": null,
-          "name": "Gym",
-          "next_charge_date": "2025-02-24",
-          "reminder_days_before": null,
-        },
         {
           "amount": 1299,
           "bucket_id": 1,
@@ -448,19 +436,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "name": "Card repayment",
           "next_charge_date": "2025-02-27",
           "reminder_days_before": null,
-        },
-        {
-          "amount": 80000,
-          "bucket_id": null,
-          "cancel_by_date": null,
-          "category_id": null,
-          "frequency": "FORTNIGHTLY",
-          "id": 3,
-          "is_reserved": 1,
-          "match_description": null,
-          "name": "Rent",
-          "next_charge_date": "2025-02-28",
-          "reminder_days_before": 7,
         },
         {
           "amount": 45000,
