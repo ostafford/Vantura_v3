@@ -764,6 +764,9 @@ export function seedDemoData(): void {
   run(
     `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain', 'Spotify')`
   )
+  run(
+    `DELETE FROM regular_paid_marks WHERE regular_id NOT IN (SELECT id FROM upcoming_charges)`
+  )
 
   const nextCharge1 = new Date()
   nextCharge1.setDate(nextCharge1.getDate() + 5)

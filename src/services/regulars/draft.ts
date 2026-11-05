@@ -249,6 +249,7 @@ export function saveRegular(draft: RegularDraft): number {
 export function deleteRegular(id: number): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM regular_paid_marks WHERE regular_id = ?`, [id])
   db.run(`DELETE FROM upcoming_charges WHERE id = ?`, [id])
   schedulePersist()
 }

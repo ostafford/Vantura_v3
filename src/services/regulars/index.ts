@@ -6,16 +6,17 @@
  * Reads are projected here (docs/adr/0004): `regularsByMonth`,
  * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
  * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
- * `linkedPaymentsInMonth`, `regularsInMonth`.
+ * `linkedPaymentsInMonth`, `regularsInMonth`, `regularOccurrencesPaidInMonth`.
  * One returns stored rows by design: `regularById` (the editor's anchor).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`, `linkedPayments.ts`, `month.ts`, `draft.ts`.
+ * `funding.ts`, `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
  * `saveRegular`, which applies the stored-date rule and writes the bucket in
- * the same write; and `deleteRegular`.
+ * the same write; and `deleteRegular`. Mark paid (#214): `markOccurrencePaid`
+ * / `unmarkOccurrencePaid`.
  */
 
 import { getDb } from '@/db'
@@ -64,6 +65,14 @@ export {
   type RegularLinkedPayments,
 } from './linkedPayments'
 export { regularsInMonth, type RegularMonth } from './month'
+export {
+  regularOccurrencesPaidInMonth,
+  markOccurrencePaid,
+  unmarkOccurrencePaid,
+  readPaidMarks,
+  type RegularOccurrencePaid,
+  type RegularPaidMark,
+} from './paid'
 export {
   nextChargeDateFromAnchor,
   firstOccurrenceOnOrAfter,
