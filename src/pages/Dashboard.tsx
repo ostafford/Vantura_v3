@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { Modal, Button, Form } from 'react-bootstrap'
-import { useLocation } from 'react-router-dom'
 import { useStore } from 'zustand'
 import {
   getAvailableBalance,
@@ -55,7 +54,6 @@ const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
 }
 
 export function Dashboard() {
-  const location = useLocation()
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const isSyncing = useStore(syncStore, (s) => s.syncing)
   const [dataVersion, setDataVersion] = useState(0)
@@ -440,35 +438,6 @@ export function Dashboard() {
     setSectionSizes(getDashboardSectionSizes())
     setSectionVisibility(getDashboardSectionVisibility())
   }, [dataVersion])
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const scroll = params.get('scroll')
-    if (!scroll) return
-    const url = new URL(window.location.href)
-    url.searchParams.delete('scroll')
-    window.history.replaceState(null, '', url.toString())
-    const idMap: Record<string, string> = {
-      upcoming: 'dashboard-section-upcoming',
-      spendable: 'dashboard-spendable-card',
-    }
-    const elId = idMap[scroll]
-    if (!elId) return
-    const t = setTimeout(() => {
-      const el = document.getElementById(elId)
-      if (!el) return
-      const reduce = window.matchMedia(
-        '(prefers-reduced-motion: reduce)'
-      ).matches
-      el.scrollIntoView({
-        behavior: reduce ? 'auto' : 'smooth',
-        block: 'center',
-      })
-      el.classList.add('dashboard-scroll-highlight')
-      setTimeout(() => el.classList.remove('dashboard-scroll-highlight'), 2000)
-    }, 150)
-    return () => clearTimeout(t)
-  }, [location.search])
 
   const handleSectionDragStart = useCallback(
     (e: React.DragEvent, id: DashboardSectionId) => {
