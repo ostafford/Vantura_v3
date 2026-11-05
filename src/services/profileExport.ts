@@ -1,11 +1,8 @@
 /**
  * Profile export/import: encrypted file-based transfer of settings, trackers,
- * upcoming charges, budget plan, Net Worth manual accounts + snapshot history,
- * and per-saver goal history between devices. Never exports Up Bank transactions
- * or accounts, the API token, or encryption keys. The manual-account balances /
- * institution names / notes that #34 added are only ever written to the
- * passphrase-encrypted bundle and stay on-device — nothing here makes a network
- * call.
+ * upcoming charges, budget plan and per-saver goal history between devices.
+ * Never exports Up Bank transactions or accounts, the API token, or encryption
+ * keys. Nothing here makes a network call.
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
@@ -24,9 +21,11 @@ import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 /**
  * Export format version for the encrypted payload. v10 (#204): the
  * `budgetHypotheticals` section is no longer written. v11 (#208): the
- * notification settings are no longer written.
+ * notification settings are no longer written. v12 (#209): the
+ * `manualAccounts` and `netWorthSnapshots` sections and the Regulars'
+ * `charge_type` / `linked_account_name` fields are no longer written.
  */
-const EXPORT_PAYLOAD_VERSION = 11
+const EXPORT_PAYLOAD_VERSION = 12
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -72,10 +71,6 @@ export interface ExportPayload {
   trackerConfigHistory?: TrackerConfigHistoryExportRow[]
   upcomingCharges: UpcomingChargeExportRow[]
   budgetBuckets: BudgetBucketExportRow[]
-  /** #34 — Net Worth manual accounts. Absent in payloads from before v5. */
-  manualAccounts?: ManualAccountExportRow[]
-  /** #34 — Net Worth daily snapshot history. Absent in payloads from before v5. */
-  netWorthSnapshots?: NetWorthSnapshotExportRow[]
   /** #29 — per-saver goal history. Absent in payloads from before v6. */
   saverGoals?: SaverGoalExportRow[]
 }
@@ -127,14 +122,6 @@ export interface UpcomingChargeExportRow {
   bucket_id?: number | null
   /** #111 — Up `description` of the Regular's linked payments (docs/adr/0020). Absent before payload v8. */
   match_description?: string | null
-  /** #118 — 'EXPENSE' | 'LIABILITY_REPAYMENT'. Absent before payload v9 (imports as 'EXPENSE'). */
-  charge_type?: string
-  /**
-   * #118 — name of the linked manual liability account. Local ids don't
-   * survive the export boundary (ADR-0013), so the link travels by name and
-   * is resolved after import. Absent before payload v9.
-   */
-  linked_account_name?: string | null
 }
 
 export interface BudgetBucketExportRow {
@@ -142,37 +129,6 @@ export interface BudgetBucketExportRow {
   name: string
   icon: string
   sort_order: number
-}
-
-/**
- * #34 — a `manual_accounts` row minus its local AUTOINCREMENT `id` (no
- * cross-database identity, same as `upcoming_charges`). `last_updated_at` and
- * `created_at` are carried through as-exported rather than reset on import — a
- * restored account should report when its balance was actually last confirmed.
- */
-export interface ManualAccountExportRow {
-  name: string
-  institution: string | null
-  account_type: string
-  kind: string
-  balance_cents: number
-  credit_limit_cents: number | null
-  interest_rate_bps: number | null
-  rate_type: string | null
-  fixed_rate_expiry_date: string | null
-  notes: string | null
-  sort_order: number
-  last_updated_at: string
-  created_at: string
-}
-
-/** #34 — a `net_worth_snapshots` row verbatim; `snapshot_date` is the PK and is
- * itself cross-database stable, so no id remap is needed. */
-export interface NetWorthSnapshotExportRow {
-  snapshot_date: string
-  up_bank_cents: number
-  manual_assets_cents: number
-  manual_liabilities_cents: number
 }
 
 export interface ExportFileWrapper {
@@ -320,10 +276,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date, bucket_id, match_description,
-      COALESCE(charge_type, 'EXPENSE'),
-      (SELECT m.name FROM manual_accounts m
-       WHERE m.id = upcoming_charges.linked_manual_account_id)
+      reminder_days_before, cancel_by_date, bucket_id, match_description
      FROM upcoming_charges ORDER BY id`
   )
   const rows: UpcomingChargeExportRow[] = []
@@ -339,8 +292,6 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string | null,
       number | null,
       string | null,
-      string,
-      string | null,
     ]
     rows.push({
       name: r[0],
@@ -353,8 +304,6 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       cancel_by_date: r[7] ?? null,
       bucket_id: r[8] ?? null,
       match_description: r[9] ?? null,
-      charge_type: r[10],
-      linked_account_name: r[11] ?? null,
     })
   }
   stmt.free()
@@ -382,73 +331,6 @@ function collectBudgetBuckets(): BudgetBucketExportRow[] {
   return rows
 }
 
-function collectManualAccounts(): ManualAccountExportRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT name, institution, account_type, kind, balance_cents,
-            credit_limit_cents, interest_rate_bps, rate_type,
-            fixed_rate_expiry_date, notes, sort_order, last_updated_at, created_at
-     FROM manual_accounts ORDER BY sort_order, id`
-  )
-  const rows: ManualAccountExportRow[] = []
-  while (stmt.step()) {
-    const r = stmt.get() as [
-      string,
-      string | null,
-      string,
-      string,
-      number,
-      number | null,
-      number | null,
-      string | null,
-      string | null,
-      string | null,
-      number,
-      string,
-      string,
-    ]
-    rows.push({
-      name: r[0],
-      institution: r[1],
-      account_type: r[2],
-      kind: r[3],
-      balance_cents: r[4],
-      credit_limit_cents: r[5],
-      interest_rate_bps: r[6],
-      rate_type: r[7],
-      fixed_rate_expiry_date: r[8],
-      notes: r[9],
-      sort_order: r[10],
-      last_updated_at: r[11],
-      created_at: r[12],
-    })
-  }
-  stmt.free()
-  return rows
-}
-
-function collectNetWorthSnapshots(): NetWorthSnapshotExportRow[] {
-  const db = getDb()
-  if (!db) return []
-  const stmt = db.prepare(
-    `SELECT snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents
-     FROM net_worth_snapshots ORDER BY snapshot_date`
-  )
-  const rows: NetWorthSnapshotExportRow[] = []
-  while (stmt.step()) {
-    const r = stmt.get() as [string, number, number, number]
-    rows.push({
-      snapshot_date: r[0],
-      up_bank_cents: r[1],
-      manual_assets_cents: r[2],
-      manual_liabilities_cents: r[3],
-    })
-  }
-  stmt.free()
-  return rows
-}
-
 /**
  * Build the plain-text export payload (before encryption).
  */
@@ -459,8 +341,6 @@ export function buildExportPayload(): ExportPayload {
   const trackerConfigHistory = collectTrackerConfigHistory()
   const upcomingCharges = collectUpcomingCharges()
   const budgetBuckets = collectBudgetBuckets()
-  const manualAccounts = collectManualAccounts()
-  const netWorthSnapshots = collectNetWorthSnapshots()
   const saverGoals = collectSaverGoals()
 
   return {
@@ -473,8 +353,6 @@ export function buildExportPayload(): ExportPayload {
     trackerConfigHistory,
     upcomingCharges,
     budgetBuckets,
-    manualAccounts,
-    netWorthSnapshots,
     saverGoals,
   }
 }
@@ -640,6 +518,16 @@ const CUT_SECTIONS: readonly {
     singular: 'hypothetical line',
     plural: 'hypothetical lines',
   },
+  {
+    key: 'manualAccounts',
+    singular: 'Net Worth account',
+    plural: 'Net Worth accounts',
+  },
+  {
+    key: 'netWorthSnapshots',
+    singular: 'Net Worth history entry',
+    plural: 'Net Worth history entries',
+  },
 ]
 
 /**
@@ -699,8 +587,6 @@ export interface ImportOptions {
   trackers: boolean
   upcomingCharges: boolean
   budgetPlan: boolean
-  /** #34 — manual_accounts + net_worth_snapshots (Net Worth). */
-  netWorth: boolean
 }
 
 /**
@@ -948,28 +834,18 @@ export function replaceTrackers(
 }
 
 /**
- * A liability repayment Regular waiting to be re-linked to its manual account
- * by name, once every selected section has been imported (#118).
- */
-export interface PendingAccountLink {
-  chargeId: number
-  accountName: string
-}
-
-/**
- * Replace upcoming_charges with imported data. Returns the account links to
- * resolve by name once manual_accounts are final — see
- * `relinkLiabilityAccounts`.
+ * Replace upcoming_charges with imported data. An older export's
+ * `charge_type` and `linked_account_name` (#118, cut in #209) are ignored: a
+ * former liability repayment imports as an ordinary Regular.
  */
 export function replaceUpcomingCharges(
   upcomingCharges: UpcomingChargeExportRow[],
   bucketIdMap: Map<number, number> = new Map()
-): PendingAccountLink[] {
+): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
   db.run(`DELETE FROM upcoming_charges`)
 
-  const pending: PendingAccountLink[] = []
   const now = new Date().toISOString()
   const charges = Array.isArray(upcomingCharges) ? upcomingCharges : []
   for (const uc of charges) {
@@ -1006,17 +882,13 @@ export function replaceUpcomingCharges(
       typeof uc.match_description === 'string' && uc.match_description
         ? uc.match_description
         : null
-    const chargeType =
-      uc.charge_type === 'LIABILITY_REPAYMENT'
-        ? 'LIABILITY_REPAYMENT'
-        : 'EXPENSE'
 
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, category_id, is_reserved,
           reminder_days_before, cancel_by_date, bucket_id, match_description,
-          charge_type, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
@@ -1028,150 +900,7 @@ export function replaceUpcomingCharges(
         cancelByDate,
         bucketId,
         matchDescription,
-        chargeType,
         now,
-      ]
-    )
-    if (
-      chargeType === 'LIABILITY_REPAYMENT' &&
-      typeof uc.linked_account_name === 'string' &&
-      uc.linked_account_name
-    ) {
-      pending.push({
-        chargeId: db.exec('SELECT last_insert_rowid()')[0]
-          .values[0][0] as number,
-        accountName: uc.linked_account_name,
-      })
-    }
-  }
-  return pending
-}
-
-/**
- * The account links of this device's liability repayment Regulars, by name —
- * captured before `replaceNetWorth` re-inserts manual_accounts under new ids,
- * so a Net-Worth-only import doesn't leave them pointing at deleted rows.
- */
-function captureLocalAccountLinks(
-  db: NonNullable<ReturnType<typeof getDb>>
-): PendingAccountLink[] {
-  const res = db.exec(
-    `SELECT c.id, m.name FROM upcoming_charges c
-     JOIN manual_accounts m ON m.id = c.linked_manual_account_id
-     WHERE c.charge_type = 'LIABILITY_REPAYMENT'`
-  )
-  return (res[0]?.values ?? []).map((r) => ({
-    chargeId: r[0] as number,
-    accountName: String(r[1]),
-  }))
-}
-
-/**
- * Re-link each pending Regular to the manual account with exactly its name.
- * Zero or several matches leave it unlinked — never a guess (same "ambiguous
- * means no link" rule as docs/adr/0020). An unlinked Regular keeps
- * `LIABILITY_REPAYMENT`: the debt still exists, Vantura just can't tell which
- * account it is (#118).
- */
-function relinkLiabilityAccounts(
-  db: NonNullable<ReturnType<typeof getDb>>,
-  pending: PendingAccountLink[]
-): void {
-  for (const { chargeId, accountName } of pending) {
-    const res = db.exec(`SELECT id FROM manual_accounts WHERE name = ?`, [
-      accountName,
-    ])
-    const ids = res[0]?.values ?? []
-    db.run(
-      `UPDATE upcoming_charges SET linked_manual_account_id = ? WHERE id = ?`,
-      [ids.length === 1 ? (ids[0][0] as number) : null, chargeId]
-    )
-  }
-}
-
-/**
- * #34 — Replace manual_accounts and net_worth_snapshots with imported data.
- * Both are full delete-then-reinsert (ADR-0013). manual_accounts.id is local
- * AUTOINCREMENT so it is dropped on export and regenerated here; nothing
- * references it across the export boundary. net_worth_snapshots carry no
- * manual-account foreign keys — they are pre-aggregated daily totals keyed by
- * date — so they just copy across.
- */
-export function replaceNetWorth(
-  manualAccounts: ManualAccountExportRow[] = [],
-  netWorthSnapshots: NetWorthSnapshotExportRow[] = []
-): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  db.run(`DELETE FROM net_worth_snapshots`)
-  db.run(`DELETE FROM manual_accounts`)
-
-  const now = new Date().toISOString()
-  const accounts = Array.isArray(manualAccounts) ? manualAccounts : []
-  for (const a of accounts) {
-    if (
-      typeof a.name !== 'string' ||
-      a.name === '' ||
-      typeof a.account_type !== 'string' ||
-      (a.kind !== 'asset' && a.kind !== 'liability') ||
-      typeof a.balance_cents !== 'number'
-    ) {
-      continue
-    }
-    const str = (v: unknown): string | null =>
-      typeof v === 'string' && v !== '' ? v : null
-    const num = (v: unknown): number | null =>
-      typeof v === 'number' ? v : null
-    const lastUpdatedAt =
-      typeof a.last_updated_at === 'string' && a.last_updated_at
-        ? a.last_updated_at
-        : now
-    const createdAt =
-      typeof a.created_at === 'string' && a.created_at ? a.created_at : now
-    db.run(
-      `INSERT INTO manual_accounts
-         (name, institution, account_type, kind, balance_cents, credit_limit_cents,
-          interest_rate_bps, rate_type, fixed_rate_expiry_date, notes, sort_order,
-          last_updated_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        a.name,
-        str(a.institution),
-        a.account_type,
-        a.kind,
-        a.balance_cents,
-        num(a.credit_limit_cents),
-        num(a.interest_rate_bps),
-        str(a.rate_type),
-        str(a.fixed_rate_expiry_date),
-        str(a.notes),
-        typeof a.sort_order === 'number' ? a.sort_order : 0,
-        lastUpdatedAt,
-        createdAt,
-      ]
-    )
-  }
-
-  const snapshots = Array.isArray(netWorthSnapshots) ? netWorthSnapshots : []
-  for (const s of snapshots) {
-    if (
-      typeof s.snapshot_date !== 'string' ||
-      s.snapshot_date.length < 10 ||
-      typeof s.up_bank_cents !== 'number' ||
-      typeof s.manual_assets_cents !== 'number' ||
-      typeof s.manual_liabilities_cents !== 'number'
-    ) {
-      continue
-    }
-    db.run(
-      `INSERT OR REPLACE INTO net_worth_snapshots
-         (snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents)
-       VALUES (?, ?, ?, ?)`,
-      [
-        s.snapshot_date.slice(0, 10),
-        s.up_bank_cents,
-        s.manual_assets_cents,
-        s.manual_liabilities_cents,
       ]
     )
   }
@@ -1259,8 +988,8 @@ export function importPayloadWithOptions(
   try {
     if (options.settings) {
       applySettings(payload.settings ?? {})
-      // Pre-v6 payloads have no saverGoals section. Guard like replaceNetWorth
-      // does — an unconditional replace with `[]` would wipe this device's
+      // Pre-v6 payloads have no saverGoals section. Guard it — an
+      // unconditional replace with `[]` would wipe this device's
       // saver goals. (Pre-v6 files only ever carried a goal *date*, never the
       // amount, so there is nothing to reconstruct from them.)
       if (payload.saverGoals !== undefined) {
@@ -1282,35 +1011,9 @@ export function importPayloadWithOptions(
         bucketIdMap
       )
     }
-    // Liability-account links travel by name (#118): collect them from the
-    // imported Regulars, or — when only Net Worth is replaced — from this
-    // device's own Regulars before their accounts are re-inserted, then
-    // resolve once manual_accounts are final.
-    const replacesNetWorth =
-      options.netWorth && payload.manualAccounts !== undefined
-    let pendingLinks: PendingAccountLink[] = []
     if (options.upcomingCharges) {
-      pendingLinks = replaceUpcomingCharges(
-        payload.upcomingCharges ?? [],
-        bucketIdMap
-      )
-    } else if (replacesNetWorth) {
-      pendingLinks = captureLocalAccountLinks(db)
+      replaceUpcomingCharges(payload.upcomingCharges ?? [], bucketIdMap)
     }
-    // A pre-v5 payload has no Net Worth section at all. Running replaceNetWorth
-    // then would DELETE both tables with nothing to reinsert, silently wiping
-    // this device's manual accounts and history. The wizard already only sets
-    // `netWorth` when the file contains the section, but gate it here too so no
-    // other caller (batch restore, tests, a future CLI) can trip the same
-    // footgun. `manualAccounts: []` — present but empty — is still a real
-    // replace-all and is left to run.
-    if (replacesNetWorth) {
-      replaceNetWorth(
-        payload.manualAccounts ?? [],
-        payload.netWorthSnapshots ?? []
-      )
-    }
-    relinkLiabilityAccounts(db, pendingLinks)
 
     db.run('COMMIT')
   } catch (err) {

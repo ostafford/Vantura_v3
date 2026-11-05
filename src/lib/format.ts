@@ -29,7 +29,7 @@ export function formatSignedMoney(cents: number): string {
 /**
  * Like {@link formatSignedMoney} but also shows an explicit `+` on positives —
  * `+$12.34` / `−$12.34` / `$0.00`. Use for *changes / deltas* where the
- * direction is the point (net-worth movement, net flow, a period-over-period
+ * direction is the point (net flow, a period-over-period
  * "Net" figure). A zero delta gets no sign.
  */
 export function formatDeltaMoney(cents: number): string {

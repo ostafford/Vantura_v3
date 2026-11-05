@@ -2,9 +2,8 @@
  * Linked payments: which synced payments belong to a Regular, and so which
  * account actually pays it (docs/adr/0020, amending docs/adr/0019). Used by
  * the Essentials-era Reserved formula branch. The notification checks that
- * also used it (bill-settled clearing, liability-repayment prompts) were cut
- * in #208; `hasLinkedPayment` has no caller until the paid check is rebuilt
- * (#211).
+ * also used it were cut in #208; `hasLinkedPayment` has no caller until the
+ * paid check is rebuilt (#211).
  */
 
 import type { Database } from 'sql.js'

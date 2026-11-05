@@ -24,10 +24,6 @@ export interface Regular {
   reminder_days_before: number | null
   /** Optional date by which to cancel (for subscriptions). */
   cancel_by_date: string | null
-  /** 'EXPENSE' (default) reduces net worth; 'LIABILITY_REPAYMENT' is asset-liability neutral. */
-  charge_type: 'EXPENSE' | 'LIABILITY_REPAYMENT'
-  /** Links a LIABILITY_REPAYMENT charge to a manual_accounts row. */
-  linked_manual_account_id: number | null
   /** Up `description` of the Regular's linked payments (docs/adr/0020). */
   match_description: string | null
   /**
@@ -47,21 +43,15 @@ type RegularTuple = [
   number,
   number | null,
   string | null,
-  string,
-  number | null,
   string | null,
   number | null,
 ]
 
-/**
- * Every Regular, in id order. `charge_type` needs no default here: the column
- * is `NOT NULL DEFAULT 'EXPENSE'` in both the DDL and its migration.
- */
+/** Every Regular, in id order. */
 export function readRegulars(db: Database): Regular[] {
   const stmt = db.prepare(
     `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date, charge_type, linked_manual_account_id,
-      match_description, bucket_id
+      reminder_days_before, cancel_by_date, match_description, bucket_id
      FROM upcoming_charges ORDER BY id`
   )
   const rows: Regular[] = []
@@ -77,10 +67,8 @@ export function readRegulars(db: Database): Regular[] {
       is_reserved: r[6],
       reminder_days_before: r[7] ?? null,
       cancel_by_date: r[8] ?? null,
-      charge_type: r[9] as Regular['charge_type'],
-      linked_manual_account_id: r[10] ?? null,
-      match_description: r[11] ?? null,
-      bucket_id: r[12] ?? null,
+      match_description: r[9] ?? null,
+      bucket_id: r[10] ?? null,
     })
   }
   stmt.free()

@@ -16,8 +16,6 @@ import { localDateString } from '@/lib/format'
 import { nextChargeDateFromAnchor } from './projection'
 import { readRegularById, type Regular } from './rows'
 
-export type RegularChargeType = Regular['charge_type']
-
 export interface RegularDraft {
   /** The Regular being edited; null for a new one. */
   id: number | null
@@ -34,9 +32,6 @@ export interface RegularDraft {
   reminderDaysBefore: string
   /** `''` = no cancel-by date. */
   cancelByDate: string
-  chargeType: RegularChargeType
-  /** Only kept for `LIABILITY_REPAYMENT`. */
-  linkedManualAccountId: number | null
   /** Up `description` of the linked payments (docs/adr/0020); `''` = none. */
   matchDescription: string
   /** Budget Plan bucket, written in the same write as the Regular. */
@@ -86,8 +81,6 @@ export function blankDraft(today: string = localDateString()): RegularDraft {
     isReserved: true,
     reminderDaysBefore: '',
     cancelByDate: '',
-    chargeType: 'EXPENSE',
-    linkedManualAccountId: null,
     matchDescription: '',
     bucketId: null,
     anchorDate: null,
@@ -118,8 +111,6 @@ export function draftFromRegular(
         ? String(stored.reminder_days_before)
         : '',
     cancelByDate: stored.cancel_by_date ?? '',
-    chargeType: stored.charge_type ?? 'EXPENSE',
-    linkedManualAccountId: stored.linked_manual_account_id ?? null,
     matchDescription: stored.match_description ?? '',
     bucketId: storedBucketId(stored.id),
     anchorDate: null,
@@ -225,10 +216,6 @@ export function saveRegular(draft: RegularDraft): number {
     draft.isReserved ? 1 : 0,
     reminder != null && !Number.isNaN(reminder) ? reminder : null,
     cancelByDate(draft),
-    draft.chargeType,
-    draft.chargeType === 'LIABILITY_REPAYMENT'
-      ? draft.linkedManualAccountId
-      : null,
     draft.matchDescription || null,
     draft.bucketId,
   ]
@@ -240,8 +227,7 @@ export function saveRegular(draft: RegularDraft): number {
       `UPDATE upcoming_charges SET
          name = ?, amount = ?, frequency = ?, next_charge_date = ?, category_id = ?,
          is_reserved = ?, reminder_days_before = ?, cancel_by_date = ?,
-         charge_type = ?, linked_manual_account_id = ?, match_description = ?,
-         bucket_id = ?
+         match_description = ?, bucket_id = ?
        WHERE id = ?`,
       [...fields, id]
     )
@@ -249,9 +235,9 @@ export function saveRegular(draft: RegularDraft): number {
     db.run(
       `INSERT INTO upcoming_charges
          (name, amount, frequency, next_charge_date, category_id, is_reserved,
-          reminder_days_before, cancel_by_date, charge_type,
-          linked_manual_account_id, match_description, bucket_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reminder_days_before, cancel_by_date, match_description, bucket_id,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [...fields, new Date().toISOString()]
     )
     id = Number(db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0])

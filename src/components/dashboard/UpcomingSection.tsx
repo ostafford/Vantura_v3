@@ -20,7 +20,6 @@ import {
   draftFromSuggestion,
   essentialsLinkHints,
   type Regular,
-  type RegularChargeType,
 } from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import { getReservedAmount } from '@/services/balance'
@@ -36,10 +35,6 @@ import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { getBuckets } from '@/services/budgetBuckets'
-import {
-  getManualAccounts,
-  type ManualAccountRow,
-} from '@/services/manualAccounts'
 import { isEssentialsUser } from '@/services/essentials'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -90,8 +85,6 @@ export function UpcomingSection({
     isReserved,
     reminderDaysBefore,
     cancelByDate,
-    chargeType,
-    linkedManualAccountId,
     matchDescription,
     bucketId: upcomingBucketId,
   } = draft
@@ -129,14 +122,6 @@ export function UpcomingSection({
   }, [categories])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allBuckets = useMemo(() => getBuckets(), [refresh, lastSyncCompletedAt])
-  const allManualAccounts = useMemo(
-    () => getManualAccounts(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
-  )
-  const manualLiabilities = allManualAccounts.filter(
-    (a: ManualAccountRow) => a.kind === 'liability'
-  )
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const essentialsUser = useMemo(
     () => isEssentialsUser(),
@@ -193,8 +178,7 @@ export function UpcomingSection({
         d.categoryId ||
         d.reminderDaysBefore !== '' ||
         d.cancelByDate ||
-        d.bucketId != null ||
-        d.chargeType === 'LIABILITY_REPAYMENT'
+        d.bucketId != null
       )
     )
     setShowModal(true)
@@ -990,71 +974,6 @@ export function UpcomingSection({
                     that date.
                   </Form.Text>
 
-                  <Form.Group className="mb-2">
-                    <Form.Label className="small">Charge type</Form.Label>
-                    <Form.Select
-                      size="sm"
-                      value={chargeType}
-                      onChange={(e) => {
-                        const type = e.target.value as RegularChargeType
-                        update(
-                          type === 'LIABILITY_REPAYMENT'
-                            ? { chargeType: type }
-                            : { chargeType: type, linkedManualAccountId: null }
-                        )
-                      }}
-                    >
-                      <option value="EXPENSE">
-                        Expense (reduces net worth)
-                      </option>
-                      <option value="LIABILITY_REPAYMENT">
-                        Liability repayment (e.g. credit card payment)
-                      </option>
-                    </Form.Select>
-                    <Form.Text className="text-muted">
-                      Liability repayments are excluded from projected net worth
-                      — paying a debt doesn&apos;t change your total wealth.
-                    </Form.Text>
-                  </Form.Group>
-
-                  {chargeType === 'LIABILITY_REPAYMENT' &&
-                    manualLiabilities.length > 0 && (
-                      <Form.Group className="mb-2">
-                        <Form.Label className="small">
-                          Link to account
-                        </Form.Label>
-                        <Form.Select
-                          size="sm"
-                          value={
-                            linkedManualAccountId != null
-                              ? String(linkedManualAccountId)
-                              : ''
-                          }
-                          onChange={(e) =>
-                            update({
-                              linkedManualAccountId: e.target.value
-                                ? Number(e.target.value)
-                                : null,
-                            })
-                          }
-                        >
-                          <option value="">None</option>
-                          {manualLiabilities.map((a: ManualAccountRow) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                              {a.institution ? ` (${a.institution})` : ''}
-                            </option>
-                          ))}
-                        </Form.Select>
-                        <Form.Text className="text-muted">
-                          Once this is linked and a settlement transaction is
-                          set below, Vantura prompts you to reduce this
-                          account&apos;s balance each time a payment is
-                          detected.
-                        </Form.Text>
-                      </Form.Group>
-                    )}
-
                   {/* ── Auto-clear when paid ────────────────────────────────── */}
                   <Form.Group className="mb-2">
                     <Form.Label className="small">
@@ -1191,9 +1110,7 @@ export function UpcomingSection({
                     <Form.Text className="text-muted d-block mt-1">
                       Link the real payment this bill matches. Its reminder then
                       clears itself when that payment next appears in a sync,
-                      instead of you dismissing it by hand. (For a liability
-                      repayment, Vantura also prompts you to update the
-                      balance.)
+                      instead of you dismissing it by hand.
                     </Form.Text>
                   </Form.Group>
                 </>

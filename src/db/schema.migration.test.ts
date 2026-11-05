@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(54)
+    expect(SCHEMA_VERSION).toBe(55)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -535,13 +535,13 @@ describe('v39 migration: drop dead is_subscription column', () => {
         'next_charge_date',
         'reminder_days_before',
         'cancel_by_date',
-        'charge_type',
         'match_raw_text',
       ])
     )
 
+    // (charge_type is v55's to drop, #209.)
     const row = db.exec(
-      `SELECT name, amount, frequency, next_charge_date, is_reserved, reminder_days_before, charge_type FROM upcoming_charges`
+      `SELECT name, amount, frequency, next_charge_date, is_reserved, reminder_days_before FROM upcoming_charges`
     )
     expect(row[0].values[0]).toEqual([
       'Netflix',
@@ -550,7 +550,6 @@ describe('v39 migration: drop dead is_subscription column', () => {
       '2026-02-01',
       1,
       3,
-      'EXPENSE',
     ])
 
     db.close()
@@ -1538,6 +1537,168 @@ describe('v54 migration: Notifications removed (#208)', () => {
     const db = new SQL.Database()
     runSchema(db)
     expect(tableExists(db, 'notification_history')).toBe(false)
+    db.close()
+  })
+})
+
+describe('v55 migration: Net Worth cut (#209)', () => {
+  const tableExists = (db: Database, name: string) =>
+    db.exec(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+      name,
+    ]).length > 0
+  const columns = (db: Database, table: string) =>
+    db.exec(`PRAGMA table_info(${table})`)[0].values.map((r) => String(r[1]))
+
+  /**
+   * A v54 database with Net Worth in use: a manual liability, a day of
+   * history, a liability repayment Regular linked to both, and a plain one.
+   */
+  function buildV54WithNetWorth(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN charge_type TEXT NOT NULL DEFAULT 'EXPENSE'`
+    )
+    db.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN linked_manual_account_id INTEGER`
+    )
+    db.run(
+      `CREATE TABLE manual_accounts (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         name TEXT NOT NULL,
+         institution TEXT,
+         account_type TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         balance_cents INTEGER NOT NULL DEFAULT 0,
+         credit_limit_cents INTEGER,
+         interest_rate_bps INTEGER,
+         rate_type TEXT,
+         fixed_rate_expiry_date TEXT,
+         notes TEXT,
+         sort_order INTEGER NOT NULL DEFAULT 0,
+         last_updated_at TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       )`
+    )
+    db.run(
+      `CREATE TABLE net_worth_snapshots (
+         snapshot_date TEXT PRIMARY KEY,
+         up_bank_cents INTEGER NOT NULL,
+         manual_assets_cents INTEGER NOT NULL DEFAULT 0,
+         manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
+       )`
+    )
+    db.run(
+      `INSERT INTO manual_accounts (id, name, account_type, kind, balance_cents, last_updated_at, created_at)
+       VALUES (3, 'Synthetic car loan', 'LOAN', 'liability', 1500000, '2026-10-01', '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO net_worth_snapshots VALUES ('2026-11-01', 500000, 0, 1500000)`
+    )
+    db.run(
+      `INSERT INTO budget_buckets (id, name, icon, sort_order, created_at)
+       VALUES (7, 'Debts', 'mdi-cash', 0, '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO upcoming_charges
+         (id, name, amount, frequency, next_charge_date, category_id, is_reserved,
+          reminder_days_before, cancel_by_date, created_at, bucket_id,
+          match_raw_text, match_description, charge_type, linked_manual_account_id)
+       VALUES
+         (1, 'Synthetic car loan', 45000, 'FORTNIGHTLY', '2026-10-09', NULL, 1,
+          3, '2027-06-30', '2026-01-01', 7, 'LOANCO RAW', 'LOANCO',
+          'LIABILITY_REPAYMENT', 3),
+         (2, 'Synthetic gym', 2500, 'MONTHLY', '2026-11-20', NULL, 0,
+          NULL, NULL, '2026-01-01', NULL, NULL, NULL, 'EXPENSE', NULL)`
+    )
+    // A table whose name is close to the dropped one, which must survive.
+    db.run(
+      `INSERT INTO saver_balance_snapshots (saver_id, snapshot_date, balance_cents)
+       VALUES ('saver-1', '2026-11-01', 9000)`
+    )
+    db.run(`UPDATE app_settings SET value = '54' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  const REGULAR_COLUMNS = `id, name, amount, frequency, next_charge_date, category_id,
+    is_reserved, reminder_days_before, cancel_by_date, created_at, bucket_id,
+    match_raw_text, match_description`
+
+  it('drops manual_accounts, net_worth_snapshots and the two liability columns', () => {
+    const db = buildV54WithNetWorth()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(tableExists(db, 'manual_accounts')).toBe(false)
+    expect(tableExists(db, 'net_worth_snapshots')).toBe(false)
+    const cols = columns(db, 'upcoming_charges')
+    expect(cols).not.toContain('charge_type')
+    expect(cols).not.toContain('linked_manual_account_id')
+    // Near misses: the other link columns, and the Saver snapshots, stay.
+    expect(cols).toEqual(
+      expect.arrayContaining(['match_raw_text', 'match_description'])
+    )
+    expect(
+      db.exec(`SELECT saver_id, balance_cents FROM saver_balance_snapshots`)[0]
+        .values
+    ).toEqual([['saver-1', 9000]])
+    db.close()
+  })
+
+  it('keeps a former liability repayment as an ordinary Regular, every other value unchanged', () => {
+    const db = buildV54WithNetWorth()
+    const before = db.exec(
+      `SELECT ${REGULAR_COLUMNS} FROM upcoming_charges ORDER BY id`
+    )[0].values
+
+    runMigrations(db)
+
+    expect(
+      db.exec(`SELECT ${REGULAR_COLUMNS} FROM upcoming_charges ORDER BY id`)[0]
+        .values
+    ).toEqual(before)
+    expect(before[0]).toEqual([
+      1,
+      'Synthetic car loan',
+      45000,
+      'FORTNIGHTLY',
+      '2026-10-09',
+      null,
+      1,
+      3,
+      '2027-06-30',
+      '2026-01-01',
+      7,
+      'LOANCO RAW',
+      'LOANCO',
+    ])
+    db.close()
+  })
+
+  it('runs on a v54 database that never had the Net Worth tables, and is idempotent', () => {
+    const db = new SQL.Database()
+    db.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '54')`
+    )
+    expect(() => runMigrations(db)).not.toThrow()
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    db.run(`UPDATE app_settings SET value = '54' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+
+  it('creates neither table nor column on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(tableExists(db, 'manual_accounts')).toBe(false)
+    expect(tableExists(db, 'net_worth_snapshots')).toBe(false)
+    const cols = columns(db, 'upcoming_charges')
+    expect(cols).not.toContain('charge_type')
+    expect(cols).not.toContain('linked_manual_account_id')
     db.close()
   })
 })

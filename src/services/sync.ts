@@ -16,7 +16,6 @@ import {
   type UpTag,
 } from '@/api/upBank'
 import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
-import { writeNetWorthSnapshot } from '@/services/netWorth'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'
 
@@ -405,7 +404,6 @@ export async function performInitialSync(
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
   reconcileSaverGoalAchievement()
-  writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
     progressCallback({
@@ -443,7 +441,6 @@ export async function performSync(
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
   reconcileSaverGoalAchievement()
-  writeNetWorthSnapshot()
   const sinceDate = getAppSetting('last_sync')
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   const txs = await fetchAllTransactions(apiToken, sinceDate, (p) => {
@@ -485,7 +482,6 @@ export async function performFullSync(
   reconcileClosedAccounts(new Set(accounts.map((a) => a.id)))
   snapshotSaverBalances(accounts)
   reconcileSaverGoalAchievement()
-  writeNetWorthSnapshot()
   progressCallback({ phase: 'transactions', fetched: 0, hasMore: true })
   await fetchAllTransactions(apiToken, null, (p) => {
     progressCallback({

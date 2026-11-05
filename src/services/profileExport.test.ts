@@ -12,7 +12,6 @@ import {
   replaceBudgetPlan,
   replaceTrackers,
   replaceUpcomingCharges,
-  replaceNetWorth,
   replaceSaverGoals,
   importPayloadWithOptions,
   describeSkippedSections,
@@ -25,8 +24,6 @@ import {
   type TrackerExportRow,
   type TrackerConfigHistoryExportRow,
   type UpcomingChargeExportRow,
-  type ManualAccountExportRow,
-  type NetWorthSnapshotExportRow,
 } from './profileExport'
 
 vi.mock('@/db', () => ({
@@ -587,15 +584,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     trackers: true,
     upcomingCharges: true,
     budgetPlan: true,
-    netWorth: true,
-  }
-
-  const NONE: ImportOptions = {
-    settings: false,
-    trackers: false,
-    upcomingCharges: false,
-    budgetPlan: false,
-    netWorth: false,
   }
 
   // ── #204: Hypothetical lines are cut ────────────────────────────────────
@@ -1205,7 +1193,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
           trackers: false,
           upcomingCharges: false,
           budgetPlan: false,
-          netWorth: false,
         }
       )
 
@@ -1224,7 +1211,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
           trackers: true,
           upcomingCharges: true,
           budgetPlan: false,
-          netWorth: false,
         }
       )
 
@@ -1360,365 +1346,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     })
   })
 
-  // ── #34: Net Worth (manual_accounts + net_worth_snapshots) ─────────────
-
-  describe('Net Worth export/import (#34)', () => {
-    function insertManualAccount(over: Partial<Record<string, unknown>> = {}) {
-      const row = {
-        name: 'Mortgage',
-        institution: 'Big Bank',
-        account_type: 'MORTGAGE',
-        kind: 'liability',
-        balance_cents: 45000000,
-        credit_limit_cents: null,
-        interest_rate_bps: 599,
-        rate_type: 'variable',
-        fixed_rate_expiry_date: null,
-        notes: 'offset linked',
-        sort_order: 0,
-        last_updated_at: '2026-02-10T00:00:00.000Z',
-        created_at: '2026-01-01T00:00:00.000Z',
-        ...over,
-      }
-      realDb.run(
-        `INSERT INTO manual_accounts
-           (name, institution, account_type, kind, balance_cents, credit_limit_cents,
-            interest_rate_bps, rate_type, fixed_rate_expiry_date, notes, sort_order,
-            last_updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          row.name,
-          row.institution,
-          row.account_type,
-          row.kind,
-          row.balance_cents,
-          row.credit_limit_cents,
-          row.interest_rate_bps,
-          row.rate_type,
-          row.fixed_rate_expiry_date,
-          row.notes,
-          row.sort_order,
-          row.last_updated_at,
-          row.created_at,
-        ] as never[]
-      )
-    }
-
-    function insertSnapshot(
-      date: string,
-      up = 100000,
-      assets = 0,
-      liabilities = 0
-    ) {
-      realDb.run(
-        `INSERT INTO net_worth_snapshots (snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents)
-         VALUES (?, ?, ?, ?)`,
-        [date, up, assets, liabilities]
-      )
-    }
-
-    function readManualAccounts() {
-      const stmt = realDb.prepare(
-        `SELECT name, account_type, kind, balance_cents, interest_rate_bps, notes,
-                sort_order, last_updated_at, created_at
-         FROM manual_accounts ORDER BY sort_order, id`
-      )
-      const out: Array<Record<string, unknown>> = []
-      while (stmt.step()) {
-        const r = stmt.get() as [
-          string,
-          string,
-          string,
-          number,
-          number | null,
-          string | null,
-          number,
-          string,
-          string,
-        ]
-        out.push({
-          name: r[0],
-          account_type: r[1],
-          kind: r[2],
-          balance_cents: r[3],
-          interest_rate_bps: r[4],
-          notes: r[5],
-          sort_order: r[6],
-          last_updated_at: r[7],
-          created_at: r[8],
-        })
-      }
-      stmt.free()
-      return out
-    }
-
-    function readSnapshots() {
-      const stmt = realDb.prepare(
-        `SELECT snapshot_date, up_bank_cents, manual_assets_cents, manual_liabilities_cents
-         FROM net_worth_snapshots ORDER BY snapshot_date`
-      )
-      const out: Array<[string, number, number, number]> = []
-      while (stmt.step())
-        out.push(stmt.get() as [string, number, number, number])
-      stmt.free()
-      return out
-    }
-
-    it('buildExportPayload carries manual_accounts (minus id) and net_worth_snapshots', () => {
-      insertManualAccount({ name: 'Mortgage' })
-      insertManualAccount({
-        name: 'Shares',
-        account_type: 'INVESTMENT',
-        kind: 'asset',
-        sort_order: 1,
-      })
-      insertSnapshot('2026-02-01', 500000, 10000, 45000000)
-
-      const payload = buildExportPayload()
-
-      expect(payload.version).toBe(11)
-      expect(payload.manualAccounts?.map((a) => a.name)).toEqual([
-        'Mortgage',
-        'Shares',
-      ])
-      expect(payload.manualAccounts?.[0]).not.toHaveProperty('id')
-      expect(payload.manualAccounts?.[0]).toMatchObject({
-        account_type: 'MORTGAGE',
-        kind: 'liability',
-        balance_cents: 45000000,
-        interest_rate_bps: 599,
-        last_updated_at: '2026-02-10T00:00:00.000Z',
-        created_at: '2026-01-01T00:00:00.000Z',
-      })
-      expect(payload.netWorthSnapshots).toEqual([
-        {
-          snapshot_date: '2026-02-01',
-          up_bank_cents: 500000,
-          manual_assets_cents: 10000,
-          manual_liabilities_cents: 45000000,
-        },
-      ])
-    })
-
-    it('replaceNetWorth wipes both tables and reinserts, preserving exported timestamps', () => {
-      insertManualAccount({ name: 'Stale local account' })
-      insertSnapshot('2025-12-31')
-
-      const accounts: ManualAccountExportRow[] = [
-        {
-          name: 'Imported Mortgage',
-          institution: null,
-          account_type: 'MORTGAGE',
-          kind: 'liability',
-          balance_cents: 30000000,
-          credit_limit_cents: null,
-          interest_rate_bps: 610,
-          rate_type: 'fixed',
-          fixed_rate_expiry_date: '2027-06-30',
-          notes: null,
-          sort_order: 0,
-          last_updated_at: '2026-02-14T00:00:00.000Z',
-          created_at: '2025-08-01T00:00:00.000Z',
-        },
-      ]
-      replaceNetWorth(accounts, [
-        {
-          snapshot_date: '2026-02-14',
-          up_bank_cents: 1234,
-          manual_assets_cents: 0,
-          manual_liabilities_cents: 30000000,
-        },
-      ])
-
-      expect(readManualAccounts()).toEqual([
-        {
-          name: 'Imported Mortgage',
-          account_type: 'MORTGAGE',
-          kind: 'liability',
-          balance_cents: 30000000,
-          interest_rate_bps: 610,
-          notes: null,
-          sort_order: 0,
-          last_updated_at: '2026-02-14T00:00:00.000Z',
-          created_at: '2025-08-01T00:00:00.000Z',
-        },
-      ])
-      expect(readSnapshots()).toEqual([['2026-02-14', 1234, 0, 30000000]])
-    })
-
-    it('replaceNetWorth with empty arrays clears both tables', () => {
-      insertManualAccount()
-      insertSnapshot('2026-01-15')
-
-      replaceNetWorth([], [])
-
-      expect(readManualAccounts()).toEqual([])
-      expect(readSnapshots()).toEqual([])
-    })
-
-    it('replaceNetWorth skips structurally invalid account and snapshot rows', () => {
-      replaceNetWorth(
-        [
-          {
-            name: '',
-            account_type: 'X',
-            kind: 'asset',
-            balance_cents: 1,
-          } as ManualAccountExportRow,
-          {
-            name: 'NoBalance',
-            account_type: 'X',
-            kind: 'asset',
-          } as unknown as ManualAccountExportRow,
-          {
-            name: 'BadKind',
-            institution: null,
-            account_type: 'SAVINGS',
-            kind: 'wealth' as unknown as 'asset',
-            balance_cents: 100,
-            credit_limit_cents: null,
-            interest_rate_bps: null,
-            rate_type: null,
-            fixed_rate_expiry_date: null,
-            notes: null,
-            sort_order: 0,
-            last_updated_at: '2026-02-01T00:00:00.000Z',
-            created_at: '2026-02-01T00:00:00.000Z',
-          },
-          {
-            name: 'Good',
-            institution: null,
-            account_type: 'SAVINGS',
-            kind: 'asset',
-            balance_cents: 5000,
-            credit_limit_cents: null,
-            interest_rate_bps: null,
-            rate_type: null,
-            fixed_rate_expiry_date: null,
-            notes: null,
-            sort_order: 0,
-            last_updated_at: '2026-02-01T00:00:00.000Z',
-            created_at: '2026-02-01T00:00:00.000Z',
-          },
-        ],
-        [
-          {
-            snapshot_date: 'bad',
-            up_bank_cents: 1,
-            manual_assets_cents: 0,
-            manual_liabilities_cents: 0,
-          } as NetWorthSnapshotExportRow,
-          {
-            snapshot_date: '2026-02-01',
-            up_bank_cents: 9,
-            manual_assets_cents: 0,
-            manual_liabilities_cents: 0,
-          },
-        ]
-      )
-
-      expect(readManualAccounts().map((a) => a.name)).toEqual(['Good'])
-      expect(readSnapshots()).toEqual([['2026-02-01', 9, 0, 0]])
-    })
-
-    it('importPayloadWithOptions honours the netWorth toggle', () => {
-      insertManualAccount({ name: 'Keep when off' })
-
-      // netWorth: false → existing manual account untouched
-      importPayloadWithOptions(
-        emptyPayload({
-          manualAccounts: [
-            {
-              name: 'Should not appear',
-              institution: null,
-              account_type: 'SAVINGS',
-              kind: 'asset',
-              balance_cents: 1,
-              credit_limit_cents: null,
-              interest_rate_bps: null,
-              rate_type: null,
-              fixed_rate_expiry_date: null,
-              notes: null,
-              sort_order: 0,
-              last_updated_at: '2026-02-01T00:00:00.000Z',
-              created_at: '2026-02-01T00:00:00.000Z',
-            },
-          ],
-        }),
-        { ...ALL_ON, netWorth: false }
-      )
-      expect(readManualAccounts().map((a) => a.name)).toEqual(['Keep when off'])
-
-      // netWorth: true → replaced
-      importPayloadWithOptions(
-        emptyPayload({
-          manualAccounts: [
-            {
-              name: 'Imported',
-              institution: null,
-              account_type: 'SAVINGS',
-              kind: 'asset',
-              balance_cents: 2,
-              credit_limit_cents: null,
-              interest_rate_bps: null,
-              rate_type: null,
-              fixed_rate_expiry_date: null,
-              notes: null,
-              sort_order: 0,
-              last_updated_at: '2026-02-01T00:00:00.000Z',
-              created_at: '2026-02-01T00:00:00.000Z',
-            },
-          ],
-          netWorthSnapshots: [
-            {
-              snapshot_date: '2026-02-01',
-              up_bank_cents: 3,
-              manual_assets_cents: 2,
-              manual_liabilities_cents: 0,
-            },
-          ],
-        }),
-        ALL_ON
-      )
-      expect(readManualAccounts().map((a) => a.name)).toEqual(['Imported'])
-      expect(readSnapshots()).toEqual([['2026-02-01', 3, 2, 0]])
-    })
-
-    it('netWorth: true on a pre-v5 payload (no Net Worth section) is a no-op, not a wipe', () => {
-      insertManualAccount({ name: 'Pre-existing' })
-      insertSnapshot('2026-01-01')
-
-      // A v4 payload has no manualAccounts / netWorthSnapshots key at all.
-      // Without the `manualAccounts !== undefined` guard in
-      // importPayloadWithOptions, `netWorth: true` would run
-      // replaceNetWorth([], []) and DELETE both tables with nothing to
-      // reinsert. The guard makes an absent section a skip regardless of
-      // caller — the wizard no longer has to be the only thing stopping it.
-      const v4Payload = emptyPayload()
-      expect(v4Payload.manualAccounts).toBeUndefined()
-
-      importPayloadWithOptions(v4Payload, { ...ALL_ON, netWorth: true })
-
-      expect(readManualAccounts().map((a) => a.name)).toEqual(['Pre-existing'])
-      expect(readSnapshots()).toEqual([['2026-01-01', 100000, 0, 0]])
-    })
-
-    it('netWorth: true with an explicitly empty manualAccounts still clears both tables', () => {
-      insertManualAccount({ name: 'Wiped' })
-      insertSnapshot('2026-01-01')
-
-      // `manualAccounts: []` is a present-but-empty section: a real replace-all
-      // that intentionally clears the device, distinct from an absent section.
-      importPayloadWithOptions(emptyPayload({ manualAccounts: [] }), {
-        ...ALL_ON,
-        netWorth: true,
-      })
-
-      expect(readManualAccounts()).toEqual([])
-      expect(readSnapshots()).toEqual([])
-    })
-  })
-
   describe('Saver goal history export/import (#29)', () => {
     function insertSaver(id: string, balance: number, target: number | null) {
       realDb.run(
@@ -1769,7 +1396,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(11)
+      expect(payload.version).toBe(12)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1884,106 +1511,173 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       expect(t[0].values[0][0]).toBeNull()
     })
   })
-  // ── #118: a Regular's charge_type and liability-account link ──────────
+  // ── #209: Net Worth is cut ──────────────────────────────────────────────
 
-  describe('liability repayment Regulars survive export/import (#118)', () => {
-    function addAccount(name: string): number {
+  describe('Net Worth cut (#209)', () => {
+    /** A v11-or-earlier payload, which still carries Net Worth. */
+    function olderExportWithNetWorth(): ExportPayload {
+      return {
+        ...emptyPayload({
+          version: 11,
+          budgetBuckets: [
+            { id: 3, name: 'Debts', icon: 'mdi-cash', sort_order: 0 },
+          ],
+          upcomingCharges: [
+            {
+              ...chargeExport({
+                name: 'Mortgage repayment',
+                amount: 250000,
+                frequency: 'FORTNIGHTLY',
+                next_charge_date: '2026-03-06',
+                is_reserved: 1,
+                reminder_days_before: 2,
+                cancel_by_date: '2027-12-31',
+                bucket_id: 3,
+                match_description: 'HOMELOAN',
+              }),
+              charge_type: 'LIABILITY_REPAYMENT',
+              linked_account_name: 'Home Loan',
+            } as UpcomingChargeExportRow,
+          ],
+        }),
+        manualAccounts: [
+          {
+            name: 'Home Loan',
+            institution: null,
+            account_type: 'MORTGAGE',
+            kind: 'liability',
+            balance_cents: 45000000,
+            credit_limit_cents: null,
+            interest_rate_bps: null,
+            rate_type: null,
+            fixed_rate_expiry_date: null,
+            notes: null,
+            sort_order: 0,
+            last_updated_at: '2026-02-10',
+            created_at: '2026-01-01',
+          },
+          {
+            name: 'Super',
+            institution: null,
+            account_type: 'SUPER',
+            kind: 'asset',
+            balance_cents: 9000000,
+            credit_limit_cents: null,
+            interest_rate_bps: null,
+            rate_type: null,
+            fixed_rate_expiry_date: null,
+            notes: null,
+            sort_order: 1,
+            last_updated_at: '2026-02-10',
+            created_at: '2026-01-01',
+          },
+        ],
+        netWorthSnapshots: [
+          {
+            snapshot_date: '2026-02-14',
+            up_bank_cents: 500000,
+            manual_assets_cents: 9000000,
+            manual_liabilities_cents: 45000000,
+          },
+          {
+            snapshot_date: '2026-02-15',
+            up_bank_cents: 510000,
+            manual_assets_cents: 9000000,
+            manual_liabilities_cents: 45000000,
+          },
+          {
+            snapshot_date: '2026-02-16',
+            up_bank_cents: 520000,
+            manual_assets_cents: 9000000,
+            manual_liabilities_cents: 45000000,
+          },
+        ],
+      } as ExportPayload
+    }
+
+    it('exports no Net Worth sections and no liability fields on Regulars', () => {
       realDb.run(
-        `INSERT INTO manual_accounts (name, account_type, kind, balance_cents, sort_order, last_updated_at, created_at)
-         VALUES (?, 'MORTGAGE', 'liability', 45000000, 0, '2026-02-10', '2026-01-01')`,
-        [name]
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
+         VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01')`
       )
-      return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
-    }
-
-    function addRepayment(name: string, accountId: number | null): number {
-      realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, charge_type, linked_manual_account_id)
-         VALUES (?, 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01', 'LIABILITY_REPAYMENT', ?)`,
-        [name, accountId]
-      )
-      return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
-    }
-
-    /** Each Regular's charge_type and the *name* of its linked account (ids change on import). */
-    function readRepayments(): Array<[string, string, string | null]> {
-      return realDb
-        .exec(
-          `SELECT c.name, c.charge_type, m.name
-           FROM upcoming_charges c
-           LEFT JOIN manual_accounts m ON m.id = c.linked_manual_account_id
-           ORDER BY c.id`
-        )[0]
-        .values.map((r) => [
-          String(r[0]),
-          String(r[1]),
-          r[2] == null ? null : String(r[2]),
-        ])
-    }
-
-    it('round-trips charge_type and re-links to the re-inserted account of the same name', () => {
-      const loanId = addAccount('Home Loan')
-      addRepayment('Mortgage repayment', loanId)
       const payload = buildExportPayload()
+      expect(payload.version).toBe(12)
+      expect(Object.keys(payload)).not.toContain('manualAccounts')
+      expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
+      expect(payload.upcomingCharges).toHaveLength(1)
+      expect(Object.keys(payload.upcomingCharges[0])).not.toContain(
+        'charge_type'
+      )
+      expect(Object.keys(payload.upcomingCharges[0])).not.toContain(
+        'linked_account_name'
+      )
+    })
 
-      importPayloadWithOptions(payload, ALL_ON)
+    it("imports an older export's liability repayment as an ordinary Regular, every surviving field intact", () => {
+      importPayloadWithOptions(olderExportWithNetWorth(), ALL_ON)
 
-      expect(readRepayments()).toEqual([
-        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
+      const bucketId = realDb.exec(
+        `SELECT id FROM budget_buckets WHERE name = 'Debts'`
+      )[0].values[0][0]
+      expect(
+        realDb.exec(
+          `SELECT name, amount, frequency, next_charge_date, is_reserved,
+                  reminder_days_before, cancel_by_date, bucket_id, match_description
+           FROM upcoming_charges`
+        )[0].values
+      ).toEqual([
+        [
+          'Mortgage repayment',
+          250000,
+          'FORTNIGHTLY',
+          '2026-03-06',
+          1,
+          2,
+          '2027-12-31',
+          bucketId,
+          'HOMELOAN',
+        ],
       ])
     })
 
-    it('links to an existing local account of the same name when only Regulars are imported', () => {
-      const loanId = addAccount('Home Loan')
-      addRepayment('Mortgage repayment', loanId)
-      const payload = buildExportPayload()
-      realDb.run(`DELETE FROM upcoming_charges`)
-
-      importPayloadWithOptions(payload, { ...NONE, upcomingCharges: true })
-
-      expect(readRepayments()).toEqual([
-        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
-      ])
+    it('skips the Net Worth sections of an older export without failing the import', () => {
+      expect(() =>
+        importPayloadWithOptions(olderExportWithNetWorth(), ALL_ON)
+      ).not.toThrow()
+      const tables = realDb
+        .exec(`SELECT name FROM sqlite_master WHERE type = 'table'`)[0]
+        .values.map((r) => String(r[0]))
+      expect(tables).not.toContain('manual_accounts')
+      expect(tables).not.toContain('net_worth_snapshots')
     })
 
-    it('leaves the link empty, but keeps LIABILITY_REPAYMENT, when the name matches more than one account', () => {
-      const loanId = addAccount('Home Loan')
-      addRepayment('Mortgage repayment', loanId)
-      const payload = buildExportPayload()
-      addAccount('Home Loan')
-
-      importPayloadWithOptions(payload, { ...NONE, upcomingCharges: true })
-
-      expect(readRepayments()).toEqual([
-        ['Mortgage repayment', 'LIABILITY_REPAYMENT', null],
-      ])
-    })
-
-    it('imports a Regular from an older file without the new fields as an unlinked EXPENSE', () => {
-      addAccount('Home Loan')
-      importPayloadWithOptions(
-        emptyPayload({ upcomingCharges: [chargeExport({ name: 'Old file' })] }),
-        { ...NONE, upcomingCharges: true }
+    it('names the skipped Net Worth accounts and history entries', () => {
+      expect(describeSkippedSections(olderExportWithNetWorth())).toBe(
+        'Skipped 2 Net Worth accounts. Vantura no longer has them. ' +
+          'Skipped 3 Net Worth history entries. Vantura no longer has them.'
       )
-      expect(readRepayments()).toEqual([['Old file', 'EXPENSE', null]])
     })
 
-    it("re-links this device's Regulars when only Net Worth is imported, and unlinks one whose account name is gone", () => {
-      const loanId = addAccount('Home Loan')
-      const carId = addAccount('Car Loan')
-      addRepayment('Mortgage repayment', loanId)
-      addRepayment('Car repayment', carId)
-      const payload = buildExportPayload()
-      payload.manualAccounts = payload.manualAccounts?.filter(
-        (a) => a.name === 'Home Loan'
+    it('uses the singular for one of each', () => {
+      const payload = olderExportWithNetWorth() as ExportPayload & {
+        manualAccounts: unknown[]
+        netWorthSnapshots: unknown[]
+      }
+      payload.manualAccounts = payload.manualAccounts.slice(0, 1)
+      payload.netWorthSnapshots = payload.netWorthSnapshots.slice(0, 1)
+      expect(describeSkippedSections(payload)).toBe(
+        'Skipped 1 Net Worth account. Vantura no longer has them. ' +
+          'Skipped 1 Net Worth history entry. Vantura no longer has them.'
       )
+    })
 
-      importPayloadWithOptions(payload, { ...NONE, netWorth: true })
-
-      expect(readRepayments()).toEqual([
-        ['Mortgage repayment', 'LIABILITY_REPAYMENT', 'Home Loan'],
-        ['Car repayment', 'LIABILITY_REPAYMENT', null],
-      ])
+    it('says nothing for empty Net Worth sections, or for liability fields on Regulars alone', () => {
+      const payload = {
+        ...olderExportWithNetWorth(),
+        manualAccounts: [],
+        netWorthSnapshots: [],
+      } as ExportPayload
+      expect(describeSkippedSections(payload)).toBeNull()
     })
   })
 })

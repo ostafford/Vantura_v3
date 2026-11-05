@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 54
+const SCHEMA_VERSION = 55
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -132,8 +132,6 @@ const DDL_STATEMENTS = [
     cancel_by_date TEXT,
     created_at TEXT NOT NULL,
     bucket_id INTEGER,
-    charge_type TEXT NOT NULL DEFAULT 'EXPENSE',
-    linked_manual_account_id INTEGER,
     match_raw_text TEXT,
     match_description TEXT,
     FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -204,28 +202,6 @@ const DDL_STATEMENTS = [
     created_at TEXT NOT NULL,
     FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS manual_accounts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    institution TEXT,
-    account_type TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    balance_cents INTEGER NOT NULL DEFAULT 0,
-    credit_limit_cents INTEGER,
-    interest_rate_bps INTEGER,
-    rate_type TEXT,
-    fixed_rate_expiry_date TEXT,
-    notes TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    last_updated_at TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS net_worth_snapshots (
-    snapshot_date TEXT PRIMARY KEY,
-    up_bank_cents INTEGER NOT NULL,
-    manual_assets_cents INTEGER NOT NULL DEFAULT 0,
-    manual_liabilities_cents INTEGER NOT NULL DEFAULT 0
   )`,
 ]
 
@@ -1471,6 +1447,29 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['54']
+    )
+  }
+  // #209 — Net Worth is cut. Drop its manual accounts and daily snapshots, and
+  // the liability-repayment columns on Regulars. A former liability repayment
+  // stays as an ordinary Regular: its amount, frequency, date, reminder and
+  // payment link (`match_description`) are untouched, so it keeps counting in
+  // Reserved, the Budget Plan and the month's occurrences as it always did.
+  if (version < 55) {
+    database.run(`DROP TABLE IF EXISTS net_worth_snapshots`)
+    database.run(`DROP TABLE IF EXISTS manual_accounts`)
+    const ucCols = new Set(
+      (
+        database.exec(`PRAGMA table_info(upcoming_charges)`)[0]?.values ?? []
+      ).map((r) => String(r[1]))
+    )
+    for (const col of ['charge_type', 'linked_manual_account_id']) {
+      if (ucCols.has(col)) {
+        database.run(`ALTER TABLE upcoming_charges DROP COLUMN ${col}`)
+      }
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['55']
     )
   }
 }

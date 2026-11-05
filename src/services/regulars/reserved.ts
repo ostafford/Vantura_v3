@@ -187,9 +187,8 @@ function excludeEssentialsFundedCharges(
  * `excludeEssentialsFunded: true` is Spendable's Reserved: for an Essentials
  * user, Regulars funded from the nominated Saver are left out (they're covered
  * there, not from Available). It costs a transactions lookup per Regular.
- * `false` is every reserved Regular regardless of funding source — what
- * Projected net worth subtracts, and Essentials coverage's "if all were
- * transactional" total.
+ * `false` is every reserved Regular regardless of funding source —
+ * Essentials coverage's "if all were transactional" total.
  */
 export function reservedBeforePayday(opts: {
   excludeEssentialsFunded: boolean
@@ -212,7 +211,7 @@ export function reservedBeforePayday(opts: {
 
 /**
  * Reserved total (cents) for a set of items: the exact sum, rounded once — the
- * figure Spendable and Projected net worth use (`calculateReservedAmount`'s
+ * figure Spendable uses (`calculateReservedAmount`'s
  * rounding). It replays `calcChargeReserved`'s own additions — a Regular's
  * unrounded share is its amount added once per occurrence — so it matches
  * bit for bit. Summing each item's already-rounded `reservedAmount` instead

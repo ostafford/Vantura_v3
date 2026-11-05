@@ -7,9 +7,7 @@
  * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
  * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
  * `linkedPaymentsInMonth`, `regularsInMonth`.
- * Two return stored rows by
- * design: `regularById` (the editor's anchor) and `linkedLiabilityRepayments`
- * (payment matching, #19).
+ * One returns stored rows by design: `regularById` (the editor's anchor).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
  * `funding.ts`, `linkedPayments.ts`, `month.ts`, `draft.ts`.
@@ -17,7 +15,7 @@
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
  * `saveRegular`, which applies the stored-date rule and writes the bucket in
- * the same write; `deleteRegular`; and `unlinkRegularsFromManualAccount`.
+ * the same write; and `deleteRegular`.
  */
 
 import { getDb } from '@/db'
@@ -57,7 +55,6 @@ export {
   type RegularDraft,
   type RegularDraftErrors,
   type RegularDraftField,
-  type RegularChargeType,
   type DraftSourceTransaction,
   type DraftSourceSuggestion,
 } from './draft'
@@ -140,42 +137,11 @@ export function regularsByMonth(): RegularsByMonth {
   return { overdue, thisMonth, later }
 }
 
-/**
- * Unlinks every Regular tied to a manual account that's being deleted: a
- * linked liability repayment becomes a plain `EXPENSE` with no linked account
- * (foreign keys aren't enforced in sql.js). The caller persists.
- */
-export function unlinkRegularsFromManualAccount(manualAccountId: number): void {
-  const db = getDb()
-  if (!db) throw new Error('Database not ready')
-  db.run(
-    `UPDATE upcoming_charges SET charge_type = 'EXPENSE', linked_manual_account_id = NULL WHERE linked_manual_account_id = ?`,
-    [manualAccountId]
-  )
-}
-
 /** A single charge by id (raw stored row, no date projection), or null. */
 export function regularById(id: number): Regular | null {
   const db = getDb()
   if (!db) return null
   return readRegularById(db, id)
-}
-
-/**
- * LIABILITY_REPAYMENT charges that are BOTH linked to a manual account AND carry
- * a payment link (`match_description`, docs/adr/0020) — the only charges the #19
- * verify-and-prompt flow (`checkLiabilityRepayments`) acts on. Raw stored rows.
- */
-export function linkedLiabilityRepayments(): Regular[] {
-  const db = getDb()
-  if (!db) return []
-  return readRegularsByStoredDate(db).filter(
-    (c) =>
-      c.charge_type === 'LIABILITY_REPAYMENT' &&
-      c.linked_manual_account_id != null &&
-      c.match_description != null &&
-      c.match_description !== ''
-  )
 }
 
 /**
@@ -221,7 +187,7 @@ export function dueSoonRegulars(): Regular[] {
   if (!db) return []
   const today = localDateString()
   const candidates = readRegularsByStoredDate(db).filter(
-    (c) => c.reminder_days_before != null && c.charge_type === 'EXPENSE'
+    (c) => c.reminder_days_before != null
   )
   const list: Regular[] = []
   for (const charge of candidates) {
