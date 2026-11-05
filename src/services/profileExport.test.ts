@@ -377,6 +377,24 @@ describe('profileExport', () => {
       )
     })
 
+    it('applySettings strips the cut Weekly Insights section from an older export’s section order (#206)', async () => {
+      const db = await import('@/db')
+      const setAppSettingMock = vi.mocked(db.setAppSetting)
+      setAppSettingMock.mockClear()
+      applySettings({
+        dashboard_section_order: JSON.stringify([
+          'trackers',
+          'insights',
+          'month_summary',
+          'upcoming',
+        ]),
+      })
+      expect(setAppSettingMock).toHaveBeenCalledWith(
+        'dashboard_section_order',
+        JSON.stringify(['trackers', 'month_summary', 'upcoming'])
+      )
+    })
+
     it('applySettings ignores non-whitelisted keys', async () => {
       const db = await import('@/db')
       const setAppSettingMock = vi.mocked(db.setAppSetting)

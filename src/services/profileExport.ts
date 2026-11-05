@@ -678,13 +678,35 @@ export interface ImportOptions {
   netWorth: boolean
 }
 
+/**
+ * #206 — exports made before the Weekly Insights section was cut carry its
+ * `insights` id in `dashboard_section_order`. Strip it the way migration v53
+ * does, keeping every other section's position. A value that isn't a JSON
+ * array is passed through: the reader already falls back to the default order.
+ */
+function stripCutDashboardSections(raw: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return raw
+  }
+  if (!Array.isArray(parsed) || !parsed.includes('insights')) return raw
+  return JSON.stringify(parsed.filter((id) => id !== 'insights'))
+}
+
 /** Apply whitelisted settings from payload. */
 export function applySettings(settings: Record<string, string>): void {
   const whitelist = new Set(SETTINGS_WHITELIST)
   for (const [key, value] of Object.entries(settings ?? {})) {
     if (typeof value !== 'string') continue
     if (whitelist.has(key as (typeof SETTINGS_WHITELIST)[number])) {
-      setAppSetting(key, value)
+      setAppSetting(
+        key,
+        key === 'dashboard_section_order'
+          ? stripCutDashboardSections(value)
+          : value
+      )
     }
   }
 }

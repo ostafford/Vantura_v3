@@ -19,7 +19,6 @@ import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { runSync } from '@/services/syncRunner'
 import { sessionStore } from '@/stores/sessionStore'
-import { InsightsSection } from '@/components/dashboard/InsightsSection'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
@@ -56,7 +55,6 @@ const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
 
 const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
   month_summary: 'month-summary',
-  insights: 'insights',
   trackers: 'trackers',
   upcoming: 'upcoming',
 }
@@ -535,8 +533,6 @@ export function Dashboard() {
       switch (id) {
         case 'month_summary':
           return <MonthSummarySection dragHandleProps={dragHandleProps} />
-        case 'insights':
-          return <InsightsSection dragHandleProps={dragHandleProps} />
         case 'trackers':
           return <TrackersSection dragHandleProps={dragHandleProps} />
         case 'upcoming':

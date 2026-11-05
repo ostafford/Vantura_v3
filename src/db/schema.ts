@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 52
+const SCHEMA_VERSION = 53
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1409,6 +1409,59 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['52']
+    )
+  }
+  // #206 — the Weekly Insights Dashboard section is cut. Strip its `insights`
+  // id from the stored section order (a JSON array) and from the stored sizes
+  // and visibility (JSON objects keyed by section id); every other section
+  // keeps its position, size and visibility. A value that isn't valid JSON of
+  // the expected shape is left untouched: the readers already ignore it and
+  // fall back to defaults.
+  // (v52 is #204's Hypothetical-lines drop.)
+  if (version < 53) {
+    const rewrite = (key: string, strip: (parsed: unknown) => unknown) => {
+      const res = database.exec(
+        `SELECT value FROM app_settings WHERE key = ?`,
+        [key]
+      )
+      const raw = res[0]?.values[0]?.[0]
+      if (typeof raw !== 'string') return
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        return
+      }
+      const next = strip(parsed)
+      if (next === undefined) return
+      database.run(`UPDATE app_settings SET value = ? WHERE key = ?`, [
+        JSON.stringify(next),
+        key,
+      ])
+    }
+    rewrite('dashboard_section_order', (parsed) =>
+      Array.isArray(parsed) && parsed.includes('insights')
+        ? parsed.filter((id) => id !== 'insights')
+        : undefined
+    )
+    const stripKey = (parsed: unknown) => {
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        !Object.prototype.hasOwnProperty.call(parsed, 'insights')
+      ) {
+        return undefined
+      }
+      const rest: Record<string, unknown> = { ...parsed }
+      delete rest.insights
+      return rest
+    }
+    rewrite('dashboard_section_sizes', stripKey)
+    rewrite('dashboard_section_visibility', stripKey)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['53']
     )
   }
 }

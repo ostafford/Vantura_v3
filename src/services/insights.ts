@@ -1,5 +1,6 @@
 /**
- * Weekly insights per 05_Calculation_logic 5.4 and 04_Core_Features 4.5.
+ * Money in / out, saver movement and category spend over a window of local
+ * days, plus the month and year comparisons built on them.
  *
  * Term definitions (aligned with Up Bank app and product intent):
  *
@@ -60,26 +61,11 @@ import {
   type MonthDailyInput,
 } from '@/lib/monthSpendingSeries'
 import {
-  formatWeekStartLabel,
   monthNarrativePriorLabel,
   yearNarrativePriorLabel,
 } from '@/lib/monthLabels'
-import { getCategoriesWithParent } from '@/services/categories'
 
-export interface WeekRange {
-  start: Date
-  end: Date
-  /** Local Monday, "YYYY-MM-DD" — the window's first day (inclusive). */
-  startStr: string
-  /** Local Sunday, "YYYY-MM-DD" — the window's last day (inclusive). */
-  endStr: string
-}
-
-/**
- * Week Monday–Sunday. Optional weekOffset: 0 = current week, -1 = previous week, etc.
- * start/end are local Date objects; startStr/endStr are the local Monday/Sunday as
- * "YYYY-MM-DD", the SQL bounds for a local-day window (#149).
- */
+/** A local Date as "YYYY-MM-DD". */
 function toDateOnly(d: Date): string {
   const y = d.getFullYear()
   const m = d.getMonth()
@@ -105,84 +91,8 @@ function capPreviousPeriodEnd(
   return endStr < naturalPreviousEnd ? endStr : naturalPreviousEnd
 }
 
-export function getWeekRange(weekOffset?: number): WeekRange {
-  const today = new Date()
-  const dayOfWeek = today.getDay()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7))
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  if (weekOffset !== undefined && weekOffset !== 0) {
-    const days = weekOffset * 7
-    monday.setDate(monday.getDate() + days)
-    sunday.setDate(sunday.getDate() + days)
-  }
-  monday.setHours(0, 0, 0, 0)
-  const endOfSundayLocal = new Date(sunday)
-  endOfSundayLocal.setHours(23, 59, 59, 999)
-  const startStr = toDateOnly(monday)
-  return {
-    start: monday,
-    end: endOfSundayLocal,
-    startStr,
-    endStr: toDateOnly(endOfSundayLocal),
-  }
-}
-
-/**
- * Raw count of transactions in the week range (no filters). For debug only.
- */
-export function getWeeklyInsightsRawCount(weekRange?: WeekRange): number {
-  const db = getDb()
-  if (!db) return 0
-  const { startStr, endStr } = weekRange ?? getWeekRange()
-  const stmt = db.prepare(
-    `SELECT COUNT(*) FROM transactions WHERE ${DISPLAY_DAY_BETWEEN}`
-  )
-  stmt.bind([startStr, endStr])
-  stmt.step()
-  const row = stmt.get()
-  stmt.free()
-  return row ? Number(row[0]) : 0
-}
-
-/** Debug breakdown: counts by filter so we can see why charges/money out might be 0. Dev only. */
-export interface WeeklyInsightsDebugCounts {
-  /** Same as Charges in Weekly Insights: spending transactions (negative, not a transfer). */
-  charges: number
-  /** Transactions with is_round_up = 1 (round-up credits to savers). */
-  roundUps: number
-  /** Transactions with transfer_account_id set (includes round-ups and explicit transfers). */
-  transfers: number
-}
-
-export function getWeeklyInsightsDebugCounts(
-  weekRange?: WeekRange
-): WeeklyInsightsDebugCounts {
-  const db = getDb()
-  if (!db) return { charges: 0, roundUps: 0, transfers: 0 }
-  const { startStr, endStr } = weekRange ?? getWeekRange()
-  const bounds = DISPLAY_DAY_BETWEEN
-  const params = [startStr, endStr]
-  const run = (where: string, p: (string | number)[] = params) => {
-    const stmt = db.prepare(`SELECT COUNT(*) FROM transactions WHERE ${where}`)
-    stmt.bind(p)
-    stmt.step()
-    const row = stmt.get()
-    stmt.free()
-    return row ? Number(row[0]) : 0
-  }
-  return {
-    charges: run(`amount < 0 AND transfer_account_id IS NULL AND ${bounds}`),
-    roundUps: run(`is_round_up = 1 AND ${bounds}`),
-    transfers: run(`transfer_account_id IS NOT NULL AND ${bounds}`),
-  }
-}
-
-/**
- * Weekly insight metrics. See file-level comment for definition of each term.
- */
-export interface WeeklyInsightsData {
+/** Money In, Money Out, Savers and Charges. See the file-level comment for each term. */
+export interface InsightsData {
   /** Real income only (no internal transfers). */
   moneyIn: number
   /** Spending only (purchases/charges; no internal transfers out). */
@@ -194,20 +104,11 @@ export interface WeeklyInsightsData {
 }
 
 /**
- * Returns weekly insight metrics for the given week. See file-level comment and WeeklyInsightsData
- * for definitions of moneyIn, moneyOut, saverChanges, and charges.
- */
-export function getWeeklyInsights(weekRange?: WeekRange): WeeklyInsightsData {
-  const { startStr, endStr } = weekRange ?? getWeekRange()
-  return insightsForDays(startStr, endStr)
-}
-
-/**
  * Money In, Money Out, Savers and Charges for the local days `[startDay,
  * endDay]` (`YYYY-MM-DD`, inclusive) — the one block every insights window
  * reads. See the file-level comment for each term.
  */
-function insightsForDays(startDay: string, endDay: string): WeeklyInsightsData {
+function insightsForDays(startDay: string, endDay: string): InsightsData {
   const db = getDb()
   if (!db) return { moneyIn: 0, moneyOut: 0, saverChanges: 0, charges: 0 }
 
@@ -288,40 +189,6 @@ function readCategoryTotals(
   return list
 }
 
-/**
- * Multi-week insights history for analytics. Returns array from oldest to newest.
- */
-export interface InsightsHistoryRow {
-  weekOffset: number
-  weekLabel: string
-  weekStart: string
-  weekEnd: string
-  moneyIn: number
-  moneyOut: number
-  saverChanges: number
-  charges: number
-}
-
-export function getInsightsHistory(weeksBack: number): InsightsHistoryRow[] {
-  const result: InsightsHistoryRow[] = []
-  for (let offset = -weeksBack + 1; offset <= 0; offset++) {
-    const range = getWeekRange(offset)
-    const insights = getWeeklyInsights(range)
-    const label = formatWeekStartLabel(range.start)
-    result.push({
-      weekOffset: offset,
-      weekLabel: label,
-      weekStart: range.startStr,
-      weekEnd: toDateOnly(range.end),
-      moneyIn: insights.moneyIn,
-      moneyOut: insights.moneyOut,
-      saverChanges: insights.saverChanges,
-      charges: insights.charges,
-    })
-  }
-  return result
-}
-
 export interface MonthlyInsightsData {
   moneyIn: number
   moneyOut: number
@@ -374,176 +241,6 @@ export function getMonthlyInsights(
 }
 
 /**
- * Per-category spending for a category over multiple weeks (for trend comparison).
- */
-export interface CategoryBreakdownHistoryRow {
-  weekOffset: number
-  weekLabel: string
-  weekStart: string
-  total: number
-}
-
-export function getCategoryBreakdownHistory(
-  categoryId: string,
-  weeksBack: number
-): CategoryBreakdownHistoryRow[] {
-  const result: CategoryBreakdownHistoryRow[] = []
-  for (let offset = -weeksBack + 1; offset <= 0; offset++) {
-    const range = getWeekRange(offset)
-    const rows = getWeeklyCategoryBreakdown(range)
-    const row = rows.find((r) => r.category_id === categoryId)
-    const label = formatWeekStartLabel(range.start)
-    result.push({
-      weekOffset: offset,
-      weekLabel: label,
-      weekStart: range.startStr,
-      total: row?.total ?? 0,
-    })
-  }
-  return result
-}
-
-/**
- * Spending by category for the week: Money Out split by Up category (see
- * `readCategoryTotals`).
- */
-export function getWeeklyCategoryBreakdown(
-  weekRange?: WeekRange
-): CategoryBreakdownRow[] {
-  const { startStr, endStr } = weekRange ?? getWeekRange()
-  return readCategoryTotals(startStr, endStr)
-}
-
-/** One category's row inside a Weekly Insights group section. */
-export interface CategoryGroupedRow {
-  category_id: string | null
-  category_name: string
-  total: number
-}
-
-/**
- * One parent-category cluster in the grouped Weekly Insights chart, plus the
- * two synthetic tail sections (Uncategorised, Other-overflow).
- */
-export interface CategoryGroupSection {
-  parentId: string | null
-  parentName: string
-  rows: CategoryGroupedRow[]
-  isOther: boolean
-}
-
-const MAX_INDIVIDUAL_CATEGORIES = 7
-
-/**
- * Up Bank's 4 real parent categories, in the fixed display order the
- * categorical colour system was validated against (src/lib/colorSystem.ts —
- * the 6 category-family hues were CVD-safety-checked as a specific ordered
- * chain: Home, Transport, Good Life [split A/B], Personal [split A/B]).
- * The CVD-adjacency guarantee depends on this *order* being preserved, not on
- * every group being present: a section that renders always emits its own
- * header before its bars, so the groups that do appear stay a subsequence of
- * the validated chain with a header buffer between each. Letting group order
- * vary by spend would break it — two families only checked as chain-neighbours
- * could end up directly adjacent. Matched by name (Up Bank's parent category
- * names), not id, since real ids aren't yet wired into this codebase — see
- * colorSystem.ts's CATEGORY_ID_TO_SLOT.
- */
-const PARENT_DISPLAY_ORDER = ['Home', 'Transport', 'Good Life', 'Personal']
-
-/**
- * Weekly category spend, grouped by real parent category in a fixed order,
- * sorted by spend within each group, with everything past the top
- * MAX_INDIVIDUAL_CATEGORIES individual categories (by spend, across all
- * parents) folded into a single "Other" row. Real parent groups with zero
- * spend that week are omitted (see #31 — the colour system's adjacency
- * guarantee needs the fixed *order* of the groups that appear, not an empty
- * header for every group); PARENT_DISPLAY_ORDER above has the reasoning.
- */
-export function getWeeklyCategoryBreakdownGrouped(
-  weekRange?: WeekRange
-): CategoryGroupSection[] {
-  const { startStr, endStr } = weekRange ?? getWeekRange()
-  const raw = readCategoryTotals(startStr, endStr)
-  if (raw.length === 0) return []
-
-  const individual = raw.slice(0, MAX_INDIVIDUAL_CATEGORIES)
-  const overflow = raw.slice(MAX_INDIVIDUAL_CATEGORIES)
-
-  const categoryTree = getCategoriesWithParent()
-  const parentById = new Map(categoryTree.map((c) => [c.id, c.parent_id]))
-  const realParents = categoryTree.filter((c) => c.parent_id === null)
-
-  const rowsByParentId = new Map<string, CategoryGroupedRow[]>()
-  const uncategorisedRows: CategoryGroupedRow[] = []
-  for (const c of individual) {
-    const row: CategoryGroupedRow = {
-      category_id: c.category_id,
-      category_name: c.category_name,
-      total: c.total,
-    }
-    const parentId = c.category_id
-      ? (parentById.get(c.category_id) ?? null)
-      : null
-    if (!parentId) {
-      uncategorisedRows.push(row)
-      continue
-    }
-    if (!rowsByParentId.has(parentId)) rowsByParentId.set(parentId, [])
-    rowsByParentId.get(parentId)!.push(row)
-  }
-
-  const orderIndex = (name: string) => {
-    const i = PARENT_DISPLAY_ORDER.indexOf(name)
-    return i === -1 ? PARENT_DISPLAY_ORDER.length : i
-  }
-  const orderedParents = [...realParents].sort(
-    (a, b) =>
-      orderIndex(a.name) - orderIndex(b.name) || a.name.localeCompare(b.name)
-  )
-
-  const sections: CategoryGroupSection[] = orderedParents
-    .map((p) => ({
-      parentId: p.id,
-      parentName: p.name,
-      rows: rowsByParentId.get(p.id) ?? [],
-      isOther: false,
-    }))
-    // Drop real-parent groups with no spend this week (#31). The CVD-adjacency
-    // guarantee needs the remaining groups to stay in PARENT_DISPLAY_ORDER,
-    // which the sort above already ensures — not an empty header per group.
-    .filter((s) => s.rows.length > 0)
-
-  if (uncategorisedRows.length > 0) {
-    sections.push({
-      parentId: null,
-      parentName: 'Uncategorised',
-      rows: uncategorisedRows,
-      isOther: false,
-    })
-  }
-
-  if (overflow.length > 0) {
-    const overflowTotal = overflow.reduce((sum, c) => sum + c.total, 0)
-    sections.push({
-      parentId: null,
-      parentName: 'Other',
-      rows: [
-        {
-          category_id: null,
-          category_name: `Other (${overflow.length} ${
-            overflow.length === 1 ? 'category' : 'categories'
-          })`,
-          total: overflowTotal,
-        },
-      ],
-      isOther: true,
-    })
-  }
-
-  return sections
-}
-
-/**
  * Spending by category for an arbitrary date range: Money Out split by Up
  * category (see `readCategoryTotals`). Used by getPeriodComparison.
  */
@@ -555,12 +252,12 @@ export function getCategoryBreakdownForDateRange(
 }
 
 /**
- * Insight metrics for an arbitrary date range (e.g. a month). Same definitions as WeeklyInsightsData.
+ * Insight metrics for an arbitrary date range (e.g. a month). See InsightsData.
  */
 export function getInsightsForDateRange(
   dateFrom: string,
   dateTo: string
-): WeeklyInsightsData {
+): InsightsData {
   return insightsForDays(toDayBound(dateFrom), toDayBound(dateTo))
 }
 
@@ -1092,7 +789,7 @@ export interface YearMonthPoint {
 
 /**
  * Money in/out per calendar month for `year`, always 12 entries (months 1–12).
- * Missing months are zeros. Uses same transaction filters as getWeeklyInsights.
+ * Missing months are zeros. Uses the same transaction filters as getInsightsForDateRange.
  */
 export function getYearMonthlyTotals(year: number): YearMonthPoint[] {
   const db = getDb()

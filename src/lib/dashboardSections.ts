@@ -9,7 +9,6 @@ export const DASHBOARD_SECTION_ORDER_KEY = 'dashboard_section_order'
 
 export const DASHBOARD_SECTION_IDS = [
   'month_summary',
-  'insights',
   'trackers',
   'upcoming',
 ] as const
@@ -18,7 +17,6 @@ export type DashboardSectionId = (typeof DASHBOARD_SECTION_IDS)[number]
 
 export const DEFAULT_DASHBOARD_SECTION_ORDER: DashboardSectionId[] = [
   'month_summary',
-  'insights',
   'trackers',
   'upcoming',
 ]
@@ -46,7 +44,6 @@ export function setDashboardSectionOrder(order: DashboardSectionId[]): void {
 
 export const DASHBOARD_SECTION_LABELS: Record<DashboardSectionId, string> = {
   month_summary: 'Month at a glance',
-  insights: 'Weekly insights',
   trackers: 'Trackers',
   upcoming: 'Regulars',
 }
@@ -62,7 +59,6 @@ export const DEFAULT_SECTION_SIZES: Record<
   DashboardSectionSize
 > = {
   month_summary: 'large',
-  insights: 'large',
   trackers: 'large',
   upcoming: 'large',
 }
@@ -123,7 +119,6 @@ export const DASHBOARD_SECTION_VISIBILITY_KEY = 'dashboard_section_visibility'
 
 export const DEFAULT_SECTION_VISIBILITY: Record<DashboardSectionId, boolean> = {
   month_summary: true,
-  insights: true,
   trackers: true,
   upcoming: true,
 }
