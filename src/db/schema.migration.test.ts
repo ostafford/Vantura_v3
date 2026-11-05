@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(55)
+    expect(SCHEMA_VERSION).toBe(56)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1699,6 +1699,93 @@ describe('v55 migration: Net Worth cut (#209)', () => {
     const cols = columns(db, 'upcoming_charges')
     expect(cols).not.toContain('charge_type')
     expect(cols).not.toContain('linked_manual_account_id')
+    db.close()
+  })
+})
+
+describe('v56 migration: the On hand switch (#213)', () => {
+  const columns = (db: Database) =>
+    db.exec(`PRAGMA table_info(accounts)`)[0].values.map((r) => String(r[1]))
+
+  /** A v55 database: the accounts table as it was, with Savers and Spending. */
+  function buildV55(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`ALTER TABLE accounts DROP COLUMN counts_on_hand`)
+    db.run(
+      `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at,
+         ownership_type, synced_at, is_closed, target_amount_cents)
+       VALUES
+         ('spend', 'Spending', 'TRANSACTIONAL', 12000, '2026-01-01', '2026-11-01', 'INDIVIDUAL', '2026-11-01', 0, NULL),
+         ('sav-1', 'Bills', 'SAVER', 50000, '2026-01-01', '2026-11-01', 'INDIVIDUAL', '2026-11-01', 0, 80000),
+         ('sav-2', 'Holiday', 'SAVER', 7000, '2026-01-01', '2026-11-01', 'JOINT', '2026-11-01', 1, NULL)`
+    )
+    db.run(`UPDATE app_settings SET value = '55' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  const OTHER_COLUMNS = `id, display_name, account_type, balance, created_at, updated_at,
+    ownership_type, synced_at, is_closed, target_amount_cents`
+
+  it('adds the column with every existing Saver off, and keeps every other value', () => {
+    const db = buildV55()
+    expect(columns(db)).not.toContain('counts_on_hand')
+    const before = db.exec(`SELECT ${OTHER_COLUMNS} FROM accounts ORDER BY id`)
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(columns(db)).toContain('counts_on_hand')
+    expect(
+      db.exec(`SELECT id, counts_on_hand FROM accounts ORDER BY id`)[0].values
+    ).toEqual([
+      ['sav-1', 0],
+      ['sav-2', 0],
+      ['spend', 0],
+    ])
+    expect(
+      db.exec(`SELECT ${OTHER_COLUMNS} FROM accounts ORDER BY id`)
+    ).toEqual(before)
+    db.close()
+  })
+
+  it('defaults a row inserted afterwards to off', () => {
+    const db = buildV55()
+    runMigrations(db)
+    db.run(
+      `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
+       VALUES ('sav-3', 'New', 'SAVER', 1, '2026-11-05', '2026-11-05')`
+    )
+    expect(
+      db.exec(`SELECT counts_on_hand FROM accounts WHERE id = 'sav-3'`)[0]
+        .values[0][0]
+    ).toBe(0)
+    db.close()
+  })
+
+  it('is idempotent, and runs on a database with no accounts table', () => {
+    const db = buildV55()
+    runMigrations(db)
+    db.run(`UPDATE app_settings SET value = '55' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+
+    const bare = new SQL.Database()
+    bare.run(
+      `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+    )
+    bare.run(
+      `INSERT INTO app_settings (key, value) VALUES ('schema_version', '55')`
+    )
+    expect(() => runMigrations(bare)).not.toThrow()
+    expect(readSetting(bare, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    bare.close()
+  })
+
+  it('creates the column on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(columns(db)).toContain('counts_on_hand')
     db.close()
   })
 })

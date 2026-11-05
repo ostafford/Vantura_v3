@@ -10,6 +10,9 @@ import {
   getSaverInterestBetween,
   getAccountById,
   getSaverMonthlyFlow,
+  getOnHandCents,
+  getOnHandSavers,
+  setSaverCountsOnHand,
 } from './accounts'
 
 vi.mock('@/db', () => ({
@@ -228,5 +231,122 @@ describe('saver monthly flow counts every Round Up row (#202)', () => {
     expect(october).toEqual([
       { monthLabel: "Oct '26", flowCents: -50120, txCount: 2 },
     ])
+  })
+})
+
+/**
+ * #213 — On hand = open, non-joint Spending account(s) + every open, non-joint
+ * Saver switched on. Joint (2Up) and closed accounts never count and are never
+ * eligible for the switch.
+ */
+describe('On hand (#213)', () => {
+  let SQL: SqlJsStatic
+  let db: Database
+
+  beforeEach(async () => {
+    SQL = await initSqlJs()
+    const { runSchema } = await import('@/db/schema')
+    db = new SQL.Database()
+    runSchema(db)
+    const mod = await import('@/db')
+    vi.mocked(mod.getDb).mockReturnValue(db as never)
+    vi.mocked(mod.schedulePersist).mockImplementation(() => {})
+  })
+
+  function insert(
+    id: string,
+    type: string,
+    balance: number,
+    opts: { on?: boolean; ownership?: string | null; closed?: boolean } = {}
+  ) {
+    db.run(
+      `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at,
+         ownership_type, is_closed, counts_on_hand)
+       VALUES (?, ?, ?, ?, '2026-01-01', '2026-01-01', ?, ?, ?)`,
+      [
+        id,
+        id,
+        type,
+        balance,
+        opts.ownership === undefined ? 'INDIVIDUAL' : opts.ownership,
+        opts.closed ? 1 : 0,
+        opts.on ? 1 : 0,
+      ]
+    )
+  }
+
+  it('is the Spending account plus every Saver switched on', () => {
+    insert('spend', 'TRANSACTIONAL', 120_00)
+    insert('bills', 'SAVER', 500_00, { on: true })
+    insert('holiday', 'SAVER', 3_000_00, { on: true })
+    insert('emergency', 'SAVER', 10_000_00)
+
+    expect(getOnHandCents()).toBe(120_00 + 500_00 + 3_000_00)
+  })
+
+  it('excludes switched-off, joint and closed accounts, whatever their switch', () => {
+    insert('spend', 'TRANSACTIONAL', 100_00)
+    insert('off', 'SAVER', 1_00)
+    insert('2up-spend', 'TRANSACTIONAL', 2_00, { ownership: 'JOINT' })
+    insert('2up-saver', 'SAVER', 4_00, { ownership: 'JOINT', on: true })
+    insert('old-spend', 'TRANSACTIONAL', 8_00, { closed: true })
+    insert('old-saver', 'SAVER', 16_00, { closed: true, on: true })
+
+    expect(getOnHandCents()).toBe(100_00)
+  })
+
+  it('counts an account with no stored ownership as non-joint', () => {
+    insert('spend', 'TRANSACTIONAL', 100_00, { ownership: null })
+    insert('bills', 'SAVER', 50_00, { ownership: null, on: true })
+
+    expect(getOnHandCents()).toBe(150_00)
+  })
+
+  it('carries a negative balance through, unclamped', () => {
+    insert('spend', 'TRANSACTIONAL', -30_00)
+    insert('bills', 'SAVER', 10_00, { on: true })
+
+    expect(getOnHandCents()).toBe(-20_00)
+  })
+
+  it('is 0 with no accounts', () => {
+    expect(getOnHandCents()).toBe(0)
+  })
+
+  it('lists only eligible Savers, by name, with their switch', () => {
+    insert('spend', 'TRANSACTIONAL', 1_00)
+    insert('s-b', 'SAVER', 2_00, { on: true })
+    insert('s-a', 'SAVER', 3_00)
+    insert('s-joint', 'SAVER', 4_00, { ownership: 'JOINT' })
+    insert('s-closed', 'SAVER', 5_00, { closed: true })
+
+    expect(getOnHandSavers()).toEqual([
+      { id: 's-a', display_name: 's-a', balance: 3_00, countsOnHand: false },
+      { id: 's-b', display_name: 's-b', balance: 2_00, countsOnHand: true },
+    ])
+  })
+
+  it('switches a Saver on and off, and On hand follows', () => {
+    insert('spend', 'TRANSACTIONAL', 100_00)
+    insert('bills', 'SAVER', 50_00)
+
+    expect(setSaverCountsOnHand('bills', true)).toBe(true)
+    expect(getOnHandCents()).toBe(150_00)
+    expect(setSaverCountsOnHand('bills', false)).toBe(true)
+    expect(getOnHandCents()).toBe(100_00)
+  })
+
+  it('refuses to switch on an ineligible account, writing nothing', () => {
+    insert('spend', 'TRANSACTIONAL', 100_00)
+    insert('2up', 'SAVER', 4_00, { ownership: 'JOINT' })
+    insert('old', 'SAVER', 8_00, { closed: true })
+
+    for (const id of ['spend', '2up', 'old', 'missing']) {
+      expect(setSaverCountsOnHand(id, true), id).toBe(false)
+    }
+    expect(
+      db.exec(`SELECT COUNT(*) FROM accounts WHERE counts_on_hand = 1`)[0]
+        .values[0][0]
+    ).toBe(0)
   })
 })

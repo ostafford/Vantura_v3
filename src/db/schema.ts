@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 55
+const SCHEMA_VERSION = 56
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -31,7 +31,8 @@ const DDL_STATEMENTS = [
     is_closed INTEGER NOT NULL DEFAULT 0,
     target_amount_cents INTEGER,
     opening_balance_cents INTEGER,
-    opening_balance_date TEXT
+    opening_balance_date TEXT,
+    counts_on_hand INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -1470,6 +1471,27 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['55']
+    )
+  }
+  // #213 — the per-Saver On hand switch (#173). Every existing account starts
+  // off, like a Saver first seen on a sync, so Headroom never jumps without
+  // the user's say-so. Sync's upsert never names this column, so it survives.
+  if (version < 56) {
+    if (tableExists(database, 'accounts')) {
+      const accCols = new Set(
+        (database.exec(`PRAGMA table_info(accounts)`)[0]?.values ?? []).map(
+          (r) => String(r[1])
+        )
+      )
+      if (!accCols.has('counts_on_hand')) {
+        database.run(
+          `ALTER TABLE accounts ADD COLUMN counts_on_hand INTEGER NOT NULL DEFAULT 0`
+        )
+      }
+    }
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['56']
     )
   }
 }

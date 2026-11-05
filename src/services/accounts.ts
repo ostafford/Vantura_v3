@@ -62,6 +62,80 @@ export function sumAccountBalancesCents(rows: AccountRow[]): number {
   return rows.reduce((s, r) => s + r.balance, 0)
 }
 
+// ─── On hand (#213, #173) ────────────────────────────────────────────────────
+//
+// On hand = the live balance of the open, non-joint Spending (TRANSACTIONAL)
+// account(s) plus every open, non-joint Saver switched on. Joint (2Up) and
+// closed accounts are never counted and never eligible for the switch.
+// `ownership_type` is NULL on rows synced before it was stored; only an
+// explicit 'JOINT' excludes, matching Actual spending (actualSpending.ts).
+
+const ON_HAND_ELIGIBLE = `is_closed = 0 AND COALESCE(ownership_type, '') <> 'JOINT'`
+
+/** On hand in cents. 0 when the database isn't ready or nothing counts. */
+export function getOnHandCents(): number {
+  const db = getDb()
+  if (!db) return 0
+  const stmt = db.prepare(
+    `SELECT COALESCE(SUM(balance), 0) FROM accounts
+     WHERE ${ON_HAND_ELIGIBLE}
+       AND (account_type = 'TRANSACTIONAL'
+            OR (account_type = 'SAVER' AND counts_on_hand = 1))`
+  )
+  stmt.step()
+  const v = stmt.get()
+  stmt.free()
+  return v ? Number(v[0]) : 0
+}
+
+export interface OnHandSaver {
+  id: string
+  display_name: string
+  balance: number
+  /** Whether this Saver's balance counts towards On hand. */
+  countsOnHand: boolean
+}
+
+/** Every Saver eligible for the On hand switch, with its state, by name. */
+export function getOnHandSavers(): OnHandSaver[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id, display_name, balance, counts_on_hand FROM accounts
+     WHERE account_type = 'SAVER' AND ${ON_HAND_ELIGIBLE}
+     ORDER BY display_name COLLATE NOCASE, id`
+  )
+  const out: OnHandSaver[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [string, string, number, number]
+    out.push({
+      id: r[0],
+      display_name: r[1],
+      balance: r[2],
+      countsOnHand: r[3] === 1,
+    })
+  }
+  stmt.free()
+  return out
+}
+
+/**
+ * Switch a Saver on or off for On hand. Returns false, writing nothing, when
+ * the account isn't an eligible Saver (missing, not a Saver, joint or closed).
+ */
+export function setSaverCountsOnHand(saverId: string, on: boolean): boolean {
+  const db = getDb()
+  if (!db) return false
+  db.run(
+    `UPDATE accounts SET counts_on_hand = ?
+     WHERE id = ? AND account_type = 'SAVER' AND ${ON_HAND_ELIGIBLE}`,
+    [on ? 1 : 0, saverId]
+  )
+  if (db.getRowsModified() === 0) return false
+  schedulePersist()
+  return true
+}
+
 export function getAccountById(id: string): AccountRow | null {
   const db = getDb()
   if (!db) return null
