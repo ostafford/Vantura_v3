@@ -71,14 +71,13 @@ function add(r: {
   is_reserved?: 0 | 1
   reminder?: number | null
   cancel_by?: string | null
-  charge_type?: 'EXPENSE' | 'LIABILITY_REPAYMENT'
   match_description?: string | null
 }) {
   db.run(
     `INSERT INTO upcoming_charges
        (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before,
-        cancel_by_date, charge_type, match_description, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '2025-01-01')`,
+        cancel_by_date, match_description, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '2025-01-01')`,
     [
       r.name,
       r.amount ?? 1000,
@@ -87,7 +86,6 @@ function add(r: {
       r.is_reserved ?? 1,
       r.reminder ?? null,
       r.cancel_by ?? null,
-      r.charge_type ?? 'EXPENSE',
       r.match_description ?? null,
     ]
   )
@@ -236,15 +234,8 @@ describe('dueSoonRegulars', () => {
     expect(names(dueSoonRegulars())).toEqual(['Today'])
   })
 
-  it('leaves out Regulars with no reminder, liability repayments and overdue ONCEs', () => {
+  it('leaves out Regulars with no reminder and overdue ONCEs', () => {
     add({ name: 'No reminder', frequency: 'ONCE', date: '2025-02-24' })
-    add({
-      name: 'Loan',
-      frequency: 'ONCE',
-      date: '2025-02-24',
-      reminder: 5,
-      charge_type: 'LIABILITY_REPAYMENT',
-    })
     add({ name: 'Overdue', frequency: 'ONCE', date: '2025-02-20', reminder: 5 })
     expect(dueSoonRegulars()).toEqual([])
   })

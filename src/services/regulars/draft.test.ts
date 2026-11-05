@@ -103,8 +103,6 @@ describe('blankDraft → saveRegular', () => {
       is_reserved: 1,
       reminder_days_before: 3,
       cancel_by_date: null,
-      charge_type: 'EXPENSE',
-      linked_manual_account_id: null,
       match_description: null,
       bucket_id: null,
     })
@@ -116,37 +114,18 @@ describe('blankDraft → saveRegular', () => {
       frequency: 'MONTHLY',
       nextChargeDate: '2026-04-15',
       isReserved: true,
-      chargeType: 'EXPENSE',
       anchorDate: null,
     })
   })
 
-  it('drops an unparseable reminder and a linked account on a plain expense', () => {
+  it('drops an unparseable reminder', () => {
     const id = saveRegular({
       ...blankDraft(),
       name: 'Gym',
       amount: '10',
       reminderDaysBefore: 'soon',
-      linkedManualAccountId: 7,
     })
-    expect(regularById(id)).toMatchObject({
-      reminder_days_before: null,
-      linked_manual_account_id: null,
-    })
-  })
-
-  it('keeps the linked account on a liability repayment', () => {
-    const id = saveRegular({
-      ...blankDraft(),
-      name: 'Car loan',
-      amount: '300',
-      chargeType: 'LIABILITY_REPAYMENT',
-      linkedManualAccountId: 7,
-    })
-    expect(regularById(id)).toMatchObject({
-      charge_type: 'LIABILITY_REPAYMENT',
-      linked_manual_account_id: 7,
-    })
+    expect(regularById(id)).toMatchObject({ reminder_days_before: null })
   })
 
   it('writes the bucket in the same save', () => {
@@ -232,7 +211,6 @@ describe('draftFromTransaction → saveRegular (#147, #153)', () => {
       nextChargeDate: '2026-04-30', // what the form shows
       anchorDate: '2026-01-31',
       isReserved: true,
-      chargeType: 'EXPENSE',
     })
   })
 
@@ -337,7 +315,6 @@ describe('draftFromSuggestion → saveRegular', () => {
       next_charge_date: '2026-03-31',
       category_id: 'tv-and-music',
       is_reserved: 1,
-      charge_type: 'EXPENSE',
       match_description: 'NETFLIX.COM',
     })
   })

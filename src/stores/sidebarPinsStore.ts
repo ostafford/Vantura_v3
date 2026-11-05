@@ -17,11 +17,6 @@ export const PINNABLE_ANALYTICS_PAGES: PinnedNavItem[] = [
     label: 'Budget Plan',
     icon: 'mdi-wallet-outline',
   },
-  {
-    path: '/analytics/net-worth',
-    label: 'Net Worth',
-    icon: 'mdi-chart-timeline-variant',
-  },
 ]
 
 interface SidebarPinsState {

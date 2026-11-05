@@ -19,8 +19,7 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { regularById, linkedLiabilityRepayments, regularsByMonth } =
-  await import('./index')
+const { regularById, regularsByMonth } = await import('./index')
 const { localDateString } = await import('@/lib/format')
 
 function makeRow(overrides: Partial<Regular> = {}): Regular {
@@ -34,8 +33,8 @@ function makeRow(overrides: Partial<Regular> = {}): Regular {
     is_reserved: 1,
     reminder_days_before: null,
     cancel_by_date: null,
-    charge_type: 'EXPENSE',
-    linked_manual_account_id: null,
+    match_description: null,
+    bucket_id: null,
     ...overrides,
   }
 }
@@ -283,7 +282,7 @@ describe('nextChargeDateFromAnchor (#47)', () => {
   })
 })
 
-describe('regularById / linkedLiabilityRepayments', () => {
+describe('regularById', () => {
   beforeAll(async () => {
     SQL = await initSqlJs()
   })
@@ -295,23 +294,12 @@ describe('regularById / linkedLiabilityRepayments', () => {
     for (const k of Object.keys(appSettings)) delete appSettings[k]
   })
 
-  function insertCharge(opts: {
-    name: string
-    chargeType?: 'EXPENSE' | 'LIABILITY_REPAYMENT'
-    linkedAccountId?: number | null
-    matchDescription?: string | null
-  }) {
+  function insertCharge(opts: { name: string }) {
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, is_reserved, created_at,
-          charge_type, linked_manual_account_id, match_description)
-       VALUES (?, 100000, 'MONTHLY', '2026-01-15', 1, '2026-01-01T00:00:00.000Z', ?, ?, ?)`,
-      [
-        opts.name,
-        opts.chargeType ?? 'EXPENSE',
-        opts.linkedAccountId ?? null,
-        opts.matchDescription ?? null,
-      ]
+         (name, amount, frequency, next_charge_date, is_reserved, created_at)
+       VALUES (?, 100000, 'MONTHLY', '2026-01-15', 1, '2026-01-01T00:00:00.000Z')`,
+      [opts.name]
     )
     return db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
   }
@@ -320,31 +308,6 @@ describe('regularById / linkedLiabilityRepayments', () => {
     const id = insertCharge({ name: 'Spotify' })
     expect(regularById(id)?.name).toBe('Spotify')
     expect(regularById(9999)).toBeNull()
-  })
-
-  it('linkedLiabilityRepayments returns only fully-linked LIABILITY_REPAYMENT rows', () => {
-    insertCharge({ name: 'Groceries' }) // EXPENSE
-    insertCharge({
-      name: 'Mortgage (no fingerprint)',
-      chargeType: 'LIABILITY_REPAYMENT',
-      linkedAccountId: 3,
-      matchDescription: null,
-    })
-    insertCharge({
-      name: 'Mortgage (no account)',
-      chargeType: 'LIABILITY_REPAYMENT',
-      linkedAccountId: null,
-      matchDescription: 'RAW',
-    })
-    const fullId = insertCharge({
-      name: 'Mortgage (linked)',
-      chargeType: 'LIABILITY_REPAYMENT',
-      linkedAccountId: 3,
-      matchDescription: 'MORTGAGE-RAW',
-    })
-
-    const linked = linkedLiabilityRepayments()
-    expect(linked.map((c) => c.id)).toEqual([fullId])
   })
 })
 
@@ -375,8 +338,8 @@ describe('regularsByMonth — overdue ONCE charges (#18)', () => {
   }) {
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, is_reserved, created_at, cancel_by_date, charge_type)
-       VALUES (?, ?, ?, ?, 1, '2020-01-01T00:00:00.000Z', ?, 'EXPENSE')`,
+         (name, amount, frequency, next_charge_date, is_reserved, created_at, cancel_by_date)
+       VALUES (?, ?, ?, ?, 1, '2020-01-01T00:00:00.000Z', ?)`,
       [
         opts.name,
         opts.amount ?? 5000,

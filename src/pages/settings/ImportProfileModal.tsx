@@ -10,7 +10,6 @@ import {
   type TrackerExportRow,
   type UpcomingChargeExportRow,
   type BudgetBucketExportRow,
-  type ManualAccountExportRow,
   type ImportOptions,
 } from '@/services/profileExport'
 import { classifyImportError } from './importErrorClassification'
@@ -33,15 +32,6 @@ function formatBudgetSummary(buckets: BudgetBucketExportRow[]): string {
   return `${buckets.length} bucket${buckets.length !== 1 ? 's' : ''}`
 }
 
-function formatNetWorthSummary(
-  accounts: ManualAccountExportRow[] | undefined
-): string {
-  if (!Array.isArray(accounts) || accounts.length === 0) return 'None'
-  const names = accounts.slice(0, 3).map((a) => a.name)
-  const more = accounts.length > 3 ? ` +${accounts.length - 3} more` : ''
-  return `${accounts.length} manual account${accounts.length !== 1 ? 's' : ''} (${names.join(', ')}${more})`
-}
-
 export function ImportProfileModal() {
   const [show, setShow] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -58,7 +48,6 @@ export function ImportProfileModal() {
     trackers: true,
     upcomingCharges: true,
     budgetPlan: true,
-    netWorth: true,
   })
 
   function close() {
@@ -96,10 +85,6 @@ export function ImportProfileModal() {
         trackers: true,
         upcomingCharges: true,
         budgetPlan: true,
-        // Pre-v5 files carry no Net Worth section; only offer it (and only
-        // let it run) when the file actually contains one, so a replace-all
-        // can't wipe local manual accounts from an old export.
-        netWorth: payload.manualAccounts !== undefined,
       })
       setStep(2)
     } catch (err) {
@@ -189,9 +174,8 @@ export function ImportProfileModal() {
           <Form onSubmit={handleSubmit}>
             <Modal.Body id="import-modal-description">
               <p className="small text-muted mb-3">
-                Imports settings, trackers, Regulars, budget plan, and Net Worth
-                manual accounts into this device. Will not import transactions
-                or API tokens.
+                Imports settings, trackers, Regulars and budget plan into this
+                device. Will not import transactions or API tokens.
               </p>
               <Form.Group className="mb-3">
                 <Form.Label>Settings file</Form.Label>
@@ -292,11 +276,10 @@ export function ImportProfileModal() {
             <Modal.Body id="import-modal-description">
               <p className="small text-muted mb-3">
                 Choose which sections to import. Each selected section fully
-                replaces the existing data on this device — importing Net Worth
-                removes any manual account that isn't in the file — while
-                unselected sections are left unchanged. If you import Trackers
-                or Regulars without importing Budget Plan, those items will lose
-                their bucket assignments.
+                replaces the existing data on this device, while unselected
+                sections are left unchanged. If you import Trackers or Regulars
+                without importing Budget Plan, those items will lose their
+                bucket assignments.
               </p>
               {preview &&
                 (() => {
@@ -375,7 +358,7 @@ export function ImportProfileModal() {
                           {formatUpcomingSummary(preview.upcomingCharges ?? [])}
                         </div>
                       </div>
-                      <div className={preview.manualAccounts ? 'mb-2' : ''}>
+                      <div>
                         <Form.Check
                           type="checkbox"
                           id="import-opt-budget-plan"
@@ -396,29 +379,6 @@ export function ImportProfileModal() {
                           {formatBudgetSummary(preview.budgetBuckets ?? [])}
                         </div>
                       </div>
-                      {preview.manualAccounts !== undefined && (
-                        <div>
-                          <Form.Check
-                            type="checkbox"
-                            id="import-opt-net-worth"
-                            label="Net Worth (manual accounts & history)"
-                            checked={options.netWorth}
-                            onChange={(e) =>
-                              setOptions((o) => ({
-                                ...o,
-                                netWorth: e.target.checked,
-                              }))
-                            }
-                            aria-label="Import Net Worth manual accounts and history"
-                          />
-                          <div className="small text-muted ms-4 mt-1">
-                            Current:{' '}
-                            {formatNetWorthSummary(current.manualAccounts)}
-                            {' → '}
-                            New: {formatNetWorthSummary(preview.manualAccounts)}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )
                 })()}
@@ -441,8 +401,7 @@ export function ImportProfileModal() {
                   (!options.settings &&
                     !options.trackers &&
                     !options.upcomingCharges &&
-                    !options.budgetPlan &&
-                    !options.netWorth)
+                    !options.budgetPlan)
                 }
                 aria-busy={importing}
               >
