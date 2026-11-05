@@ -387,8 +387,8 @@ export function computeCurrentPeriodSegments(
 }
 
 /**
- * Roll a tracker's current-period segments up into the numbers the Dashboard and
- * notifications use. `effectiveBudget` is the sum of the prorated per-segment
+ * Roll a tracker's current-period segments up into the numbers the Trackers
+ * screens and the forecast use. `effectiveBudget` is the sum of the prorated per-segment
  * budgets — equal to the head budget when nothing changed this period.
  */
 function summariseCurrentPeriod(tracker: CurrentPeriodInput): {

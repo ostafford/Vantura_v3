@@ -32,10 +32,9 @@ describe('BalanceCards', () => {
     expect(html).not.toContain('click to set low balance alert')
   })
 
-  it('keeps the deep-link id and tour hook on the hero', () => {
+  it('keeps the tour hook on the hero', () => {
     const html = ReactDOMServer.renderToString(<BalanceCards {...baseProps} />)
 
-    expect(html).toContain('id="dashboard-spendable-card"')
     expect(html).toContain('data-tour="balance-cards"')
     expect(html).toContain('role="button"')
   })

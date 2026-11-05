@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 53
+const SCHEMA_VERSION = 54
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -205,17 +205,6 @@ const DDL_STATEMENTS = [
     FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
-  `CREATE TABLE IF NOT EXISTS notification_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    link_path TEXT,
-    link_label TEXT,
-    created_at TEXT NOT NULL,
-    read_at TEXT
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_notification_history_created_at ON notification_history(created_at)`,
   `CREATE TABLE IF NOT EXISTS manual_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -1462,6 +1451,26 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['53']
+    )
+  }
+  // #208 — Notifications are cut. Drop their history table (its index goes
+  // with it) and every setting they kept: the master and per-type toggles and
+  // the large-transaction threshold (`notifications_enabled`, `notif_*`), the
+  // once-a-day and once-per-value guards (`notif_last_*`, `notif_to_*`,
+  // `notif_tp_*`, `notif_sm_*`, `notif_bill_settled_*`, `notif_large_tx_*`,
+  // `liab_repay_*`), and the legacy `last_notification_date`. `\` escapes
+  // LIKE's `_` wildcard, so only those exact prefixes match.
+  if (version < 54) {
+    database.run(`DROP TABLE IF EXISTS notification_history`)
+    database.run(
+      `DELETE FROM app_settings
+        WHERE key IN ('notifications_enabled', 'last_notification_date')
+           OR key LIKE 'notif\\_%' ESCAPE '\\'
+           OR key LIKE 'liab\\_repay\\_%' ESCAPE '\\'`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['54']
     )
   }
 }

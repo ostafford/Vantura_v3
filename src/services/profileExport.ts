@@ -23,9 +23,10 @@ import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 
 /**
  * Export format version for the encrypted payload. v10 (#204): the
- * `budgetHypotheticals` section is no longer written.
+ * `budgetHypotheticals` section is no longer written. v11 (#208): the
+ * notification settings are no longer written.
  */
-const EXPORT_PAYLOAD_VERSION = 10
+const EXPORT_PAYLOAD_VERSION = 11
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -48,16 +49,6 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'lock_timeout_minutes',
   'saver_account_order',
   'essentials_saver_account_id',
-  'notifications_enabled',
-  'notif_bills',
-  'notif_tracker_overspent',
-  'notif_tracker_pace',
-  'notif_spendable_low',
-  'notif_payday',
-  'notif_large_tx',
-  'notif_saver_milestone',
-  'notif_sync_stale',
-  'notif_large_tx_threshold_cents',
 ] as const
 
 /**
@@ -652,9 +643,33 @@ const CUT_SECTIONS: readonly {
 ]
 
 /**
- * The notice the import step shows for an older export's cut sections, e.g.
- * "Skipped 2 hypothetical lines. Vantura no longer has them." Null when the
- * file carries none (or only empty ones).
+ * Settings an older export may carry for features Vantura has since cut. The
+ * whitelist no longer has them, so `applySettings` already ignores them; the
+ * importer names them so the user knows they were skipped (#170).
+ */
+const CUT_SETTINGS: readonly { keys: readonly string[]; notice: string }[] = [
+  {
+    // #208 — every notification setting an export ever carried (v1–v10).
+    keys: [
+      'notifications_enabled',
+      'notif_bills',
+      'notif_tracker_overspent',
+      'notif_tracker_pace',
+      'notif_spendable_low',
+      'notif_payday',
+      'notif_large_tx',
+      'notif_saver_milestone',
+      'notif_sync_stale',
+      'notif_large_tx_threshold_cents',
+    ],
+    notice: 'Skipped your notification settings. Vantura no longer has them.',
+  },
+]
+
+/**
+ * The notice the import step shows for an older export's cut sections and
+ * settings, e.g. "Skipped 2 hypothetical lines. Vantura no longer has them."
+ * Null when the file carries none (or only empty sections).
  */
 export function describeSkippedSections(payload: ExportPayload): string | null {
   const legacy = payload as unknown as Record<string, unknown>
@@ -664,6 +679,16 @@ export function describeSkippedSections(payload: ExportPayload): string | null {
     if (!Array.isArray(rows) || rows.length === 0) continue
     const noun = rows.length === 1 ? section.singular : section.plural
     notices.push(`Skipped ${rows.length} ${noun}. Vantura no longer has them.`)
+  }
+  const settings = payload.settings ?? {}
+  for (const cut of CUT_SETTINGS) {
+    if (
+      cut.keys.some((key) =>
+        Object.prototype.hasOwnProperty.call(settings, key)
+      )
+    ) {
+      notices.push(cut.notice)
+    }
   }
   return notices.length > 0 ? notices.join(' ') : null
 }

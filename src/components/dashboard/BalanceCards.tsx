@@ -105,7 +105,6 @@ export function BalanceCards({
   return (
     <div className="balance-cards mb-4" data-tour="balance-cards">
       <div
-        id="dashboard-spendable-card"
         className={`balance-hero balance-hero--${spendableTone}`}
         role="button"
         tabIndex={0}
