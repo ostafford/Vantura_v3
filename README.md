@@ -42,7 +42,7 @@ Open the URL shown in the terminal.
 
 **Up Bank Personal Access Token:** Create in Up app → Profile → Data sharing → Personal access tokens. Enter during onboarding; it is encrypted with a key derived from your passphrase and never stored in plain form.
 
-**First run:** The onboarding wizard guides you through passphrase creation, API token entry, payday schedule, and initial sync. After that, an unlock screen appears on each app open.
+**First run:** The onboarding wizard guides you through passphrase creation, API token entry, your pay, and initial sync. After that, an unlock screen appears on each app open.
 
 **Demo / sample data:** Choose "Try with sample data" on the first onboarding step to explore the app without an Up Bank token. A DEMO badge appears in the navbar.
 
