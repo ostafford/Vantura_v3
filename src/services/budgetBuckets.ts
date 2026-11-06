@@ -1,9 +1,5 @@
 import { getDb, getAppSetting, schedulePersist } from '@/db'
-import {
-  monthlyEquivalentMultiplier,
-  toPeriodCents,
-  type BudgetDisplayPeriod,
-} from '@/lib/monthlyEquivalent'
+import { monthlyEquivalentMultiplier } from '@/lib/monthlyEquivalent'
 import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 export interface BudgetBucketRow {
@@ -156,47 +152,6 @@ export function getBucketItems(bucketId: number): BucketItemSummary {
   return { upcoming }
 }
 
-export interface BucketCardSummary {
-  /** Regulars (except `ONCE`) plus active Trackers, in the display period. */
-  plannedCents: number
-}
-
-export function getBucketCardSummary(
-  bucketId: number,
-  period: BudgetDisplayPeriod
-): BucketCardSummary {
-  const db = getDb()
-  const { upcoming } = getBucketItems(bucketId)
-  let plannedCents = 0
-
-  for (const u of upcoming) {
-    if (u.frequency === 'ONCE') continue
-    plannedCents += toPeriodCents(u.amount, u.frequency, period)
-  }
-
-  if (db) {
-    const stmt = db.prepare(
-      `SELECT budget_amount, reset_frequency FROM trackers WHERE bucket_id = ? AND is_active = 1`
-    )
-    stmt.bind([bucketId])
-    while (stmt.step()) {
-      const row = stmt.get() as [number, string]
-      plannedCents += toPeriodCents(row[0], row[1], period)
-    }
-    stmt.free()
-  }
-
-  return { plannedCents }
-}
-
-/** Total outgoing cents for a bucket in the given display period. */
-export function getBucketTotalCents(
-  bucketId: number,
-  period: BudgetDisplayPeriod
-): number {
-  return getBucketCardSummary(bucketId, period).plannedCents
-}
-
 export function getUnassignedUpcoming(): BucketUpcomingItem[] {
   const db = getDb()
   if (!db) return []
@@ -239,15 +194,4 @@ export function getMonthlyIncomeCents(): number | null {
   const pay = readPay()
   if (!pay) return null
   return Math.round(pay.perPay * monthlyEquivalentMultiplier(pay.frequency))
-}
-
-/**
- * Income per display period from the stored pay. MONTHLY delegates to
- * getMonthlyIncomeCents. Null under the same conditions (see `readPay`).
- */
-export function getIncomeCents(period: BudgetDisplayPeriod): number | null {
-  if (period === 'MONTHLY') return getMonthlyIncomeCents()
-  const pay = readPay()
-  if (!pay) return null
-  return toPeriodCents(pay.perPay, pay.frequency, period)
 }

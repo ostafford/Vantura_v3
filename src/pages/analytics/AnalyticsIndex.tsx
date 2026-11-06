@@ -90,8 +90,8 @@ export function AnalyticsIndex() {
                 <div>
                   <h6 className="mb-1 fw-semibold">Budget Plan</h6>
                   <p className="mb-0 text-muted small">
-                    Group your expenses into buckets and see weekly, monthly and
-                    yearly totals.
+                    This month&apos;s plan vs actual, with your expenses grouped
+                    into buckets.
                   </p>
                   <span
                     className="small mt-1 d-inline-block"

@@ -1,37 +1,31 @@
 import { useState, useMemo, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { Row, Col, Button, Modal, Form, Card } from 'react-bootstrap'
 import { useStore } from 'zustand'
-import { Link, useSearchParams } from 'react-router-dom'
-import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Modal,
-  Form,
-  ProgressBar,
-} from 'react-bootstrap'
 import {
   getBuckets,
   createBucket,
   updateBucket,
   deleteBucket,
   reorderBuckets,
-  getBucketCardSummary,
   getUnassignedUpcoming,
-  getIncomeCents,
   assignUpcomingToBucket,
   type BudgetBucketRow,
-  type BucketCardSummary,
 } from '@/services/budgetBuckets'
-import { formatMoney, formatSignedMoney } from '@/lib/format'
-import { syncStore } from '@/stores/syncStore'
+import { formatMoney } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
-import { BUCKET_ICONS, BUDGET_DISPLAY_PERIODS } from '@/lib/budgetBucketMeta'
+import { BUCKET_ICONS } from '@/lib/budgetBucketMeta'
 import { getBucketColor } from '@/lib/colorSystem'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
-import type { BudgetDisplayPeriod } from '@/lib/monthlyEquivalent'
 import type React from 'react'
 import { HelpPopover } from '@/components/HelpPopover'
+import { usePlanVsActual } from '@/components/budgetPlan/usePlanVsActual'
+import {
+  BucketPlanCard,
+  MonthSummaryCard,
+  UnplannedCard,
+} from '@/components/budgetPlan/PlanVsActualParts'
+import { UNPLANNED_CARD_ID } from '@/components/budgetPlan/planFormat'
 
 // ─── Bucket modal ────────────────────────────────────────────────────────────
 
@@ -260,26 +254,24 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 
+/** Scrolls to the Unplanned card and moves focus there (the bar's unplanned segment). */
+function showUnplanned() {
+  const el = document.getElementById(UNPLANNED_CARD_ID)
+  if (!el) return
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  el.focus({ preventScroll: true })
+}
+
+/**
+ * The Budget Plan: plan vs actual for the current calendar month (#241, Spec D
+ * #239), on `getPlanVsActual` (#240). There is no display period: every
+ * figure is this month's, occurrence-based, and `?period=` is ignored.
+ */
 export function AnalyticsBudgetPlan() {
-  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const periodParam = searchParams.get('period')
-  const period: BudgetDisplayPeriod =
-    periodParam === 'WEEKLY' || periodParam === 'YEARLY'
-      ? periodParam
-      : 'MONTHLY'
-  function setPeriod(p: BudgetDisplayPeriod) {
-    setSearchParams(
-      (prev) => {
-        prev.set('period', p)
-        return prev
-      },
-      { replace: true }
-    )
-  }
   const [showBucketModal, setShowBucketModal] = useState(false)
   const [editingBucket, setEditingBucket] = useState<BudgetBucketRow | null>(
     null
@@ -290,26 +282,22 @@ export function AnalyticsBudgetPlan() {
   const [showAssignModal, setShowAssignModal] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
+  const plan = usePlanVsActual(version)
 
   const buckets = useMemo(
     () => getBuckets(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [version, lastSyncCompletedAt]
+    [version]
   )
-
-  const bucketSummaries = useMemo(
-    () =>
-      Object.fromEntries(
-        buckets.map((b) => [b.id, getBucketCardSummary(b.id, period)])
-      ) as Record<number, BucketCardSummary>,
+  const unassignedRegulars = useMemo(
+    () => getUnassignedUpcoming(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buckets, period, version, lastSyncCompletedAt]
+    [version]
   )
 
   // Drag-and-drop reorder — same native-DnD pattern as Savers, but bucket
   // order lives directly on sort_order (no app_settings key needed): a drop
-  // just rewrites sort_order and refreshes, buckets already come back
-  // ordered from getBuckets().
+  // just rewrites sort_order and refreshes.
   const [dragOverId, setDragOverId] = useState<number | null>(null)
 
   const handleDragStart = useCallback((e: React.DragEvent, id: number) => {
@@ -321,10 +309,6 @@ export function AnalyticsBudgetPlan() {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverId(id)
-  }, [])
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverId(null)
   }, [])
 
   const handleBucketDrop = useCallback(
@@ -346,400 +330,179 @@ export function AnalyticsBudgetPlan() {
     [buckets, refresh]
   )
 
-  const handleDragEnd = useCallback(() => {
-    setDragOverId(null)
-  }, [])
-
-  const unassignedUpcoming = useMemo(
-    () => getUnassignedUpcoming(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [version, lastSyncCompletedAt]
-  )
-
-  const incomeCents = useMemo(
-    () => getIncomeCents(period),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [period, version, lastSyncCompletedAt]
-  )
-
-  const totalOutgoingCents = useMemo(
-    () =>
-      Object.values(bucketSummaries).reduce(
-        (sum, s) => sum + s.plannedCents,
-        0
-      ),
-    [bucketSummaries]
-  )
-
-  const unallocatedCents =
-    incomeCents != null ? incomeCents - totalOutgoingCents : null
-
-  const periodLabel =
-    BUDGET_DISPLAY_PERIODS.find((p) => p.value === period)?.label ?? period
-
   function openCreate() {
     setEditingBucket(null)
     setShowBucketModal(true)
   }
 
-  function openEdit(b: BudgetBucketRow, e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setEditingBucket(b)
-    setShowBucketModal(true)
-  }
+  if (!plan) return null
 
-  if (buckets.length === 0) {
-    return (
-      <div className="grid-margin">
-        <Card>
-          <Card.Body className="text-center py-5">
-            <i
-              className="mdi mdi-wallet-outline"
-              style={{
-                fontSize: '3rem',
-                color: 'var(--vantura-primary)',
-                opacity: 0.6,
-              }}
-              aria-hidden
-            />
-            <h5 className="mt-3 mb-2">Welcome to Budget Plan</h5>
-            <p
-              className="text-muted mb-1"
-              style={{ maxWidth: 480, margin: '0 auto' }}
-            >
-              Budget Plan helps you understand your complete financial picture.
-              Group your expenses into <strong>buckets</strong> — life pillars
-              like Subscriptions, Household, or Lifestyle.
-            </p>
-            <p
-              className="text-muted mb-1"
-              style={{ maxWidth: 480, margin: '0 auto' }}
-            >
-              Each bucket holds your Regulars and Trackers — broken down by
-              week, month, or year.
-            </p>
-            <p
-              className="text-muted mb-4"
-              style={{ maxWidth: 480, margin: '0 auto' }}
-            >
-              At a glance you will always see your total outgoing, your income,
-              and how much of your income no bucket plans for yet.
-            </p>
-            <Button variant="primary" onClick={openCreate}>
-              <i className="mdi mdi-plus me-1" aria-hidden />
-              Create your first bucket
-            </Button>
-          </Card.Body>
-        </Card>
-
-        <BucketModal
-          show={showBucketModal}
-          editing={null}
-          onClose={() => setShowBucketModal(false)}
-          onSaved={refresh}
-        />
-      </div>
-    )
-  }
+  const rowsByBucket = new Map(buckets.map((b) => [b.id, b]))
+  const { notInABucket } = plan
 
   return (
     <div className="grid-margin">
-      {/* Header row */}
-      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <div className="d-flex align-items-center gap-1">
-          <div
-            className="period-toggle"
-            role="group"
-            aria-label="Select display period"
-          >
-            {BUDGET_DISPLAY_PERIODS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                className={`segment-btn${period === p.value ? ' active' : ''}`}
-                onClick={() => setPeriod(p.value)}
-                aria-pressed={period === p.value}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <HelpPopover
-            id="budget-plan-help"
-            title="Budget Plan"
-            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Unallocated: the Income no bucket plans for. Set your pay amount in Settings → Pay to enable the Income figure."
-            ariaLabel="How does Budget Plan work?"
-          />
-        </div>
-        <div className="d-flex gap-2">
-          {unassignedUpcoming.length > 0 && (
-            <Button
-              variant="outline-warning"
-              size="sm"
-              onClick={() => setShowAssignModal(true)}
-            >
-              <i className="mdi mdi-alert-circle-outline me-1" aria-hidden />
-              {unassignedUpcoming.length} upcoming unassigned
+      <MonthSummaryCard
+        plan={plan}
+        onShowUnplanned={showUnplanned}
+        aside={
+          <div className="d-flex align-items-center gap-2">
+            <HelpPopover
+              id="budget-plan-help"
+              title="Budget Plan"
+              content="Your plan vs what actually went out, for this calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned this month. Committed is what your buckets plan this month, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar."
+              ariaLabel="How does Budget Plan work?"
+            />
+            <Button variant="primary" size="sm" onClick={openCreate}>
+              <i className="mdi mdi-plus me-1" aria-hidden />
+              Add bucket
             </Button>
-          )}
-          <Button variant="primary" size="sm" onClick={openCreate}>
-            <i className="mdi mdi-plus me-1" aria-hidden />
-            Add bucket
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      {/* Bucket grid */}
       <Row className="g-3 mb-4">
-        {buckets.map((b) => {
-          const hex = getBucketColor(b.id, mode)
-          const summary = bucketSummaries[b.id] ?? { plannedCents: 0 }
+        {plan.buckets.length === 0 && (
+          <Col xs={12}>
+            <Card className="plan-card--empty">
+              <Card.Body className="text-center py-4">
+                <i
+                  className="mdi mdi-wallet-outline"
+                  style={{
+                    fontSize: '2.5rem',
+                    color: 'var(--vantura-primary)',
+                    opacity: 0.6,
+                  }}
+                  aria-hidden
+                />
+                <h3 className="h6 mt-2 mb-1">No buckets yet</h3>
+                <p
+                  className="text-muted small mb-3"
+                  style={{ maxWidth: 440, margin: '0 auto' }}
+                >
+                  Group your Regulars and Trackers into <strong>buckets</strong>{' '}
+                  — like Subscriptions, Household or Lifestyle — to see each
+                  one’s plan vs actual this month.
+                </p>
+                <Button variant="primary" onClick={openCreate}>
+                  <i className="mdi mdi-plus me-1" aria-hidden />
+                  Create your first bucket
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        )}
 
+        {plan.buckets.map((b) => {
+          const hex = getBucketColor(b.bucketId, mode)
+          const row = rowsByBucket.get(b.bucketId)
           return (
             <Col
-              key={b.id}
+              key={b.bucketId}
               xs={12}
               sm={6}
               lg={4}
               draggable
-              onDragStart={(e) => handleDragStart(e, b.id)}
-              onDragOver={(e) => handleDragOver(e, b.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleBucketDrop(e, b.id)}
-              onDragEnd={handleDragEnd}
+              onDragStart={(e) => handleDragStart(e, b.bucketId)}
+              onDragOver={(e) => handleDragOver(e, b.bucketId)}
+              onDragLeave={() => setDragOverId(null)}
+              onDrop={(e) => handleBucketDrop(e, b.bucketId)}
+              onDragEnd={() => setDragOverId(null)}
+              style={{ opacity: dragOverId === b.bucketId ? 0.6 : 1 }}
             >
-              <Link
-                to={`/analytics/budget/${b.id}?period=${period}`}
-                className="text-decoration-none"
-                style={{ color: 'inherit' }}
-              >
-                <Card
-                  className="h-100"
-                  style={{
-                    borderLeft: `4px solid ${hex}`,
-                    cursor: 'pointer',
-                    transition: 'box-shadow var(--duration-fast) ease',
-                    opacity: dragOverId === b.id ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow =
-                      '0 3px 10px rgba(0,0,0,0.11)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = ''
-                  }}
-                >
-                  <Card.Body className="py-3">
-                    <div className="d-flex align-items-start justify-content-between">
-                      <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                        <span
-                          style={{
-                            width: 36,
-                            height: 36,
-                            minWidth: 36,
-                            borderRadius: 8,
-                            backgroundColor: `${hex}22`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.2rem',
-                            color: hex,
-                          }}
-                        >
-                          <i className={`mdi ${b.icon}`} aria-hidden />
-                        </span>
-                        <div className="min-w-0 flex-grow-1">
-                          <div className="fw-semibold text-truncate">
-                            {b.name}
-                          </div>
-                          <div
-                            className="fw-bold"
-                            style={{ color: hex, fontSize: '1.1rem' }}
-                          >
-                            ${formatMoney(summary.plannedCents)}
-                            <span
-                              className="text-muted fw-normal ms-1"
-                              style={{ fontSize: '0.75rem' }}
-                            >
-                              /{periodLabel.toLowerCase()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="p-0 text-muted"
-                          onClick={(e) => openEdit(b, e)}
-                          aria-label={`Edit ${b.name}`}
-                        >
-                          <i className="mdi mdi-pencil-outline" aria-hidden />
-                        </Button>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="p-0 text-muted"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setDeletingBucket(b)
-                          }}
-                          aria-label={`Delete ${b.name}`}
-                        >
-                          <i
-                            className="mdi mdi-trash-can-outline"
-                            aria-hidden
-                          />
-                        </Button>
-                        <i
-                          className="mdi mdi-chevron-right text-muted"
-                          aria-hidden
-                        />
-                      </div>
+              <BucketPlanCard
+                testId="plan-bucket"
+                name={b.name}
+                title={
+                  <Link
+                    to={`/analytics/budget/${b.bucketId}`}
+                    className="plan-card__link"
+                  >
+                    {b.name}
+                  </Link>
+                }
+                icon={b.icon}
+                color={hex}
+                plannedCents={b.plannedCents}
+                actualCents={b.actualCents}
+                items={b.items}
+                empty={
+                  <div className="plan-muted small">
+                    Nothing in this bucket yet.{' '}
+                    <Link
+                      to={`/analytics/budget/${b.bucketId}`}
+                      className="plan-link"
+                    >
+                      Add Regulars or Trackers
+                    </Link>
+                  </div>
+                }
+                actions={
+                  row && (
+                    <div className="d-flex align-items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => {
+                          setEditingBucket(row)
+                          setShowBucketModal(true)
+                        }}
+                        aria-label={`Edit ${b.name}`}
+                      >
+                        <i className="mdi mdi-pencil-outline" aria-hidden />
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => setDeletingBucket(row)}
+                        aria-label={`Delete ${b.name}`}
+                      >
+                        <i className="mdi mdi-trash-can-outline" aria-hidden />
+                      </Button>
                     </div>
-                  </Card.Body>
-                </Card>
-              </Link>
+                  )
+                }
+              />
             </Col>
           )
         })}
-      </Row>
 
-      {/* Unassigned upcoming charges */}
-      {unassignedUpcoming.length > 0 && (
-        <Card className="mb-4 border-warning">
-          <Card.Header className="d-flex align-items-center justify-content-between">
-            <div className="d-flex align-items-center gap-2">
-              <i
-                className="mdi mdi-alert-circle-outline text-warning"
-                aria-hidden
-              />
-              <span className="fw-semibold">
-                Unassigned Regulars ({unassignedUpcoming.length})
-              </span>
-            </div>
-            <Button
-              variant="outline-warning"
-              size="sm"
-              onClick={() => setShowAssignModal(true)}
-            >
-              Assign now
-            </Button>
-          </Card.Header>
-          <Card.Body className="py-2">
-            <p className="text-muted small mb-2">
-              These charges are not included in any bucket — your budget totals
-              may be incomplete.
-            </p>
-            <div className="d-flex flex-wrap gap-2">
-              {unassignedUpcoming.map((u) => (
-                <span key={u.id} className="badge bg-secondary">
-                  <i className="mdi mdi-calendar-clock me-1" aria-hidden />
-                  {u.name}
-                </span>
-              ))}
-            </div>
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* Income / Committed / Unallocated footer */}
-      <Card>
-        <Card.Body>
-          <Row className="g-3 text-center mb-3">
-            <Col xs={12} sm={4}>
-              <div className="text-muted small mb-1">
-                Income ({periodLabel})
-              </div>
-              {incomeCents != null ? (
-                <div className="fw-bold fs-5">${formatMoney(incomeCents)}</div>
-              ) : (
-                <div className="text-muted small">
-                  Not set —{' '}
-                  <Link to="/settings" className="text-decoration-underline">
-                    add in Settings
-                  </Link>
-                </div>
-              )}
-            </Col>
-            <Col xs={12} sm={4}>
-              <div className="text-muted small mb-1">
-                Committed ({periodLabel})
-              </div>
-              <div className="fw-bold fs-5">
-                ${formatMoney(totalOutgoingCents)}
-                {incomeCents != null && incomeCents > 0 && (
-                  <span
-                    className="text-muted fw-normal ms-1"
-                    style={{ fontSize: '0.75rem' }}
+        {notInABucket.items.length > 0 && (
+          <Col xs={12} sm={6} lg={4}>
+            <BucketPlanCard
+              testId="plan-not-in-a-bucket"
+              name="Not in a bucket"
+              title="Not in a bucket"
+              icon="mdi-tray-full"
+              color="var(--bs-secondary-color)"
+              dashed
+              caption="Counts as Spent on plan. Plans nothing toward Committed."
+              plannedCents={notInABucket.plannedCents}
+              actualCents={notInABucket.actualCents}
+              items={notInABucket.items}
+              footer={
+                unassignedRegulars.length > 0 &&
+                plan.buckets.length > 0 && (
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="mt-1"
+                    onClick={() => setShowAssignModal(true)}
                   >
-                    ({Math.round((totalOutgoingCents / incomeCents) * 100)}%)
-                  </span>
-                )}
-              </div>
-            </Col>
-            <Col xs={12} sm={4}>
-              <div className="text-muted small mb-1">
-                Unallocated ({periodLabel})
-              </div>
-              {unallocatedCents != null ? (
-                <div
-                  className="fw-bold fs-5"
-                  style={{
-                    color:
-                      unallocatedCents >= 0
-                        ? 'var(--vantura-success-text)'
-                        : 'var(--vantura-danger-text)',
-                  }}
-                >
-                  {formatSignedMoney(unallocatedCents)}
-                </div>
-              ) : (
-                <div className="text-muted small">Set income to calculate</div>
-              )}
-            </Col>
-          </Row>
+                    Assign Regulars to buckets
+                  </Button>
+                )
+              }
+            />
+          </Col>
+        )}
 
-          {incomeCents != null && incomeCents > 0 && (
-            <>
-              <ProgressBar
-                style={{ height: 8, borderRadius: 4 }}
-                aria-label="Income committed"
-              >
-                <ProgressBar
-                  variant={
-                    totalOutgoingCents / incomeCents >= 1
-                      ? 'danger'
-                      : totalOutgoingCents / incomeCents >= 0.85
-                        ? 'warning'
-                        : 'primary'
-                  }
-                  now={Math.min(100, (totalOutgoingCents / incomeCents) * 100)}
-                  key={1}
-                />
-                {unallocatedCents != null && unallocatedCents > 0 && (
-                  <ProgressBar
-                    variant="secondary"
-                    now={(unallocatedCents / incomeCents) * 100}
-                    style={{ opacity: 0.2 }}
-                    key={2}
-                  />
-                )}
-              </ProgressBar>
-              <div className="d-flex justify-content-between mt-1">
-                <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                  Committed
-                </span>
-                <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                  Unallocated
-                </span>
-              </div>
-            </>
-          )}
-        </Card.Body>
-      </Card>
+        <Col xs={12} sm={6} lg={4}>
+          <UnplannedCard unplanned={plan.unplanned} />
+        </Col>
+      </Row>
 
       {/* Modals */}
       <BucketModal

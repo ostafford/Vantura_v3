@@ -2904,3 +2904,275 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Budget Plan: plan vs actual (#241) ────────────────────────────────────────
+   Colour is for over only (#174); bucket colours carry identity (ADR 0011).
+   Bars ease to new widths on a re-read (sync, Mark paid); nothing animates on
+   first paint. */
+.plan-muted {
+  color: var(--bs-secondary-color);
+}
+.plan-over {
+  color: var(--vantura-danger-text);
+  font-weight: 600;
+}
+.plan-warn {
+  color: var(--vantura-warning-text);
+}
+.plan-link {
+  color: var(--vantura-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.plan-headline {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.plan-set-pay {
+  display: flex;
+  align-items: baseline;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--bs-tertiary-bg);
+}
+.income-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bs-tertiary-bg);
+}
+.income-bar__seg {
+  flex: 0 0 auto;
+  height: 100%;
+  transition: flex-basis var(--duration-slow) var(--ease-out);
+}
+.income-bar__seg--on-plan {
+  background: var(--vantura-primary);
+}
+.income-bar__seg--unplanned {
+  background: var(--vantura-warning);
+}
+.income-bar .income-bar__seg--unplanned {
+  cursor: pointer;
+}
+.income-bar__seg--to-go {
+  background: color-mix(in srgb, var(--vantura-primary) 35%, transparent);
+}
+.income-bar__seg--rest {
+  background: var(--vantura-success);
+}
+.plan-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+.plan-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.plan-legend__item--button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.plan-legend__item--button .plan-legend__name {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.plan-legend__swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+.plan-legend__name {
+  color: var(--bs-secondary-color);
+}
+.plan-legend__fig {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.plan-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.82rem;
+  color: var(--bs-secondary-color);
+}
+.plan-figures strong {
+  color: var(--bs-body-color);
+  font-variant-numeric: tabular-nums;
+}
+.plan-card {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+.plan-card--dashed {
+  border-style: dashed;
+  border-left-style: dashed;
+}
+.plan-card--unplanned {
+  border-left-color: var(--bs-secondary-color);
+}
+.plan-card--unplanned:focus {
+  outline: none;
+}
+.plan-card--unplanned:focus-visible {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--vantura-primary) 45%, transparent);
+}
+.plan-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  font-size: 1.1rem;
+}
+.plan-card__icon--unplanned {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+}
+.plan-card__total {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.plan-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bs-tertiary-bg);
+}
+.plan-bar__fill,
+.plan-bar__over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition:
+    width var(--duration-slow) var(--ease-out),
+    left var(--duration-slow) var(--ease-out);
+}
+.plan-bar__fill {
+  left: 0;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bs-secondary-color) 55%, transparent);
+}
+.plan-bar__fill--over {
+  background: var(--plan-tone);
+  border-radius: 3px 0 0 3px;
+}
+.plan-bar__over {
+  border-radius: 0 3px 3px 0;
+  background: var(--vantura-danger);
+}
+.plan-bar__pace {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--bs-body-color);
+  opacity: 0.55;
+  transition: left var(--duration-slow) var(--ease-out);
+}
+.plan-item {
+  margin-bottom: 0.65rem;
+}
+.plan-item__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  font-size: 0.875rem;
+}
+.plan-item__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-item__fig {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.plan-item__state {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+}
+.plan-unplanned,
+.plan-unplanned__subs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plan-unplanned {
+  font-size: 0.875rem;
+}
+.plan-unplanned__subs {
+  padding-left: 1.25rem;
+  font-size: 0.78rem;
+  color: var(--bs-secondary-color);
+}
+.plan-unplanned__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 28px;
+}
+.plan-unplanned__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-unplanned__toggle {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.plan-unplanned__chevron {
+  margin-left: -0.25rem;
+  color: var(--bs-secondary-color);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.plan-unplanned__chevron.is-open {
+  transform: rotate(90deg);
+}
+.plan-card .plan-card__link {
+  color: inherit;
+  text-decoration: none;
+}
+.plan-card .plan-card__link:hover,
+.plan-card .plan-card__link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.plan-card--empty {
+  border: 1px dashed var(--bs-border-color);
+}
