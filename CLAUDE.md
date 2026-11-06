@@ -41,13 +41,13 @@ Pre-commit hook (`husky` + `lint-staged`) auto-formats/lints staged `.ts`/`.tsx`
 ### Sync: Up Bank API → local DB
 
 - `src/api/upBank.ts` wraps the Up Bank REST API (Personal Access Token, ~60 req/min rate limit).
-- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives tracker recalculation (and rolls `next_payday` forward until #195 removes it). It is called on every app boot (`App.tsx`) via `advanceNextPaydayIfNeeded()` then `recalculateTrackers()`, and again on manual/periodic sync. Touching pagination, rate limiting, or the initial-vs-incremental sync split? Check `docs/features/sync/` first.
+- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives tracker recalculation. `recalculateTrackers()` runs on every app boot (`App.tsx`), at local midnight, and on manual/periodic sync. Touching pagination, rate limiting, or the initial-vs-incremental sync split? Check `docs/features/sync/` first.
 
 ### Calendar-month domain model
 
 Headroom, Still to go out, plan vs actual and Income are all reads for the **calendar month**, computed on every call and never stored. Trackers reset weekly, fortnightly or monthly (`PAYDAY` resets were removed in #192). Month and period bounds come from `src/lib/dateStr.ts` (`calendarMonthDayBounds`, `calendarPeriodBounds`), and "today" is the **local** date (`localDateString`). This logic has had several date-edge-case bugs historically (unpadded dates, month rollover, UTC vs local), so check `docs/features/headroom/` and `docs/features/trackers/` first.
 
-The payday cycle survives only as **Pay frequency**, which turns the pay amount into monthly Income (`getMonthlyIncomeCents`). `next_payday` / `payday_day` and `src/lib/payday.ts` are read by nothing that computes a figure; #195 removes them.
+There is no payday date (cut in #195). Pay is just **Pay amount** and **Pay frequency** (`src/lib/payFrequency.ts`), which turn into monthly Income (`getMonthlyIncomeCents`).
 
 ### State management: vanilla zustand stores, not React context
 
