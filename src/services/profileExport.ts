@@ -28,6 +28,10 @@ import {
   type MonthEndPlanBody,
   type MonthEndPlanRow,
 } from '@/services/monthEndPlan'
+import {
+  getLastReviewedMonth,
+  replaceLastReviewedMonth,
+} from '@/services/monthReview'
 
 /**
  * Export format version for the encrypted payload. v10 (#204): the
@@ -41,9 +45,10 @@ import {
  * written. v16 (#195): the payday date settings (`next_payday`,
  * `payday_day`) are no longer written; import skips them silently.
  * v17 (#242): the `monthEndPlans` section and `firstPlannableMonth` are
- * written, and imported with the Budget Plan.
+ * written, and imported with the Budget Plan. v18 (#244): `lastReviewedMonth`
+ * is written, and imported with them.
  */
-const EXPORT_PAYLOAD_VERSION = 17
+const EXPORT_PAYLOAD_VERSION = 18
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -98,6 +103,8 @@ export interface ExportPayload {
   monthEndPlans?: MonthEndPlanExportRow[]
   /** #242 — the first plannable month, `YYYY-MM`. Absent before v17. */
   firstPlannableMonth?: string | null
+  /** #244 — the last reviewed month, `YYYY-MM`. Absent before v18. */
+  lastReviewedMonth?: string | null
 }
 
 /** #242 — a `month_end_plans` row, with its plan body parsed. */
@@ -424,6 +431,7 @@ export function buildExportPayload(): ExportPayload {
     onHandSaverIds,
     monthEndPlans,
     firstPlannableMonth: getFirstPlannableMonth(),
+    lastReviewedMonth: getLastReviewedMonth(),
   }
 }
 
@@ -491,6 +499,14 @@ export const IMPORT_ERROR_INVALID_TRACKER_RESET =
  */
 export const IMPORT_ERROR_INVALID_MONTH_END_PLAN =
   'This file has a past month’s plan that isn’t valid. Nothing was imported.'
+
+/**
+ * #244 — user-facing error when the file's last reviewed month isn't a
+ * finished month (malformed, or this month or later). The whole import is
+ * refused rather than guessing which months were reviewed.
+ */
+export const IMPORT_ERROR_INVALID_LAST_REVIEWED_MONTH =
+  'This file has a reviewed month that isn’t valid. Nothing was imported.'
 
 /** User-facing error when the passphrase does not match the file. */
 export const IMPORT_ERROR_WRONG_PASSPHRASE =
@@ -1026,15 +1042,22 @@ function restorePaidMarks(
 }
 
 /**
- * #242 — the payload's Month-end plans and first plannable month, validated.
- * A payload from before v17 has neither, so it imports with none (and the
- * next boot starts the first plannable month again). Throws
- * `IMPORT_ERROR_INVALID_MONTH_END_PLAN` on anything that isn't exactly valid.
+ * #242 — the payload's Month-end plans, first plannable month and (#244) last
+ * reviewed month, validated. A payload from before v17 has none of them, so
+ * it imports with none (and the next boot starts the first plannable month
+ * again); one from v17 has no last reviewed month, so it's cleared. Throws
+ * `IMPORT_ERROR_INVALID_LAST_REVIEWED_MONTH` for a bad last reviewed month,
+ * and `IMPORT_ERROR_INVALID_MONTH_END_PLAN` for anything else not exactly
+ * valid.
  */
 export function readImportedMonthEndPlans(
   payload: ExportPayload,
   today: string = localDateString()
-): { rows: MonthEndPlanRow[]; firstMonth: string | null } {
+): {
+  rows: MonthEndPlanRow[]
+  firstMonth: string | null
+  lastReviewedMonth: string | null
+} {
   const invalid = () => new Error(IMPORT_ERROR_INVALID_MONTH_END_PLAN)
   const currentMonth = today.slice(0, 7)
   const rawFirst = payload.firstPlannableMonth
@@ -1043,8 +1066,17 @@ export function readImportedMonthEndPlans(
     if (!isMonth(rawFirst) || rawFirst > currentMonth) throw invalid()
     firstMonth = rawFirst
   }
+  // #244 — a reviewed month is a finished one.
+  const rawReviewed = payload.lastReviewedMonth
+  let lastReviewedMonth: string | null = null
+  if (rawReviewed !== undefined && rawReviewed !== null) {
+    if (!isMonth(rawReviewed) || rawReviewed >= currentMonth) {
+      throw new Error(IMPORT_ERROR_INVALID_LAST_REVIEWED_MONTH)
+    }
+    lastReviewedMonth = rawReviewed
+  }
   const raw = payload.monthEndPlans
-  if (raw === undefined) return { rows: [], firstMonth }
+  if (raw === undefined) return { rows: [], firstMonth, lastReviewedMonth }
   if (!Array.isArray(raw)) throw invalid()
   const rows: MonthEndPlanRow[] = []
   const months = new Set<string>()
@@ -1070,6 +1102,7 @@ export function readImportedMonthEndPlans(
   return {
     rows: rows.sort((a, b) => a.month.localeCompare(b.month)),
     firstMonth,
+    lastReviewedMonth,
   }
 }
 
@@ -1195,6 +1228,7 @@ export function importPayloadWithOptions(
       // freezes anything itself; the next boot does.
       const plans = readImportedMonthEndPlans(payload)
       replaceMonthEndPlans(plans.rows, plans.firstMonth)
+      replaceLastReviewedMonth(plans.lastReviewedMonth)
     }
 
     if (options.trackers) {

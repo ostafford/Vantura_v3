@@ -1,0 +1,85 @@
+/**
+ * The **Month review** (#244, Spec D #239, decided in #180): a card at the top
+ * of the Dashboard for the latest finished month that has a Month-end plan and
+ * hasn't been reviewed. Computed on render; the only thing stored is the
+ * **last reviewed month** (`app_settings`).
+ *
+ * - Only the latest such month is ever shown. Marking it reviewed counts
+ *   every earlier month as reviewed too (they stay reachable with ‹).
+ * - Its figure is the finished-month read's Saved (`getPlanVsActual`), so the
+ *   card and the Budget Plan always agree, and it stays live like Saved does.
+ * - In-page only: no OS or push notification, badge, count, history log,
+ *   setting or schedule (the cut Notifications feature stays cut).
+ */
+
+import { getAppSetting, getDb, setAppSetting } from '@/db'
+import { localDateString } from '@/lib/format'
+import { isMonth, readMonthEndPlanRows } from '@/services/monthEndPlan'
+import { getPlanVsActual } from '@/services/planVsActual'
+
+/** `app_settings` key: the last reviewed month, `YYYY-MM`. */
+export const LAST_REVIEWED_MONTH_KEY = 'last_reviewed_month'
+
+export type MonthReview =
+  | { month: string; kind: 'saved'; cents: number }
+  /** `cents` is the overspend, as a positive figure. */
+  | { month: string; kind: 'overspent'; cents: number }
+  /** The month's plan had no pay, so there's no figure. */
+  | { month: string; kind: 'no-pay' }
+
+/** The stored last reviewed month, or `null` when unset or malformed. */
+export function getLastReviewedMonth(): string | null {
+  const value = getAppSetting(LAST_REVIEWED_MONTH_KEY)
+  return isMonth(value) ? value : null
+}
+
+/**
+ * The Month review to show, or `null`: the latest finished month with a
+ * readable Month-end plan, when it's later than the last reviewed month.
+ */
+export function getMonthReview(
+  today: string = localDateString()
+): MonthReview | null {
+  const current = today.slice(0, 7)
+  const latest = readMonthEndPlanRows()
+    .map((r) => r.month)
+    .filter((m) => m < current)
+    .at(-1)
+  if (latest === undefined) return null
+  const reviewed = getLastReviewedMonth()
+  if (reviewed !== null && latest <= reviewed) return null
+
+  const read = getPlanVsActual(latest)
+  if (!read || read.state !== 'finished') return null
+  if (read.savedCents === null) return { month: latest, kind: 'no-pay' }
+  return read.savedCents < 0
+    ? { month: latest, kind: 'overspent', cents: -read.savedCents }
+    : { month: latest, kind: 'saved', cents: read.savedCents }
+}
+
+/**
+ * Stores `month` as the last reviewed month, so it and every earlier month
+ * count as reviewed. Never moves it backwards.
+ */
+export function markMonthReviewed(month: string): void {
+  if (!isMonth(month)) return
+  const reviewed = getLastReviewedMonth()
+  if (reviewed !== null && reviewed >= month) return
+  setAppSetting(LAST_REVIEWED_MONTH_KEY, month)
+}
+
+/**
+ * Replaces the last reviewed month (a profile import): `null` clears it.
+ * Must run inside the import's transaction; it opens none.
+ */
+export function replaceLastReviewedMonth(month: string | null): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM app_settings WHERE key = ?`, [LAST_REVIEWED_MONTH_KEY])
+  if (month !== null) {
+    db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [
+      LAST_REVIEWED_MONTH_KEY,
+      month,
+    ])
+  }
+}

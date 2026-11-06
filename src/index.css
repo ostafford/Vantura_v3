@@ -3176,6 +3176,85 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .plan-card--empty {
   border: 1px dashed var(--bs-border-color);
 }
+/* Month review (#244): one line at the top of the Dashboard. Enters with a
+   short fade-and-rise; leaves the same way, reversed, when marked reviewed. */
+.month-review {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--vantura-border);
+  border-radius: 10px;
+  background: var(--bs-body-bg);
+  animation: month-review-in var(--duration-base) var(--ease-out) both;
+}
+.month-review.is-leaving {
+  animation: month-review-out var(--duration-fast) var(--ease-out) both;
+}
+.month-review__icon {
+  color: var(--vantura-primary);
+  font-size: 1.1rem;
+}
+/* Beats the global `a:not(.btn)…` link colour: the line reads as text, with
+   the figure bold, so only Mark reviewed looks like an action. */
+.month-review a.month-review__link:not(.btn),
+.month-review a.month-review__link:not(.btn):hover {
+  color: var(--bs-body-color);
+  text-decoration: none;
+  min-width: 0;
+}
+.month-review__link:hover .month-review__cta,
+.month-review__link:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.month-review__cta {
+  color: var(--vantura-primary);
+  font-weight: 600;
+}
+.month-review__sep {
+  color: var(--bs-secondary-color);
+}
+.month-review__mark {
+  /* A bigger hit area than the text, without moving the line. */
+  padding: 0.6rem 0.4rem;
+  margin: -0.6rem -0.4rem;
+  border: 0;
+  background: none;
+  color: var(--vantura-primary);
+  font: inherit;
+  font-weight: 600;
+}
+.month-review__mark:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.month-review__link:focus-visible,
+.month-review__mark:focus-visible {
+  outline: 2px solid var(--vantura-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@keyframes month-review-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes month-review-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .month-review,
+  .month-review.is-leaving {
+    animation: none;
+  }
+}
+
 /* ‹ Month › (#243). 32px chevrons with a 44px hit area (::before). */
 .plan-month-nav {
   display: inline-flex;
