@@ -11,6 +11,7 @@ import {
   getAccountById,
   getSaverMonthlyFlow,
   getOnHandCents,
+  getOnHandAccounts,
   getOnHandSavers,
   setSaverCountsOnHand,
 } from './accounts'
@@ -293,6 +294,23 @@ describe('On hand (#213)', () => {
     insert('old-saver', 'SAVER', 16_00, { closed: true, on: true })
 
     expect(getOnHandCents()).toBe(100_00)
+  })
+
+  it('lists the counted accounts, Spending first, summing to On hand', () => {
+    insert('Zed Spending', 'TRANSACTIONAL', 100_00)
+    insert('Bills', 'SAVER', 50_00, { on: true })
+    insert('Aardvark', 'SAVER', 25_00, { on: true })
+    insert('Off', 'SAVER', 1_00)
+    insert('Joint', 'TRANSACTIONAL', 2_00, { ownership: 'JOINT' })
+    insert('Closed', 'SAVER', 4_00, { closed: true, on: true })
+
+    const accounts = getOnHandAccounts()
+    expect(accounts.map((a) => [a.id, a.account_type, a.balance])).toEqual([
+      ['Zed Spending', 'TRANSACTIONAL', 100_00],
+      ['Aardvark', 'SAVER', 25_00],
+      ['Bills', 'SAVER', 50_00],
+    ])
+    expect(accounts.reduce((s, a) => s + a.balance, 0)).toBe(getOnHandCents())
   })
 
   it('counts an account with no stored ownership as non-joint', () => {

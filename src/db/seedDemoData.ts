@@ -5,6 +5,7 @@
 
 import { getDb, setAppSetting, schedulePersist } from '@/db'
 import { writeTrackerConfigVersion } from '@/services/trackers'
+import { localDateString } from '@/lib/format'
 
 const DEMO_ACCOUNT_ID = 'demo-account-main'
 const DEMO_SAVER_ID = 'demo-saver-1'
@@ -762,7 +763,7 @@ export function seedDemoData(): void {
   // Upcoming charges with bill reminders — covers all supported frequencies and
   // both subscription and non-subscription types so the full UI surface is populated.
   run(
-    `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain', 'Spotify')`
+    `DELETE FROM upcoming_charges WHERE name IN ('Netflix', 'Rent', 'Gym', 'Insurance', 'Domain', 'Spotify', 'Phone')`
   )
   run(
     `DELETE FROM regular_paid_marks WHERE regular_id NOT IN (SELECT id FROM upcoming_charges)`
@@ -780,6 +781,10 @@ export function seedDemoData(): void {
   insuranceNext.setDate(15)
   const insuranceCancelBy = new Date(insuranceNext)
   insuranceCancelBy.setDate(insuranceCancelBy.getDate() - 14)
+  // Phone: a bill dated 3 days ago and not paid yet, so (from the 4th of the
+  // month) Headroom's Still to go out shows an overdue occurrence to Mark paid.
+  const phoneDue = new Date()
+  phoneDue.setDate(phoneDue.getDate() - 3)
   const domainNext = new Date()
   domainNext.setFullYear(domainNext.getFullYear() + 1)
   domainNext.setMonth(2)
@@ -860,6 +865,22 @@ export function seedDemoData(): void {
       domainNext.toISOString().slice(0, 10),
       null,
       0,
+      null,
+      null,
+      NOW,
+    ]
+  )
+
+  run(
+    `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, category_id, is_reserved, reminder_days_before, cancel_by_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'Phone',
+      6500,
+      'MONTHLY',
+      localDateString(phoneDue),
+      catUtilities,
+      1,
       null,
       null,
       NOW,

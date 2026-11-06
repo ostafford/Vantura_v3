@@ -652,6 +652,231 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 /* Dashboard: 2-column grid, cards auto-size to content, responsive */
+/* ── Headroom (#216): On hand − Still to go out = Headroom ───────────────────
+   One row of three cards when the section is wide enough, stacked otherwise
+   (a container query, so the sidebar's width counts). Each card's header text
+   shrinks with its own width (cqi) down to a floor. Figures carry the card's
+   colour (the darker -text tokens); names stay neutral. Red only for a
+   negative Headroom, an overdue Regular or a negative Free spending so far. */
+.headroom {
+  /* container-type drops the intrinsic width, so claim the full row. */
+  width: 100%;
+  container-type: inline-size;
+  margin-bottom: 1.5rem;
+}
+.headroom__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.headroom__op {
+  display: none;
+}
+@container (min-width: 720px) {
+  .headroom__row {
+    flex-direction: row;
+  }
+  .headroom-card {
+    flex: 1 1 0;
+  }
+  .headroom__op {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+    font-size: 1.75rem;
+    font-weight: 300;
+    color: var(--bs-secondary-color);
+  }
+}
+.headroom-card {
+  --hr-tone: var(--vantura-info);
+  --hr-ink: var(--vantura-info-text);
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  border-color: color-mix(in srgb, var(--hr-tone) 45%, transparent);
+}
+.headroom-card--on-hand {
+  --hr-tone: var(--vantura-info);
+  --hr-ink: var(--vantura-info-text);
+}
+.headroom-card--to-go {
+  --hr-tone: var(--vantura-warning);
+  --hr-ink: var(--vantura-warning-text);
+}
+.headroom-card--ok {
+  --hr-tone: var(--vantura-success);
+  --hr-ink: var(--vantura-success-text);
+}
+.headroom-card--bad {
+  --hr-tone: var(--vantura-danger);
+  --hr-ink: var(--vantura-danger-text);
+}
+.headroom-card--none {
+  --hr-tone: var(--bs-secondary-color);
+  --hr-ink: var(--bs-secondary-color);
+}
+.headroom-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--hr-tone) 14%, transparent);
+  border-top: 4px solid var(--hr-tone);
+}
+.headroom-card__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-weight: 600;
+  font-size: clamp(0.78rem, 4.2cqi, 0.95rem);
+}
+.headroom-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--hr-tone);
+  color: var(--vantura-text-on-pastel);
+}
+.headroom-card__total {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 700;
+  font-size: clamp(1.05rem, 8cqi, 1.6rem);
+  line-height: 1.2;
+  color: var(--hr-ink);
+  font-variant-numeric: tabular-nums;
+}
+.headroom-card__body {
+  padding: 0.5rem 1rem 0.75rem;
+  font-size: 0.875rem;
+}
+.headroom-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+.headroom-line__name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+  row-gap: 0.15rem;
+  min-width: 0;
+}
+.headroom-line__fig {
+  flex-shrink: 0;
+  color: var(--hr-ink);
+  font-variant-numeric: tabular-nums;
+}
+.headroom-line--dim {
+  opacity: 0.5;
+}
+.headroom-line--divided {
+  border-top: 1px solid var(--bs-border-color);
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+}
+.headroom-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--hr-tone);
+}
+.headroom-subhead {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--hr-ink);
+}
+.headroom-line + .headroom-subhead {
+  margin-top: 0.5rem;
+}
+.headroom-note {
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
+}
+.headroom-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1.6;
+  font-size: 0.68rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+}
+.headroom-pill--overdue {
+  background: color-mix(in srgb, var(--vantura-danger) 18%, transparent);
+  color: var(--vantura-danger-text);
+  font-weight: 600;
+  transition:
+    background-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
+}
+.headroom-pill--overdue:hover {
+  background: color-mix(in srgb, var(--vantura-danger) 28%, transparent);
+}
+.headroom-pill--overdue:active {
+  transform: scale(0.97);
+}
+.headroom-pill--overdue:focus-visible {
+  outline: 2px solid var(--vantura-danger-text);
+  outline-offset: 2px;
+}
+.headroom-fig--bad {
+  color: var(--vantura-danger-text);
+}
+.headroom-bar {
+  display: flex;
+  height: 10px;
+  margin-top: 0.5rem;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--bs-tertiary-bg);
+}
+.headroom-bar__to-go {
+  background: var(--vantura-warning);
+  transition: flex-basis var(--duration-slow) var(--ease-out);
+}
+.headroom-bar__left {
+  flex: 1 1 0;
+  background: var(--vantura-success);
+}
+/* Matches the global link rule's specificity (and comes later) so an <a> and a
+   <button> link read the same, in the readable -text shade. */
+.headroom-link,
+.headroom .headroom-card a.headroom-link {
+  font-size: 0.72rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vantura-info-text);
+  text-decoration: underline;
+  transition: opacity var(--duration-fast) ease;
+}
+.headroom-link:hover,
+.headroom .headroom-card a.headroom-link:hover {
+  color: var(--vantura-info-text);
+  opacity: 0.8;
+}
+
 .dashboard-grid {
   --dashboard-gap: 1.5rem;
   display: grid;
@@ -2046,6 +2271,28 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-align: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   animation: toast-slide-down 0.32s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+.vantura-toast__action {
+  margin-left: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  transition: background-color var(--duration-fast) ease;
+}
+.vantura-toast__action:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.vantura-toast__action:active {
+  transform: scale(0.97);
+}
+.vantura-toast__action:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .vantura-toast--success {

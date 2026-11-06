@@ -22,6 +22,7 @@ import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
 import { BalanceCards } from '@/components/dashboard/BalanceCards'
+import { HeadroomSection } from '@/components/dashboard/HeadroomSection'
 import { EssentialsCoverageBlock } from '@/components/dashboard/EssentialsCoverageBlock'
 import { getEssentialsCoverage } from '@/services/essentialsCoverage'
 import {
@@ -57,6 +58,7 @@ export function Dashboard() {
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const isSyncing = useStore(syncStore, (s) => s.syncing)
   const [dataVersion, setDataVersion] = useState(0)
+  const bumpDataVersion = useCallback(() => setDataVersion((v) => v + 1), [])
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>(() =>
     getDashboardSectionOrder()
   )
@@ -591,6 +593,10 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+      <HeadroomSection
+        refreshKey={`${lastSyncCompletedAt}|${dataVersion}|${today}`}
+        onChange={bumpDataVersion}
+      />
       <BalanceCards
         spendableValue={spendableDisplayValue}
         spendableSubtitle={spendableSubtitle}
