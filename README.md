@@ -65,7 +65,7 @@ See [SECURITY.md](SECURITY.md) for full details and how to report a vulnerabilit
 
 ## Deployment
 
-**Hosting:** Cloudflare Pages — auto-deploys on every push to `main`. No manual steps required. Configuration: `public/_redirects` (SPA routing), `public/_headers` (security headers).
+**Hosting:** Cloudflare Pages — auto-deploys on every push to `main`. No manual steps required. Configuration: `public/_headers` (security headers); SPA routing is Pages' built-in fallback (no `404.html`).
 
 **Live site:** [https://myvantura.xyz/](https://myvantura.xyz/)
 
