@@ -21,7 +21,8 @@ import { localDateString } from '@/lib/format'
 
 /**
  * If stored next_payday is in the past, advance it using payday_frequency and payday_day.
- * Call on app init and at start of each sync so the reserved amount uses the current value.
+ * Call on app init and at start of each sync. Nothing computes from next_payday
+ * since #211; Settings still shows it until #195 removes it.
  */
 export function advanceNextPaydayIfNeeded(): void {
   const frequency = getAppSetting('payday_frequency')
