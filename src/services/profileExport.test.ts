@@ -1397,7 +1397,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(13)
+      expect(payload.version).toBe(14)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1609,6 +1609,134 @@ describe('profile import writers: real-DB coverage (#36)', () => {
     })
   })
 
+  describe('Regular paid marks export/import (#214)', () => {
+    function addRegular(name: string, date: string): number {
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
+         VALUES (?, 5000, 'MONTHLY', ?, 1, '2026-01-01')`,
+        [name, date]
+      )
+      return Number(realDb.exec(`SELECT last_insert_rowid()`)[0].values[0][0])
+    }
+    function readMarks(): unknown[][] {
+      const r = realDb.exec(
+        `SELECT c.name, m.occurrence_date, m.marked_at
+         FROM regular_paid_marks m JOIN upcoming_charges c ON c.id = m.regular_id
+         ORDER BY c.name, m.occurrence_date`
+      )
+      return r.length ? r[0].values : []
+    }
+
+    it('exports each Regular with its marks', () => {
+      const power = addRegular('Power', '2026-01-10')
+      addRegular('Gym', '2026-01-12')
+      realDb.run(
+        `INSERT INTO regular_paid_marks VALUES (?, '2026-03-10', '2026-03-12T00:00:00.000Z'),
+                                               (?, '2026-02-10', '2026-02-11T00:00:00.000Z')`,
+        [power, power]
+      )
+
+      const charges = buildExportPayload().upcomingCharges
+      expect(charges.map((c) => [c.name, c.paid_marks])).toEqual([
+        [
+          'Power',
+          [
+            {
+              occurrence_date: '2026-02-10',
+              marked_at: '2026-02-11T00:00:00.000Z',
+            },
+            {
+              occurrence_date: '2026-03-10',
+              marked_at: '2026-03-12T00:00:00.000Z',
+            },
+          ],
+        ],
+        ['Gym', []],
+      ])
+    })
+
+    it('round-trips the marks onto the re-created Regulars, replacing the device’s own', () => {
+      const power = addRegular('Power', '2026-01-10')
+      realDb.run(
+        `INSERT INTO regular_paid_marks VALUES (?, '2026-03-10', '2026-03-12T00:00:00.000Z')`,
+        [power]
+      )
+      const exported = buildExportPayload().upcomingCharges
+      // This device's own state, which the import replaces.
+      const local = addRegular('Local', '2026-01-05')
+      realDb.run(
+        `INSERT INTO regular_paid_marks VALUES (?, '2026-03-05', '2026-03-06T00:00:00.000Z')`,
+        [local]
+      )
+
+      replaceUpcomingCharges(exported)
+
+      expect(readMarks()).toEqual([
+        ['Power', '2026-03-10', '2026-03-12T00:00:00.000Z'],
+      ])
+      // The Regular has a new id, and the mark follows it.
+      const newId = realDb.exec(`SELECT id FROM upcoming_charges`)[0]
+        .values[0][0]
+      expect(newId).not.toBe(power)
+      expect(
+        realDb.exec(`SELECT regular_id FROM regular_paid_marks`)[0].values[0][0]
+      ).toBe(newId)
+    })
+
+    it('an older export without marks imports with none', () => {
+      const power = addRegular('Power', '2026-01-10')
+      realDb.run(
+        `INSERT INTO regular_paid_marks VALUES (?, '2026-03-10', '2026-03-12T00:00:00.000Z')`,
+        [power]
+      )
+      const older = emptyPayload({
+        version: 13,
+        upcomingCharges: [chargeExport({ name: 'Power' })],
+      })
+      expect(older.upcomingCharges[0].paid_marks).toBeUndefined()
+
+      importPayloadWithOptions(older, ALL_ON)
+
+      expect(readCharges().map((c) => c.name)).toEqual(['Power'])
+      expect(readMarks()).toEqual([])
+    })
+
+    it('skips malformed marks', () => {
+      replaceUpcomingCharges([
+        chargeExport({
+          name: 'Power',
+          paid_marks: [
+            { occurrence_date: '2026-3-10', marked_at: 'x' },
+            { occurrence_date: '2026-03-10', marked_at: '' },
+            {
+              occurrence_date: '2026-03-01',
+              marked_at: '2026-03-02T00:00:00.000Z',
+            },
+            null as never,
+          ],
+        }),
+      ])
+      expect(readMarks()).toEqual([
+        ['Power', '2026-03-01', '2026-03-02T00:00:00.000Z'],
+      ])
+    })
+
+    it('leaves the marks alone when Regulars are not imported', () => {
+      const power = addRegular('Power', '2026-01-10')
+      realDb.run(
+        `INSERT INTO regular_paid_marks VALUES (?, '2026-03-10', '2026-03-12T00:00:00.000Z')`,
+        [power]
+      )
+      importPayloadWithOptions(emptyPayload({ version: 13 }), {
+        ...ALL_ON,
+        upcomingCharges: false,
+      })
+      expect(readMarks()).toEqual([
+        ['Power', '2026-03-10', '2026-03-12T00:00:00.000Z'],
+      ])
+    })
+  })
+
   // ── #209: Net Worth is cut ──────────────────────────────────────────────
 
   describe('Net Worth cut (#209)', () => {
@@ -1699,7 +1827,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(13)
+      expect(payload.version).toBe(14)
       expect(Object.keys(payload)).not.toContain('manualAccounts')
       expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
       expect(payload.upcomingCharges).toHaveLength(1)

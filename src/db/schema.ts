@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 56
+const SCHEMA_VERSION = 57
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -136,6 +136,13 @@ const DDL_STATEMENTS = [
     match_raw_text TEXT,
     match_description TEXT,
     FOREIGN KEY (category_id) REFERENCES categories(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS regular_paid_marks (
+    regular_id INTEGER NOT NULL,
+    occurrence_date TEXT NOT NULL,
+    marked_at TEXT NOT NULL,
+    PRIMARY KEY (regular_id, occurrence_date),
+    FOREIGN KEY (regular_id) REFERENCES upcoming_charges(id) ON DELETE CASCADE
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
@@ -1492,6 +1499,24 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['56']
+    )
+  }
+  // #214 — Mark paid (#212): one row per (Regular, occurrence date) the user
+  // marked paid, with when. sql.js leaves foreign keys off, so the Regulars
+  // module deletes a Regular's marks itself; the FK documents the intent.
+  if (version < 57) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS regular_paid_marks (
+        regular_id INTEGER NOT NULL,
+        occurrence_date TEXT NOT NULL,
+        marked_at TEXT NOT NULL,
+        PRIMARY KEY (regular_id, occurrence_date),
+        FOREIGN KEY (regular_id) REFERENCES upcoming_charges(id) ON DELETE CASCADE
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['57']
     )
   }
 }

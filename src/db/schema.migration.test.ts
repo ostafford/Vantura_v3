@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(56)
+    expect(SCHEMA_VERSION).toBe(57)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1786,6 +1786,50 @@ describe('v56 migration: the On hand switch (#213)', () => {
     const db = new SQL.Database()
     runSchema(db)
     expect(columns(db)).toContain('counts_on_hand')
+    db.close()
+  })
+})
+
+describe('v57 migration: Regular paid marks (#214)', () => {
+  const columns = (db: Database) =>
+    db
+      .exec(`PRAGMA table_info(regular_paid_marks)`)[0]
+      ?.values.map((r) => String(r[1])) ?? []
+
+  it('creates regular_paid_marks on a v56 database, keeping Regulars as they were', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`DROP TABLE regular_paid_marks`)
+    db.run(
+      `INSERT INTO upcoming_charges (id, name, amount, frequency, next_charge_date, created_at, match_description)
+       VALUES (1, 'Synthetic power', 9000, 'MONTHLY', '2026-03-10', '2026-01-01', 'POWERCO')`
+    )
+    db.run(`UPDATE app_settings SET value = '56' WHERE key = 'schema_version'`)
+    const before = db.exec(`SELECT * FROM upcoming_charges`)
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(columns(db)).toEqual(['regular_id', 'occurrence_date', 'marked_at'])
+    expect(db.exec(`SELECT * FROM upcoming_charges`)).toEqual(before)
+    db.run(
+      `INSERT INTO regular_paid_marks VALUES (1, '2026-03-10', '2026-03-12T00:00:00Z')`
+    )
+    // One mark per (Regular, occurrence date).
+    expect(() =>
+      db.run(
+        `INSERT INTO regular_paid_marks VALUES (1, '2026-03-10', '2026-03-13T00:00:00Z')`
+      )
+    ).toThrow()
+    db.close()
+  })
+
+  it('is idempotent, and creates the table on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(columns(db)).toEqual(['regular_id', 'occurrence_date', 'marked_at'])
+    db.run(`UPDATE app_settings SET value = '56' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
 })

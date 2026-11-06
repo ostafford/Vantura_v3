@@ -194,3 +194,64 @@ export function getProjectedOccurrencesInRange(
   }
   return list
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Whole days from `a` to `b` (`YYYY-MM-DD`), signed. */
+function daysBetween(a: string, b: string): number {
+  return Math.round((parseDate(b).getTime() - parseDate(a).getTime()) / DAY_MS)
+}
+
+/** True when `date` is one of `row`'s projected occurrences (docs/adr/0004). */
+export function isProjectedOccurrence(row: Regular, date: string): boolean {
+  const day = date.slice(0, 10)
+  return getProjectedOccurrencesInRange(row, day, day).length > 0
+}
+
+/**
+ * The projected occurrence of a **recurring** Regular that a payment dated
+ * `date` pays (#214), or `null` when it pays none. Pure: the caller supplies
+ * the Linked payment.
+ *
+ * Every occurrence's window runs halfway to its neighbours, so the payment
+ * pays the nearest occurrence; at the exact midpoint, the **earlier** one.
+ * The neighbours come from the series ignoring `cancel_by_date`:
+ *
+ * - Before the first occurrence (the anchor), the window reaches back half the
+ *   gap to the second occurrence. A payment exactly on that boundary pays
+ *   nothing: the tie goes to the earlier side, where there is no occurrence.
+ * - After the last occurrence before `cancel_by_date`, the window reaches half
+ *   a step towards where the next one would have fallen. A payment nearer that
+ *   cancelled date pays nothing.
+ *
+ * `ONCE` and unrecognised frequencies return `null`: `ONCE` has its own rule.
+ */
+export function occurrencePaidBy(row: Regular, date: string): string | null {
+  const anchor = row.next_charge_date.slice(0, 10)
+  const day = date.slice(0, 10)
+  const cancelBy = row.cancel_by_date ? row.cancel_by_date.slice(0, 10) : null
+  const k = firstRecurringIndexOnOrAfter(anchor, row.frequency, day)
+  if (k == null) return null
+  const atOrAfter = nthOccurrence(anchor, row.frequency, k)
+  if (!atOrAfter) return null
+
+  let paid: string | null
+  if (k === 0) {
+    // On or before the anchor: compare with a virtual occurrence one gap
+    // (anchor → second occurrence) before the anchor.
+    const second = nthOccurrence(anchor, row.frequency, 1)
+    if (!second) return null
+    const gap = daysBetween(anchor, second)
+    const beforeAnchor = daysBetween(day, anchor)
+    paid = gap - beforeAnchor <= beforeAnchor ? null : anchor
+  } else {
+    const before = nthOccurrence(anchor, row.frequency, k - 1)
+    if (!before) return null
+    paid =
+      daysBetween(before, day) <= daysBetween(day, atOrAfter)
+        ? before
+        : atOrAfter
+  }
+  if (paid && cancelBy && paid > cancelBy) return null
+  return paid
+}

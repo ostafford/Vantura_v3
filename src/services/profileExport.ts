@@ -17,6 +17,7 @@ import {
 import { SCHEMA_VERSION } from '@/db/schema'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
+import { readPaidMarks } from '@/services/regulars'
 
 /**
  * Export format version for the encrypted payload. v10 (#204): the
@@ -24,9 +25,10 @@ import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
  * notification settings are no longer written. v12 (#209): the
  * `manualAccounts` and `netWorthSnapshots` sections and the Regulars'
  * `charge_type` / `linked_account_name` fields are no longer written.
- * v13 (#213): the `onHandSaverIds` section is written.
+ * v13 (#213): the `onHandSaverIds` section is written. v14 (#214): each
+ * Regular carries its `paid_marks`.
  */
-const EXPORT_PAYLOAD_VERSION = 13
+const EXPORT_PAYLOAD_VERSION = 14
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -128,6 +130,16 @@ export interface UpcomingChargeExportRow {
   bucket_id?: number | null
   /** #111 — Up `description` of the Regular's linked payments (docs/adr/0020). Absent before payload v8. */
   match_description?: string | null
+  /**
+   * #214 — the occurrences the user marked paid. Nested on the Regular because
+   * Regulars get new ids on import. Absent before payload v14.
+   */
+  paid_marks?: PaidMarkExportRow[]
+}
+
+export interface PaidMarkExportRow {
+  occurrence_date: string
+  marked_at: string
 }
 
 export interface BudgetBucketExportRow {
@@ -296,9 +308,15 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   if (!db) return []
   const stmt = db.prepare(
     `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
-      reminder_days_before, cancel_by_date, bucket_id, match_description
+      reminder_days_before, cancel_by_date, bucket_id, match_description, id
      FROM upcoming_charges ORDER BY id`
   )
+  const marksByRegular = new Map<number, PaidMarkExportRow[]>()
+  for (const m of readPaidMarks()) {
+    const list = marksByRegular.get(m.regularId) ?? []
+    list.push({ occurrence_date: m.occurrenceDate, marked_at: m.markedAt })
+    marksByRegular.set(m.regularId, list)
+  }
   const rows: UpcomingChargeExportRow[] = []
   while (stmt.step()) {
     const r = stmt.get() as [
@@ -312,6 +330,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string | null,
       number | null,
       string | null,
+      number,
     ]
     rows.push({
       name: r[0],
@@ -324,6 +343,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       cancel_by_date: r[7] ?? null,
       bucket_id: r[8] ?? null,
       match_description: r[9] ?? null,
+      paid_marks: marksByRegular.get(r[10]) ?? [],
     })
   }
   stmt.free()
@@ -866,6 +886,7 @@ export function replaceUpcomingCharges(
 ): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  db.run(`DELETE FROM regular_paid_marks`)
   db.run(`DELETE FROM upcoming_charges`)
 
   const now = new Date().toISOString()
@@ -924,6 +945,40 @@ export function replaceUpcomingCharges(
         matchDescription,
         now,
       ]
+    )
+    restorePaidMarks(db, uc.paid_marks)
+  }
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * #214 — the paid marks of the Regular just inserted. Malformed rows are
+ * skipped. A mark for a date that isn't one of the Regular's occurrences is
+ * kept as exported: the paid read ignores it, as it would on the device it
+ * came from.
+ */
+function restorePaidMarks(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  marks: unknown
+): void {
+  if (!Array.isArray(marks)) return
+  const regularId = Number(
+    db.exec(`SELECT last_insert_rowid()`)[0].values[0][0]
+  )
+  for (const m of marks as Partial<PaidMarkExportRow>[]) {
+    if (
+      typeof m?.occurrence_date !== 'string' ||
+      !DAY_RE.test(m.occurrence_date) ||
+      typeof m.marked_at !== 'string' ||
+      m.marked_at === ''
+    ) {
+      continue
+    }
+    db.run(
+      `INSERT OR IGNORE INTO regular_paid_marks (regular_id, occurrence_date, marked_at)
+       VALUES (?, ?, ?)`,
+      [regularId, m.occurrence_date, m.marked_at]
     )
   }
 }
