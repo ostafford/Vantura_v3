@@ -32,6 +32,11 @@
  *
  * **Storage:** `month_end_plans`, one row per month; `plan_json` is the plan
  * body, versioned by its `version` field (`MONTH_END_PLAN_VERSION`).
+ *
+ * **Reading a finished month** (#243): `planInputOf` turns a plan into the
+ * attribution read's plan input. **Past-month marks** are written into the
+ * plan (`markFrozenOccurrencePaid` / `unmarkFrozenOccurrencePaid`), never the
+ * live table: they change an occurrence's status only.
  */
 
 import { getDb, getAppSetting, setAppSetting, schedulePersist } from '@/db'
@@ -39,8 +44,11 @@ import { addDaysToDateStr, calendarMonthDayBounds } from '@/lib/dateStr'
 import { localDateString } from '@/lib/format'
 import { isPayFrequency, type PayFrequency } from '@/lib/payFrequency'
 import { getBuckets, readPay } from '@/services/budgetBuckets'
-import { trackerPlansInMonth } from '@/services/monthAttribution'
-import { regularPlansInMonth } from '@/services/regulars'
+import {
+  trackerPlansInMonth,
+  type MonthPlanInput,
+} from '@/services/monthAttribution'
+import { regularPlansInMonth, type Regular } from '@/services/regulars'
 
 /** The plan body's format version. Bump it when the shape changes. */
 export const MONTH_END_PLAN_VERSION = 1
@@ -399,6 +407,42 @@ export function getMonthEndPlan(month: string): MonthEndPlan | null {
   return row ? { ...row.body, month: row.month, frozenAt: row.frozenAt } : null
 }
 
+/**
+ * A Month-end plan as the attribution read's plan input (#243): its Regulars
+ * as stored rows (the stored date as `next_charge_date`, so occurrence
+ * windows project as they did), their frozen occurrences and marks, and its
+ * Trackers. Fields a plan doesn't freeze (category, reminder) don't affect
+ * the read and are left empty.
+ */
+export function planInputOf(plan: MonthEndPlanBody): MonthPlanInput {
+  const rows: Regular[] = plan.regulars.map((r) => ({
+    id: r.id,
+    name: r.name,
+    amount: r.amount,
+    frequency: r.frequency,
+    next_charge_date: r.anchorDate,
+    category_id: null,
+    reminder_days_before: null,
+    cancel_by_date: r.cancelByDate,
+    match_description: r.matchDescription,
+    bucket_id: r.bucketId,
+  }))
+  return {
+    regulars: {
+      rows,
+      occurrences: new Map(plan.regulars.map((r) => [r.id, r.occurrences])),
+      marks: plan.paidMarks.map((m) => ({ ...m })),
+    },
+    trackers: plan.trackers.map((t) => ({
+      trackerId: t.id,
+      name: t.name,
+      bucketId: t.bucketId,
+      plannedCents: t.plannedCents,
+      categoryIdsByDay: new Map(Object.entries(t.categoryIdsByDay)),
+    })),
+  }
+}
+
 /** The months that have a row, oldest first (parseable or not). */
 function storedMonths(): Set<string> {
   const db = getDb()
@@ -459,6 +503,83 @@ export function freezeMonthEndPlans(
   }
   if (frozen.length > 0) schedulePersist()
   return frozen
+}
+
+/** Rewrites `month`'s plan body (its row must exist). */
+function writePlanBody(month: string, body: MonthEndPlanBody): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`UPDATE month_end_plans SET plan_json = ? WHERE month = ?`, [
+    JSON.stringify(body),
+    month,
+  ])
+  schedulePersist()
+}
+
+/**
+ * Marks one of a finished month's occurrences paid, in that month's plan
+ * (#243): past-month marks never touch the live table, so this works for a
+ * Regular deleted since the freeze, and deleting a Regular never erases one.
+ * A mark changes the occurrence's status only, never Actual spending or
+ * Saved. Returns false, writing nothing, when the month has no plan or `date`
+ * isn't one of that Regular's frozen occurrences. Marking an already-marked
+ * occurrence keeps its original time.
+ */
+export function markFrozenOccurrencePaid(
+  month: string,
+  regularId: number,
+  date: string
+): boolean {
+  const plan = getMonthEndPlan(month)
+  const regular = plan?.regulars.find((r) => r.id === regularId)
+  if (!plan || !regular || !regular.occurrences.includes(date)) return false
+  if (
+    plan.paidMarks.some(
+      (m) => m.regularId === regularId && m.occurrenceDate === date
+    )
+  ) {
+    return true
+  }
+  const paidMarks = [
+    ...plan.paidMarks,
+    { regularId, occurrenceDate: date, markedAt: new Date().toISOString() },
+  ].sort(
+    (a, b) =>
+      a.regularId - b.regularId ||
+      a.occurrenceDate.localeCompare(b.occurrenceDate)
+  )
+  writePlanBody(month, bodyOf(plan, paidMarks))
+  return true
+}
+
+/** Removes the mark on one of a finished month's occurrences (the Undo). */
+export function unmarkFrozenOccurrencePaid(
+  month: string,
+  regularId: number,
+  date: string
+): void {
+  const plan = getMonthEndPlan(month)
+  if (!plan) return
+  const paidMarks = plan.paidMarks.filter(
+    (m) => !(m.regularId === regularId && m.occurrenceDate === date)
+  )
+  if (paidMarks.length === plan.paidMarks.length) return
+  writePlanBody(month, bodyOf(plan, paidMarks))
+}
+
+/** `plan`'s body with `paidMarks` in place of its own. */
+function bodyOf(
+  plan: MonthEndPlan,
+  paidMarks: FrozenPaidMark[]
+): MonthEndPlanBody {
+  return {
+    version: plan.version,
+    buckets: plan.buckets,
+    regulars: plan.regulars,
+    trackers: plan.trackers,
+    pay: plan.pay,
+    paidMarks,
+  }
 }
 
 /**

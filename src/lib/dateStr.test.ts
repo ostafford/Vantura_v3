@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  addMonthsToMonthStr,
   normalizeDateStr,
   addDaysToDateStr,
   daysBetweenDateStr,
@@ -131,5 +132,19 @@ describe('calendarPeriodBounds', () => {
       from: '2025-01-01',
       to: '2026-01-01',
     })
+  })
+})
+
+describe('addMonthsToMonthStr', () => {
+  it('steps forward and back across a year boundary', () => {
+    expect(addMonthsToMonthStr('2026-12', 1)).toBe('2027-01')
+    expect(addMonthsToMonthStr('2027-01', -1)).toBe('2026-12')
+    expect(addMonthsToMonthStr('2026-11', -14)).toBe('2025-09')
+    expect(addMonthsToMonthStr('2026-03', 0)).toBe('2026-03')
+  })
+
+  it('throws on anything that isn’t a real month', () => {
+    expect(() => addMonthsToMonthStr('2026-13', 1)).toThrow()
+    expect(() => addMonthsToMonthStr('2026-1', 1)).toThrow()
   })
 })

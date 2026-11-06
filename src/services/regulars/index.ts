@@ -57,7 +57,11 @@ export {
   type RegularLinkedPayments,
 } from './linkedPayments'
 export { regularsInMonth, type RegularMonth } from './month'
-export { regularPlansInMonth, type RegularPlanInMonth } from './plan'
+export {
+  regularPlansInMonth,
+  type RegularPlanInMonth,
+  type RegularsPlanInput,
+} from './plan'
 export {
   regularOccurrencesPaidInMonth,
   markOccurrencePaid,

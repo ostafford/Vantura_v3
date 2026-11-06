@@ -19,10 +19,13 @@ import {
   itemBar,
   markPaidDate,
   monthLabel,
+  monthProgress,
   planMoney,
+  savedHeadline,
   stateLine,
   type PlanTone,
 } from './planFormat'
+import { planMonthSearch, type PlanMonth } from './planMonth'
 
 const toneClass: Record<PlanTone, string> = {
   muted: 'plan-muted',
@@ -90,6 +93,65 @@ function barLabel(
   return pace === null ? base : `${base}, pace ${planMoney(pace)} by today`
 }
 
+// ─── Month nav ───────────────────────────────────────────────────────────────
+
+/**
+ * The month name with ‹ / › beside it (#243). A disabled chevron is a
+ * disabled button, so it stays in the tab order's place and says why.
+ * `path` is the page the chevrons stay on; the month rides in `?month=`.
+ */
+export function MonthNav({
+  planMonth,
+  path,
+  as: Heading = 'h2',
+}: {
+  planMonth: PlanMonth
+  path: string
+  as?: 'h2' | 'span'
+}) {
+  const { month, current, prev, next } = planMonth
+  const chevron = (
+    target: string | null,
+    dir: 'prev' | 'next',
+    disabledWhy: string
+  ) => {
+    const icon = dir === 'prev' ? 'mdi-chevron-left' : 'mdi-chevron-right'
+    const label = dir === 'prev' ? 'Previous month' : 'Next month'
+    return target === null ? (
+      <button
+        type="button"
+        className="plan-month-nav__chevron"
+        disabled
+        aria-label={`${label} (${disabledWhy})`}
+        data-testid={`plan-month-${dir}`}
+      >
+        <i className={`mdi ${icon}`} aria-hidden />
+      </button>
+    ) : (
+      <Link
+        to={`${path}${planMonthSearch(target, current)}`}
+        className="plan-month-nav__chevron"
+        aria-label={`${label}: ${monthLabel(target)}`}
+        data-testid={`plan-month-${dir}`}
+      >
+        <i className={`mdi ${icon}`} aria-hidden />
+      </Link>
+    )
+  }
+  return (
+    <div className="plan-month-nav">
+      {chevron(prev, 'prev', 'no earlier month to show')}
+      <Heading
+        className="h6 fw-semibold mb-0 plan-month-nav__name"
+        data-testid="plan-month"
+      >
+        {monthLabel(month)}
+      </Heading>
+      {chevron(next, 'next', 'this is the current month')}
+    </div>
+  )
+}
+
 // ─── Month summary ───────────────────────────────────────────────────────────
 
 const SEGMENT_CLASS = {
@@ -97,10 +159,13 @@ const SEGMENT_CLASS = {
   unplanned: 'income-bar__seg--unplanned',
   'to-go': 'income-bar__seg--to-go',
   rest: 'income-bar__seg--rest',
+  saved: 'income-bar__seg--rest',
 } as const
 
 interface MonthSummaryProps {
   plan: PlanVsActual
+  /** The month name with its chevrons. */
+  nav: ReactNode
   /** Scrolls to the Unplanned card. */
   onShowUnplanned: () => void
   /** Help popover and actions beside the month. */
@@ -115,53 +180,98 @@ function SetYourPay() {
   )
 }
 
+/**
+ * The month's headline: Free spending so far while it runs; Saved, or
+ * Overspent (red, as a positive figure), once it has finished (#243).
+ */
+function headline(plan: PlanVsActual): {
+  cents: number | null
+  label: string
+  over: boolean
+} {
+  if (plan.state === 'in-progress') {
+    const free = plan.freeSpendingSoFarCents
+    return {
+      cents: free,
+      label: 'Free spending so far',
+      over: free !== null && free < 0,
+    }
+  }
+  if (plan.savedCents === null) {
+    return { cents: null, label: 'Saved', over: false }
+  }
+  return savedHeadline(plan.savedCents)
+}
+
+/** A finished month with no Income: its plan had no pay, and setting one now can't change it. */
+function NoPayInPlan({ month }: { month: string }) {
+  return (
+    <div className="plan-set-pay mb-3" data-testid="plan-no-pay">
+      <i className="mdi mdi-cash-off me-2" aria-hidden />
+      <span>
+        No pay was set when {monthLabel(month).split(' ')[0]} ended, so Saved
+        can’t be worked out.
+      </span>
+    </div>
+  )
+}
+
 export function MonthSummaryCard({
   plan,
+  nav,
   onShowUnplanned,
   aside,
 }: MonthSummaryProps) {
-  const { figures, bar } = plan
-  const segments = incomeBarSegments(bar, figures.incomeCents)
-  const free = plan.freeSpendingSoFarCents
+  const { figures } = plan
+  const finished = plan.state === 'finished'
+  const segments = incomeBarSegments(plan, figures.incomeCents)
+  const head = headline(plan)
+  const noIncome = finished ? <span>not set</span> : <SetYourPay />
 
   return (
     <Card className="mb-3" data-testid="plan-summary">
       <Card.Body>
         <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div className="d-flex align-items-baseline gap-2 flex-wrap">
-            <h2 className="h6 fw-semibold mb-0">{monthLabel(plan.month)}</h2>
-            <span className="plan-muted small">
-              Day {plan.dayOfMonth} of {plan.daysInMonth}
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            {nav}
+            <span className="plan-muted small" data-testid="plan-progress">
+              {monthProgress(plan)}
             </span>
           </div>
           {aside}
         </div>
 
         {segments === null ? (
-          <div className="plan-set-pay mb-3" data-testid="plan-set-pay">
-            <i className="mdi mdi-cash me-2" aria-hidden />
-            <span>
-              <SetYourPay /> to see Free spending so far and where your Income
-              goes this month.
-            </span>
-          </div>
+          finished ? (
+            <NoPayInPlan month={plan.month} />
+          ) : (
+            <div className="plan-set-pay mb-3" data-testid="plan-set-pay">
+              <i className="mdi mdi-cash me-2" aria-hidden />
+              <span>
+                <SetYourPay /> to see Free spending so far and where your Income
+                goes this month.
+              </span>
+            </div>
+          )
         ) : (
           <>
             <div className="d-flex align-items-baseline gap-2 flex-wrap mb-3">
               <span
-                className={`plan-headline${free !== null && free < 0 ? ' plan-over' : ''}`}
+                className={`plan-headline${head.over ? ' plan-over' : ''}`}
                 data-testid="plan-headline"
               >
-                {planMoney(free)}
+                {planMoney(head.cents)}
               </span>
-              <span className="plan-muted">Free spending so far</span>
+              <span className="plan-muted" data-testid="plan-headline-label">
+                {head.label}
+              </span>
             </div>
 
             <div
               className="income-bar"
               role="img"
               aria-label={`Income ${planMoney(figures.incomeCents)}: ${segments
-                .map((s) => `${s.label} ${planMoney(s.cents)}`)
+                .map((s) => `${s.label} ${planMoney(s.shownCents)}`)
                 .join(', ')}`}
               data-testid="income-bar"
             >
@@ -188,7 +298,7 @@ export function MonthSummaryCard({
                     <span
                       className={`plan-legend__fig${s.over ? ' plan-over' : ''}`}
                     >
-                      {planMoney(s.cents)}
+                      {planMoney(s.shownCents)}
                     </span>
                   </>
                 )
@@ -208,12 +318,13 @@ export function MonthSummaryCard({
                 )
               })}
             </div>
-            {bar.stillToGoOutCents === null && (
-              <div className="plan-muted small mt-2">
-                A tracker’s budget can’t be worked out for this month, so Still
-                to go out and If the rest goes to plan aren’t shown.
-              </div>
-            )}
+            {plan.state === 'in-progress' &&
+              plan.bar.stillToGoOutCents === null && (
+                <div className="plan-muted small mt-2">
+                  A tracker’s budget can’t be worked out for this month, so
+                  Still to go out and If the rest goes to plan aren’t shown.
+                </div>
+              )}
           </>
         )}
 
@@ -222,7 +333,7 @@ export function MonthSummaryCard({
           <span>
             Income{' '}
             {figures.incomeCents === null ? (
-              <SetYourPay />
+              noIncome
             ) : (
               <strong>{planMoney(figures.incomeCents)}</strong>
             )}
@@ -233,13 +344,14 @@ export function MonthSummaryCard({
           <span>
             Unallocated{' '}
             {figures.unallocatedCents === null ? (
-              <SetYourPay />
+              noIncome
             ) : (
               <strong>{planMoney(figures.unallocatedCents)}</strong>
             )}
           </span>
           <span>
-            Actual so far <strong>{planMoney(figures.actualCents)}</strong>
+            {finished ? 'Actual' : 'Actual so far'}{' '}
+            <strong>{planMoney(figures.actualCents)}</strong>
           </span>
         </div>
       </Card.Body>

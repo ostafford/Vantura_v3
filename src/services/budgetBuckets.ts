@@ -198,6 +198,10 @@ export function readPay(): Pay | null {
  */
 export function getMonthlyIncomeCents(): number | null {
   const pay = readPay()
-  if (!pay) return null
+  return pay ? monthlyIncomeFromPay(pay) : null
+}
+
+/** Monthly Income from a pay: the rule `getMonthlyIncomeCents` applies. */
+export function monthlyIncomeFromPay(pay: Pay): number {
   return Math.round(pay.perPay * monthlyEquivalentMultiplier(pay.frequency))
 }
