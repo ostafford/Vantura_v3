@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 58
+const SCHEMA_VERSION = 59
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -128,7 +128,6 @@ const DDL_STATEMENTS = [
     frequency TEXT NOT NULL,
     next_charge_date TEXT NOT NULL,
     category_id TEXT,
-    is_reserved INTEGER DEFAULT 1,
     reminder_days_before INTEGER,
     cancel_by_date TEXT,
     created_at TEXT NOT NULL,
@@ -1510,6 +1509,30 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['58']
+    )
+  }
+  // #211 — Spendable is cut, with Reserved, Forecast and Essentials coverage.
+  // Drop the Regulars' "Include in Spendable" flag (every Regular now counts
+  // in Still to go out; its other data is untouched), the low-balance alert's
+  // two keys and the Essentials Saver nomination.
+  if (version < 59) {
+    const ucCols = new Set(
+      (
+        database.exec(`PRAGMA table_info(upcoming_charges)`)[0]?.values ?? []
+      ).map((r) => String(r[1]))
+    )
+    if (ucCols.has('is_reserved')) {
+      database.run(`ALTER TABLE upcoming_charges DROP COLUMN is_reserved`)
+    }
+    database.run(
+      `DELETE FROM app_settings
+        WHERE key IN ('spendable_alert_below_cents',
+                      'spendable_alert_below_pct_pay',
+                      'essentials_saver_account_id')`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['59']
     )
   }
 }

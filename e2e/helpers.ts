@@ -9,7 +9,7 @@ import { type Page, expect } from '@playwright/test'
 export async function startWithSampleData(page: Page): Promise<void> {
   await page.goto('/')
   await page.getByRole('button', { name: 'Try with sample data' }).click()
-  await expect(page.getByLabel(/Spendable balance/i)).toBeVisible({
+  await expect(page.getByRole('region', { name: 'Headroom' })).toBeVisible({
     timeout: 15_000,
   })
 }
@@ -37,7 +37,7 @@ export async function switchToLightTheme(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Light', exact: true }).click()
   await expect(page.locator('html')).toHaveAttribute('data-bs-theme', 'light')
   await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
-  await expect(page.getByLabel(/Spendable balance/i)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Headroom' })).toBeVisible()
 }
 
 export async function goToTrackers(page: Page): Promise<void> {

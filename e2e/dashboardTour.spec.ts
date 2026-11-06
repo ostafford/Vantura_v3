@@ -52,7 +52,7 @@ async function closeTourSoonAfterItOpens(page: Page, how: CloseMethod) {
 async function revisitDashboard(page: Page) {
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('link', { name: 'Dashboard', exact: true }).click()
-  await expect(page.getByLabel(/Spendable balance/i)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Headroom' })).toBeVisible()
   await page.waitForTimeout(1000)
 }
 

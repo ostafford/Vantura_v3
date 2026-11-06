@@ -62,7 +62,6 @@ const SECTION_POPOVERS: Record<DashboardSectionId, SectionPopover> = {
     title: 'Regulars',
     description:
       'Add <strong>bills and subscriptions</strong> you know are coming — rent, Netflix, insurance, etc.<br><br>' +
-      'Each Regular reduces <strong>Spendable</strong> until its due date. Toggle <strong>Include in Spendable</strong> per Regular to control this.<br><br>' +
       'Grouped into <strong>Overdue</strong>, <strong>This month</strong> and <strong>Later</strong>.',
     side: 'top',
     align: 'center',
@@ -84,15 +83,15 @@ export function startDashboardTour(
       },
     },
 
-    // Step 2 — Balance cards (always fixed at the top of the Dashboard)
+    // Step 2 — Headroom (always fixed at the top of the Dashboard)
     {
-      element: '[data-tour="balance-cards"]',
+      element: '[data-tour="headroom"]',
       popover: {
-        title: 'Balance cards',
+        title: 'Headroom',
         description:
-          '<strong>Available</strong> — sum of your transactional account balances (excludes savers).<br><br>' +
-          '<strong>Spendable</strong> — safe-to-spend: Available minus charges due before your next payday.<br><br>' +
-          'Click <strong>Spendable</strong> to set a low-balance alert.',
+          '<strong>On hand</strong> — your Spending account plus any Savers you switch on.<br><br>' +
+          '<strong>Still to go out</strong> — Regulars not paid yet this month, plus what’s left in your trackers.<br><br>' +
+          '<strong>Headroom</strong> is On hand minus Still to go out. It can go below zero.',
         side: 'bottom' as SideType,
         align: 'center' as AlignType,
       },

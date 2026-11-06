@@ -6,7 +6,7 @@ test.describe('Weekly Insights is cut (#206)', () => {
     await startWithSampleData(page)
     const popover = page.locator('.driver-popover')
     await expect(popover).toBeVisible()
-    // Intro, Balance cards, three sections, Navigation, Lock
+    // Intro, Headroom, three sections, Navigation, Lock
     await expect(popover).toContainText('1 of 7')
 
     const titles: string[] = []

@@ -4,13 +4,12 @@
  * `upcoming_charges` elsewhere.
  *
  * Reads are projected here (docs/adr/0004): `regularsByMonth`,
- * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
- * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
- * `linkedPaymentsInMonth`, `regularsInMonth`, `regularOccurrencesPaidInMonth`.
+ * `regularOccurrencesInMonth`, `dueSoonRegulars`, `linkedPaymentsInMonth`,
+ *, `regularsInMonth`, `regularOccurrencesPaidInMonth`.
  * One returns stored rows by design: `regularById` (the editor's anchor).
  *
- * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`, `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
+ * Internals: `rows.ts` (the one SELECT), `projection.ts`,
+ * `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
@@ -36,17 +35,6 @@ import {
 import { regularOccurrencesPaidInMonth } from './paid'
 
 export type { Regular } from './rows'
-export {
-  reservedBeforePayday,
-  totalReserved,
-  type ReservedItem,
-} from './reserved'
-export {
-  regularsWithFundingSource,
-  essentialsLinkHints,
-  type RegularWithFundingSource,
-  type EssentialsLinkHint,
-} from './funding'
 export {
   blankDraft,
   draftFromRegular,
@@ -234,8 +222,13 @@ export function daysUntilCharge(nextChargeDate: string): number {
 }
 
 /**
- * Charges that are within their reminder window (due_days <= reminder_days_before).
- * Sorted by next_charge_date ascending (soonest first).
+ * Regulars in their reminder window: the **earliest unpaid occurrence on or
+ * after today** is due within `reminder_days_before` days (0 = today). Paid is
+ * the per-occurrence read (`regularOccurrencesPaidInMonth`: a mark, or a
+ * Linked payment by the nearest-occurrence rule), so an occurrence clears
+ * itself once it's paid, and a paid one moves the Regular on to its next
+ * occurrence, which shows only if that is inside the window too (#211).
+ * Projected rows, soonest first.
  */
 export function dueSoonRegulars(): Regular[] {
   const db = getDb()
@@ -244,23 +237,41 @@ export function dueSoonRegulars(): Regular[] {
   const candidates = readRegularsByStoredDate(db).filter(
     (c) => c.reminder_days_before != null
   )
+  // `id|date` of every paid occurrence, read once per month needed.
+  const paidByMonth = new Map<string, Set<string>>()
+  const isPaid = (id: number, date: string): boolean => {
+    const month = date.slice(0, 7)
+    let paid = paidByMonth.get(month)
+    if (!paid) {
+      paid = new Set(
+        regularOccurrencesPaidInMonth(month)
+          .filter((o) => o.paid)
+          .map((o) => `${o.regular.id}|${o.date}`)
+      )
+      paidByMonth.set(month, paid)
+    }
+    return paid.has(`${id}|${date}`)
+  }
   const list: Regular[] = []
   for (const charge of candidates) {
-    const nextOccurrence = firstOccurrenceOnOrAfter(
+    const window = charge.reminder_days_before as number
+    let occurrence = firstOccurrenceOnOrAfter(
       charge.next_charge_date,
       charge.frequency,
       today,
       charge.cancel_by_date
     )
-    if (!nextOccurrence) continue
-    const projected = { ...charge, next_charge_date: nextOccurrence }
-    const days = daysUntilCharge(projected.next_charge_date)
-    if (
-      days >= 0 &&
-      projected.reminder_days_before != null &&
-      days <= projected.reminder_days_before
-    ) {
-      list.push(projected)
+    while (occurrence && daysUntilCharge(occurrence) <= window) {
+      if (!isPaid(charge.id, occurrence)) {
+        list.push({ ...charge, next_charge_date: occurrence })
+        break
+      }
+      occurrence = firstOccurrenceOnOrAfter(
+        charge.next_charge_date,
+        charge.frequency,
+        addDaysToDateStr(occurrence, 1),
+        charge.cancel_by_date
+      )
     }
   }
   list.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))

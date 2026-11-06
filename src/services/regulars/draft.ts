@@ -27,7 +27,6 @@ export interface RegularDraft {
   nextChargeDate: string
   /** `''` = no category. */
   categoryId: string
-  isReserved: boolean
   /** Days, as typed; `''` = no reminder. */
   reminderDaysBefore: string
   /** `''` = no cancel-by date. */
@@ -69,7 +68,7 @@ export interface DraftSourceSuggestion {
   matchDescription: string
 }
 
-/** A new, empty Regular: monthly, due today, counted in Spendable. */
+/** A new, empty Regular: monthly, due today. */
 export function blankDraft(today: string = localDateString()): RegularDraft {
   return {
     id: null,
@@ -78,7 +77,6 @@ export function blankDraft(today: string = localDateString()): RegularDraft {
     frequency: 'MONTHLY',
     nextChargeDate: today,
     categoryId: '',
-    isReserved: true,
     reminderDaysBefore: '',
     cancelByDate: '',
     matchDescription: '',
@@ -105,7 +103,6 @@ export function draftFromRegular(
     frequency: stored.frequency,
     nextChargeDate: shown.next_charge_date,
     categoryId: stored.category_id ?? '',
-    isReserved: stored.is_reserved === 1,
     reminderDaysBefore:
       stored.reminder_days_before != null
         ? String(stored.reminder_days_before)
@@ -213,7 +210,6 @@ export function saveRegular(draft: RegularDraft): number {
     draft.frequency,
     nextChargeDateToStore(db, draft),
     draft.categoryId || null,
-    draft.isReserved ? 1 : 0,
     reminder != null && !Number.isNaN(reminder) ? reminder : null,
     cancelByDate(draft),
     draft.matchDescription || null,
@@ -226,7 +222,7 @@ export function saveRegular(draft: RegularDraft): number {
     db.run(
       `UPDATE upcoming_charges SET
          name = ?, amount = ?, frequency = ?, next_charge_date = ?, category_id = ?,
-         is_reserved = ?, reminder_days_before = ?, cancel_by_date = ?,
+         reminder_days_before = ?, cancel_by_date = ?,
          match_description = ?, bucket_id = ?
        WHERE id = ?`,
       [...fields, id]
@@ -234,10 +230,10 @@ export function saveRegular(draft: RegularDraft): number {
   } else {
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, category_id, is_reserved,
+         (name, amount, frequency, next_charge_date, category_id,
           reminder_days_before, cancel_by_date, match_description, bucket_id,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [...fields, new Date().toISOString()]
     )
     id = Number(db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0])

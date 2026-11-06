@@ -82,8 +82,7 @@ export function PaydaySection() {
   return (
     <>
       <p className="small text-muted mb-3">
-        Used for your spendable balance and budget planning. Update when your
-        pay cycle changes.
+        Used for budget planning. Update when your pay cycle changes.
       </p>
       <Form onSubmit={handlePaydaySubmit}>
         <Form.Group className="mb-3">
@@ -129,8 +128,7 @@ export function PaydaySection() {
           />
           <Form.Text className="text-muted">
             What lands in your account each pay, after tax. Your monthly Income
-            is built from it, and it&apos;s used for Spendable context and
-            alerts.
+            is built from it.
           </Form.Text>
         </Form.Group>
         <Form.Group className="mb-3">

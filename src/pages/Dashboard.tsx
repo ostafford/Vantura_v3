@@ -2,16 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { Modal, Button, Form } from 'react-bootstrap'
 import { useStore } from 'zustand'
-import {
-  getAvailableBalance,
-  getReservedAmount,
-  getSpendableBalance,
-  getPayAmountCents,
-  getSpendableAlert,
-  type SpendableAlertMode,
-} from '@/services/balance'
-import { getForecastSpendable } from '@/services/forecast'
-import { formatMoney, formatSignedMoney, formatShortDate } from '@/lib/format'
+import { formatMoney } from '@/lib/format'
 import { MONTH_NAMES } from '@/lib/constants'
 import { getAppSetting, setAppSetting } from '@/db'
 import { syncStore } from '@/stores/syncStore'
@@ -21,10 +12,7 @@ import { sessionStore } from '@/stores/sessionStore'
 import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
-import { BalanceCards } from '@/components/dashboard/BalanceCards'
 import { HeadroomSection } from '@/components/dashboard/HeadroomSection'
-import { EssentialsCoverageBlock } from '@/components/dashboard/EssentialsCoverageBlock'
-import { getEssentialsCoverage } from '@/services/essentialsCoverage'
 import {
   shouldShowDashboardTour,
   startDashboardTour,
@@ -45,8 +33,6 @@ import {
 import { daysUntilCharge, dueSoonRegulars } from '@/services/regulars'
 import { UpBankUnauthorizedError, SYNC_401_MESSAGE } from '@/api/upBank'
 import { toast } from '@/stores/toastStore'
-const SPENDABLE_ALERT_KEY = 'spendable_alert_below_cents'
-const SPENDABLE_ALERT_PCT_PAY_KEY = 'spendable_alert_below_pct_pay'
 
 const TOUR_DATA_ATTRS: Record<DashboardSectionId, string> = {
   month_summary: 'month-summary',
@@ -83,203 +69,20 @@ export function Dashboard() {
     getAppSetting('dismissed_due_soon_date')
   )
   const bannerDismissedToday = bannerDismissedOn === today
-  const [showThresholdModal, setShowThresholdModal] = useState(false)
-  const [thresholdMode, setThresholdMode] =
-    useState<SpendableAlertMode>('dollars')
-  const [thresholdDollars, setThresholdDollars] = useState('')
-  const [thresholdPctPay, setThresholdPctPay] = useState('')
-
-  const {
-    availableCents,
-    spendableCents,
-    forecastCents,
-    payAmountCents,
-    spendableAlert,
-    nextPayday,
-    reservedCents,
-    essentialsCoverage,
-    lastSyncAgeMs,
-  } = useMemo(
-    () => ({
-      availableCents: getAvailableBalance(),
-      spendableCents: getSpendableBalance(),
-      forecastCents: getForecastSpendable(),
-      payAmountCents: getPayAmountCents(),
-      spendableAlert: getSpendableAlert(),
-      nextPayday: getAppSetting('next_payday'),
-      reservedCents: getReservedAmount(),
-      essentialsCoverage: getEssentialsCoverage(),
-      lastSyncAgeMs: (() => {
-        const ls = getAppSetting('last_sync')
-        return ls ? Date.now() - new Date(ls).getTime() : null
-      })(),
-    }),
+  const lastSyncAgeMs = useMemo(
+    () => {
+      const ls = getAppSetting('last_sync')
+      return ls ? Date.now() - new Date(ls).getTime() : null
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncCompletedAt, dataVersion, today]
   )
 
-  const effectiveThresholdCents = spendableAlert?.thresholdCents ?? null
-  const isSpendableLow =
-    effectiveThresholdCents != null &&
-    effectiveThresholdCents > 0 &&
-    spendableCents < effectiveThresholdCents
-  const spendableGradient =
-    spendableCents < 0 || isSpendableLow ? 'danger' : 'success'
-  const spendableDisplayValue = formatSignedMoney(spendableCents)
   const isStale = lastSyncAgeMs != null && lastSyncAgeMs > 60 * 60 * 1000
   const staleHours =
     isStale && lastSyncAgeMs != null
       ? Math.floor(lastSyncAgeMs / (60 * 60 * 1000))
       : 0
-
-  const spendableSubtitle =
-    nextPayday && nextPayday.trim() !== ''
-      ? `$${formatMoney(reservedCents)} reserved until ${formatShortDate(nextPayday)}`
-      : `$${formatMoney(reservedCents)} reserved for upcoming`
-  // The hero button's visible value/subtitle aren't part of its accessible
-  // name, so spell the whole picture out here — value, reserved line, and any
-  // alert state (mirrors the tooltip heading) — plus what activating it does.
-  const spendableStateNote =
-    spendableCents < 0
-      ? ' Spendable is negative.'
-      : isSpendableLow
-        ? ' Below your alert threshold.'
-        : ''
-  const spendableAriaLabel = `Spendable balance ${spendableDisplayValue}. ${spendableSubtitle}.${spendableStateNote} Activate to set a low-balance alert.`
-  const availableProjectedSubtitle =
-    payAmountCents != null
-      ? `Projected post-payday: $${formatMoney(availableCents + payAmountCents)}`
-      : 'Balance as reported by Up Bank'
-
-  const forecastGradient = forecastCents < 0 ? 'danger' : 'info'
-  const forecastDisplayValue = formatSignedMoney(forecastCents)
-  const forecastSubtitle =
-    nextPayday && nextPayday.trim() !== ''
-      ? `Projected for ${formatShortDate(nextPayday)}`
-      : 'Projected to next payday'
-  const forecastTooltip = (
-    <div style={{ fontSize: '0.82rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
-        {forecastCents < 0
-          ? 'Forecast is negative'
-          : 'How Forecast is calculated'}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <div>
-          • <strong>Spendable</strong> — your current safety-net balance
-        </div>
-        <div>
-          • minus the <strong>remaining budget</strong> in each active
-          tracker&apos;s current period
-        </div>
-        <div style={{ opacity: 0.7 }}>
-          Doesn&apos;t assume future tracker resets or a spending pace — just
-          what&apos;s left to spend right now.
-        </div>
-        {forecastCents < 0 && (
-          <div
-            style={{
-              marginTop: '0.3rem',
-              color: 'var(--vantura-danger-on-tooltip)',
-            }}
-          >
-            Tracker budgets remaining exceed your current Spendable balance.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-
-  const spendableTooltip = (() => {
-    const projected =
-      payAmountCents != null ? spendableCents + payAmountCents : null
-
-    return (
-      <div style={{ fontSize: '0.82rem' }}>
-        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
-          {spendableCents < 0
-            ? 'Spendable is negative'
-            : isSpendableLow
-              ? 'Below your alert threshold'
-              : 'How Spendable is calculated'}
-        </div>
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
-        >
-          <div>
-            • <strong>Available</strong> — your Up Bank balance
-          </div>
-          <div>
-            • minus <strong>Reserved</strong> — Regulars set aside before payday
-          </div>
-          {spendableCents < 0 && (
-            <div
-              style={{
-                marginTop: '0.3rem',
-                color: 'var(--vantura-danger-on-tooltip)',
-              }}
-            >
-              Reserved charges exceed your available balance.
-            </div>
-          )}
-          {isSpendableLow && spendableCents >= 0 && (
-            <div
-              style={{
-                marginTop: '0.3rem',
-                color: 'var(--vantura-warning-on-tooltip)',
-              }}
-            >
-              Check your Regulars or tap to adjust the threshold.
-            </div>
-          )}
-          {projected != null && (
-            <div
-              style={{
-                marginTop: '0.3rem',
-                borderTop: '1px solid rgba(255,255,255,0.12)',
-                paddingTop: '0.3rem',
-              }}
-            >
-              After payday: {formatSignedMoney(spendableCents)} + $
-              {formatMoney(payAmountCents!)} ={' '}
-              <strong>{formatSignedMoney(projected)}</strong>
-            </div>
-          )}
-        </div>
-        <div
-          style={{ marginTop: '0.45rem', opacity: 0.55, fontSize: '0.78rem' }}
-        >
-          Tap this card to set a low-balance alert.
-        </div>
-      </div>
-    )
-  })()
-
-  const availableTooltip = (
-    <div style={{ fontSize: '0.82rem' }}>
-      <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>
-        Your Up Bank balance
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <div>• Sum of all transactional account balances</div>
-        <div>• Excludes saver accounts</div>
-        <div>• Pending/held transactions already reflected</div>
-      </div>
-      {payAmountCents != null && (
-        <div
-          style={{
-            marginTop: '0.45rem',
-            borderTop: '1px solid rgba(255,255,255,0.12)',
-            paddingTop: '0.3rem',
-          }}
-        >
-          Post-payday: {formatSignedMoney(availableCents)} + $
-          {formatMoney(payAmountCents)} ={' '}
-          <strong>{formatSignedMoney(availableCents + payAmountCents)}</strong>
-        </div>
-      )}
-    </div>
-  )
 
   const now = new Date()
   const headerDate = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
@@ -387,43 +190,6 @@ export function Dashboard() {
       toast.error(message)
     }
   }, [])
-
-  const openThresholdModal = useCallback(() => {
-    const alert = getSpendableAlert()
-    // % of pay can't be configured without a pay amount to apply it to.
-    const mode =
-      alert?.mode === 'pct' && payAmountCents != null ? 'pct' : 'dollars'
-    setThresholdMode(mode)
-    setThresholdDollars(
-      alert?.mode === 'dollars' ? (alert.value / 100).toFixed(2) : ''
-    )
-    setThresholdPctPay(alert?.mode === 'pct' ? String(alert.value) : '')
-    setShowThresholdModal(true)
-  }, [payAmountCents])
-
-  // One mode wins: the inactive key is always zeroed, so `getSpendableAlert`
-  // never sees both floors set (schema v38 invariant).
-  const saveThreshold = useCallback(() => {
-    if (thresholdMode === 'pct') {
-      const pctTrimmed = thresholdPctPay.trim()
-      const pct = pctTrimmed === '' ? 0 : parseInt(pctTrimmed, 10)
-      setAppSetting(
-        SPENDABLE_ALERT_PCT_PAY_KEY,
-        String(Number.isNaN(pct) || pct < 0 || pct > 100 ? 0 : pct)
-      )
-      setAppSetting(SPENDABLE_ALERT_KEY, '0')
-    } else {
-      const trimmed = thresholdDollars.trim()
-      const cents = trimmed === '' ? 0 : Math.round(parseFloat(trimmed) * 100)
-      setAppSetting(
-        SPENDABLE_ALERT_KEY,
-        String(Number.isNaN(cents) ? 0 : Math.max(0, cents))
-      )
-      setAppSetting(SPENDABLE_ALERT_PCT_PAY_KEY, '0')
-    }
-    setShowThresholdModal(false)
-    setDataVersion((v) => v + 1)
-  }, [thresholdMode, thresholdDollars, thresholdPctPay])
 
   useEffect(() => {
     if (shouldShowDashboardTour()) {
@@ -597,108 +363,7 @@ export function Dashboard() {
         refreshKey={`${lastSyncCompletedAt}|${dataVersion}|${today}`}
         onChange={bumpDataVersion}
       />
-      <BalanceCards
-        spendableValue={spendableDisplayValue}
-        spendableSubtitle={spendableSubtitle}
-        spendableTone={spendableGradient}
-        spendableTooltip={spendableTooltip}
-        spendableAriaLabel={spendableAriaLabel}
-        onOpenAlert={openThresholdModal}
-        availableValue={formatSignedMoney(availableCents)}
-        availableSubtitle={availableProjectedSubtitle}
-        availableTooltip={availableTooltip}
-        forecastValue={forecastDisplayValue}
-        forecastSubtitle={forecastSubtitle}
-        forecastTone={forecastGradient}
-        forecastTooltip={forecastTooltip}
-      />
-      {essentialsCoverage && (
-        <EssentialsCoverageBlock coverage={essentialsCoverage} />
-      )}
       {dueSoonAlert}
-
-      <Modal
-        show={showThresholdModal}
-        onHide={() => setShowThresholdModal(false)}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Spendable alert threshold</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3" style={{ fontSize: '0.85rem' }}>
-            Alert when Spendable drops below a floor — the card turns red.
-            Choose <strong>one</strong>: a dollar amount or a percentage of your
-            pay. Leave the chosen field empty or 0 to disable the alert.
-          </p>
-          <div className="d-flex align-items-center gap-2 mb-3">
-            <Form.Check
-              type="radio"
-              name="threshold-mode"
-              id="threshold-mode-dollars"
-              label="Dollar amount"
-              checked={thresholdMode === 'dollars'}
-              onChange={() => setThresholdMode('dollars')}
-              style={{ minWidth: '8.5rem' }}
-            />
-            <div className="input-group" style={{ maxWidth: '10rem' }}>
-              <span className="input-group-text">$</span>
-              <Form.Control
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="250.00"
-                value={thresholdDollars}
-                disabled={thresholdMode !== 'dollars'}
-                onChange={(e) => setThresholdDollars(e.target.value)}
-                aria-label="Alert when Spendable is below this dollar amount"
-              />
-            </div>
-          </div>
-          <div className="d-flex align-items-center gap-2">
-            <Form.Check
-              type="radio"
-              name="threshold-mode"
-              id="threshold-mode-pct"
-              label="% of pay"
-              checked={thresholdMode === 'pct'}
-              disabled={payAmountCents == null}
-              onChange={() => setThresholdMode('pct')}
-              style={{ minWidth: '8.5rem' }}
-            />
-            <div className="input-group" style={{ maxWidth: '10rem' }}>
-              <Form.Control
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                placeholder="50"
-                value={thresholdPctPay}
-                disabled={thresholdMode !== 'pct' || payAmountCents == null}
-                onChange={(e) => setThresholdPctPay(e.target.value)}
-                aria-label="Alert when Spendable is below this percent of pay amount"
-              />
-              <span className="input-group-text">%</span>
-            </div>
-          </div>
-          <Form.Text className="text-muted d-block mt-2">
-            {payAmountCents == null
-              ? 'Set a Pay amount in Settings to use “% of pay”.'
-              : 'The floor is your pay amount × this percentage.'}
-          </Form.Text>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowThresholdModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={saveThreshold}>
-            Save
-          </Button>
-        </Modal.Footer>
-      </Modal>
 
       <Modal
         show={showCustomiseModal}

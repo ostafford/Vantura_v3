@@ -3,7 +3,6 @@ import { Form } from 'react-bootstrap'
 import { AboutSection } from './settings/AboutSection'
 import { AppearanceSection } from './settings/AppearanceSection'
 import { PaydaySection } from './settings/PaydaySection'
-import { EssentialsSection } from './settings/EssentialsSection'
 import { DashboardSectionOrderForm } from './settings/DashboardSectionOrderForm'
 import { SecuritySection } from './settings/SecuritySection'
 import { DataSection } from './settings/DataSection'
@@ -16,7 +15,6 @@ function getSettingsSectionKeys(): string[] {
     'about',
     'appearance',
     'payday',
-    'essentials',
     'dashboard-sections',
     'security',
     'data',
@@ -27,7 +25,6 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
   about: 'About',
   appearance: 'Appearance',
   payday: 'Payday',
-  essentials: 'Essentials',
   'dashboard-sections': 'Dashboard sections',
   security: 'Security',
   data: 'Data',
@@ -37,7 +34,6 @@ const SETTINGS_SECTION_ICONS: Record<string, string> = {
   about: 'mdi-information-outline',
   appearance: 'mdi-palette-outline',
   payday: 'mdi-calendar-today',
-  essentials: 'mdi-piggy-bank-outline',
   'dashboard-sections': 'mdi-view-dashboard-outline',
   security: 'mdi-shield-lock-outline',
   data: 'mdi-database-outline',
@@ -143,7 +139,6 @@ export function Settings() {
               {activeSection === 'about' && <AboutSection />}
               {activeSection === 'appearance' && <AppearanceSection />}
               {activeSection === 'payday' && <PaydaySection />}
-              {activeSection === 'essentials' && <EssentialsSection />}
               {activeSection === 'dashboard-sections' && (
                 <>
                   <p className="small text-muted mb-3">

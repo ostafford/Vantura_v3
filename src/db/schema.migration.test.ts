@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(58)
+    expect(SCHEMA_VERSION).toBe(59)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -379,9 +379,11 @@ function readSetting(db: Database, key: string): string | null {
   return v != null ? String(v) : null
 }
 
+// v38 collapsed the Spendable alert's two floors to one. v59 (#211) removes
+// both keys, so all that's left to check is that the ladder still runs from
+// a v37 alert to that end state.
 describe('v38 migration: collapse the Spendable alert to a single floor', () => {
-  it('zeros the dollar floor when the % of pay floor was the higher (effective) one', () => {
-    // pay 5000.00, 50% => 2500.00 pct floor > 1000.00 dollar floor
+  it('runs from a two-floor v37 alert to no alert keys once v59 has run', () => {
     const db = buildLegacyV37Database({
       pay_amount_cents: '500000',
       spendable_alert_below_cents: '100000',
@@ -391,79 +393,11 @@ describe('v38 migration: collapse the Spendable alert to a single floor', () => 
     runMigrations(db)
 
     expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
-    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('0')
-    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('50')
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBeNull()
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBeNull()
+    expect(readSetting(db, 'pay_amount_cents')).toBe('500000')
 
     db.close()
-  })
-
-  it('zeros the % of pay floor when the dollar floor was the higher (effective) one', () => {
-    // pay 5000.00, 50% => 2500.00 pct floor < 3000.00 dollar floor
-    const db = buildLegacyV37Database({
-      pay_amount_cents: '500000',
-      spendable_alert_below_cents: '300000',
-      spendable_alert_below_pct_pay: '50',
-    })
-
-    runMigrations(db)
-
-    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('300000')
-    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
-
-    db.close()
-  })
-
-  it('keeps the dollar floor on a tie', () => {
-    // pay 5000.00, 50% => 2500.00 pct floor == 2500.00 dollar floor
-    const db = buildLegacyV37Database({
-      pay_amount_cents: '500000',
-      spendable_alert_below_cents: '250000',
-      spendable_alert_below_pct_pay: '50',
-    })
-
-    runMigrations(db)
-
-    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('250000')
-    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
-
-    db.close()
-  })
-
-  it('keeps the dollar floor when there is no pay amount to evaluate the % floor against', () => {
-    const db = buildLegacyV37Database({
-      spendable_alert_below_cents: '100000',
-      spendable_alert_below_pct_pay: '50',
-    })
-
-    runMigrations(db)
-
-    expect(readSetting(db, 'spendable_alert_below_cents')).toBe('100000')
-    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBe('0')
-
-    db.close()
-  })
-
-  it('leaves a single configured floor untouched', () => {
-    const dollarsOnly = buildLegacyV37Database({
-      spendable_alert_below_cents: '150000',
-      spendable_alert_below_pct_pay: '0',
-    })
-    runMigrations(dollarsOnly)
-    expect(readSetting(dollarsOnly, 'spendable_alert_below_cents')).toBe(
-      '150000'
-    )
-    expect(readSetting(dollarsOnly, 'spendable_alert_below_pct_pay')).toBe('0')
-    dollarsOnly.close()
-
-    const pctOnly = buildLegacyV37Database({
-      pay_amount_cents: '500000',
-      spendable_alert_below_cents: '0',
-      spendable_alert_below_pct_pay: '25',
-    })
-    runMigrations(pctOnly)
-    expect(readSetting(pctOnly, 'spendable_alert_below_cents')).toBe('0')
-    expect(readSetting(pctOnly, 'spendable_alert_below_pct_pay')).toBe('25')
-    pctOnly.close()
   })
 
   it('is a no-op (beyond the version bump) when no alert is configured, and is idempotent', () => {
@@ -539,16 +473,15 @@ describe('v39 migration: drop dead is_subscription column', () => {
       ])
     )
 
-    // (charge_type is v55's to drop, #209.)
+    // (charge_type is v55's to drop, #209; is_reserved is v59's, #211.)
     const row = db.exec(
-      `SELECT name, amount, frequency, next_charge_date, is_reserved, reminder_days_before FROM upcoming_charges`
+      `SELECT name, amount, frequency, next_charge_date, reminder_days_before FROM upcoming_charges`
     )
     expect(row[0].values[0]).toEqual([
       'Netflix',
       1999,
       'MONTHLY',
       '2026-02-01',
-      1,
       3,
     ])
 
@@ -1556,6 +1489,10 @@ describe('v55 migration: Net Worth cut (#209)', () => {
   function buildV54WithNetWorth(): Database {
     const db = new SQL.Database()
     runSchema(db)
+    // A v54 Regular still had is_reserved (v59's to drop, #211).
+    db.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN is_reserved INTEGER DEFAULT 1`
+    )
     db.run(
       `ALTER TABLE upcoming_charges ADD COLUMN charge_type TEXT NOT NULL DEFAULT 'EXPENSE'`
     )
@@ -1620,8 +1557,9 @@ describe('v55 migration: Net Worth cut (#209)', () => {
     return db
   }
 
+  // is_reserved is left out: v59 drops it (#211).
   const REGULAR_COLUMNS = `id, name, amount, frequency, next_charge_date, category_id,
-    is_reserved, reminder_days_before, cancel_by_date, created_at, bucket_id,
+    reminder_days_before, cancel_by_date, created_at, bucket_id,
     match_raw_text, match_description`
 
   it('drops manual_accounts, net_worth_snapshots and the two liability columns', () => {
@@ -1665,7 +1603,6 @@ describe('v55 migration: Net Worth cut (#209)', () => {
       'FORTNIGHTLY',
       '2026-10-09',
       null,
-      1,
       3,
       '2027-06-30',
       '2026-01-01',
@@ -1929,6 +1866,120 @@ describe('v58 migration: dead tables dropped (#210)', () => {
     runSchema(db)
     expect(tableExists(db, 'budget_transaction_anchors')).toBe(false)
     expect(tableExists(db, 'future_items')).toBe(false)
+    db.close()
+  })
+})
+
+describe('v59 migration: Spendable cut (#211)', () => {
+  const columns = (db: Database) =>
+    db
+      .exec(`PRAGMA table_info(upcoming_charges)`)[0]
+      .values.map((r) => String(r[1]))
+
+  // Every column a Regular keeps, so the test can show none of it changed.
+  const KEPT_COLUMNS = `id, name, amount, frequency, next_charge_date, category_id,
+    reminder_days_before, cancel_by_date, created_at, bucket_id,
+    match_raw_text, match_description`
+
+  /**
+   * A v58 database with Spendable in use: one Regular included, one excluded,
+   * a paid mark, both alert keys, an Essentials nomination, and settings that
+   * must survive (including near-miss keys).
+   */
+  function buildV58WithSpendable(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(
+      `ALTER TABLE upcoming_charges ADD COLUMN is_reserved INTEGER DEFAULT 1`
+    )
+    db.run(
+      `INSERT INTO budget_buckets (id, name, icon, sort_order, created_at)
+       VALUES (4, 'Bills', 'mdi-wallet', 0, '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO upcoming_charges
+         (id, name, amount, frequency, next_charge_date, category_id, is_reserved,
+          reminder_days_before, cancel_by_date, created_at, bucket_id,
+          match_raw_text, match_description)
+       VALUES
+         (1, 'Synthetic rent', 180000, 'MONTHLY', '2026-11-01', NULL, 1,
+          5, NULL, '2026-01-01', 4, 'RENT RAW', 'RENT'),
+         (2, 'Synthetic domain', 1500, 'YEARLY', '2027-03-01', NULL, 0,
+          NULL, '2027-02-01', '2026-01-02', NULL, NULL, NULL)`
+    )
+    db.run(
+      `INSERT INTO regular_paid_marks (regular_id, occurrence_date, marked_at)
+       VALUES (1, '2026-11-01', '2026-11-02T09:00:00Z')`
+    )
+    for (const [key, value] of [
+      ['spendable_alert_below_cents', '50000'],
+      ['spendable_alert_below_pct_pay', '0'],
+      ['essentials_saver_account_id', 'saver-1'],
+      ['pay_amount_cents', '450000'],
+      ['next_payday', '2026-11-15'],
+      ['spendable_alert_below_cents_extra', 'keep'],
+    ]) {
+      db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [
+        key,
+        value,
+      ])
+    }
+    db.run(`UPDATE app_settings SET value = '58' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  it('drops is_reserved, the alert keys and the Essentials nomination', () => {
+    const db = buildV58WithSpendable()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(columns(db)).not.toContain('is_reserved')
+    expect(readSetting(db, 'spendable_alert_below_cents')).toBeNull()
+    expect(readSetting(db, 'spendable_alert_below_pct_pay')).toBeNull()
+    expect(readSetting(db, 'essentials_saver_account_id')).toBeNull()
+    // Other settings, including a near-miss key, stay.
+    expect(readSetting(db, 'pay_amount_cents')).toBe('450000')
+    expect(readSetting(db, 'next_payday')).toBe('2026-11-15')
+    expect(readSetting(db, 'spendable_alert_below_cents_extra')).toBe('keep')
+    db.close()
+  })
+
+  it('keeps every Regular and the rest of its data, included or not', () => {
+    const db = buildV58WithSpendable()
+    const before = db.exec(
+      `SELECT ${KEPT_COLUMNS} FROM upcoming_charges ORDER BY id`
+    )[0].values
+
+    runMigrations(db)
+
+    expect(
+      db.exec(`SELECT ${KEPT_COLUMNS} FROM upcoming_charges ORDER BY id`)[0]
+        .values
+    ).toEqual(before)
+    expect(before).toHaveLength(2)
+    expect(
+      db.exec(`SELECT regular_id, occurrence_date FROM regular_paid_marks`)[0]
+        .values
+    ).toEqual([[1, '2026-11-01']])
+    db.close()
+  })
+
+  it('runs on a v58 database without the column or keys, and is idempotent', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`UPDATE app_settings SET value = '58' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    db.run(`UPDATE app_settings SET value = '58' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+
+  it('creates no is_reserved column on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(columns(db)).not.toContain('is_reserved')
     db.close()
   })
 })

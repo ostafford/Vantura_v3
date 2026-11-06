@@ -3,7 +3,8 @@
  * A former liability repayment is kept as an ordinary Regular. After the v55
  * migration it must count everywhere exactly like a plain Regular with the
  * same amount, frequency and date: in the Budget Plan's Committed, in
- * Reserved (Spendable), in the month's occurrences and in due-soon.
+ * Still to go out's Regulars not paid yet, in the month's occurrences and in
+ * due-soon.
  */
 import {
   describe,
@@ -31,9 +32,11 @@ vi.mock('@/db', () => ({
 
 const { runSchema, runMigrations } = await import('@/db/schema')
 const { getBucketTotalCents } = await import('./budgetBuckets')
-const { getReservedAmount } = await import('./balance')
-const { regularOccurrencesInMonth, dueSoonRegulars, reservedBeforePayday } =
-  await import('./regulars')
+const {
+  regularOccurrencesInMonth,
+  regularOccurrencesPaidInMonth,
+  dueSoonRegulars,
+} = await import('./regulars')
 
 const LOAN = 'Synthetic car loan'
 const TWIN = 'Synthetic twin'
@@ -49,9 +52,13 @@ beforeEach(() => {
   appSettings['next_payday'] = '2026-11-27'
   appSettings['payday_frequency'] = 'MONTHLY'
 
-  // A v54 database: today's schema plus the two columns v55 drops.
+  // A v54 database: today's schema plus the two columns v55 drops and the
+  // one v59 drops.
   db = new SQL.Database()
   runSchema(db)
+  db.run(
+    `ALTER TABLE upcoming_charges ADD COLUMN is_reserved INTEGER DEFAULT 1`
+  )
   db.run(
     `ALTER TABLE upcoming_charges ADD COLUMN charge_type TEXT NOT NULL DEFAULT 'EXPENSE'`
   )
@@ -102,14 +109,16 @@ describe('a former liability repayment after the v55 migration (#209)', () => {
     expect(dates(LOAN)).toEqual(dates(TWIN))
   })
 
-  it('is reserved before payday like its plain twin', () => {
-    const reserved = (name: string) =>
-      reservedBeforePayday({ excludeEssentialsFunded: true })
-        .filter((r) => r.regular.name === name)
-        .map((r) => [r.projectedDate, r.occurrenceCount, r.reservedAmount])
-    expect(reserved(LOAN)).toEqual([['2026-11-06', 2, 90000]])
-    expect(reserved(LOAN)).toEqual(reserved(TWIN))
-    expect(getReservedAmount()).toBe(2 * 2 * 45000)
+  it("is not paid yet this month like its plain twin (Still to go out's Regulars)", () => {
+    const unpaid = (name: string) =>
+      regularOccurrencesPaidInMonth('2026-11')
+        .filter((o) => o.regular.name === name && !o.paid)
+        .map((o) => [o.date, o.regular.amount])
+    expect(unpaid(LOAN)).toEqual([
+      ['2026-11-06', 45000],
+      ['2026-11-20', 45000],
+    ])
+    expect(unpaid(LOAN)).toEqual(unpaid(TWIN))
   })
 
   it('shows in due-soon like its plain twin', () => {

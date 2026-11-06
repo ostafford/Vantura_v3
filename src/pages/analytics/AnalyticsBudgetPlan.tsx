@@ -371,7 +371,7 @@ export function AnalyticsBudgetPlan() {
     [bucketSummaries]
   )
 
-  const freeSpendingCents =
+  const unallocatedCents =
     incomeCents != null ? incomeCents - totalOutgoingCents : null
 
   const periodLabel =
@@ -424,7 +424,7 @@ export function AnalyticsBudgetPlan() {
               style={{ maxWidth: 480, margin: '0 auto' }}
             >
               At a glance you will always see your total outgoing, your income,
-              and exactly how much free spending money you have left.
+              and how much of your income no bucket plans for yet.
             </p>
             <Button variant="primary" onClick={openCreate}>
               <i className="mdi mdi-plus me-1" aria-hidden />
@@ -468,7 +468,7 @@ export function AnalyticsBudgetPlan() {
           <HelpPopover
             id="budget-plan-help"
             title="Budget Plan"
-            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Free Spending. Set your pay amount in Settings → Payday to enable the Income figure."
+            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Unallocated: the Income no bucket plans for. Set your pay amount in Settings → Payday to enable the Income figure."
             ariaLabel="How does Budget Plan work?"
           />
         </div>
@@ -645,7 +645,7 @@ export function AnalyticsBudgetPlan() {
         </Card>
       )}
 
-      {/* Income / Outgoing / Free Spending footer */}
+      {/* Income / Committed / Unallocated footer */}
       <Card>
         <Card.Body>
           <Row className="g-3 text-center mb-3">
@@ -682,19 +682,19 @@ export function AnalyticsBudgetPlan() {
             </Col>
             <Col xs={12} sm={4}>
               <div className="text-muted small mb-1">
-                Free spending ({periodLabel})
+                Unallocated ({periodLabel})
               </div>
-              {freeSpendingCents != null ? (
+              {unallocatedCents != null ? (
                 <div
                   className="fw-bold fs-5"
                   style={{
                     color:
-                      freeSpendingCents >= 0
+                      unallocatedCents >= 0
                         ? 'var(--vantura-success-text)'
                         : 'var(--vantura-danger-text)',
                   }}
                 >
-                  {formatSignedMoney(freeSpendingCents)}
+                  {formatSignedMoney(unallocatedCents)}
                 </div>
               ) : (
                 <div className="text-muted small">Set income to calculate</div>
@@ -719,10 +719,10 @@ export function AnalyticsBudgetPlan() {
                   now={Math.min(100, (totalOutgoingCents / incomeCents) * 100)}
                   key={1}
                 />
-                {freeSpendingCents != null && freeSpendingCents > 0 && (
+                {unallocatedCents != null && unallocatedCents > 0 && (
                   <ProgressBar
                     variant="secondary"
-                    now={(freeSpendingCents / incomeCents) * 100}
+                    now={(unallocatedCents / incomeCents) * 100}
                     style={{ opacity: 0.2 }}
                     key={2}
                   />
@@ -733,7 +733,7 @@ export function AnalyticsBudgetPlan() {
                   Committed
                 </span>
                 <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                  Free
+                  Unallocated
                 </span>
               </div>
             </>
