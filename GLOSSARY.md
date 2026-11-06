@@ -2,215 +2,166 @@
 
 Vantura is a local-first personal finance app for Up Bank customers. This is the
 project glossary: the canonical word for each domain concept, and the words to
-avoid. It is grown one feature at a time as the docs are rebuilt — right now it
-covers the **Dashboard**, **pay** and the **payday cycle**, the balance figures,
-**Actual spending** and **attribution**, **trackers**, **transactions**, **Regulars**, **budget plan**,
-**savers**, the month/period **comparisons** and **reports**, the **weekly
-metrics**, **net worth**, **sync**, **notifications**, **appearance**, **security**,
-the **Settings** shell, and **profile export/import**. Implementation lives
-in `docs/features/`; decisions live in `docs/adr/`.
+avoid. It covers **spending and income**, the **Dashboard** and **Headroom**, the
+**Budget Plan**, **Regulars**, **Trackers**, **transactions**, **Savers**, **sync**,
+**security**, **Settings**, **appearance** and **motion**. Implementation lives in
+`docs/features/`; decisions live in `docs/adr/`.
 
 ## Language
 
-### Balance figures
+### Spending and income
 
-**Available**:
-The sum of balances across the user's open Up Bank *transactional* accounts. Saver accounts are never included. Held (authorised-but-unsettled) transactions are already netted out by Up Bank, so Vantura does not deduct them again.
-_Avoid_: balance, bank balance, total balance, current balance
+**Actual spending**:
+What a period really cost: Up purchases and payments out (held or settled) on the Spending account and every Saver, minus refunds, by Display date in local time. Round-ups don't count. Transfers between your own accounts, Round Up rows, joint accounts, pay, interest and any other uncategorised money in are not spending. Can be negative when refunds outweigh purchases, and is never clamped. The one definition behind Trackers, attribution, Headroom and Month at a glance. The line falls at "Up put it in a category" because a categorised credit undoes a purchase Vantura can place; an uncategorised one points at no purchase, so counting a friend's repayment would be a guess. The accepted cost: a split bill shows as the whole bill, which overstates spending rather than understating it.
+_Avoid_: money out (the screen label), spend, expenses, debits
 
-**Reserved**:
-The part of Available that must be held back to cover `is_reserved` Regulars falling due *strictly before* the next payday. A charge due *on* payday is not reserved — that day's incoming pay covers it. Weekly/fortnightly charges count once per occurrence before payday; infrequent charges (monthly and rarer) count their full amount once, never prorated. A safety-net floor, not a save-toward-a-future-bill fund (`docs/adr/0019`). For an Essentials user, a Regular funded from the nominated Essentials Saver is excluded from Reserved entirely — it's covered from there, not from Available. A Regular with `is_reserved` off is excluded from Reserved regardless of funding source.
-_Avoid_: allocated, committed, earmarked, set-aside, provisioned, sinking fund
+**Refund**:
+A positive Up amount that carries a category. It reduces Actual spending in that category, in the month it lands, never the month of the original purchase.
+_Avoid_: credit, reversal, money back
 
-**Spendable**:
-Vantura's central safety-net figure: Available minus Reserved. Deliberately conservative — it is never a false "green light" to spend. The Up Bank API is ground truth beneath it.
-_Avoid_: safe-to-spend, disposable, leftover, free cash, remaining
-
-**Forecast**:
-Spendable minus the remaining budget of every active tracker's current period — what stays safe if the user spends every tracker to its limit. Assumes no future tracker resets and no spending pace.
-_Avoid_: projected spendable, predicted balance, estimated spendable
-
-### Pay and payday
+**Money in**:
+Positive, non-transfer Up amounts with no category: pay, interest, money from people. Shown beside Money out on Month at a glance. Refunds aren't money in; they reduce Actual spending instead.
+_Avoid_: income (that's the Settings-based figure), deposits, credits
 
 **Pay amount**:
-The take-home amount of one pay (`pay_amount_cents`), as the user entered it. Optional. Income is built from it; it also drives the cards' "after payday" projections and the percent-of-pay alert floor.
+The take-home amount of one pay, as the user entered it. Optional; without it, every figure built on Income shows a prompt to set it instead of a number.
 _Avoid_: salary, wage, Income (that's the monthly figure)
 
 **Pay frequency**:
-How often the user is paid: `WEEKLY`, `FORTNIGHTLY` or `MONTHLY`. Stored as `payday_frequency`; the key name is historical. With Pay amount, the only pay setting that outlives the payday date (#195).
-_Avoid_: payday frequency, pay cycle
+How often the pay amount arrives: weekly, fortnightly or monthly. With Pay amount, the only pay setting that outlives the payday date (#195).
+_Avoid_: payday frequency, pay cycle, pay schedule
 
 **Income**:
-The user's planned monthly income: Pay amount × pays per month (52/12 weekly, 26/12 fortnightly, 1 monthly). Taken from settings, not transactions, so it's the same every month. "Not set", never $0, when the Pay amount or Pay frequency isn't set. In a month with an extra pay (five weekly or three fortnightly pays) it comes in about one pay under what actually arrived. Budget Plan's Weekly / Yearly views rescale the same pay until #179 removes the toggle.
+Pay amount × the average number of pays in a month for the pay frequency (52/12 weekly, 26/12 fortnightly, 1 monthly). The same every month; never detected from deposits. "Not set", never $0, when the Pay amount or Pay frequency isn't set. A month with an extra pay therefore understates what was really left over.
 _Avoid_: Money in (that's what actually arrived), salary, earnings, pay (bare)
 
-**Payday cycle**:
-The user's pay schedule: Pay frequency, a day, and `next_payday` (always kept strictly in the future). Anchors Spendable, Reserved and Projected net worth. Being retired: the day and `next_payday` go with #195, once the features that read them are cut. While it exists it is an explicit, user-confirmed fact. The app never infers or guesses it, and a request that needs it without it configured fails loudly rather than falling back to a default.
-_Avoid_: pay period (for the config), pay schedule, salary cycle
-
-**Relative payday rule**:
-A `payday_day` value of 100–105 encoding "last «weekday» of the month" — 100 = last business day, 101–105 = last Monday…Friday. Exists because a fixed day-of-month can't express "paid on the last business day." Goes with the payday date (#195).
-_Avoid_: floating payday, dynamic payday
-
-### Trackers
-
-**Tracker**:
-A user-defined budget over one or more Up Bank categories — a name, a budget amount, a reset cycle, and the categories whose spending counts against it. A personalised lens on already-categorised transaction data, not a separate data store. A category belongs to at most one active tracker (`docs/adr/0003`).
-_Avoid_: budget (bare — reserve for the amount), category group, envelope
-
-**Reset cycle**:
-How often a tracker's budget starts over: `WEEKLY`, `FORTNIGHTLY` or `MONTHLY`, each on its own reset day (a weekday, or day-of-month 1–28). `PAYDAY` was removed in #192; existing PAYDAY trackers and their config history became `MONTHLY`, day 1.
-_Avoid_: reset frequency (in prose — it is the column name, not the term), billing cycle, period type
-
-**Tracker period**:
-The half-open date window `[last_reset_date, next_reset_date)` a tracker's spend is currently measured in. Advanced by the reset engine once `next_reset_date` passes.
-_Avoid_: cycle, window, budget period
-
-**Config history**:
-The per-tracker timeline of budget-amount and category-set versions (`tracker_config_history`), each with an `effective_from` date. A budget or category edit takes effect the next day and the current tracker period **splits** at that boundary — the part before the change stays judged against the old config, the part after against the new one, each segment's budget prorated by its share of the period's days. Not retroactive, not blended. Current-period only; past periods are unaffected (`docs/adr/0014`).
-_Avoid_: audit log, revision history, effective budget (that is the derived `effectiveBudget` number, not this timeline)
-
-### Transactions
-
-**Display date**:
-`created_at ?? settled_at` — the date Vantura uses for a transaction everywhere: range filters, date grouping, sort, tracker periods, and the month a transaction counts in. Matches the Up app's own choice. Not the settled date.
-_Avoid_: transaction date (ambiguous), posted date, settled date
-
-**Transaction user data**:
-The local overlay of things a user adds to a synced transaction — currently just a note — stored in its own table, never on the transaction row, never touched by sync. A row exists only while it carries a note (`docs/adr/0008`). A `user_category_override` field was tried and dropped in schema v43 / `#27` (never written, never consulted by any query); category changes go through an Up PATCH instead.
-_Avoid_: transaction metadata, annotations, custom fields
-
-### Spending
-
-**Actual spending**:
-The one definition of money the user spent, used by every figure that sums spending: Money out, a Tracker's spending, and attribution. Purchases and payments out from the Spending account or any Saver, categorised or not, less refunds (money back that Up has put in a category). It counts from the moment it leaves the balance (HELD or SETTLED), in the month of its Display date. The total is signed: refunds can take it below zero, and it is never clamped. Excluded: transfers between the user's own accounts, Round Up rows, joint accounts, and money in that Up hasn't categorised (pay, interest, money from people). The line falls at "Up put it in a category" because a categorised credit undoes a purchase Vantura can place; an uncategorised one points at no purchase, so counting a friend's repayment would be a guess. The accepted cost: a split bill shows as the whole bill, which overstates spending rather than understating it.
-_Avoid_: money out (the screen label), spend, expenses, debits
-
 **Round-up**:
-The amount Up adds to round a purchase up to the dollar, carried on the purchase itself (Up's `roundUp` attribute; `round_up_amount`), never inferred from description text. The purchase counts at its own amount; the round-up is never added or subtracted, and a rounded purchase is never treated as a transfer.
+A Spending-account round-up contribution, identified only by the Up API's `roundUp` attribute — never inferred from description text. Up records each one as its own Round Up row; the purchase's own amount already excludes it, so a rounded purchase counts at its own amount and is never treated as a transfer.
 _Avoid_: round up transfer, spare change, micro-saving
 
 **Round Up row**:
-Up's separate transaction that moves round-up money (`transaction_type = 'Round Up'`), usually a credit into a Saver and sometimes a debit on Spending. Never Actual spending, whatever its transfer account: a few carry none, so the transfer exclusion alone would let them through.
+Up's separate transaction that moves round-up money, usually a credit into a Saver and sometimes a debit on the Spending account. Never Actual spending, whatever its transfer account: a few carry none, so the transfer rule alone would let them through.
 _Avoid_: round-up (bare), round-up transfer
 
-**Attribution**:
-The rule for where each Actual spending transaction counts in a calendar month: exactly one place, in this order. (1) The Regular it's a Linked payment of. (2) Otherwise, the active Tracker whose categories, as they stood on its Display date, include its category. (3) Otherwise, Unplanned. Refunds skip step 1. If two Trackers own the category on that day (only possible through overlapping config history), neither takes it and it goes to Unplanned. So Regulars + Trackers + Unplanned always equals the month's Actual spending. Computed on every read (`docs/adr/0022`).
-_Avoid_: allocation, categorisation, matching
+**Defined percentage**:
+A percentage is shown only when it has a defined meaning. A change needs both figures above zero. A share of a budget needs both the spend and the budget above zero. Otherwise the dollar figure stands alone, never 0% and never clamped. So a change from $100 to −$50 shows the dollar change, not "down 150%", and a tracker with $0 spent shows no percentage. Over 100% is shown as it is.
+_Avoid_: percentage guard, N/A %
 
-**Unplanned**:
-Actual spending in a month that no Regular or Tracker took under attribution. It means "not covered by the plan", not "unexpected": a routine grocery shop in a category with no Tracker is Unplanned. Broken down by Up parent category, then subcategory, plus an Uncategorised row. A row can go negative when refunds exceed purchases.
-_Avoid_: unbudgeted, other, miscellaneous, unexpected
+### Dashboard
+
+**Headroom**:
+On hand minus Still to go out: what's left of the money you have once this calendar month's remaining bills and tracker budgets have gone out. Can be negative, and is never clamped; a negative figure is the shortfall signal. Shown on the Dashboard only.
+_Avoid_: Spendable, safe to spend, available, free cash, leftover
+
+**On hand**:
+The live Up balance of the Spending account plus every Saver switched on for it. A Saver that first appears on a sync starts switched off, so Headroom never moves without the user's say-so.
+_Avoid_: Available, balance, total balance, cash
+
+**Still to go out**:
+What's still expected to leave this calendar month: every Regular occurrence due this month that isn't paid yet (overdue ones included), plus each Tracker's Left. Counts every Regular and active Tracker, in a bucket or not. Unplanned spending isn't forecast.
+_Avoid_: Reserved, Still planned, committed, upcoming, remaining
+
+**Left**:
+A Tracker's planned amount for the calendar month minus its Actual spending, floored at $0, so one tracker's overspend never cancels another's remainder. Summed as "Left in trackers". A Tracker word only.
+_Avoid_: remaining, available, balance
+
+**Free spending so far**:
+Income minus Actual spending for the calendar month to date. Shown in the Headroom card. Not Unallocated, which is Income minus Committed.
+_Avoid_: Unallocated, Headroom, leftover, remaining
+
+**Dashboard section**:
+One of the rearrangeable blocks below Headroom: Month at a glance, Trackers, Regulars. Each has a per-browser order, size and visibility. Order is editable on the Dashboard *and* in Settings; size and visibility only on the Dashboard — an intentional split. Headroom is fixed above them.
+_Avoid_: widget, panel, module
+
+**Stale data**:
+Synced Up Bank data whose last sync was 30 minutes or more ago, or that has never synced. What the app does about it is in `docs/features/sync/OVERVIEW.md`.
+_Avoid_: outdated, expired, old data
 
 ### Budget Plan
 
 **Budget Plan**:
-The forward-looking organiser at `/analytics/budget` — buckets of recurring expenses, "what if" hypothetical lines, and an Income / Committed / Free Spending footer, all rescaled by a Weekly / Monthly / Yearly display-period toggle. A glanceable ledger, not a heavy planner.
+The page where Regulars and Trackers are grouped into buckets against Income, with an Income / Committed / Unallocated summary rescaled by a Weekly / Monthly / Yearly toggle.
 _Avoid_: budget, planner, forecast
 
 **Bucket**:
-A named group within Budget Plan (`name` + `icon`). Holds assigned Regulars, assigned trackers, and hypothetical lines side by side. A tracker or charge is claimed by the bucket, not assigned from its own side.
+A named group of Regulars and Trackers on the Budget Plan. Being in a bucket decides what an item contributes to Committed; it never decides which spending the item owns.
 _Avoid_: category, group, envelope, folder
 
-**Hypothetical line**:
-A "what if this expense existed" amount added to a bucket. It counts toward the bucket's and the page's Committed total (so the user sees its impact), is flagged with a flask icon, and can be removed with no effect on any real transaction or charge.
-_Avoid_: draft, scenario, placeholder expense
+**Committed**:
+The total the buckets' Regulars and Trackers come to for the selected display period. One-off Regulars don't count toward it (`docs/adr/0009`).
+_Avoid_: allocated, reserved, budgeted total
 
-**Free spending**:
-Income minus Committed for the selected display period. `null` (and hidden) whenever the pay amount isn't set. One-time (`ONCE`) charges never reduce it (`docs/adr/0009`).
-_Avoid_: disposable income, spare, remaining, leftover
+**Unallocated**:
+Income minus Committed for the selected display period: the part of Income that no bucket plans for. Shows a prompt instead of a number while Income isn't set. Not Free spending so far, which is Income minus Actual spending.
+_Avoid_: Free spending, spare, surplus, disposable income
+
+**Attribution**:
+The rule for where each Actual spending transaction counts in a calendar month: exactly one place, in this order. (1) The Regular it's a Linked payment of. (2) Otherwise, the active Tracker whose categories, as they stood on its Display date, include its category. (3) Otherwise, Unplanned. Refunds skip step 1. If two Trackers own the category on that day (only possible through overlapping config history), neither takes it and it goes to Unplanned. So Regulars + Trackers + Unplanned always equals the month's Actual spending. Computed on every read; buckets never decide it (`docs/adr/0022`).
+_Avoid_: allocation, categorisation, matching
+
+**Unplanned**:
+Actual spending in a month that no Regular or Tracker took under attribution. It means "not covered by the plan", not "unexpected": a routine grocery shop in a category with no Tracker is Unplanned. Can go negative when refunds exceed purchases.
+_Avoid_: unbudgeted, other, miscellaneous, unexpected
 
 ### Regulars
 
 **Regular**:
-A manually-entered future bill or subscription — name, amount, frequency, next date. Its stored date is never advanced; each read projects it forward to the next occurrence. Feeds Spendable (when `is_reserved`) and the due-soon banner. Named after Up's own term for the same concept (`docs/adr/0018`); internally still the `upcoming_charges` table.
+A bill or subscription you expect to pay: name, amount, frequency and date. Its stored date is never advanced; each read projects it forward to its occurrences. Feeds Still to go out, the Budget Plan and the due-soon banner. Named after Up's own term (`docs/adr/0018`).
 _Avoid_: upcoming charge, bill (bare), recurring transaction, scheduled payment
 
-**Overdue / This month / Later**:
-The three groups the Regulars list is split into, by date only; paid status doesn't affect them. *Overdue* = a `ONCE` charge whose date has passed with no future occurrence — held out of the other two (so it can't inflate their totals) and shown in its own callout with a Paid / Reschedule / Remove resolution (#18). *This month* = the next occurrence on or after today falls in the current calendar month. *Later* = the next occurrence is after this month.
-_Avoid_: Next pay, this pay period / future, urgent / non-urgent, upcoming / scheduled, arrears
-
-**Settlement detection**:
-Auto-clearing a bill's due notification when a linked payment for the Regular lands within 5 days before its projected date. Runs on app open.
-_Avoid_: reconciliation, matching, clearing
+**Occurrence**:
+One due date of a Regular. A one-off has exactly one.
+_Avoid_: instance, payment date, due item
 
 **Linked payment**:
-An Up debit that belongs to a Regular: its description is exactly the one the Regular is linked to, and its amount is within ±20% of the Regular's amount. A payment that would belong to two Regulars belongs to neither, and a refund is never one. Which debits are in scope depends on the reader: settled, non-transfer debits for settlement detection, funding source and liability-repayment prompts; HELD or SETTLED Actual spending debits, by Display date, for attribution (`docs/adr/0020`).
+A held or settled, non-transfer Up debit that belongs to a Regular: its description is exactly the one the Regular is linked to, and its amount is within ±20% of the Regular's amount. A payment that would belong to two Regulars belongs to neither, and a refund is never one (`docs/adr/0020`).
 _Avoid_: match, fingerprint, reconciled transaction
 
-**Funding source**:
-The account that pays a Regular: the account of its most recent linked payment. Unknown when it has none, and unknown is always treated as the transactional account, never as Essentials (`docs/adr/0019`).
-_Avoid_: paying account, source account
+**Paid**:
+An occurrence is paid when a Linked payment lands nearest to it (the earlier occurrence when two are equally near), or when the user has used **Mark paid** on it. Never assumed because its date has passed. Mark paid changes the status only, never Actual spending.
+_Avoid_: settled, cleared, reconciled
 
-**Liability repayment charge**:
-A Regular with `charge_type = LIABILITY_REPAYMENT` — a payment toward a tracked debt (`manual_accounts` liability), treated as net-worth-neutral rather than an expense. Excluded from the due-soon banner. When it is also linked to a manual liability account and to its payments, a linked payment raises a one-time prompt to reduce the linked liability's balance by the charge amount — the balance is only ever changed by the user confirming that prompt, never automatically (#19).
-_Avoid_: loan payment, debt payment, transfer
+**Overdue / This month / Later**:
+The groups the Regulars list is split into, one row per Regular, placed by its earliest unpaid occurrence. *Overdue*: before today in this calendar month, or a one-off from an earlier month still unpaid. *This month*: today to month end. *Later*: after this month, including a Regular whose occurrences this month are all paid.
+_Avoid_: next pay, urgent / non-urgent, upcoming / scheduled, arrears
 
-### Comparisons
+**Due soon**:
+A Regular whose earliest unpaid occurrence from today falls within the reminder window the user set for it. Shown in the Dashboard banner until it's paid or dismissed for the day.
+_Avoid_: reminder (that's the setting), alert, notification
 
-**Period comparison**:
-The generic engine (`getPeriodComparison`) that turns a current and a previous date range into Money in / Money out / Charges / Net deltas plus narrative sentences. It never derives "previous" itself — one caller per period type does (`getMonthComparison`, `getYearComparison`, `getWeekComparison`); a custom range has no caller yet. `docs/adr/0007`.
-_Avoid_: comparison report, delta engine, period diff
+### Trackers
 
-**Comparison narrative**:
-The generated win / challenge / opportunity sentences a period comparison produces ("Income is up $X vs March"). Shown on the Reports "what changed" card and the Month/Weekly at-a-glance cards.
-_Avoid_: insight text, summary, commentary
+**Tracker**:
+A user-defined budget over one or more Up Bank categories: a name, a budget amount, a reset cycle, and the categories whose Actual spending counts against it. A category belongs to at most one active tracker (`docs/adr/0003`).
+_Avoid_: budget (bare — reserve for the amount), category group, envelope
 
-**YTD comparison**:
-A period comparison for an in-progress year: Jan 1–today against Jan 1–the same day last year, not full year against full year. The only year-mode behaviour on the `/analytics` card; flagged to the user via `periodNote`.
-_Avoid_: partial-year comparison, annual comparison
+**Reset cycle**:
+How often a tracker's budget starts over: weekly, fortnightly or monthly, each on its own reset day (a weekday, or day-of-month 1–28). For Headroom and attribution a tracker is measured over the calendar month instead.
+_Avoid_: reset frequency (in prose), billing cycle, period type
 
-**Elapsed-day capping**:
-When comparing a period that is still in progress against the previous one, the baseline is capped to the *same number of elapsed days*, never the full previous period. So an 11-days-in month compares against days 1–11 of last month, not all of last month. Applied by both the month and the week comparisons.
-_Avoid_: partial-period adjustment, prorating, day alignment
+**Tracker period**:
+The half-open date window `[last_reset_date, next_reset_date)` a tracker's spending is currently measured in on Trackers' own screens.
+_Avoid_: cycle, window, budget period
 
-**Defined percentage**:
-A percentage is shown only when it has a defined meaning. A change needs both periods above zero; a share needs every part ≥ 0 and the total above zero. Otherwise the dollar figure stands alone, never 0% and never clamped. So a change from $100 to −$50 shows the dollar change, not "down 150%".
-_Avoid_: percentage guard, N/A %
+**Config history**:
+The per-tracker timeline of budget-amount and category-set versions, each with an effective-from date. A budget or category edit takes effect the next day and the current tracker period **splits** at that boundary — the part before the change stays judged against the old config, the part after against the new one, each segment's budget prorated by its share of the period's days. Not retroactive, not blended. Current-period only; past periods are unaffected (`docs/adr/0014`).
+_Avoid_: audit log, revision history, effective budget (that is the derived number, not this timeline)
 
-### Weekly metrics
+### Transactions
 
-The four figures on the Weekly Insights card. Each is measured over a local-time Monday–Sunday week, on the transaction display date.
+**Display date**:
+`created_at ?? settled_at`, in device local time: the date Vantura uses for a transaction everywhere — which month it counts in, range filters, grouping, sort, tracker periods. Matches the Up app. Not the settled date.
+_Avoid_: transaction date (ambiguous), posted date, settled date
 
-**Money in**:
-Up Bank money that arrived in the week: positive amounts that are not internal transfers (`source = 'up'`). Excludes money moved in from a saver. Not Income, which is the planned monthly figure. Known issue: it still includes categorised refunds, which Actual spending already subtracts, so Net counts a refund twice (#200).
-_Avoid_: income (bare), deposits, credits
+**Transaction user data**:
+The local overlay of things a user adds to a synced transaction — currently just a note — stored apart from the transaction, never touched by sync. It exists only while it carries a note (`docs/adr/0008`). Category changes go through Up instead.
+_Avoid_: transaction metadata, annotations, custom fields
 
-**Money out**:
-The screen label for Actual spending over the window shown (here, the week). Not a separate definition; #175 renames it "Spent".
-_Avoid_: Money out as a term; use Actual spending
+### Accounts and Savers
 
-**Charges (count)**:
-The number of debits in the week's Actual spending: one per purchase or payment out. Refunds aren't charges. Not a dollar figure.
-_Avoid_: transactions, payments made
-
-**Savers movement**:
-Net flow between spending and saver accounts for the week, sign-flipped so money moved *into* savers reads as a positive "saved" figure and money withdrawn reads negative.
-_Avoid_: savings, saver balance, transfers
-
-### Net worth
-
-**Net worth**:
-All synced Up Bank balances plus manual-account assets, minus manual-account liabilities. Up Bank home-loan debt (a negative synced balance) is folded in as a liability.
-_Avoid_: total balance, wealth, equity
-
-**Manual account**:
-A user-entered account Vantura does not sync — mortgage, super, property, credit card, HECS, other-bank savings, etc. Each has a `kind` of *asset* or *liability*, derived from its type at save time. Liability balances are stored as positive numbers.
-_Avoid_: external account, offline account, custom account
-
-**Net worth snapshot**:
-One `net_worth_snapshots` row per calendar day, last write wins, holding the three component sums (Up Bank, manual assets, manual liabilities) — never a stored total. The only net-worth history there is; feeds the trend chart.
-_Avoid_: history entry, balance record, daily total
-
-**Projected net worth**:
-Net worth minus the reserved `EXPENSE` Regulars due before the next payday, including those funded from the Essentials Saver, which still leave net worth even though they're excluded from Reserved. Excludes liability-repayment charges — those don't reduce net worth (`docs/adr/0005`).
-_Avoid_: forecast net worth, future net worth, adjusted net worth
-
-**Stale account**:
-A manual account whose balance hasn't been updated within its type's threshold (7 days for a credit card, up to 365 for property). Shown with an "≈ approximate" marker.
-_Avoid_: outdated account, unsynced account
-
-### Savers
+**Spending account**:
+Up's everyday transactional account. Its balance is always part of On hand.
+_Avoid_: transactional account (in prose), main account, everyday account
 
 **Saver**:
 An Up Bank account with `account_type = 'SAVER'`. No separate table — it's an `accounts` row. Optionally carries Vantura-side goals (see *Saver goal cycle*), independent of anything configured in Up.
@@ -250,24 +201,6 @@ _Avoid_: hard sync, force sync, deep sync
 An Up Bank transaction that is authorised but not yet settled. Each incremental sync re-checks any locally-HELD transaction that fell outside the `since` window, until it settles or is reversed.
 _Avoid_: pending (bare), unsettled, provisional
 
-### Notifications
-
-**Notification check**:
-One of the idempotent checks `runNotificationChecks()` runs on Dashboard mount. Each decides whether to add a history row (and fire an OS alert), gated by its type's toggle (all eight types default on) and its guard key.
-_Avoid_: alert rule, notification job, trigger
-
-**Notification guard key**:
-The `app_settings` key that stops a check re-firing. Two shapes: a *daily* guard stores today's date and re-arms each calendar day; a *fired-for-value* guard stores a watched value (a tracker reset date, a saver target, a payee key) and re-fires only when that value changes.
-_Avoid_: dedup key, lock, seen marker
-
-**Sticky notification**:
-A `bills_due` history row. It survives "clear non-sticky" and is removed only when settlement detection finds the matching payment — unlike every other type, which just ages out after 7 days.
-_Avoid_: pinned notification, persistent alert
-
-**What's New notification**:
-A `whats_new` history row seeded once per app version from the CHANGELOG. No toggle, not a check, guarded in `localStorage` — so it is not carried by profile export and re-seeds on a restored profile.
-_Avoid_: release note, changelog entry, update alert
-
 ### Security
 
 **Unlock passphrase**:
@@ -293,12 +226,16 @@ The state where `app_settings.demo_mode = '1'` — the DB holds seeded sample da
 _Avoid_: sample mode, test mode, preview mode
 
 **Profile export**:
-A passphrase-encrypted file holding a subset of the local data — whitelisted settings, trackers, Regulars, and budget plan. Never the API token, accounts (Up or manual), transactions, or net-worth history. The export passphrase is separate from the unlock passphrase.
+A passphrase-encrypted file holding a subset of the local data: whitelisted settings, trackers, Regulars and their paid marks, the Budget Plan, saver goals, and which Savers count in On hand. Never the API token, accounts or transactions. The export passphrase is separate from the unlock passphrase.
 _Avoid_: backup, snapshot, dump
 
 **Profile import**:
-Applying an export file as a per-section **replace** (delete-then-reinsert), never a merge (`docs/adr/0013`). Foreign keys are remapped through a fresh id map; cross-database references resolve by name or are dropped. Destructive to the sections chosen.
+Applying an export file as a per-section **replace** (delete-then-reinsert), never a merge (`docs/adr/0013`). Sections and settings belonging to removed features are skipped, and the user is told which. Destructive to the sections chosen.
 _Avoid_: restore, sync, merge
+
+**What's New**:
+The modal shown once per app version, listing what changed in that version. Not a notification.
+_Avoid_: release notes popup, update alert
 
 ### Appearance
 
@@ -321,7 +258,7 @@ The small allowance for expressive, noticeable motion — reserved for rare, hig
 _Avoid_: flourish, wow moment, polish budget
 
 **Interruptible motion**:
-Motion that retargets from its current position when re-triggered mid-flight instead of restarting — a CSS transition or spring, never a `@keyframes`. Required for anything rapidly triggered or reversible (a drawer spammed open/closed, a toggle). The notification drawer's `data-state` enter/exit is the reference (`docs/animation-plans/001-notification-drawer-enter-exit.md`).
+Motion that retargets from its current position when re-triggered mid-flight instead of restarting — a CSS transition or spring, never a `@keyframes`. Required for anything rapidly triggered or reversible (a drawer spammed open/closed, a toggle).
 _Avoid_: reversible animation, cancellable transition
 
 **1:1 tracking**:
@@ -331,21 +268,3 @@ _Avoid_: drag follow, pointer lock, live drag
 **Response-on-press**:
 Interactive elements acknowledge input on pointer-down, not on click/release — a button highlights the instant it's pressed. Feedback during an interaction is continuous, not deferred to the end.
 _Avoid_: press feedback delay, active-state lag
-
-### Dashboard
-
-**Balance card**:
-One of the three fixed figures at the top of the Dashboard: Available, Spendable, Forecast. Always present, not reorderable. Distinct from a Dashboard section.
-_Avoid_: stat, tile, widget
-
-**Dashboard section**:
-One of the five rearrangeable blocks below the balance cards: Month at a glance, Weekly insights, Trackers, Upcoming transactions, Net Worth. Each has a per-browser order, size, and visibility. Order is editable on the Dashboard *and* in Settings; size and visibility are editable only on the Dashboard — an intentional split, kept until a deliberate decision to move it.
-_Avoid_: widget, panel, module, card (reserve "card" for the balance cards)
-
-**Spendable alert threshold**:
-The user-set floor below which Spendable counts as low — the Spendable card turns red and a notification fires. Set by tapping the Spendable card, as *either* a dollar amount *or* a percentage of Pay amount (never both — schema v38 collapsed the old two-floor `max()` model). A percentage alert is dormant while no Pay amount is set.
-_Avoid_: limit, cap, budget, minimum balance
-
-**Stale data**:
-Synced Up Bank data whose last sync (`last_sync`) was 30 minutes or more ago, or that has never synced. What the app does about it (the quiet re-sync, and the "N h old" badge past 60 minutes) is in `docs/features/sync/OVERVIEW.md`.
-_Avoid_: outdated, expired, old data
