@@ -3,6 +3,7 @@ import {
   incomeBarSegments,
   itemBar,
   markPaidDate,
+  savedHeadline,
   stateLine,
 } from './planFormat'
 import type { PlanItem } from '@/services/planVsActual'
@@ -13,10 +14,22 @@ const bar = (
   stillToGoOutCents: number | null,
   ifTheRestGoesToPlanCents: number | null
 ) => ({
-  spentOnPlanCents,
-  spentUnplannedCents,
-  stillToGoOutCents,
-  ifTheRestGoesToPlanCents,
+  state: 'in-progress' as const,
+  bar: {
+    spentOnPlanCents,
+    spentUnplannedCents,
+    stillToGoOutCents,
+    ifTheRestGoesToPlanCents,
+  },
+})
+
+const finished = (
+  spentOnPlanCents: number,
+  spentUnplannedCents: number,
+  savedCents: number | null
+) => ({
+  state: 'finished' as const,
+  bar: { spentOnPlanCents, spentUnplannedCents, savedCents },
 })
 
 const widths = (segments: ReturnType<typeof incomeBarSegments>) =>
@@ -58,6 +71,45 @@ describe('incomeBarSegments', () => {
 
   it('is null when Income isn’t set', () => {
     expect(incomeBarSegments(bar(1, 1, 1, null), null)).toBeNull()
+  })
+})
+
+describe('incomeBarSegments, finished month (#243)', () => {
+  it('splits Income into Spent on plan · Spent unplanned · Saved', () => {
+    const segments = incomeBarSegments(finished(60000, 10000, 30000), 100000)
+    expect(segments!.map((s) => [s.key, s.label])).toEqual([
+      ['on-plan', 'Spent on plan'],
+      ['unplanned', 'Spent unplanned'],
+      ['saved', 'Saved'],
+    ])
+    expect(widths(segments)).toEqual([60, 10, 30])
+    expect(segments![2]).toMatchObject({ shownCents: 30000, over: false })
+  })
+
+  it('reads Overspent, as a positive figure in the over colour, with the bar full', () => {
+    const segments = incomeBarSegments(finished(90000, 30000, -20000), 100000)
+    expect(widths(segments)).toEqual([90, 10, 0])
+    expect(segments![2]).toMatchObject({
+      label: 'Overspent',
+      cents: -20000,
+      shownCents: 20000,
+      over: true,
+    })
+  })
+
+  it('is null when the plan has no Income', () => {
+    expect(incomeBarSegments(finished(1, 1, null), null)).toBeNull()
+  })
+})
+
+describe('savedHeadline', () => {
+  it('is Saved at or above zero and Overspent below it', () => {
+    expect(savedHeadline(0)).toEqual({ label: 'Saved', cents: 0, over: false })
+    expect(savedHeadline(-1)).toEqual({
+      label: 'Overspent',
+      cents: 1,
+      over: true,
+    })
   })
 })
 
@@ -128,6 +180,10 @@ describe('stateLine', () => {
     expect(stateLine(tracker({ kind: 'not-due' })).text).toBe(
       'not due this month'
     )
+    expect(stateLine(tracker({ kind: 'no-payment-found' }))).toMatchObject({
+      text: 'No payment found',
+      tone: 'warn',
+    })
   })
 })
 
@@ -152,6 +208,12 @@ describe('markPaidDate', () => {
     expect(
       markPaidDate(regular({ kind: 'no-actual-figure' }, ['2026-10-25']))
     ).toBe('2026-10-25')
+  })
+
+  it('offers it on a finished month’s no-payment-found Regular', () => {
+    expect(
+      markPaidDate(regular({ kind: 'no-payment-found' }, ['2026-10-05']))
+    ).toBe('2026-10-05')
   })
 
   it('offers nothing for any other state', () => {

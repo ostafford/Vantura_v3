@@ -3176,6 +3176,69 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .plan-card--empty {
   border: 1px dashed var(--bs-border-color);
 }
+/* ‹ Month › (#243). 32px chevrons with a 44px hit area (::before). */
+.plan-month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.plan-month-nav__name {
+  min-width: 8.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.plan-month-nav__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.375rem 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--bs-body-color);
+  font-size: 1.25rem;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
+}
+.plan-month-nav__chevron {
+  position: relative;
+}
+.plan-month-nav__chevron::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.plan-month-nav__chevron:hover {
+  background-color: color-mix(in srgb, var(--bs-body-color) 8%, transparent);
+  color: var(--bs-body-color);
+}
+.plan-month-nav__chevron:active {
+  transform: scale(0.94);
+}
+.plan-month-nav__chevron:focus-visible {
+  outline: 2px solid var(--vantura-primary);
+  outline-offset: 2px;
+}
+.plan-month-nav__chevron:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.plan-month-nav__chevron:disabled:active {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-month-nav__chevron {
+    transition: none;
+  }
+  .plan-month-nav__chevron:active {
+    transform: none;
+  }
+}
+
 .plan-mark-paid {
   /* A bigger hit area than the 0.72rem text, without moving the line. */
   padding: 0.6rem 0.4rem;

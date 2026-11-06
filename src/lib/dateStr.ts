@@ -50,6 +50,15 @@ export function calendarMonthDayBounds(month: string): {
   }
 }
 
+/** `month` (`YYYY-MM`) moved by `n` calendar months (may be negative). */
+export function addMonthsToMonthStr(month: string, n: number): string {
+  calendarMonthDayBounds(month) // throws on anything that isn't a real month
+  const [y, m] = month.split('-').map(Number)
+  const index = y * 12 + (m - 1) + n
+  const year = Math.floor(index / 12)
+  return `${String(year).padStart(4, '0')}-${String((index % 12) + 1).padStart(2, '0')}`
+}
+
 /**
  * Calendar bounds for a display period relative to `now`, `offset` periods
  * away (0 = the current one, -1 = the previous, etc.). `from` is inclusive,

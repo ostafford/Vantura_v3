@@ -15,6 +15,21 @@ import { readPaidMarks, type RegularPaidMark } from './paid'
 import { getProjectedOccurrencesInRange } from './projection'
 import { readRegulars, type Regular } from './rows'
 
+/**
+ * A finished month's Regulars from its Month-end plan, read in place of the
+ * live table (#243): the rows as frozen, their occurrences in the month and
+ * the month's paid marks. Linked payments are still matched over live
+ * transactions, against these rows.
+ */
+export interface RegularsPlanInput {
+  /** As frozen; `next_charge_date` is the stored anchor. */
+  rows: Regular[]
+  /** Each Regular's occurrence dates in the month, as frozen. */
+  occurrences: Map<number, string[]>
+  /** The month's marks, as frozen (past-month marks live in the plan). */
+  marks: RegularPaidMark[]
+}
+
 export interface RegularPlanInMonth {
   /** The Regular as stored (`next_charge_date` is the anchor, not projected). */
   regular: Regular

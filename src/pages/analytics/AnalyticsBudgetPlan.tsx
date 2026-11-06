@@ -19,13 +19,21 @@ import { getBucketColor } from '@/lib/colorSystem'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
 import type React from 'react'
 import { HelpPopover } from '@/components/HelpPopover'
-import { usePlanVsActual } from '@/components/budgetPlan/usePlanVsActual'
+import {
+  usePlanMonth,
+  usePlanVsActual,
+} from '@/components/budgetPlan/usePlanVsActual'
 import {
   BucketPlanCard,
+  MonthNav,
   MonthSummaryCard,
   UnplannedCard,
 } from '@/components/budgetPlan/PlanVsActualParts'
-import { UNPLANNED_CARD_ID } from '@/components/budgetPlan/planFormat'
+import {
+  UNPLANNED_CARD_ID,
+  monthLabel,
+} from '@/components/budgetPlan/planFormat'
+import { planMonthSearch } from '@/components/budgetPlan/planMonth'
 
 // ─── Bucket modal ────────────────────────────────────────────────────────────
 
@@ -264,9 +272,12 @@ function showUnplanned() {
 }
 
 /**
- * The Budget Plan: plan vs actual for the current calendar month (#241, Spec D
- * #239), on `getPlanVsActual` (#240). There is no display period: every
- * figure is this month's, occurrence-based, and `?period=` is ignored.
+ * The Budget Plan: plan vs actual for one calendar month (#241, Spec D #239),
+ * on `getPlanVsActual` (#240). It opens on the current month; ‹ / › step to
+ * finished months (`?month=`, #243), each judged against its Month-end plan.
+ * There is no display period: every figure is that month's, occurrence-based,
+ * and `?period=` is ignored. Bucket editing acts on the live plan, so it's
+ * offered on the current month only.
  */
 export function AnalyticsBudgetPlan() {
   const themeMode = useStore(themeStore, (s) => s.mode)
@@ -282,7 +293,10 @@ export function AnalyticsBudgetPlan() {
   const [showAssignModal, setShowAssignModal] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
-  const plan = usePlanVsActual(version)
+  const planMonth = usePlanMonth()
+  const plan = usePlanVsActual(version, planMonth.month)
+  const editable = planMonth.isCurrent
+  const nav = <MonthNav planMonth={planMonth} path="/analytics/budget" />
 
   const buckets = useMemo(
     () => getBuckets(),
@@ -335,7 +349,23 @@ export function AnalyticsBudgetPlan() {
     setShowBucketModal(true)
   }
 
-  if (!plan) return null
+  if (!plan) {
+    if (editable) return null
+    return (
+      <div className="grid-margin">
+        <Card className="mb-3" data-testid="plan-summary">
+          <Card.Body>
+            <div className="mb-2">{nav}</div>
+            <p className="plan-muted mb-0" data-testid="plan-no-month-end-plan">
+              Vantura has no Month-end plan for {monthLabel(planMonth.month)},
+              so it can’t judge that month.
+            </p>
+          </Card.Body>
+        </Card>
+      </div>
+    )
+  }
+  const monthSearch = planMonthSearch(planMonth.month, planMonth.current)
 
   const rowsByBucket = new Map(buckets.map((b) => [b.id, b]))
   const { notInABucket } = plan
@@ -344,25 +374,38 @@ export function AnalyticsBudgetPlan() {
     <div className="grid-margin">
       <MonthSummaryCard
         plan={plan}
+        nav={nav}
         onShowUnplanned={showUnplanned}
         aside={
           <div className="d-flex align-items-center gap-2">
             <HelpPopover
               id="budget-plan-help"
               title="Budget Plan"
-              content="Your plan vs what actually went out, for this calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned this month. Committed is what your buckets plan this month, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar."
+              content="Your plan vs what actually went out, for one calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned that month. Committed is what your buckets plan, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar. Use ‹ to look back at a finished month: it's judged against the plan you had when it ended, while its spending stays up to date."
               ariaLabel="How does Budget Plan work?"
             />
-            <Button variant="primary" size="sm" onClick={openCreate}>
-              <i className="mdi mdi-plus me-1" aria-hidden />
-              Add bucket
-            </Button>
+            {editable && (
+              <Button variant="primary" size="sm" onClick={openCreate}>
+                <i className="mdi mdi-plus me-1" aria-hidden />
+                Add bucket
+              </Button>
+            )}
           </div>
         }
       />
 
       <Row className="g-3 mb-4">
-        {plan.buckets.length === 0 && (
+        {plan.buckets.length === 0 && !editable && (
+          <Col xs={12}>
+            <Card className="plan-card--empty">
+              <Card.Body className="text-center py-3 plan-muted small">
+                There were no buckets in {monthLabel(plan.month)}’s plan.
+              </Card.Body>
+            </Card>
+          </Col>
+        )}
+
+        {plan.buckets.length === 0 && editable && (
           <Col xs={12}>
             <Card className="plan-card--empty">
               <Card.Body className="text-center py-4">
@@ -402,12 +445,16 @@ export function AnalyticsBudgetPlan() {
               xs={12}
               sm={6}
               lg={4}
-              draggable
-              onDragStart={(e) => handleDragStart(e, b.bucketId)}
-              onDragOver={(e) => handleDragOver(e, b.bucketId)}
-              onDragLeave={() => setDragOverId(null)}
-              onDrop={(e) => handleBucketDrop(e, b.bucketId)}
-              onDragEnd={() => setDragOverId(null)}
+              {...(editable && {
+                draggable: true,
+                onDragStart: (e: React.DragEvent) =>
+                  handleDragStart(e, b.bucketId),
+                onDragOver: (e: React.DragEvent) =>
+                  handleDragOver(e, b.bucketId),
+                onDragLeave: () => setDragOverId(null),
+                onDrop: (e: React.DragEvent) => handleBucketDrop(e, b.bucketId),
+                onDragEnd: () => setDragOverId(null),
+              })}
               style={{ opacity: dragOverId === b.bucketId ? 0.6 : 1 }}
             >
               <BucketPlanCard
@@ -415,7 +462,7 @@ export function AnalyticsBudgetPlan() {
                 name={b.name}
                 title={
                   <Link
-                    to={`/analytics/budget/${b.bucketId}`}
+                    to={`/analytics/budget/${b.bucketId}${monthSearch}`}
                     className="plan-card__link"
                   >
                     {b.name}
@@ -427,17 +474,24 @@ export function AnalyticsBudgetPlan() {
                 actualCents={b.actualCents}
                 items={b.items}
                 empty={
-                  <div className="plan-muted small">
-                    Nothing in this bucket yet.{' '}
-                    <Link
-                      to={`/analytics/budget/${b.bucketId}`}
-                      className="plan-link"
-                    >
-                      Add Regulars or Trackers
-                    </Link>
-                  </div>
+                  editable ? (
+                    <div className="plan-muted small">
+                      Nothing in this bucket yet.{' '}
+                      <Link
+                        to={`/analytics/budget/${b.bucketId}`}
+                        className="plan-link"
+                      >
+                        Add Regulars or Trackers
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="plan-muted small">
+                      Nothing was in this bucket.
+                    </div>
+                  )
                 }
                 actions={
+                  editable &&
                   row && (
                     <div className="d-flex align-items-center gap-1 flex-shrink-0">
                       <Button
@@ -483,6 +537,7 @@ export function AnalyticsBudgetPlan() {
               actualCents={notInABucket.actualCents}
               items={notInABucket.items}
               footer={
+                editable &&
                 unassignedRegulars.length > 0 &&
                 plan.buckets.length > 0 && (
                   <Button
