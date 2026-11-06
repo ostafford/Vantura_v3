@@ -86,25 +86,30 @@ function readDebitsBetween(
 /**
  * Every Regular, in id order, with its Linked payments whose Display date falls
  * in `month` (`YYYY-MM`), oldest first. Computed on every call; a deleted
- * Regular isn't listed. Empty when the DB isn't ready.
+ * Regular isn't listed. Empty when the DB isn't ready. `rows` replaces the
+ * live Regulars (a Month-end plan's, #243); the transactions are always live.
  */
-export function linkedPaymentsInMonth(month: string): RegularLinkedPayments[] {
+export function linkedPaymentsInMonth(
+  month: string,
+  rows?: Regular[]
+): RegularLinkedPayments[] {
   const { first, last } = calendarMonthDayBounds(month)
-  return linkedPaymentsBetween(first, last)
+  return linkedPaymentsBetween(first, last, rows)
 }
 
 /**
  * Every Regular, in id order, with its Linked payments whose Display date falls
  * in `[start, end]` (`YYYY-MM-DD`, inclusive), oldest first. Same rule as
- * `linkedPaymentsInMonth`, over any span of days.
+ * `linkedPaymentsInMonth`, over any span of days, optionally against `rows`.
  */
 export function linkedPaymentsBetween(
   start: string,
-  end: string
+  end: string,
+  rows?: Regular[]
 ): RegularLinkedPayments[] {
   const db = getDb()
   if (!db) return []
-  const regulars = readRegulars(db)
+  const regulars = rows ?? readRegulars(db)
   const linkable = regulars.filter(
     (r): r is Regular & { match_description: string } => !!r.match_description
   )

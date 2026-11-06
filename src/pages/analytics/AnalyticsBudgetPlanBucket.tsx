@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from 'zustand'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Button, Modal, Form, Badge } from 'react-bootstrap'
 import {
   getBucket,
@@ -40,9 +40,19 @@ import {
   type ColorMode,
 } from '@/lib/colorSystem'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
-import { usePlanVsActual } from '@/components/budgetPlan/usePlanVsActual'
-import { BucketPlanCard } from '@/components/budgetPlan/PlanVsActualParts'
-import { monthLabel } from '@/components/budgetPlan/planFormat'
+import {
+  usePlanMonth,
+  usePlanVsActual,
+} from '@/components/budgetPlan/usePlanVsActual'
+import {
+  BucketPlanCard,
+  MonthNav,
+} from '@/components/budgetPlan/PlanVsActualParts'
+import { monthLabel, monthProgress } from '@/components/budgetPlan/planFormat'
+import {
+  markFrozenOccurrencePaid,
+  unmarkFrozenOccurrencePaid,
+} from '@/services/monthEndPlan'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -586,6 +596,13 @@ function TrackerBucketRow({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+/**
+ * One bucket's plan vs actual for the month the Budget Plan shows (#241),
+ * with ‹ / › and the month in `?month=` (#243). A finished month shows the
+ * bucket as its Month-end plan froze it (even if since renamed or deleted),
+ * and its Mark paid writes to that plan. Managing the bucket's Regulars and
+ * Trackers edits the live plan, so it's offered on the current month only.
+ */
 export function AnalyticsBudgetPlanBucket() {
   const { bucketId } = useParams<{ bucketId: string }>()
   const navigate = useNavigate()
@@ -593,17 +610,26 @@ export function AnalyticsBudgetPlanBucket() {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
-  const plan = usePlanVsActual(version)
+  const planMonth = usePlanMonth()
+  const plan = usePlanVsActual(version, planMonth.month)
+  const finished = plan?.state === 'finished'
 
   const [showAddUpcoming, setShowAddUpcoming] = useState(false)
   const [showAddTracker, setShowAddTracker] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
-  // Same Mark paid + Undo as the Dashboard's Still to go out (#214).
+  // Same Mark paid + Undo as the Dashboard's Still to go out (#214). In a
+  // finished month the mark is written to that month's plan, never the live
+  // table (#243), and changes the status only.
+  const frozenMonth = finished ? plan.month : null
   const handleMarkPaid = useCallback(
     (regularId: number, date: string, name: string) => {
-      if (!markOccurrencePaid(regularId, date)) {
+      const marked =
+        frozenMonth === null
+          ? markOccurrencePaid(regularId, date)
+          : markFrozenOccurrencePaid(frozenMonth, regularId, date)
+      if (!marked) {
         toast.error(`Couldn’t mark ${name} paid.`)
         refresh()
         return
@@ -613,13 +639,14 @@ export function AnalyticsBudgetPlanBucket() {
         action: {
           label: 'Undo',
           onClick: () => {
-            unmarkOccurrencePaid(regularId, date)
+            if (frozenMonth === null) unmarkOccurrencePaid(regularId, date)
+            else unmarkFrozenOccurrencePaid(frozenMonth, regularId, date)
             refresh()
           },
         },
       })
     },
-    [refresh]
+    [refresh, frozenMonth]
   )
 
   const id = bucketId ? Number(bucketId) : null
@@ -642,19 +669,42 @@ export function AnalyticsBudgetPlanBucket() {
     [id, version, lastSyncCompletedAt]
   )
 
-  if (!bucket) {
+  const planBucket = plan?.buckets.find((b) => b.bucketId === id)
+  const nav = (
+    <MonthNav
+      planMonth={planMonth}
+      path={`/analytics/budget/${bucketId ?? ''}`}
+      as="span"
+    />
+  )
+  const backSearch = planMonth.isCurrent ? '' : `?month=${planMonth.month}`
+
+  // A finished month shows the bucket as frozen; the current month, as stored.
+  const shown = finished
+    ? planBucket && { id: planBucket.bucketId, ...planBucket }
+    : bucket
+  if (!shown) {
     return (
       <div className="grid-margin">
-        <p className="text-muted">Bucket not found.</p>
-        <Button variant="link" onClick={() => navigate('/analytics/budget')}>
+        {!planMonth.isCurrent && <div className="mb-2">{nav}</div>}
+        <p className="text-muted" data-testid="bucket-not-in-month">
+          {planMonth.isCurrent
+            ? 'Bucket not found.'
+            : plan
+              ? `This bucket wasn’t in ${monthLabel(planMonth.month)}’s plan.`
+              : `Vantura has no Month-end plan for ${monthLabel(planMonth.month)}, so it can’t judge that month.`}
+        </p>
+        <Button
+          variant="link"
+          onClick={() => navigate(`/analytics/budget${backSearch}`)}
+        >
           Back to Budget Plan
         </Button>
       </div>
     )
   }
 
-  const hex = getBucketColor(bucket.id, mode)
-  const planBucket = plan?.buckets.find((b) => b.bucketId === bucket.id)
+  const hex = getBucketColor(shown.id, mode)
 
   function handleUnassignUpcoming(item: BucketUpcomingItem) {
     assignUpcomingToBucket(item.id, null)
@@ -687,16 +737,18 @@ export function AnalyticsBudgetPlanBucket() {
               flexShrink: 0,
             }}
           >
-            <i className={`mdi ${bucket.icon}`} aria-hidden />
+            <i className={`mdi ${shown.icon}`} aria-hidden />
           </span>
           <div>
-            <h5 className="mb-0 fw-bold">{bucket.name}</h5>
-            {plan && (
-              <span className="text-muted small">
-                {monthLabel(plan.month)} · Day {plan.dayOfMonth} of{' '}
-                {plan.daysInMonth}
-              </span>
-            )}
+            <h5 className="mb-0 fw-bold">{shown.name}</h5>
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              {nav}
+              {plan && (
+                <span className="text-muted small" data-testid="plan-progress">
+                  {monthProgress(plan)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -707,7 +759,7 @@ export function AnalyticsBudgetPlanBucket() {
           <BucketPlanCard
             testId="plan-bucket"
             name={planBucket.name}
-            title="This month"
+            title={finished ? monthLabel(plan.month) : 'This month'}
             icon={planBucket.icon}
             color={hex}
             plannedCents={planBucket.plannedCents}
@@ -723,90 +775,109 @@ export function AnalyticsBudgetPlanBucket() {
         </div>
       )}
 
-      {/* Upcoming Transactions */}
-      <Card className="mb-3">
-        <Card.Header className="d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <i className="mdi mdi-calendar-clock text-muted" aria-hidden />
-            <span className="fw-semibold">Regulars</span>
-          </div>
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={() => setShowAddUpcoming(true)}
-          >
-            <i className="mdi mdi-plus me-1" aria-hidden />
-            Add
-          </Button>
-        </Card.Header>
-        <Card.Body>
-          {upcomingItems.length === 0 ? (
-            <p className="text-muted small mb-0">
-              Add fixed recurring charges — subscriptions, bills, loan
-              repayments. You can assign existing Regulars or create one from a
-              real transaction.
-            </p>
+      {finished && (
+        <p className="plan-muted small" data-testid="bucket-finished-note">
+          This is the bucket as {monthLabel(plan.month)} ended. Changes to its
+          Regulars and Trackers apply from{' '}
+          {bucket ? (
+            <Link to={`/analytics/budget/${bucket.id}`} className="plan-link">
+              {monthLabel(planMonth.current)}
+            </Link>
           ) : (
-            upcomingItems.map((u) => (
-              <UpcomingRow
-                key={u.id}
-                item={u}
-                onUnassign={() => handleUnassignUpcoming(u)}
-              />
-            ))
+            monthLabel(planMonth.current)
           )}
-        </Card.Body>
-      </Card>
+          .
+        </p>
+      )}
 
-      {/* Trackers */}
-      <Card className="mb-3">
-        <Card.Header className="d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <i className="mdi mdi-chart-line text-muted" aria-hidden />
-            <span className="fw-semibold">Trackers</span>
-          </div>
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={() => setShowAddTracker(true)}
-          >
-            <i className="mdi mdi-plus me-1" aria-hidden />
-            Add tracker
-          </Button>
-        </Card.Header>
-        <Card.Body>
-          {trackers.length === 0 ? (
-            <p className="text-muted small mb-0">
-              Link a spending tracker to this bucket — its budget for the month
-              counts toward the bucket’s plan.
-            </p>
-          ) : (
-            id != null &&
-            trackers.map((t) => (
-              <TrackerBucketRow
-                key={t.id}
-                tracker={t}
-                bucketId={id}
-                onUnassign={() => handleUnassignTracker(t)}
-              />
-            ))
-          )}
-        </Card.Body>
-      </Card>
+      {!finished && bucket && (
+        <>
+          {/* Upcoming Transactions */}
+          <Card className="mb-3">
+            <Card.Header className="d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-2">
+                <i className="mdi mdi-calendar-clock text-muted" aria-hidden />
+                <span className="fw-semibold">Regulars</span>
+              </div>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => setShowAddUpcoming(true)}
+              >
+                <i className="mdi mdi-plus me-1" aria-hidden />
+                Add
+              </Button>
+            </Card.Header>
+            <Card.Body>
+              {upcomingItems.length === 0 ? (
+                <p className="text-muted small mb-0">
+                  Add fixed recurring charges — subscriptions, bills, loan
+                  repayments. You can assign existing Regulars or create one
+                  from a real transaction.
+                </p>
+              ) : (
+                upcomingItems.map((u) => (
+                  <UpcomingRow
+                    key={u.id}
+                    item={u}
+                    onUnassign={() => handleUnassignUpcoming(u)}
+                  />
+                ))
+              )}
+            </Card.Body>
+          </Card>
 
-      {/* Modals */}
-      <AddUpcomingTransactionModal
-        show={showAddUpcoming}
-        bucketId={bucket.id}
-        onClose={() => setShowAddUpcoming(false)}
-        onSaved={refresh}
-      />
-      <AddTrackerModal
-        show={showAddTracker}
-        bucketId={bucket.id}
-        onClose={() => setShowAddTracker(false)}
-        onSaved={refresh}
-      />
+          {/* Trackers */}
+          <Card className="mb-3">
+            <Card.Header className="d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-2">
+                <i className="mdi mdi-chart-line text-muted" aria-hidden />
+                <span className="fw-semibold">Trackers</span>
+              </div>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => setShowAddTracker(true)}
+              >
+                <i className="mdi mdi-plus me-1" aria-hidden />
+                Add tracker
+              </Button>
+            </Card.Header>
+            <Card.Body>
+              {trackers.length === 0 ? (
+                <p className="text-muted small mb-0">
+                  Link a spending tracker to this bucket — its budget for the
+                  month counts toward the bucket’s plan.
+                </p>
+              ) : (
+                id != null &&
+                trackers.map((t) => (
+                  <TrackerBucketRow
+                    key={t.id}
+                    tracker={t}
+                    bucketId={id}
+                    onUnassign={() => handleUnassignTracker(t)}
+                  />
+                ))
+              )}
+            </Card.Body>
+          </Card>
+
+          {/* Modals */}
+          <AddUpcomingTransactionModal
+            show={showAddUpcoming}
+            bucketId={bucket.id}
+            onClose={() => setShowAddUpcoming(false)}
+            onSaved={refresh}
+          />
+          <AddTrackerModal
+            show={showAddTracker}
+            bucketId={bucket.id}
+            onClose={() => setShowAddTracker(false)}
+            onSaved={refresh}
+          />
+        </>
+      )}
     </div>
   )
 }

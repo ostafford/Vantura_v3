@@ -4,13 +4,18 @@
  * from `getPlanVsActual` (#240); nothing here computes money, it only decides
  * how each figure is shown.
  *
- * Colour is for **over** only (#174): an over item, and a negative
- * *If the rest goes to plan*. An overdue Regular gets the warning tone, as in
- * the #174 prototype. Everything else reads muted.
+ * Colour is for **over** only (#174): an over item, Overspent, and a negative
+ * *If the rest goes to plan*. An overdue Regular, and a finished month's
+ * *no payment found*, get the warning tone, as in the #174 prototype.
+ * Everything else reads muted.
  */
 
 import { formatSignedMoney } from '@/lib/format'
-import type { PlanItem, PlanVsActual } from '@/services/planVsActual'
+import type {
+  PlanItem,
+  PlanVsActualFinished,
+  PlanVsActualInProgress,
+} from '@/services/planVsActual'
 
 /** The Unplanned card's element id, the target of the bar's unplanned segment. */
 export const UNPLANNED_CARD_ID = 'budget-unplanned'
@@ -22,6 +27,17 @@ export function monthLabel(month: string): string {
     month: 'long',
     year: 'numeric',
   })
+}
+
+/** "Day N of M" while the month runs, or "Month finished" (#243). */
+export function monthProgress(
+  plan:
+    | Pick<PlanVsActualInProgress, 'state' | 'dayOfMonth' | 'daysInMonth'>
+    | Pick<PlanVsActualFinished, 'state'>
+): string {
+  return plan.state === 'finished'
+    ? 'Month finished'
+    : `Day ${plan.dayOfMonth} of ${plan.daysInMonth}`
 }
 
 export type PlanTone = 'muted' | 'over' | 'warn'
@@ -66,19 +82,43 @@ export function stateLine(item: PlanItem): StateLine {
       return { text: 'paid', tone: 'muted', icon: 'mdi-check' }
     case 'not-due':
       return { text: 'not due this month', tone: 'muted' }
+    case 'no-payment-found':
+      return {
+        text: 'No payment found',
+        tone: 'warn',
+        icon: 'mdi-alert-outline',
+      }
   }
 }
 
 /**
  * The occurrence Mark paid would mark, or `null` when Mark paid isn't offered:
- * a Regular that is overdue (#212 offers it there) or has no actual figure
- * (#174: Vantura can't see it paid), at its oldest unpaid occurrence.
+ * a Regular that is overdue (#212 offers it there), has no actual figure
+ * (#174: Vantura can't see it paid), or, in a finished month, has no payment
+ * found (#243), at its oldest unpaid occurrence.
  */
 export function markPaidDate(item: PlanItem): string | null {
   if (item.type !== 'regular') return null
-  if (item.state.kind !== 'overdue' && item.state.kind !== 'no-actual-figure')
+  const { kind } = item.state
+  if (
+    kind !== 'overdue' &&
+    kind !== 'no-actual-figure' &&
+    kind !== 'no-payment-found'
+  ) {
     return null
+  }
   return item.unpaidDates[0] ?? null
+}
+
+/** The headline for a finished month: Saved, or Overspent (as a positive figure) when negative. */
+export function savedHeadline(savedCents: number): {
+  label: 'Saved' | 'Overspent'
+  cents: number
+  over: boolean
+} {
+  return savedCents < 0
+    ? { label: 'Overspent', cents: -savedCents, over: true }
+    : { label: 'Saved', cents: savedCents, over: false }
 }
 
 /** True when an item's actual is above its planned. */
@@ -123,45 +163,77 @@ export function itemBar(
   }
 }
 
-export type IncomeSegmentKey = 'on-plan' | 'unplanned' | 'to-go' | 'rest'
+export type IncomeSegmentKey =
+  | 'on-plan'
+  | 'unplanned'
+  | 'to-go'
+  | 'rest'
+  | 'saved'
 
 export interface IncomeSegment {
   key: IncomeSegmentKey
   label: string
-  /** The legend figure, signed; `null` when the read declines it. */
+  /** The segment's figure, signed (sets its width); `null` when the read declines it. */
   cents: number | null
-  /** Share of the bar, 0–100. Never negative; the four never pass 100. */
+  /** The legend figure: `cents`, except Overspent, shown as a positive figure. */
+  shownCents: number | null
+  /** Share of the bar, 0–100. Never negative; together never past 100. */
   widthPct: number
   /** True when the legend figure shows in the over colour. */
   over: boolean
 }
 
 /**
- * The Income bar, **capped at Income** (#241): segments fill Income in order
- * (Spent on plan, Spent unplanned, Still to go out, If the rest goes to plan),
+ * The Income bar, **capped at Income** (#241): segments fill Income in order,
  * each taking at most what's left of it. A negative segment gets no width but
- * keeps its legend figure. When spending passes Income the bar is full, and a
- * negative *If the rest goes to plan* shows the shortfall in the over colour.
- * `null` when Income isn't set (the page shows "Set your pay" instead).
+ * keeps its legend figure. When spending passes Income the bar is full, and
+ * the last segment's negative figure shows the shortfall in the over colour.
+ *
+ * - In progress: Spent on plan · Spent unplanned · Still to go out · If the
+ *   rest goes to plan.
+ * - Finished (#243): Spent on plan · Spent unplanned · Saved. Saved's legend
+ *   reads Overspent, as a positive figure, when it's negative.
+ *
+ * `null` when Income isn't set (the page shows a prompt instead).
  */
 export function incomeBarSegments(
-  bar: PlanVsActual['bar'],
+  plan:
+    | Pick<PlanVsActualInProgress, 'state' | 'bar'>
+    | Pick<PlanVsActualFinished, 'state' | 'bar'>,
   incomeCents: number | null
 ): IncomeSegment[] | null {
   if (incomeCents === null || incomeCents <= 0) return null
-  const parts: Omit<IncomeSegment, 'widthPct'>[] = [
+  const spent: Omit<IncomeSegment, 'widthPct' | 'shownCents'>[] = [
     {
       key: 'on-plan',
       label: 'Spent on plan',
-      cents: bar.spentOnPlanCents,
+      cents: plan.bar.spentOnPlanCents,
       over: false,
     },
     {
       key: 'unplanned',
       label: 'Spent unplanned',
-      cents: bar.spentUnplannedCents,
+      cents: plan.bar.spentUnplannedCents,
       over: false,
     },
+  ]
+  if (plan.state === 'finished') {
+    const saved = plan.bar.savedCents
+    const headline = saved === null ? null : savedHeadline(saved)
+    return fill(incomeCents, [
+      ...spent,
+      {
+        key: 'saved',
+        label: headline?.label ?? 'Saved',
+        cents: saved,
+        shownCents: headline?.cents ?? null,
+        over: headline?.over ?? false,
+      },
+    ])
+  }
+  const { bar } = plan
+  return fill(incomeCents, [
+    ...spent,
     {
       key: 'to-go',
       label: 'Still to go out',
@@ -176,11 +248,22 @@ export function incomeBarSegments(
         bar.ifTheRestGoesToPlanCents !== null &&
         bar.ifTheRestGoesToPlanCents < 0,
     },
-  ]
+  ])
+}
+
+function fill(
+  incomeCents: number,
+  parts: (Omit<IncomeSegment, 'widthPct' | 'shownCents'> &
+    Partial<Pick<IncomeSegment, 'shownCents'>>)[]
+): IncomeSegment[] {
   let remaining = incomeCents
   return parts.map((p) => {
     const width = Math.min(Math.max(0, p.cents ?? 0), remaining)
     remaining -= width
-    return { ...p, widthPct: (width / incomeCents) * 100 }
+    return {
+      ...p,
+      shownCents: p.shownCents === undefined ? p.cents : p.shownCents,
+      widthPct: (width / incomeCents) * 100,
+    }
   })
 }
