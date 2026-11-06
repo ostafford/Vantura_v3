@@ -8,11 +8,11 @@ Vantura is a **local-first** personal finance app for Up Bank customers. All dat
 
 ## Product philosophy
 
-Vantura's product vision, target users, and non-negotiable design principles live in `docs/PRODUCT.md` — read it before making product/UX judgment calls, not just architectural ones. In short: Spendable is a safety-net "source of truth" value, and the Up Bank API is ground truth beneath it.
+Vantura's product vision, target users, and non-negotiable design principles live in `docs/PRODUCT.md` — read it before making product/UX judgment calls, not just architectural ones. In short: **Headroom** is the Dashboard's safety-net figure, and the Up Bank API is ground truth beneath it.
 
 ## Engineering standards & working agreement
 
-- **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Spendable miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
+- **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Headroom miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
 - **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `GLOSSARY.md` specifically needs an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
 
@@ -41,11 +41,13 @@ Pre-commit hook (`husky` + `lint-staged`) auto-formats/lints staged `.ts`/`.tsx`
 ### Sync: Up Bank API → local DB
 
 - `src/api/upBank.ts` wraps the Up Bank REST API (Personal Access Token, ~60 req/min rate limit).
-- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives payday/tracker recalculation. It is called on every app boot (`App.tsx`) via `advanceNextPaydayIfNeeded()` then `recalculateTrackers()`, and again on manual/periodic sync. Touching pagination, rate limiting, or the initial-vs-incremental sync split? Check `docs/features/sync/` first.
+- `src/services/sync.ts` orchestrates fetch-and-upsert of accounts/transactions/categories/tags, and drives tracker recalculation (and rolls `next_payday` forward until #195 removes it). It is called on every app boot (`App.tsx`) via `advanceNextPaydayIfNeeded()` then `recalculateTrackers()`, and again on manual/periodic sync. Touching pagination, rate limiting, or the initial-vs-incremental sync split? Check `docs/features/sync/` first.
 
-### Payday-centric domain model
+### Calendar-month domain model
 
-A recurring theme across the codebase: budgets, trackers, and the "Spendable" balance are all anchored to the user's **payday cycle**, not the calendar month. `src/lib/payday.ts` defines the payday frequency/day encoding (including special codes 100–105 for "last weekday/Mon–Fri of the month"), and `advanceNextPaydayIfNeeded()` in `sync.ts` rolls `next_payday` forward whenever it's in the past. Trackers can reset weekly/fortnightly/monthly/`PAYDAY`. Touching tracker reset logic, budget periods, or the Spendable calculation? Check `src/lib/payday.ts`, `docs/features/payday-spendable/`, and `docs/features/trackers/` first — this logic has had several date-edge-case bugs historically (unpadded dates, month-rollover, relative payday rules).
+Headroom, Still to go out, plan vs actual and Income are all reads for the **calendar month**, computed on every call and never stored. Trackers reset weekly, fortnightly or monthly (`PAYDAY` resets were removed in #192). Month and period bounds come from `src/lib/dateStr.ts` (`calendarMonthDayBounds`, `calendarPeriodBounds`), and "today" is the **local** date (`localDateString`). This logic has had several date-edge-case bugs historically (unpadded dates, month rollover, UTC vs local), so check `docs/features/headroom/` and `docs/features/trackers/` first.
+
+The payday cycle survives only as **Pay frequency**, which turns the pay amount into monthly Income (`getMonthlyIncomeCents`). `next_payday` / `payday_day` and `src/lib/payday.ts` are read by nothing that computes a figure; #195 removes them.
 
 ### State management: vanilla zustand stores, not React context
 

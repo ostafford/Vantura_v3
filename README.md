@@ -8,15 +8,14 @@ A local-first financial insights app for Up Bank customers. All data stays on yo
 
 ## Features
 
-- **Dashboard** — Spendable up front, with Available and Forecast beside it, plus reorderable sections: Month at a glance, Trackers, and Regulars.
-- **Spendable balance** — Safe-to-spend amount: your available balance minus the Regulars due before your next payday, each counted in full (never prorated).
-- **Trackers** — Budget categories with weekly, fortnightly, monthly, or payday reset cycles. Progress bar, days to reset, and transaction list per tracker.
-- **Regulars** — Bills and subscriptions with frequency, due date, and optional Spendable deduction. Vantura can also find them in your transaction history.
+- **Dashboard** — Headroom up front, plus reorderable sections: Month at a glance, Trackers, and Regulars.
+- **Headroom** — What's left this month: what you have on hand (your Spending account plus any Savers you switch on) minus what's still to go out (Regulars not paid yet and what's left in your trackers). It can go below zero.
+- **Trackers** — Budget categories with weekly, fortnightly, or monthly reset cycles. Progress bar, days to reset, and transaction list per tracker.
+- **Regulars** — Bills and subscriptions with frequency, due date and reminders. A payment that matches a Regular marks it paid, or you can mark it paid yourself. Vantura can also find them in your transaction history.
 - **Month at a glance** — Day-by-day spending chart vs. the previous month, with the month's money in and money out.
-- **Analytics** — Deeper trends across Trackers, Reports, and Savers.
+- **Analytics** — Deeper trends across Trackers, Budget Plan, and Savers.
 - **Savers** — Track Up Bank saver accounts with goal amounts, target dates, contribution history, and drag-to-reorder cards.
 - **Budget Plan** — Group expenses into named buckets and a free-spending summary.
-- **Notifications** — Bell inbox in the navbar with 9 financial alert types (bills due, tracker overspent, low spendable, payday, possible payday detected, large transactions, saver milestones, and more); 8 of the 9 have per-type toggles in Settings.
 - **Transactions** — Full history with filters (date, category, amount, search) and round-up linking.
 - **Profile export / import** — Back up settings, trackers, and upcoming charges to an encrypted file; restore on another device.
 - **Biometric unlock** — Touch ID / Face ID via WebAuthn with configurable inactivity lock (Settings → Security).
