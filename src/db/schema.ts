@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 60
+const SCHEMA_VERSION = 61
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -142,6 +142,11 @@ const DDL_STATEMENTS = [
     marked_at TEXT NOT NULL,
     PRIMARY KEY (regular_id, occurrence_date),
     FOREIGN KEY (regular_id) REFERENCES upcoming_charges(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE IF NOT EXISTS month_end_plans (
+    month TEXT PRIMARY KEY,
+    plan_json TEXT NOT NULL,
+    frozen_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
@@ -1545,6 +1550,25 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['60']
+    )
+  }
+  // #242 — the Month-end plan (#180): one row per finished calendar month
+  // (`YYYY-MM`), holding the plan it is judged against as versioned JSON
+  // (`src/services/monthEndPlan.ts`). Written once at the freeze and read
+  // whole, so JSON rather than tables. No row is backfilled: the first
+  // plannable month (an `app_settings` key) is set at the first boot after
+  // this migration, and only later months are frozen.
+  if (version < 61) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS month_end_plans (
+        month TEXT PRIMARY KEY,
+        plan_json TEXT NOT NULL,
+        frozen_at TEXT NOT NULL
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['61']
     )
   }
 }

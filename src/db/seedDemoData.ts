@@ -4,6 +4,11 @@
  */
 
 import { getDb, setAppSetting, schedulePersist } from '@/db'
+import {
+  FIRST_PLANNABLE_MONTH_KEY,
+  freezeMonthEndPlans,
+} from '@/services/monthEndPlan'
+import { addDaysToDateStr } from '@/lib/dateStr'
 import { writeTrackerConfigVersion } from '@/services/trackers'
 import { localDateString } from '@/lib/format'
 
@@ -942,4 +947,11 @@ export function seedDemoData(): void {
       [DEMO_SAVER_2_ID, dateStr, Math.round(holidayBase + progress * 8000)]
     )
   }
+
+  // A Month-end plan for last month (#242), frozen from the plan just seeded,
+  // so ‹ and the Month review card have a finished month to show.
+  const today = localDateString()
+  const lastMonth = addDaysToDateStr(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
+  setAppSetting(FIRST_PLANNABLE_MONTH_KEY, lastMonth)
+  freezeMonthEndPlans(today)
 }

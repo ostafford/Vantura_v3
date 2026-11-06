@@ -17,6 +17,7 @@ import {
 } from '@/api/upBank'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'
+import { ensureFirstPlannableMonth } from '@/services/monthEndPlan'
 
 export type SyncProgress = {
   phase: 'accounts' | 'transactions' | 'held' | 'categories' | 'tags' | 'done'
@@ -378,6 +379,8 @@ export async function performInitialSync(
   for (const t of tags) upsertTag(t)
   setAppSetting('last_sync', new Date().toISOString())
   setAppSetting('onboarding_complete', '1')
+  // A fresh install's first plannable month is its onboarding month (#242).
+  ensureFirstPlannableMonth()
   progressCallback({ phase: 'done' })
 }
 

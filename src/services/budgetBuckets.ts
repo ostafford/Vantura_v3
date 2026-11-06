@@ -168,13 +168,19 @@ export function getUnassignedUpcoming(): BucketUpcomingItem[] {
   return list
 }
 
+/** The usable stored pay: amount per pay (cents) and Pay frequency. */
+export interface Pay {
+  perPay: number
+  frequency: PayFrequency
+}
+
 /**
  * The stored pay — amount per pay (cents) and Pay frequency — or null when
  * either is unusable: the amount unset, non-numeric or ≤ 0, or the frequency
  * unset or not a Pay frequency (`isPayFrequency`). An unset frequency is never assumed
  * to be monthly.
  */
-function readPay(): { perPay: number; frequency: PayFrequency } | null {
+export function readPay(): Pay | null {
   const raw = getAppSetting('pay_amount_cents')
   if (raw == null || raw.trim() === '' || !/^\d+$/.test(raw.trim())) return null
   const perPay = parseInt(raw, 10)

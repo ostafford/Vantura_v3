@@ -128,10 +128,24 @@ function readCountedTransactions(
   return out
 }
 
-interface TrackerInMonth {
-  line: TrackerMonthLine
-  /** The config version in effect on each day of the month (null = none). */
-  versionByDay: Map<string, TrackerConfigVersion | null>
+/**
+ * An active Tracker's plan for a calendar month: its planned figure and the
+ * category set in effect on each day. The Trackers half of the month
+ * attribution read, and of a Month-end plan (#242).
+ */
+export interface TrackerMonthPlan {
+  trackerId: number
+  name: string
+  /** Budget Plan bucket, or `null` when it isn't in a bucket. */
+  bucketId: number | null
+  /** As `TrackerMonthLine.plannedCents`. */
+  plannedCents: number | null
+  /**
+   * The category ids of the config in effect on each day of the month
+   * (`YYYY-MM-DD` → ids, sorted). Empty on a day before its first config
+   * version: nothing is claimed that day.
+   */
+  categoryIdsByDay: Map<string, string[]>
 }
 
 /** Every day of `[first, last]`, `YYYY-MM-DD`. */
@@ -142,20 +156,23 @@ function daysOf(first: string, last: string): string[] {
 }
 
 /**
- * Every active Tracker with its planned figure and its config in effect per
- * day ("config as of day D" = the version with the greatest
- * `effective_from <= D`, docs/adr/0014). A version's budget is denominated in
- * its own `reset_frequency`, or the Tracker's when that is null (#38). A
- * cadence that isn't a tracker reset frequency can't be priced, so the
- * Tracker gets no planned figure for the month (its actual still counts).
+ * Every active Tracker, in id order, with its planned figure and its config
+ * in effect per day of `month` (`YYYY-MM`) ("config as of day D" = the version
+ * with the greatest `effective_from <= D`, docs/adr/0014). A version's budget
+ * is denominated in its own `reset_frequency`, or the Tracker's when that is
+ * null (#38). A cadence that isn't a tracker reset frequency can't be priced,
+ * so the Tracker gets no planned figure for the month (its actual still
+ * counts).
  */
-function readTrackersInMonth(days: string[]): TrackerInMonth[] {
-  const out: TrackerInMonth[] = []
+export function trackerPlansInMonth(month: string): TrackerMonthPlan[] {
+  const { first, last } = calendarMonthDayBounds(month)
+  const days = daysOf(first, last)
+  const out: TrackerMonthPlan[] = []
   for (const { id } of getTrackersList()) {
     const tracker = getTracker(id)
     if (!tracker) continue
     const history = getTrackerConfigHistory(id)
-    const versionByDay = new Map<string, TrackerConfigVersion | null>()
+    const categoryIdsByDay = new Map<string, string[]>()
     let weighted = 0
     let unpriceable = false
     for (const day of days) {
@@ -164,7 +181,7 @@ function readTrackersInMonth(days: string[]): TrackerInMonth[] {
         if (v.effective_from <= day) version = v
         else break
       }
-      versionByDay.set(day, version)
+      categoryIdsByDay.set(day, version ? [...version.category_ids].sort() : [])
       if (version) {
         const cadence = version.reset_frequency ?? tracker.reset_frequency
         if (
@@ -179,16 +196,14 @@ function readTrackersInMonth(days: string[]): TrackerInMonth[] {
       }
     }
     out.push({
-      line: {
-        trackerId: id,
-        bucketId: tracker.bucket_id,
-        plannedCents: unpriceable ? null : Math.round(weighted / days.length),
-        actualCents: 0,
-      },
-      versionByDay,
+      trackerId: id,
+      name: tracker.name,
+      bucketId: tracker.bucket_id,
+      plannedCents: unpriceable ? null : Math.round(weighted / days.length),
+      categoryIdsByDay,
     })
   }
-  return out.sort((a, b) => a.line.trackerId - b.line.trackerId)
+  return out.sort((a, b) => a.trackerId - b.trackerId)
 }
 
 function buildUnplanned(transactions: CountedTransaction[]): Unplanned {
@@ -262,14 +277,22 @@ export function getMonthAttribution(month: string): MonthAttribution {
 
   // 2. The active Tracker whose config in effect on the Display date includes
   // the category. 3. Else Unplanned.
-  const trackers = readTrackersInMonth(daysOf(first, last))
+  const trackers = trackerPlansInMonth(month).map((plan) => ({
+    plan,
+    line: {
+      trackerId: plan.trackerId,
+      bucketId: plan.bucketId,
+      plannedCents: plan.plannedCents,
+      actualCents: 0,
+    } satisfies TrackerMonthLine,
+  }))
   const unplanned: CountedTransaction[] = []
   for (const tx of rest) {
     const owners =
       tx.categoryId === null
         ? []
         : trackers.filter((t) =>
-            t.versionByDay.get(tx.day)?.category_ids.includes(tx.categoryId!)
+            t.plan.categoryIdsByDay.get(tx.day)?.includes(tx.categoryId!)
           )
     // Exactly one owner takes it. Two Trackers claiming the same category on
     // the same day (ADR 0003 forbids sharing a category, but a back-dated

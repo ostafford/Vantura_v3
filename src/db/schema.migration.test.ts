@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(60)
+    expect(SCHEMA_VERSION).toBe(61)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -2028,5 +2028,80 @@ describe('v60 migration: payday date cut (#195)', () => {
     db.run(`UPDATE app_settings SET value = '59' WHERE key = 'schema_version'`)
     expect(() => runMigrations(db)).not.toThrow()
     db.close()
+  })
+})
+
+describe('v61 migration: Month-end plans (#242)', () => {
+  function tables(db: Database): string[] {
+    return (
+      db.exec(`SELECT name FROM sqlite_master WHERE type='table'`)[0]?.values ??
+      []
+    ).map((r) => String(r[0]))
+  }
+
+  function planColumns(db: Database): string[] {
+    return (db.exec(`PRAGMA table_info(month_end_plans)`)[0]?.values ?? []).map(
+      (r) => String(r[1])
+    )
+  }
+
+  function buildV60(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`DROP TABLE month_end_plans`)
+    db.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at)
+       VALUES ('Bills', 'mdi-home', 0, '2026-10-01T00:00:00Z')`
+    )
+    db.run(`UPDATE app_settings SET value = '60' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  it('creates month_end_plans on a v60 database, empty, keeping everything else', () => {
+    const db = buildV60()
+    expect(tables(db)).not.toContain('month_end_plans')
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(planColumns(db)).toEqual(['month', 'plan_json', 'frozen_at'])
+    expect(db.exec(`SELECT COUNT(*) FROM month_end_plans`)[0].values).toEqual([
+      [0],
+    ])
+    // No first plannable month is backfilled: the first boot sets it.
+    expect(readSetting(db, 'first_plannable_month')).toBeNull()
+    expect(db.exec(`SELECT name FROM budget_buckets`)[0].values).toEqual([
+      ['Bills'],
+    ])
+    db.close()
+  })
+
+  it('keys a plan by month: a second row for the month is refused', () => {
+    const db = buildV60()
+    runMigrations(db)
+    db.run(
+      `INSERT INTO month_end_plans (month, plan_json, frozen_at)
+       VALUES ('2026-10', '{}', '2026-11-01T00:00:00Z')`
+    )
+    expect(() =>
+      db.run(
+        `INSERT INTO month_end_plans (month, plan_json, frozen_at)
+         VALUES ('2026-10', '{}', '2026-11-02T00:00:00Z')`
+      )
+    ).toThrow()
+    db.close()
+  })
+
+  it('is idempotent, and creates the table on a fresh database', () => {
+    const db = buildV60()
+    runMigrations(db)
+    db.run(`UPDATE app_settings SET value = '60' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+
+    const fresh = new SQL.Database()
+    runSchema(fresh)
+    expect(planColumns(fresh)).toEqual(['month', 'plan_json', 'frozen_at'])
+    fresh.close()
   })
 })
