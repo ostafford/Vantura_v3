@@ -12,6 +12,7 @@ vi.mock('@/db', () => ({
 }))
 
 const {
+  deleteBucket,
   getBucketCardSummary,
   getBuckets,
   getIncomeCents,
@@ -179,5 +180,32 @@ describe('getMonthlyIncomeCents', () => {
     appSettings.pay_amount_cents = '240000'
     expect(getIncomeCents('WEEKLY')).toBe(120000)
     expect(getIncomeCents('YEARLY')).toBe(6240000)
+  })
+})
+
+describe('deleteBucket', () => {
+  it('deletes the bucket and unassigns its Regulars and Trackers, keeping them', () => {
+    insertUpcoming('Rent', 150000, 'MONTHLY')
+    insertTracker(50000, 'MONTHLY')
+    db.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Fun', 'icon', 1, '2026-01-01')`
+    )
+    insertUpcoming('Cinema', 2000, 'MONTHLY', 2)
+
+    deleteBucket(1)
+
+    expect(db.exec(`SELECT id, name FROM budget_buckets`)[0].values).toEqual([
+      [2, 'Fun'],
+    ])
+    expect(
+      db.exec(`SELECT name, bucket_id FROM upcoming_charges ORDER BY name`)[0]
+        .values
+    ).toEqual([
+      ['Cinema', 2],
+      ['Rent', null],
+    ])
+    expect(db.exec(`SELECT bucket_id FROM trackers`)[0].values).toEqual([
+      [null],
+    ])
   })
 })

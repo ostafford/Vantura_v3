@@ -385,3 +385,59 @@ export function getRoundUpsByParentIds(
   stmt.free()
   return map
 }
+
+export interface RecentDebitRow {
+  id: string
+  description: string
+  raw_text: string | null
+  amount: number
+  date: string
+  category_id: string | null
+}
+
+/**
+ * Recent debits for the "pick the transaction this bill matches" pickers (the
+ * Regular form and a bucket's add-Regular modal), newest first, optionally
+ * filtered by description or raw text. Transfers and Round Up rows are left out.
+ */
+export function searchRecentDebits(
+  search: string,
+  limit = 40
+): RecentDebitRow[] {
+  const db = getDb()
+  if (!db) return []
+  const pattern = search.trim() ? `%${search.trim()}%` : '%'
+  const stmt = db.prepare(
+    `SELECT id, description, raw_text, ABS(amount), COALESCE(settled_at, created_at), category_id
+     FROM transactions
+     WHERE amount < 0
+       AND transfer_account_id IS NULL
+       AND round_up_parent_id IS NULL
+       AND (description LIKE ? ESCAPE '\\' OR raw_text LIKE ? ESCAPE '\\')
+     ORDER BY substr(COALESCE(settled_at, created_at), 1, 10) DESC,
+              COALESCE(settled_at, created_at) DESC
+     LIMIT ?`
+  )
+  stmt.bind([pattern, pattern, limit])
+  const list: RecentDebitRow[] = []
+  while (stmt.step()) {
+    const r = stmt.get() as [
+      string,
+      string,
+      string | null,
+      number,
+      string,
+      string | null,
+    ]
+    list.push({
+      id: r[0],
+      description: r[1],
+      raw_text: r[2] ?? null,
+      amount: r[3],
+      date: r[4],
+      category_id: r[5] ?? null,
+    })
+  }
+  stmt.free()
+  return list
+}

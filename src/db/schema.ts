@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 57
+const SCHEMA_VERSION = 58
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -157,15 +157,6 @@ const DDL_STATEMENTS = [
     user_notes TEXT,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
   )`,
-  `CREATE TABLE IF NOT EXISTS future_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    amount_cents INTEGER NOT NULL,
-    frequency TEXT NOT NULL DEFAULT 'MONTHLY',
-    target_date TEXT,
-    notes TEXT,
-    created_at TEXT NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY
   )`,
@@ -201,16 +192,6 @@ const DDL_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_saver_goal_history_saver
      ON saver_goal_history(saver_id, created_at)`,
-  `CREATE TABLE IF NOT EXISTS budget_transaction_anchors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bucket_id INTEGER NOT NULL,
-    transaction_id TEXT NOT NULL,
-    description_pattern TEXT NOT NULL,
-    frequency TEXT NOT NULL DEFAULT 'MONTHLY',
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id)
-  )`,
 ]
 
 export function runSchema(database: Database): void {
@@ -1517,6 +1498,18 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['57']
+    )
+  }
+  // #210 — drop two tables nothing reads: budget_transaction_anchors (the
+  // bucket anchors feature is gone; only its transaction-picker query lived
+  // on, and that reads `transactions`) and future_items (Maybuys / Wants /
+  // Goals, whose routes were already redirect stubs).
+  if (version < 58) {
+    database.run(`DROP TABLE IF EXISTS budget_transaction_anchors`)
+    database.run(`DROP TABLE IF EXISTS future_items`)
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['58']
     )
   }
 }

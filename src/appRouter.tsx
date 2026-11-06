@@ -117,10 +117,6 @@ export const appRouter = createBrowserRouter(
               } satisfies AppRouteHandle,
             },
             {
-              path: 'income',
-              element: <Navigate to="/analytics" replace />,
-            },
-            {
               path: 'trackers',
               element: <AnalyticsTrackers />,
               handle: {
@@ -153,26 +149,6 @@ export const appRouter = createBrowserRouter(
             {
               path: 'savers/:saverId',
               element: <SaverAccountTransactionsRedirect />,
-            },
-            {
-              path: 'maybuys',
-              element: <Navigate to="/analytics" replace />,
-            },
-            {
-              path: 'wants',
-              element: <Navigate to="/analytics" replace />,
-            },
-            {
-              path: 'wants/:wantId',
-              element: <Navigate to="/analytics" replace />,
-            },
-            {
-              path: 'goals',
-              element: <Navigate to="/analytics" replace />,
-            },
-            {
-              path: 'goals/:goalId',
-              element: <Navigate to="/analytics" replace />,
             },
           ],
         },

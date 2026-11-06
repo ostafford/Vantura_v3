@@ -21,7 +21,6 @@ import {
   IMPORT_ERROR_WRONG_PASSPHRASE,
   type ExportPayload,
   type ImportOptions,
-  type BudgetBucketExportRow,
   type TrackerExportRow,
   type TrackerConfigHistoryExportRow,
   type UpcomingChargeExportRow,
@@ -417,7 +416,7 @@ describe('profileExport', () => {
   })
 })
 
-describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
+describe('replaceBudgetPlan after the anchors table is dropped (#210)', () => {
   let SQL: SqlJsStatic
   let realDb: Database
 
@@ -432,73 +431,65 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
     vi.mocked(db.schedulePersist).mockImplementation(() => {})
   })
 
-  function insertBucket(name: string): number {
-    realDb.run(
-      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES (?, 'mdi-wallet', 0, '2026-01-01')`,
+  const tableExists = (name: string) =>
+    realDb.exec(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
       [name]
-    )
-    return realDb.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
-  }
+    ).length > 0
 
-  function insertAnchor(bucketId: number, transactionId: string): void {
+  it('replaces the buckets on a database with no anchors table', () => {
+    expect(tableExists('budget_transaction_anchors')).toBe(false)
     realDb.run(
-      `INSERT INTO budget_transaction_anchors (bucket_id, transaction_id, description_pattern, frequency, created_at)
-       VALUES (?, ?, 'PATTERN', 'MONTHLY', '2026-01-01')`,
-      [bucketId, transactionId]
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Old', 'mdi-wallet', 0, '2026-01-01')`
     )
-  }
 
-  function anchorBucketIds(): number[] {
-    const stmt = realDb.prepare(
-      `SELECT bucket_id FROM budget_transaction_anchors ORDER BY id`
-    )
-    const ids: number[] = []
-    while (stmt.step()) ids.push(stmt.get()[0] as number)
-    stmt.free()
-    return ids
-  }
-
-  it('remaps anchors to the new bucket id when the bucket name survives the import', () => {
-    const billsId = insertBucket('Bills')
-    insertAnchor(billsId, 'tx-1')
-
-    const imported: BudgetBucketExportRow[] = [
+    const map = replaceBudgetPlan([
       { id: 999, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
-    ]
-    const bucketIdMap = replaceBudgetPlan(imported)
-    const newBillsId = bucketIdMap.get(999)
+    ])
 
-    expect(newBillsId).toBeDefined()
-    expect(newBillsId).not.toBe(billsId)
-    expect(anchorBucketIds()).toEqual([newBillsId])
+    expect(
+      realDb.exec(`SELECT id, name FROM budget_buckets`)[0].values
+    ).toEqual([[map.get(999), 'Bills']])
   })
 
-  it('deletes anchors whose bucket name does not survive the import', () => {
-    const groceriesId = insertBucket('Groceries')
-    insertAnchor(groceriesId, 'tx-2')
-
-    const imported: BudgetBucketExportRow[] = [
-      { id: 999, name: 'Entertainment', icon: 'mdi-wallet', sort_order: 0 },
-    ]
-    replaceBudgetPlan(imported)
-
-    expect(anchorBucketIds()).toEqual([])
+  it('exports no anchors or future-items section', () => {
+    realDb.run(
+      `INSERT INTO budget_buckets (name, icon, sort_order, created_at) VALUES ('Bills', 'mdi-wallet', 0, '2026-01-01')`
+    )
+    const keys = Object.keys(buildExportPayload())
+    expect(keys.some((k) => /anchor/i.test(k))).toBe(false)
+    expect(keys.some((k) => /future/i.test(k))).toBe(false)
   })
 
-  it('leaves anchors on unrelated surviving buckets untouched when other buckets are dropped', () => {
-    const billsId = insertBucket('Bills')
-    const groceriesId = insertBucket('Groceries')
-    insertAnchor(billsId, 'tx-1')
-    insertAnchor(groceriesId, 'tx-2')
+  it('imports an older export carrying a stray anchors section, writing nothing for it', () => {
+    const older = {
+      version: 12,
+      exportedAt: '2026-02-15T00:00:00.000Z',
+      appSchemaVersion: 50,
+      settings: {},
+      trackers: [],
+      trackerCategories: [],
+      upcomingCharges: [],
+      budgetBuckets: [
+        { id: 4, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
+      ],
+      budget_transaction_anchors: [
+        { bucket_id: 4, transaction_id: 'tx-1', description_pattern: 'X' },
+      ],
+    } as unknown as ExportPayload
 
-    // Only "Bills" is re-imported; "Groceries" is dropped from the plan.
-    const imported: BudgetBucketExportRow[] = [
-      { id: 1, name: 'Bills', icon: 'mdi-wallet', sort_order: 0 },
-    ]
-    const bucketIdMap = replaceBudgetPlan(imported)
-    const newBillsId = bucketIdMap.get(1)
-
-    expect(anchorBucketIds()).toEqual([newBillsId])
+    expect(() =>
+      importPayloadWithOptions(older, {
+        settings: true,
+        trackers: true,
+        upcomingCharges: true,
+        budgetPlan: true,
+      })
+    ).not.toThrow()
+    expect(realDb.exec(`SELECT name FROM budget_buckets`)[0].values).toEqual([
+      ['Bills'],
+    ])
+    expect(tableExists('budget_transaction_anchors')).toBe(false)
   })
 })
 
@@ -506,7 +497,7 @@ describe('replaceBudgetPlan: budget_transaction_anchors preservation', () => {
  * #36 — real-DB coverage for the import writers that had none:
  * replaceTrackers, replaceUpcomingCharges, and the importPayloadWithOptions
  * orchestrator. Each runs delete-then-reinsert against a live in-memory
- * sql.js DB (matching the replaceBudgetPlan block above), so id remapping,
+ * sql.js DB, so id remapping,
  * category-existence filtering, config-history synthesis and per-section
  * option gating are exercised for real rather than mocked.
  */

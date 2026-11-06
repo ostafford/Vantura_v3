@@ -23,8 +23,8 @@ import {
 } from '@/services/trackers'
 import {
   searchRecentDebits,
-  type AnchorDebitRow,
-} from '@/services/budgetTransactionAnchors'
+  type RecentDebitRow,
+} from '@/services/transactions'
 import {
   toPeriodCents,
   type BudgetDisplayPeriod,
@@ -82,7 +82,7 @@ function AddUpcomingTransactionModal({
 }: AddUpcomingTransactionModalProps) {
   const [step, setStep] = useState<'pick' | 'configure'>('pick')
   const [txSearch, setTxSearch] = useState('')
-  const [selectedTx, setSelectedTx] = useState<AnchorDebitRow | null>(null)
+  const [selectedTx, setSelectedTx] = useState<RecentDebitRow | null>(null)
   const { draft, reset, update, setFrequency, save } =
     useRegularDraft(blankDraft)
 
@@ -113,7 +113,7 @@ function AddUpcomingTransactionModal({
   // Same Regular the Dashboard creates from this payment, including the
   // payment link (#147) and its date as the anchor (#153): counted in
   // Spendable, an expense, in this bucket.
-  function handleSelectTx(tx: AnchorDebitRow) {
+  function handleSelectTx(tx: RecentDebitRow) {
     setSelectedTx(tx)
     reset({ ...draftFromTransaction(tx, draft.frequency), bucketId })
     setStep('configure')
