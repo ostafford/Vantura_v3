@@ -354,4 +354,65 @@ describe('dueSoonRegulars', () => {
       '2025-02-28 Rent',
     ])
   })
+
+  describe('paid-aware: a paid occurrence clears itself (#211)', () => {
+    const onlyId = () =>
+      Number(db.exec('SELECT id FROM upcoming_charges')[0].values[0][0])
+    function pay(id: string, description: string, amount: number, at: string) {
+      db.run(
+        `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
+         VALUES (?, 'everyday', 'SETTLED', ?, ?, ?, ?)`,
+        [id, description, -amount, at, at]
+      )
+    }
+
+    it('leaves out an occurrence whose Linked payment has landed early', () => {
+      add({
+        name: 'Netflix',
+        frequency: 'MONTHLY',
+        date: '2024-11-25',
+        amount: 1599,
+        reminder: 5,
+        match_description: 'NETFLIX.COM',
+      })
+      pay('tx-feb', 'NETFLIX.COM', 1599, '2025-02-23T09:00:00+11:00')
+      expect(dueSoonRegulars()).toEqual([])
+    })
+
+    it('leaves out an occurrence marked paid', () => {
+      add({ name: 'Rent', frequency: 'ONCE', date: '2025-02-25', reminder: 5 })
+      const id = onlyId()
+      expect(markOccurrencePaid(id, '2025-02-25')).toBe(true)
+      expect(dueSoonRegulars()).toEqual([])
+    })
+
+    it('keeps an occurrence when the payment belongs to an earlier one', () => {
+      add({
+        name: 'Netflix',
+        frequency: 'MONTHLY',
+        date: '2024-11-25',
+        amount: 1599,
+        reminder: 5,
+        match_description: 'NETFLIX.COM',
+      })
+      // Nearest to 25 Jan, so it pays January's occurrence, not February's.
+      pay('tx-jan', 'NETFLIX.COM', 1599, '2025-01-26T09:00:00+11:00')
+      expect(dated(dueSoonRegulars())).toEqual(['2025-02-25 Netflix'])
+    })
+
+    it('moves to the next unpaid occurrence, across a month end, when it is still in the window', () => {
+      // Weekly: 24 Feb is marked paid; 3 Mar is 8 days out, inside an 8-day window.
+      add({ name: 'Gym', frequency: 'WEEKLY', date: '2025-01-06', reminder: 8 })
+      const id = onlyId()
+      expect(markOccurrencePaid(id, '2025-02-24')).toBe(true)
+      expect(dated(dueSoonRegulars())).toEqual(['2025-03-03 Gym'])
+    })
+
+    it('shows nothing when the next unpaid occurrence is outside the window', () => {
+      add({ name: 'Gym', frequency: 'WEEKLY', date: '2025-01-06', reminder: 7 })
+      const id = onlyId()
+      expect(markOccurrencePaid(id, '2025-02-24')).toBe(true)
+      expect(dueSoonRegulars()).toEqual([])
+    })
+  })
 })
