@@ -94,7 +94,7 @@ export function HeadroomCards({
   const free = h.freeSpendingSoFarCents
 
   return (
-    <section className="headroom" aria-label="Headroom">
+    <section className="headroom" aria-label="Headroom" data-tour="headroom">
       <div className="headroom__row">
         <SumCard
           tone="on-hand"

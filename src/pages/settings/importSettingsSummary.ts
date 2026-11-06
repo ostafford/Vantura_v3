@@ -27,9 +27,5 @@ export function formatSettingsSummary(
       parts.push(`${label} payday`)
     }
   }
-  // Changes Spendable on import, so it's called out (decision 6).
-  if (settings.essentials_saver_account_id) {
-    parts.push('Essentials Saver nominated')
-  }
   return parts.length > 0 ? parts.join(', ') : 'Some settings'
 }

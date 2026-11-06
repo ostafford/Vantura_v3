@@ -8,9 +8,6 @@
  * links to neither. HELD and SETTLED both count, and the payment is dated by
  * its **Display date** (`created_at ?? settled_at`, local day). Refunds are
  * never Linked payments.
- *
- * This is separate from `findLinkedPayment` in `../fundingSource`, whose
- * SETTLED-only "most recent" rule is unchanged for its existing consumers.
  */
 
 import type { Database } from 'sql.js'

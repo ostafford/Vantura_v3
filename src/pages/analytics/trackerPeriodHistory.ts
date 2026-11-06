@@ -17,7 +17,7 @@ import {
  * `-(periodsBack - 1)` … `0`, where `0` is the current period.
  *
  * "Today" is the **local** calendar date — the convention shared with
- * `services/trackers` and the Spendable calculation. It is handed to
+ * `services/trackers`. It is handed to
  * `calendarPeriodBounds` as noon UTC because that helper reads a `Date`'s UTC
  * calendar fields; a raw `new Date()` would put a UTC+10/+11 user (i.e. every
  * Up Bank customer) opening the page before ~10am local into the previous

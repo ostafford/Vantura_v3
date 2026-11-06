@@ -387,8 +387,8 @@ export function AnalyticsSavers() {
       <div className="d-flex align-items-start justify-content-between mb-3">
         <p className="text-muted mb-0">
           Balances sync from Up Bank account type{' '}
-          <code className="small">SAVER</code>. &quot;Available&quot; on the
-          Dashboard still sums transactional accounts only.
+          <code className="small">SAVER</code>. A Saver counts in the
+          Dashboard&apos;s On hand only when you switch it on.
         </p>
         <HelpPopover
           id="savers-help"

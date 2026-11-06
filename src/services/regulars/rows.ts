@@ -19,7 +19,6 @@ export interface Regular {
   /** The stored anchor date — never advanced (docs/adr/0004). */
   next_charge_date: string
   category_id: string | null
-  is_reserved: number
   /** Remind me this many days before next charge (null = no reminder). */
   reminder_days_before: number | null
   /** Optional date by which to cancel (for subscriptions). */
@@ -40,7 +39,6 @@ type RegularTuple = [
   string,
   string,
   string | null,
-  number,
   number | null,
   string | null,
   string | null,
@@ -50,7 +48,7 @@ type RegularTuple = [
 /** Every Regular, in id order. */
 export function readRegulars(db: Database): Regular[] {
   const stmt = db.prepare(
-    `SELECT id, name, amount, frequency, next_charge_date, category_id, is_reserved,
+    `SELECT id, name, amount, frequency, next_charge_date, category_id,
       reminder_days_before, cancel_by_date, match_description, bucket_id
      FROM upcoming_charges ORDER BY id`
   )
@@ -64,11 +62,10 @@ export function readRegulars(db: Database): Regular[] {
       frequency: r[3],
       next_charge_date: r[4],
       category_id: r[5] ?? null,
-      is_reserved: r[6],
-      reminder_days_before: r[7] ?? null,
-      cancel_by_date: r[8] ?? null,
-      match_description: r[9] ?? null,
-      bucket_id: r[10] ?? null,
+      reminder_days_before: r[6] ?? null,
+      cancel_by_date: r[7] ?? null,
+      match_description: r[8] ?? null,
+      bucket_id: r[9] ?? null,
     })
   }
   stmt.free()

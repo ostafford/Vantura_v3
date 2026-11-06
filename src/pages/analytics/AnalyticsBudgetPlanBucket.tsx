@@ -111,8 +111,8 @@ function AddUpcomingTransactionModal({
   }
 
   // Same Regular the Dashboard creates from this payment, including the
-  // payment link (#147) and its date as the anchor (#153): counted in
-  // Spendable, an expense, in this bucket.
+  // payment link (#147) and its date as the anchor (#153): an expense, in this
+  // bucket.
   function handleSelectTx(tx: RecentDebitRow) {
     setSelectedTx(tx)
     reset({ ...draftFromTransaction(tx, draft.frequency), bucketId })

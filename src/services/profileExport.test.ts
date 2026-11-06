@@ -93,10 +93,15 @@ describe('profileExport', () => {
       }
     })
 
-    it('essentials_saver_account_id is in SETTINGS_WHITELIST (decision 6)', () => {
-      expect(
-        new Set(SETTINGS_WHITELIST).has('essentials_saver_account_id')
-      ).toBe(true)
+    it('no Spendable alert or Essentials key is in SETTINGS_WHITELIST (#211)', () => {
+      const wl = new Set(SETTINGS_WHITELIST)
+      for (const key of [
+        'spendable_alert_below_cents',
+        'spendable_alert_below_pct_pay',
+        'essentials_saver_account_id',
+      ]) {
+        expect(wl.has(key), `${key} still whitelisted`).toBe(false)
+      }
     })
 
     it('leaves the nominated pay source out of an export (#194)', async () => {
@@ -552,7 +557,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       frequency: 'MONTHLY',
       next_charge_date: '2026-03-01',
       category_id: null,
-      is_reserved: 1,
       ...over,
     }
   }
@@ -749,20 +753,18 @@ describe('profile import writers: real-DB coverage (#36)', () => {
   function readCharges(): Array<{
     name: string
     category_id: string | null
-    is_reserved: number
     reminder_days_before: number | null
     cancel_by_date: string | null
     bucket_id: number | null
     next_charge_date: string
   }> {
     const stmt = realDb.prepare(
-      `SELECT name, category_id, is_reserved, reminder_days_before, cancel_by_date, bucket_id, next_charge_date
+      `SELECT name, category_id, reminder_days_before, cancel_by_date, bucket_id, next_charge_date
        FROM upcoming_charges ORDER BY id`
     )
     const out: Array<{
       name: string
       category_id: string | null
-      is_reserved: number
       reminder_days_before: number | null
       cancel_by_date: string | null
       bucket_id: number | null
@@ -772,7 +774,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       const r = stmt.get() as [
         string,
         string | null,
-        number,
         number | null,
         string | null,
         number | null,
@@ -781,11 +782,10 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       out.push({
         name: r[0],
         category_id: r[1],
-        is_reserved: r[2],
-        reminder_days_before: r[3],
-        cancel_by_date: r[4],
-        bucket_id: r[5],
-        next_charge_date: r[6],
+        reminder_days_before: r[2],
+        cancel_by_date: r[3],
+        bucket_id: r[4],
+        next_charge_date: r[5],
       })
     }
     stmt.free()
@@ -934,8 +934,8 @@ describe('profile import writers: real-DB coverage (#36)', () => {
   describe('replaceUpcomingCharges', () => {
     it("round-trips a Regular's payment link (docs/adr/0020) and leaves a file without one unlinked", () => {
       realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at, match_raw_text, match_description)
-         VALUES ('Oura', 1000, 'MONTHLY', '2026-03-23', 1, '2026-01-01', 'OURARING, OULU', 'Oura')`
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at, match_raw_text, match_description)
+         VALUES ('Oura', 1000, 'MONTHLY', '2026-03-23', '2026-01-01', 'OURARING, OULU', 'Oura')`
       )
       const exported = buildExportPayload().upcomingCharges
 
@@ -955,8 +955,8 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
     it('wipes existing charges and inserts the imported set', () => {
       realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
-         VALUES ('Stale', 100, 'MONTHLY', '2026-01-01', 1, '2026-01-01')`
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at)
+         VALUES ('Stale', 100, 'MONTHLY', '2026-01-01', '2026-01-01')`
       )
 
       replaceUpcomingCharges([chargeExport({ name: 'Fresh' })])
@@ -1007,7 +1007,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       expect(readCharges()[0]).toEqual(
         expect.objectContaining({
           name: 'Minimal',
-          is_reserved: 1,
           reminder_days_before: null,
           cancel_by_date: null,
           next_charge_date: '2026-05-01',
@@ -1277,8 +1276,8 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Existing', 'mdi-wallet', 0, '2026-01-01')`
       )
       realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
-         VALUES ('Existing charge', 1000, 'MONTHLY', '2026-01-01', 1, '2026-01-01')`
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at)
+         VALUES ('Existing charge', 1000, 'MONTHLY', '2026-01-01', '2026-01-01')`
       )
 
       expect(() =>
@@ -1388,7 +1387,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(14)
+      expect(payload.version).toBe(15)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1603,8 +1602,8 @@ describe('profile import writers: real-DB coverage (#36)', () => {
   describe('Regular paid marks export/import (#214)', () => {
     function addRegular(name: string, date: string): number {
       realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
-         VALUES (?, 5000, 'MONTHLY', ?, 1, '2026-01-01')`,
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at)
+         VALUES (?, 5000, 'MONTHLY', ?, '2026-01-01')`,
         [name, date]
       )
       return Number(realDb.exec(`SELECT last_insert_rowid()`)[0].values[0][0])
@@ -1746,12 +1745,12 @@ describe('profile import writers: real-DB coverage (#36)', () => {
                 amount: 250000,
                 frequency: 'FORTNIGHTLY',
                 next_charge_date: '2026-03-06',
-                is_reserved: 1,
                 reminder_days_before: 2,
                 cancel_by_date: '2027-12-31',
                 bucket_id: 3,
                 match_description: 'HOMELOAN',
               }),
+              is_reserved: 1,
               charge_type: 'LIABILITY_REPAYMENT',
               linked_account_name: 'Home Loan',
             } as UpcomingChargeExportRow,
@@ -1814,11 +1813,11 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
     it('exports no Net Worth sections and no liability fields on Regulars', () => {
       realDb.run(
-        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, is_reserved, created_at)
-         VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01')`
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at)
+         VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(14)
+      expect(payload.version).toBe(15)
       expect(Object.keys(payload)).not.toContain('manualAccounts')
       expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
       expect(payload.upcomingCharges).toHaveLength(1)
@@ -1838,7 +1837,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       )[0].values[0][0]
       expect(
         realDb.exec(
-          `SELECT name, amount, frequency, next_charge_date, is_reserved,
+          `SELECT name, amount, frequency, next_charge_date,
                   reminder_days_before, cancel_by_date, bucket_id, match_description
            FROM upcoming_charges`
         )[0].values
@@ -1848,7 +1847,6 @@ describe('profile import writers: real-DB coverage (#36)', () => {
           250000,
           'FORTNIGHTLY',
           '2026-03-06',
-          1,
           2,
           '2027-12-31',
           bucketId,
@@ -1894,6 +1892,110 @@ describe('profile import writers: real-DB coverage (#36)', () => {
         manualAccounts: [],
         netWorthSnapshots: [],
       } as ExportPayload
+      expect(describeSkippedSections(payload)).toBeNull()
+    })
+  })
+
+  // ── #211: Spendable is cut ──────────────────────────────────────────────
+
+  describe('Spendable cut (#211)', () => {
+    const CUT_KEYS = [
+      'spendable_alert_below_cents',
+      'spendable_alert_below_pct_pay',
+      'essentials_saver_account_id',
+    ]
+
+    /** A v14-or-earlier payload, which still carries the Spendable settings. */
+    function olderExportWithSpendable(): ExportPayload {
+      return emptyPayload({
+        version: 14,
+        settings: {
+          pay_amount_cents: '450000',
+          spendable_alert_below_cents: '50000',
+          spendable_alert_below_pct_pay: '0',
+          essentials_saver_account_id: 'saver-1',
+        },
+        upcomingCharges: [
+          { ...chargeExport({ name: 'Rent' }), is_reserved: 1 },
+          {
+            ...chargeExport({
+              name: 'Domain',
+              amount: 1500,
+              frequency: 'YEARLY',
+              next_charge_date: '2027-03-01',
+              reminder_days_before: 7,
+            }),
+            is_reserved: 0,
+          },
+        ] as UpcomingChargeExportRow[],
+      })
+    }
+
+    it('exports no Spendable settings and no is_reserved on Regulars', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getAppSetting).mockImplementation((key) =>
+        CUT_KEYS.includes(key) ? '1' : key === 'pay_amount_cents' ? '1' : null
+      )
+      realDb.run(
+        `INSERT INTO upcoming_charges (name, amount, frequency, next_charge_date, created_at)
+         VALUES ('Rent', 180000, 'MONTHLY', '2026-03-01', '2026-01-01')`
+      )
+      const payload = buildExportPayload()
+      expect(payload.version).toBe(15)
+      for (const key of CUT_KEYS) {
+        expect(payload.settings[key], key).toBeUndefined()
+      }
+      expect(payload.settings.pay_amount_cents).toBe('1')
+      expect(payload.upcomingCharges).toHaveLength(1)
+      expect(Object.keys(payload.upcomingCharges[0])).not.toContain(
+        'is_reserved'
+      )
+    })
+
+    it('imports an older export without its Spendable settings, every Regular counted, the rest intact', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.setAppSetting).mockClear()
+
+      importPayloadWithOptions(olderExportWithSpendable(), ALL_ON)
+
+      const written = vi.mocked(db.setAppSetting).mock.calls.map(([key]) => key)
+      for (const key of CUT_KEYS) expect(written, key).not.toContain(key)
+      expect(written).toContain('pay_amount_cents')
+      expect(
+        realDb.exec(
+          `SELECT name, amount, frequency, next_charge_date, reminder_days_before
+           FROM upcoming_charges ORDER BY id`
+        )[0].values
+      ).toEqual([
+        ['Rent', 180000, 'MONTHLY', '2026-03-01', null],
+        ['Domain', 1500, 'YEARLY', '2027-03-01', 7],
+      ])
+    })
+
+    it('says what it skipped', () => {
+      expect(describeSkippedSections(olderExportWithSpendable())).toBe(
+        'Skipped your Spendable alert. Vantura no longer has it. ' +
+          'Skipped your Essentials Saver. Vantura no longer has it. ' +
+          '1 Regular had “Include in Spendable” off. It now counts in Still to go out.'
+      )
+    })
+
+    it('counts every Regular that had Include in Spendable off', () => {
+      const payload = olderExportWithSpendable()
+      payload.settings = {}
+      payload.upcomingCharges = [
+        ...payload.upcomingCharges,
+        { ...chargeExport({ name: 'Gym' }), is_reserved: 0 },
+      ] as UpcomingChargeExportRow[]
+      expect(describeSkippedSections(payload)).toBe(
+        '2 Regulars had “Include in Spendable” off. They now count in Still to go out.'
+      )
+    })
+
+    it('says nothing when every Regular had it on and no Spendable setting is present', () => {
+      const payload = olderExportWithSpendable()
+      payload.settings = { pay_amount_cents: '450000' }
+      payload.upcomingCharges = payload.upcomingCharges.slice(0, 1)
       expect(describeSkippedSections(payload)).toBeNull()
     })
   })

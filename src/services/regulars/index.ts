@@ -4,13 +4,12 @@
  * `upcoming_charges` elsewhere.
  *
  * Reads are projected here (docs/adr/0004): `regularsByMonth`,
- * `regularOccurrencesInMonth`, `dueSoonRegulars`, `reservedBeforePayday`
- * (+ `totalReserved`), `regularsWithFundingSource`, `essentialsLinkHints`,
- * `linkedPaymentsInMonth`, `regularsInMonth`, `regularOccurrencesPaidInMonth`.
+ * `regularOccurrencesInMonth`, `dueSoonRegulars`, `linkedPaymentsInMonth`,
+ *, `regularsInMonth`, `regularOccurrencesPaidInMonth`.
  * One returns stored rows by design: `regularById` (the editor's anchor).
  *
- * Internals: `rows.ts` (the one SELECT), `projection.ts`, `reserved.ts`,
- * `funding.ts`, `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
+ * Internals: `rows.ts` (the one SELECT), `projection.ts`,
+ * `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
@@ -36,17 +35,6 @@ import {
 import { regularOccurrencesPaidInMonth } from './paid'
 
 export type { Regular } from './rows'
-export {
-  reservedBeforePayday,
-  totalReserved,
-  type ReservedItem,
-} from './reserved'
-export {
-  regularsWithFundingSource,
-  essentialsLinkHints,
-  type RegularWithFundingSource,
-  type EssentialsLinkHint,
-} from './funding'
 export {
   blankDraft,
   draftFromRegular,

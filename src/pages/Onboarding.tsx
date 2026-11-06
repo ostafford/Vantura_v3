@@ -371,10 +371,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <Form onSubmit={handleStep4Submit}>
               <h6 className="mb-2">When do you get paid?</h6>
               <p className="text-muted small mb-3">
-                This helps calculate your Spendable balance. When Monthly, Day
-                is the date in the month (1st–28th) or a relative rule such as
-                Last Friday — useful when your employer pays on the last weekday
-                of each month.
+                When Monthly, Day is the date in the month (1st–28th) or a
+                relative rule such as Last Friday — useful when your employer
+                pays on the last weekday of each month.
               </p>
               <Form.Group className="mb-2">
                 <Form.Label htmlFor="onboarding-payday-frequency">
@@ -515,8 +514,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               <h5 className="mb-2">All set</h5>
               <p className="text-muted small mb-3">
                 You&apos;re ready to start tracking your finances. Create
-                trackers to monitor spending, view Spendable to see your
-                safe-to-spend amount, and use Analytics for longer-term trends.
+                trackers to monitor spending, check Headroom on the Dashboard to
+                see what&apos;s left once this month&apos;s Regulars and
+                trackers are covered, and use Analytics for longer-term trends.
               </p>
               <p className="text-muted small mb-3">
                 New to Vantura? You can take a short dashboard tour or read the

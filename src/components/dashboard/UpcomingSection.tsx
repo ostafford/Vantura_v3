@@ -20,11 +20,9 @@ import {
   blankDraft,
   draftFromRegular,
   draftFromSuggestion,
-  essentialsLinkHints,
   type Regular,
 } from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
-import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
 import {
   searchRecentDebits,
@@ -37,7 +35,6 @@ import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { getBuckets } from '@/services/budgetBuckets'
-import { isEssentialsUser } from '@/services/essentials'
 import { HelpPopover } from '@/components/HelpPopover'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
@@ -84,7 +81,6 @@ export function UpcomingSection({
     frequency,
     nextChargeDate,
     categoryId,
-    isReserved,
     reminderDaysBefore,
     cancelByDate,
     matchDescription,
@@ -107,11 +103,6 @@ export function UpcomingSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [refresh, lastSyncCompletedAt, today]
   )
-  const reserved = useMemo(
-    () => getReservedAmount(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt, today]
-  )
   const categories = useMemo(
     () => getCategories(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,32 +116,6 @@ export function UpcomingSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allBuckets = useMemo(() => getBuckets(), [refresh, lastSyncCompletedAt])
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
-  const essentialsUser = useMemo(
-    () => isEssentialsUser(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refresh, lastSyncCompletedAt]
-  )
-
-  /**
-   * Essentials-era nudge (#97, docs/adr/0019 "Known limitations"): funding
-   * source needs a linked payment (docs/adr/0020), so a Regular without one
-   * gets no Essentials benefit — it's always reserved. Surfaced only for an
-   * active Essentials nomination; classic users get nothing here since
-   * linking has no effect on their Reserved figure. See essentialsLinkHints.
-   */
-  const linkHints = useMemo(
-    () => (essentialsUser ? essentialsLinkHints() : new Map()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [essentialsUser, refresh, lastSyncCompletedAt, today]
-  )
-
-  function essentialsLinkLabel(c: Regular): string | null {
-    const hint = linkHints.get(c.id)
-    if (hint === 'unlinked') return 'link a payment to use Essentials'
-    if (hint === 'no_payment') return 'no matching payment found'
-    return null
-  }
-
   function openCreate() {
     setEditingCharge(null)
     reset(blankDraft())
@@ -328,16 +293,8 @@ export function UpcomingSection({
               <span className="badge badge-reminder ms-1">{dueLabel}</span>
             )}
           </div>
-          {(categoryName || c.is_reserved === 0 || essentialsLinkLabel(c)) && (
-            <div className="small text-muted">
-              {[
-                categoryName,
-                c.is_reserved === 0 ? 'excluded from Spendable' : null,
-                essentialsLinkLabel(c),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
+          {categoryName && (
+            <div className="small text-muted">{categoryName}</div>
           )}
         </td>
         <td>{c.frequency.charAt(0) + c.frequency.slice(1).toLowerCase()}</td>
@@ -424,7 +381,7 @@ export function UpcomingSection({
             <HelpPopover
               id="upcoming-help"
               title="Regulars"
-              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into This month (due by the end of this calendar month) and Later, each showing the face-value total of what's listed. Regulars marked Include in Spendable reduce your Spendable balance until they're due — the 'reserved for Regulars' total below is just that subset: weekly/fortnightly ones count each occurrence before your next payday, monthly-or-rarer ones count once in full, so it won't match the group totals above."
+              content="Add bills and subscriptions you know are coming — rent, Netflix, insurance, etc. Set a name, amount, frequency (weekly, fortnightly, monthly, quarterly, yearly, or once), and next due date. The date auto-advances each cycle. Grouped into This month (due by the end of this calendar month) and Later, each showing the face-value total of what's listed."
               ariaLabel="What are Regulars?"
             />
           </div>
@@ -517,10 +474,6 @@ export function UpcomingSection({
                                         c.category_id
                                           ? categoryNameById.get(c.category_id)
                                           : null,
-                                        c.is_reserved === 0
-                                          ? 'excluded from Spendable'
-                                          : null,
-                                        essentialsLinkLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}
@@ -581,10 +534,6 @@ export function UpcomingSection({
                                         c.category_id
                                           ? categoryNameById.get(c.category_id)
                                           : null,
-                                        c.is_reserved === 0
-                                          ? 'excluded from Spendable'
-                                          : null,
-                                        essentialsLinkLabel(c),
                                       ]
                                         .filter(Boolean)
                                         .join(' · ')}
@@ -657,9 +606,6 @@ export function UpcomingSection({
                 : `Show all ${totalCount} (${hiddenCount} more)`}
             </button>
           )}
-          <div className="mt-2 small text-danger">
-            ${formatMoney(reserved)} reserved for Regulars
-          </div>
         </Card.Body>
       </Card>
 
@@ -873,17 +819,6 @@ export function UpcomingSection({
                   type="date"
                   value={nextChargeDate}
                   onChange={(e) => update({ nextChargeDate: e.target.value })}
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="checkbox"
-                  id="upcoming-charge-is-reserved"
-                  name="isReserved"
-                  label="Include in Spendable (reserve this amount)"
-                  checked={isReserved}
-                  onChange={(e) => update({ isReserved: e.target.checked })}
                 />
               </Form.Group>
 

@@ -26,9 +26,11 @@ import { readPaidMarks } from '@/services/regulars'
  * `manualAccounts` and `netWorthSnapshots` sections and the Regulars'
  * `charge_type` / `linked_account_name` fields are no longer written.
  * v13 (#213): the `onHandSaverIds` section is written. v14 (#214): each
- * Regular carries its `paid_marks`.
+ * Regular carries its `paid_marks`. v15 (#211): the Spendable alert and
+ * Essentials Saver settings and the Regulars' `is_reserved` are no longer
+ * written.
  */
-const EXPORT_PAYLOAD_VERSION = 14
+const EXPORT_PAYLOAD_VERSION = 15
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -44,13 +46,10 @@ export const SETTINGS_WHITELIST: readonly string[] = [
   'payday_day',
   'next_payday',
   'pay_amount_cents',
-  'spendable_alert_below_cents',
-  'spendable_alert_below_pct_pay',
   'dashboard_tour_completed',
   'dashboard_section_order',
   'lock_timeout_minutes',
   'saver_account_order',
-  'essentials_saver_account_id',
 ] as const
 
 /**
@@ -124,7 +123,6 @@ export interface UpcomingChargeExportRow {
   frequency: string
   next_charge_date: string
   category_id: string | null
-  is_reserved: number
   reminder_days_before?: number | null
   cancel_by_date?: string | null
   bucket_id?: number | null
@@ -307,7 +305,7 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
   const db = getDb()
   if (!db) return []
   const stmt = db.prepare(
-    `SELECT name, amount, frequency, next_charge_date, category_id, is_reserved,
+    `SELECT name, amount, frequency, next_charge_date, category_id,
       reminder_days_before, cancel_by_date, bucket_id, match_description, id
      FROM upcoming_charges ORDER BY id`
   )
@@ -325,7 +323,6 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       string,
       string,
       string | null,
-      number,
       number | null,
       string | null,
       number | null,
@@ -338,12 +335,11 @@ function collectUpcomingCharges(): UpcomingChargeExportRow[] {
       frequency: r[2],
       next_charge_date: r[3],
       category_id: r[4],
-      is_reserved: r[5],
-      reminder_days_before: r[6] ?? null,
-      cancel_by_date: r[7] ?? null,
-      bucket_id: r[8] ?? null,
-      match_description: r[9] ?? null,
-      paid_marks: marksByRegular.get(r[10]) ?? [],
+      reminder_days_before: r[5] ?? null,
+      cancel_by_date: r[6] ?? null,
+      bucket_id: r[7] ?? null,
+      match_description: r[8] ?? null,
+      paid_marks: marksByRegular.get(r[9]) ?? [],
     })
   }
   stmt.free()
@@ -594,7 +590,32 @@ const CUT_SETTINGS: readonly { keys: readonly string[]; notice: string }[] = [
     ],
     notice: 'Skipped your notification settings. Vantura no longer has them.',
   },
+  {
+    // #211 — the Spendable low-balance alert (v1–v14).
+    keys: ['spendable_alert_below_cents', 'spendable_alert_below_pct_pay'],
+    notice: 'Skipped your Spendable alert. Vantura no longer has it.',
+  },
+  {
+    // #211 — the Essentials Saver nomination (v9–v14).
+    keys: ['essentials_saver_account_id'],
+    notice: 'Skipped your Essentials Saver. Vantura no longer has it.',
+  },
 ]
+
+/**
+ * #211 — the number of an older export's Regulars that had "Include in
+ * Spendable" off (`is_reserved: 0`). The flag is gone, so they import like
+ * every other Regular and count in Still to go out. One left on (the
+ * default) loses nothing, so only the ones switched off are named.
+ */
+function countExcludedFromSpendable(payload: ExportPayload): number {
+  const charges = Array.isArray(payload.upcomingCharges)
+    ? payload.upcomingCharges
+    : []
+  return charges.filter(
+    (uc) => (uc as unknown as { is_reserved?: unknown }).is_reserved === 0
+  ).length
+}
 
 /**
  * The notice the import step shows for an older export's cut sections and
@@ -619,6 +640,14 @@ export function describeSkippedSections(payload: ExportPayload): string | null {
     ) {
       notices.push(cut.notice)
     }
+  }
+  const excluded = countExcludedFromSpendable(payload)
+  if (excluded > 0) {
+    notices.push(
+      excluded === 1
+        ? '1 Regular had “Include in Spendable” off. It now counts in Still to go out.'
+        : `${excluded} Regulars had “Include in Spendable” off. They now count in Still to go out.`
+    )
   }
   return notices.length > 0 ? notices.join(' ') : null
 }
@@ -850,7 +879,8 @@ export function replaceTrackers(
 /**
  * Replace upcoming_charges with imported data. An older export's
  * `charge_type` and `linked_account_name` (#118, cut in #209) are ignored: a
- * former liability repayment imports as an ordinary Regular.
+ * former liability repayment imports as an ordinary Regular. Its `is_reserved`
+ * (cut in #211) is ignored too: every Regular counts.
  */
 export function replaceUpcomingCharges(
   upcomingCharges: UpcomingChargeExportRow[],
@@ -882,7 +912,6 @@ export function replaceUpcomingCharges(
       categoryExists(db, uc.category_id)
         ? uc.category_id
         : null
-    const isReserved = typeof uc.is_reserved === 'number' ? uc.is_reserved : 1
     const reminderDaysBefore =
       typeof uc.reminder_days_before === 'number'
         ? uc.reminder_days_before
@@ -900,17 +929,16 @@ export function replaceUpcomingCharges(
 
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, category_id, is_reserved,
+         (name, amount, frequency, next_charge_date, category_id,
           reminder_days_before, cancel_by_date, bucket_id, match_description,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uc.name,
         uc.amount,
         uc.frequency,
         nextCharge,
         categoryId,
-        isReserved,
         reminderDaysBefore,
         cancelByDate,
         bucketId,

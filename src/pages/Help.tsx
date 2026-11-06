@@ -25,7 +25,6 @@ const HELP_SECTION_KEYS = [
   'navigation',
   'getting-started',
   'dashboard',
-  'spendable-balance',
   'trackers',
   'upcoming-charges',
   'analytics',
@@ -41,7 +40,6 @@ const HELP_SECTION_LABELS: Record<string, string> = {
   navigation: 'Navigation',
   'getting-started': 'Getting started',
   dashboard: 'Dashboard',
-  'spendable-balance': 'Spendable balance',
   trackers: 'Trackers',
   'upcoming-charges': 'Regulars',
   analytics: 'Analytics',
@@ -305,13 +303,12 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-0">
                     Choose your pay frequency (weekly, fortnightly, or monthly)
-                    and your next payday date. This drives the Spendable balance
-                    calculation.
+                    and your next payday date.
                   </p>
                   <Tip>
                     You can optionally set your pay amount in Settings → Payday.
-                    This enables the Free Spending figure in Budget Plan and a
-                    post-payday projection on the Spendable card.
+                    This enables the Free Spending figure in Budget Plan and
+                    Free spending so far on the Dashboard.
                   </Tip>
                 </>
               )}
@@ -320,14 +317,16 @@ export function Help() {
               {activeSection === 'dashboard' && (
                 <>
                   <SectionHeading icon="mdi-currency-usd" first>
-                    Balance cards
+                    Headroom
                   </SectionHeading>
                   <p className="mb-2">
-                    <strong>Available</strong> and <strong>Spendable</strong>{' '}
-                    sit at the top of the Dashboard. Click Spendable to set a
-                    low-balance alert. See{' '}
-                    <strong>Help → Spendable balance</strong> for how the
-                    calculation works.
+                    <strong>Headroom</strong> sits at the top of the Dashboard:
+                    what you have <strong>On hand</strong> minus what&apos;s{' '}
+                    <strong>Still to go out</strong> this month. On hand is your
+                    Spending account plus any Savers you switch on. Still to go
+                    out is every Regular not paid yet this month plus
+                    what&apos;s left in each tracker. Headroom can go below
+                    zero.
                   </p>
 
                   <SectionHeading icon="mdi-view-grid-outline">
@@ -352,40 +351,6 @@ export function Help() {
                     Drag the icon on the left of any section header to reorder,
                     or use Settings → Dashboard sections.
                   </Tip>
-                </>
-              )}
-
-              {/* ── Spendable balance ────────────────────────────────── */}
-              {activeSection === 'spendable-balance' && (
-                <>
-                  <SectionHeading icon="mdi-calculator" first>
-                    How it&apos;s calculated
-                  </SectionHeading>
-                  <p className="mb-2">
-                    <strong>
-                      Spendable = Available − Regulars reserved before your next
-                      payday.
-                    </strong>
-                  </p>
-                  <p className="mb-2">
-                    Your Available balance from Up Bank already reflects any
-                    pending or held transactions, so Vantura does not deduct
-                    them a second time. Only charges due before the next payday
-                    are reserved. A weekly or fortnightly Regular counts once
-                    for every time it falls due before payday; a monthly,
-                    quarterly, yearly or one-off Regular counts once, in full —
-                    nothing is prorated.
-                  </p>
-
-                  <SectionHeading icon="mdi-bell-outline">
-                    Low-balance alert
-                  </SectionHeading>
-                  <p className="mb-0">
-                    Click the Spendable card on the Dashboard to set a threshold
-                    — either a fixed dollar amount or a percentage of your pay.
-                    When Spendable drops below that threshold, the card turns
-                    red as a visual warning.
-                  </p>
                 </>
               )}
 
@@ -458,17 +423,6 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-2">
                     Weekly · Fortnightly · Monthly · Quarterly · Yearly · Once
-                  </p>
-
-                  <SectionHeading icon="mdi-currency-usd">
-                    Include in Spendable
-                  </SectionHeading>
-                  <p className="mb-2">
-                    Each charge has an <strong>Include in Spendable</strong>{' '}
-                    toggle (default: on). When on, the charge reduces your
-                    Spendable balance until its due date — so your &quot;safe to
-                    spend&quot; amount already accounts for it. Turn it off to
-                    track a charge without affecting Spendable.
                   </p>
 
                   <SectionHeading icon="mdi-format-list-group">
@@ -684,15 +638,10 @@ export function Help() {
 
                   <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
                   <p className="mb-2">
-                    Your payday frequency and date affect{' '}
-                    <strong>Spendable</strong>: only charges due before your
-                    next payday are reserved in the calculation.
+                    Your pay frequency and <strong>pay amount</strong> set your
+                    monthly Income, which gives the Free Spending figure in
+                    Budget Plan and Free spending so far on the Dashboard.
                   </p>
-                  <Tip>
-                    Set your <strong>pay amount</strong> here to enable the Free
-                    Spending figure in Budget Plan and the post-payday
-                    projection on the Spendable card.
-                  </Tip>
 
                   <SectionHeading icon="mdi-palette-outline">
                     Appearance

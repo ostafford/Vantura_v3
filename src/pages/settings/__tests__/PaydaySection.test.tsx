@@ -32,7 +32,7 @@ describe('PaydaySection', () => {
     expect(input).not.toMatch(/aria-label=/)
 
     expect(html).toContain(
-      'What lands in your account each pay, after tax. Your monthly Income is built from it, and it&#x27;s used for Spendable context and alerts.'
+      'What lands in your account each pay, after tax. Your monthly Income is built from it.'
     )
   })
 })

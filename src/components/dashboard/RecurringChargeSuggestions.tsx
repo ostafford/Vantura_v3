@@ -57,7 +57,7 @@ export function RecurringChargeSuggestions({
     id ? (categories.find((c) => c.id === id)?.name ?? null) : null
 
   function handleAdd(s: RecurringChargeSuggestion) {
-    // Counted in Spendable, with the latest payment's date as the anchor (#153).
+    // The latest payment's date as the anchor (#153).
     const draft = draftFromSuggestion(s)
     const errors = validateRegularDraft(draft)
     if (errors.name) {

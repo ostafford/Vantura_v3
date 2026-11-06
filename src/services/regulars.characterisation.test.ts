@@ -11,6 +11,10 @@
  * longer read, and `charge_type` / `linked_manual_account_id` are gone. The
  * two former liability repayments stay seeded as ordinary Regulars; the one
  * with a reminder now shows in due-soon (decided in #209).
+ *
+ * #211 cut Spendable: Reserved and Essentials coverage are no longer read,
+ * and `is_reserved` is gone. The Regular that had it off stays seeded as an
+ * ordinary Regular; the other readers' outputs are otherwise unchanged.
  */
 import {
   describe,
@@ -36,25 +40,21 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const { getReservedAmount } = await import('./balance')
-const { getEssentialsCoverage } = await import('./essentialsCoverage')
 const {
   regularsByMonth,
   regularOccurrencesInMonth,
   dueSoonRegulars,
   regularById,
-  reservedBeforePayday,
 } = await import('./regulars')
 
 const TRANSACTIONAL = 'transactional-1'
-const ESSENTIALS_SAVER = 'essentials-saver-1'
+const BILLS_SAVER = 'bills-saver-1'
 
 interface Seed {
   name: string
   amount: number
   frequency: string
   next_charge_date: string
-  is_reserved?: 0 | 1
   reminder_days_before?: number | null
   cancel_by_date?: string | null
   match_description?: string | null
@@ -77,7 +77,7 @@ const SEEDS: Seed[] = [
     match_description: 'NETFLIX.COM',
     category_id: 'tv-and-music',
   },
-  // WEEKLY: two occurrences before payday (02-24, 03-03) → counted twice in Reserved.
+  // WEEKLY: two occurrences before payday (02-24, 03-03).
   {
     name: 'Gym',
     amount: 1500,
@@ -147,7 +147,7 @@ const SEEDS: Seed[] = [
     next_charge_date: '2025-01-10',
     cancel_by_date: '2025-04-15',
   },
-  // Essentials-funded: its latest linked payment came from the Essentials Saver.
+  // Linked to a payment from a Saver.
   {
     name: 'Electricity',
     amount: 18000,
@@ -172,13 +172,12 @@ const SEEDS: Seed[] = [
     frequency: 'MONTHLY',
     next_charge_date: '2025-01-27',
   },
-  // Not reserved: out of Reserved, still grouped and due-soon.
+  // In a bucket, with a 1-day reminder (it had is_reserved off before #211).
   {
     name: 'Spotify',
     amount: 1299,
     frequency: 'MONTHLY',
     next_charge_date: '2025-01-24',
-    is_reserved: 0,
     reminder_days_before: 1,
     bucket_id: 1,
   },
@@ -187,17 +186,16 @@ const SEEDS: Seed[] = [
 function seedRegular(s: Seed) {
   db.run(
     `INSERT INTO upcoming_charges
-       (name, amount, frequency, next_charge_date, category_id, is_reserved,
+       (name, amount, frequency, next_charge_date, category_id,
         reminder_days_before, cancel_by_date, created_at, bucket_id,
         match_description)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '2025-01-01', ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, '2025-01-01', ?, ?)`,
     [
       s.name,
       s.amount,
       s.frequency,
       s.next_charge_date,
       s.category_id ?? null,
-      s.is_reserved ?? 1,
       s.reminder_days_before ?? null,
       s.cancel_by_date ?? null,
       s.bucket_id ?? null,
@@ -241,19 +239,18 @@ beforeEach(async () => {
 
   appSettings['next_payday'] = '2025-03-07'
   appSettings['payday_frequency'] = 'MONTHLY'
-  appSettings['essentials_saver_account_id'] = ESSENTIALS_SAVER
 
   db.run(
     `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
      VALUES (?, 'Everyday', 'TRANSACTIONAL', 500000, '2025-01-01', '2025-01-01'),
             (?, 'Bills', 'SAVER', 200000, '2025-01-01', '2025-01-01')`,
-    [TRANSACTIONAL, ESSENTIALS_SAVER]
+    [TRANSACTIONAL, BILLS_SAVER]
   )
 
   for (const s of SEEDS) seedRegular(s)
 
   settleDebit(TRANSACTIONAL, 'NETFLIX.COM', '2025-01-25T09:00:00+11:00', 1599)
-  settleDebit(ESSENTIALS_SAVER, 'POWERCO', '2025-01-26T09:00:00+11:00', 18000)
+  settleDebit(BILLS_SAVER, 'POWERCO', '2025-01-26T09:00:00+11:00', 18000)
   settleDebit(TRANSACTIONAL, 'LOANCO', '2025-01-28T09:00:00+11:00', 45000)
 })
 
@@ -267,89 +264,6 @@ function brief(rows: Array<{ name: string; next_charge_date: string }>) {
 }
 
 describe('Regulars readers — characterisation (#159)', () => {
-  it('Reserved amount (Spendable), Essentials-funded excluded', () => {
-    expect(getReservedAmount()).toMatchInlineSnapshot(`154099`)
-  })
-
-  it('Reserved breakdown', () => {
-    expect(
-      reservedBeforePayday({ excludeEssentialsFunded: true }).map(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ regular, ...item }) => item
-      )
-    ).toMatchInlineSnapshot(`
-      [
-        {
-          "frequency": "MONTHLY",
-          "fullAmount": 1599,
-          "name": "Netflix",
-          "occurrenceCount": 1,
-          "projectedDate": "2025-02-25",
-          "reservedAmount": 1599,
-        },
-        {
-          "frequency": "WEEKLY",
-          "fullAmount": 1500,
-          "name": "Gym",
-          "occurrenceCount": 2,
-          "projectedDate": "2025-02-24",
-          "reservedAmount": 3000,
-        },
-        {
-          "frequency": "FORTNIGHTLY",
-          "fullAmount": 80000,
-          "name": "Rent",
-          "occurrenceCount": 1,
-          "projectedDate": "2025-02-28",
-          "reservedAmount": 80000,
-        },
-        {
-          "frequency": "MONTHLY",
-          "fullAmount": 4500,
-          "name": "Phone",
-          "occurrenceCount": 1,
-          "projectedDate": "2025-02-28",
-          "reservedAmount": 4500,
-        },
-        {
-          "frequency": "MONTHLY",
-          "fullAmount": 45000,
-          "name": "Car loan",
-          "occurrenceCount": 1,
-          "projectedDate": "2025-02-28",
-          "reservedAmount": 45000,
-        },
-        {
-          "frequency": "MONTHLY",
-          "fullAmount": 20000,
-          "name": "Card repayment",
-          "occurrenceCount": 1,
-          "projectedDate": "2025-02-27",
-          "reservedAmount": 20000,
-        },
-      ]
-    `)
-  })
-
-  it('Essentials coverage', () => {
-    expect(getEssentialsCoverage()).toMatchInlineSnapshot(`
-      {
-        "essentialsSetAsideCents": 18000,
-        "reservedHereCents": 154099,
-        "saverBalanceCents": 200000,
-        "shortfallCents": 0,
-        "state": "partial",
-        "transactionalCount": 10,
-      }
-    `)
-  })
-
-  it('Essentials coverage with no Saver nominated', () => {
-    delete appSettings['essentials_saver_account_id']
-    expect(getEssentialsCoverage()).toMatchInlineSnapshot(`null`)
-    expect(getReservedAmount()).toMatchInlineSnapshot(`172099`)
-  })
-
   it('Overdue / This month / Later grouping', () => {
     const g = regularsByMonth()
     expect({
@@ -392,7 +306,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 14,
-          "is_reserved": 0,
           "match_description": null,
           "name": "Spotify",
           "next_charge_date": "2025-02-24",
@@ -405,7 +318,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": "tv-and-music",
           "frequency": "MONTHLY",
           "id": 1,
-          "is_reserved": 1,
           "match_description": "NETFLIX.COM",
           "name": "Netflix",
           "next_charge_date": "2025-02-25",
@@ -418,7 +330,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 11,
-          "is_reserved": 1,
           "match_description": "POWERCO",
           "name": "Electricity",
           "next_charge_date": "2025-02-26",
@@ -431,7 +342,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 13,
-          "is_reserved": 1,
           "match_description": null,
           "name": "Card repayment",
           "next_charge_date": "2025-02-27",
@@ -444,7 +354,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 12,
-          "is_reserved": 1,
           "match_description": "LOANCO",
           "name": "Car loan",
           "next_charge_date": "2025-02-28",
@@ -457,7 +366,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 6,
-          "is_reserved": 1,
           "match_description": null,
           "name": "Phone",
           "next_charge_date": "2025-02-28",
@@ -554,7 +462,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 14,
-          "is_reserved": 0,
           "match_description": null,
           "name": "Spotify",
           "next_charge_date": "2025-02-24",
@@ -567,7 +474,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": "tv-and-music",
           "frequency": "MONTHLY",
           "id": 1,
-          "is_reserved": 1,
           "match_description": "NETFLIX.COM",
           "name": "Netflix",
           "next_charge_date": "2025-02-25",
@@ -580,7 +486,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 11,
-          "is_reserved": 1,
           "match_description": "POWERCO",
           "name": "Electricity",
           "next_charge_date": "2025-02-26",
@@ -593,7 +498,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "FORTNIGHTLY",
           "id": 3,
-          "is_reserved": 1,
           "match_description": null,
           "name": "Rent",
           "next_charge_date": "2025-02-28",
@@ -606,7 +510,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 12,
-          "is_reserved": 1,
           "match_description": "LOANCO",
           "name": "Car loan",
           "next_charge_date": "2025-02-28",
@@ -619,7 +522,6 @@ describe('Regulars readers — characterisation (#159)', () => {
           "category_id": null,
           "frequency": "MONTHLY",
           "id": 6,
-          "is_reserved": 1,
           "match_description": null,
           "name": "Phone",
           "next_charge_date": "2025-02-28",
@@ -639,7 +541,6 @@ describe('Regulars readers — characterisation (#159)', () => {
         "category_id": null,
         "frequency": "MONTHLY",
         "id": 6,
-        "is_reserved": 1,
         "match_description": null,
         "name": "Phone",
         "next_charge_date": "2025-01-31",

@@ -48,12 +48,12 @@ test.describe('Headroom cards (#216)', () => {
     expect(await total(onHand(page))).toBe(452300)
     await expectSumHolds(page)
 
-    // Above the Spendable balance cards.
+    // Above the Dashboard's sections.
     const section = await page
       .getByRole('region', { name: 'Headroom' })
       .boundingBox()
-    const spendable = await page.getByLabel(/Spendable balance/i).boundingBox()
-    expect(section!.y).toBeLessThan(spendable!.y)
+    const sections = await page.locator('.dashboard-grid').boundingBox()
+    expect(section!.y).toBeLessThan(sections!.y)
   })
 
   test('Mark paid drops an overdue Regular from Still to go out, and Undo restores it', async ({

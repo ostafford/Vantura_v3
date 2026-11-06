@@ -30,7 +30,6 @@ function makeRow(overrides: Partial<Regular> = {}): Regular {
     frequency: 'MONTHLY',
     next_charge_date: '2026-01-15',
     category_id: null,
-    is_reserved: 1,
     reminder_days_before: null,
     cancel_by_date: null,
     match_description: null,
@@ -297,8 +296,8 @@ describe('regularById', () => {
   function insertCharge(opts: { name: string }) {
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, is_reserved, created_at)
-       VALUES (?, 100000, 'MONTHLY', '2026-01-15', 1, '2026-01-01T00:00:00.000Z')`,
+         (name, amount, frequency, next_charge_date, created_at)
+       VALUES (?, 100000, 'MONTHLY', '2026-01-15', '2026-01-01T00:00:00.000Z')`,
       [opts.name]
     )
     return db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -338,8 +337,8 @@ describe('regularsByMonth — overdue ONCE charges (#18)', () => {
   }) {
     db.run(
       `INSERT INTO upcoming_charges
-         (name, amount, frequency, next_charge_date, is_reserved, created_at, cancel_by_date)
-       VALUES (?, ?, ?, ?, 1, '2020-01-01T00:00:00.000Z', ?)`,
+         (name, amount, frequency, next_charge_date, created_at, cancel_by_date)
+       VALUES (?, ?, ?, ?, '2020-01-01T00:00:00.000Z', ?)`,
       [
         opts.name,
         opts.amount ?? 5000,

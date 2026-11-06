@@ -12,16 +12,13 @@ describe('formatSettingsSummary', () => {
     ).toMatch(/^Weekly payday \(/)
   })
 
-  it('calls out an Essentials nomination, since it changes Spendable', () => {
+  it('no longer mentions an Essentials nomination from an older export (#211)', () => {
     expect(
       formatSettingsSummary({
         payday_frequency: 'MONTHLY',
         essentials_saver_account_id: 'saver-1',
       })
-    ).toBe('Monthly payday, Essentials Saver nominated')
-    expect(
-      formatSettingsSummary({ essentials_saver_account_id: 'saver-1' })
-    ).toBe('Essentials Saver nominated')
+    ).toBe('Monthly payday')
   })
 
   it('falls back to "Some settings" when nothing it describes is present', () => {

@@ -100,7 +100,6 @@ describe('blankDraft → saveRegular', () => {
       frequency: 'MONTHLY',
       next_charge_date: '2026-04-20',
       category_id: null,
-      is_reserved: 1,
       reminder_days_before: 3,
       cancel_by_date: null,
       match_description: null,
@@ -108,12 +107,11 @@ describe('blankDraft → saveRegular', () => {
     })
   })
 
-  it('opens on today, monthly, counted in Spendable', () => {
+  it('opens on today, monthly', () => {
     expect(blankDraft()).toMatchObject({
       id: null,
       frequency: 'MONTHLY',
       nextChargeDate: '2026-04-15',
-      isReserved: true,
       anchorDate: null,
     })
   })
@@ -210,7 +208,6 @@ describe('draftFromTransaction → saveRegular (#147, #153)', () => {
       matchDescription: 'Rent',
       nextChargeDate: '2026-04-30', // what the form shows
       anchorDate: '2026-01-31',
-      isReserved: true,
     })
   })
 
@@ -314,7 +311,6 @@ describe('draftFromSuggestion → saveRegular', () => {
       frequency: 'MONTHLY',
       next_charge_date: '2026-03-31',
       category_id: 'tv-and-music',
-      is_reserved: 1,
       match_description: 'NETFLIX.COM',
     })
   })

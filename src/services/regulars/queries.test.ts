@@ -33,11 +33,7 @@ const {
   markOccurrencePaid,
   regularOccurrencesInMonth,
   dueSoonRegulars,
-  reservedBeforePayday,
-  totalReserved,
 } = await import('@/services/regulars')
-
-const SAVER = 'bills-saver'
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -55,9 +51,7 @@ beforeEach(async () => {
   appSettings['payday_frequency'] = 'MONTHLY'
   db.run(
     `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)
-     VALUES ('everyday', 'Everyday', 'TRANSACTIONAL', 0, '2025-01-01', '2025-01-01'),
-            (?, 'Bills', 'SAVER', 0, '2025-01-01', '2025-01-01')`,
-    [SAVER]
+     VALUES ('everyday', 'Everyday', 'TRANSACTIONAL', 0, '2025-01-01', '2025-01-01')`
   )
 })
 
@@ -70,35 +64,24 @@ function add(r: {
   frequency: string
   date: string
   amount?: number
-  is_reserved?: 0 | 1
   reminder?: number | null
   cancel_by?: string | null
   match_description?: string | null
 }) {
   db.run(
     `INSERT INTO upcoming_charges
-       (name, amount, frequency, next_charge_date, is_reserved, reminder_days_before,
+       (name, amount, frequency, next_charge_date, reminder_days_before,
         cancel_by_date, match_description, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '2025-01-01')`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, '2025-01-01')`,
     [
       r.name,
       r.amount ?? 1000,
       r.frequency,
       r.date,
-      r.is_reserved ?? 1,
       r.reminder ?? null,
       r.cancel_by ?? null,
       r.match_description ?? null,
     ]
-  )
-}
-
-/** A settled debit from the Saver, making a linked Regular Essentials-funded. */
-function paidFromSaver(description: string, amount: number) {
-  db.run(
-    `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
-     VALUES (?, ?, 'SETTLED', ?, ?, '2025-01-26T09:00:00+11:00', '2025-01-26T09:00:00+11:00')`,
-    [`tx-${description}`, SAVER, description, -amount]
   )
 }
 
@@ -370,80 +353,5 @@ describe('dueSoonRegulars', () => {
       '2025-02-25 Netflix',
       '2025-02-28 Rent',
     ])
-  })
-})
-
-describe('reservedBeforePayday', () => {
-  it('reserves a Regular due the day before payday, not one due on payday', () => {
-    add({ name: 'Day before', frequency: 'ONCE', date: '2025-03-06' })
-    add({ name: 'On payday', frequency: 'ONCE', date: '2025-03-07' })
-    expect(
-      names(reservedBeforePayday({ excludeEssentialsFunded: true }))
-    ).toEqual(['Day before'])
-  })
-
-  it('counts each weekly occurrence before payday; totalReserved sums them', () => {
-    add({ name: 'Gym', frequency: 'WEEKLY', date: '2025-01-06', amount: 1500 })
-    const items = reservedBeforePayday({ excludeEssentialsFunded: true })
-    expect(
-      items.map((i) => [i.name, i.occurrenceCount, i.reservedAmount])
-    ).toEqual([['Gym', 2, 3000]])
-    expect(totalReserved(items)).toBe(3000)
-  })
-
-  it('leaves out Regulars that are not reserved', () => {
-    add({
-      name: 'Not reserved',
-      frequency: 'ONCE',
-      date: '2025-02-25',
-      is_reserved: 0,
-    })
-    expect(reservedBeforePayday({ excludeEssentialsFunded: false })).toEqual([])
-  })
-
-  it('is empty with no payday or no pay frequency configured', () => {
-    add({ name: 'Netflix', frequency: 'ONCE', date: '2025-02-25' })
-    delete appSettings['payday_frequency']
-    expect(reservedBeforePayday({ excludeEssentialsFunded: false })).toEqual([])
-    appSettings['payday_frequency'] = 'MONTHLY'
-    delete appSettings['next_payday']
-    expect(reservedBeforePayday({ excludeEssentialsFunded: false })).toEqual([])
-  })
-
-  it('carries the stored Regular alongside the projected date', () => {
-    add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-31' })
-    const [item] = reservedBeforePayday({ excludeEssentialsFunded: true })
-    expect(item.projectedDate).toBe('2025-02-28')
-    expect(item.regular.next_charge_date).toBe('2025-01-31')
-  })
-
-  describe('Essentials-funded Regulars (docs/adr/0019)', () => {
-    beforeEach(() => {
-      add({
-        name: 'Power',
-        frequency: 'MONTHLY',
-        date: '2025-01-26',
-        amount: 18000,
-        match_description: 'POWERCO',
-      })
-      add({ name: 'Netflix', frequency: 'ONCE', date: '2025-02-25' })
-      paidFromSaver('POWERCO', 18000)
-    })
-
-    it('are excluded for an Essentials user when asked, included otherwise', () => {
-      appSettings['essentials_saver_account_id'] = SAVER
-      expect(
-        names(reservedBeforePayday({ excludeEssentialsFunded: true }))
-      ).toEqual(['Netflix'])
-      expect(
-        names(reservedBeforePayday({ excludeEssentialsFunded: false }))
-      ).toEqual(['Power', 'Netflix'])
-    })
-
-    it('are never excluded for a classic user (no Saver nominated)', () => {
-      expect(
-        names(reservedBeforePayday({ excludeEssentialsFunded: true }))
-      ).toEqual(['Power', 'Netflix'])
-    })
   })
 })

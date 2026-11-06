@@ -16,11 +16,15 @@ test.describe('onboarding', () => {
 })
 
 test.describe('golden path: sample data → dashboard', () => {
-  test('loading sample data lands on the dashboard with a spendable balance', async ({
+  test('loading sample data lands on the dashboard with Headroom', async ({
     page,
   }) => {
     await startWithSampleData(page)
-    await expect(page.getByText('Spendable', { exact: true })).toBeVisible()
+    await expect(
+      page
+        .getByRole('region', { name: 'Headroom' })
+        .getByTestId('headroom-on-hand')
+    ).toBeVisible()
   })
 })
 
