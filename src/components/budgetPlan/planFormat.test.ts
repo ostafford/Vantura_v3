@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { incomeBarSegments, itemBar, stateLine } from './planFormat'
+import {
+  incomeBarSegments,
+  itemBar,
+  markPaidDate,
+  stateLine,
+} from './planFormat'
 import type { PlanItem } from '@/services/planVsActual'
 
 const bar = (
@@ -118,10 +123,41 @@ describe('stateLine', () => {
     )
     expect(stateLine(tracker({ kind: 'overdue' })).tone).toBe('warn')
     expect(stateLine(tracker({ kind: 'no-actual-figure' })).text).toBe(
-      'no actual figure · Mark paid'
+      'no actual figure'
     )
     expect(stateLine(tracker({ kind: 'not-due' })).text).toBe(
       'not due this month'
     )
+  })
+})
+
+describe('markPaidDate', () => {
+  const regular = (
+    state: PlanItem['state'],
+    unpaidDates: string[]
+  ): PlanItem => ({
+    type: 'regular',
+    regularId: 1,
+    name: 'Rent',
+    plannedCents: 1,
+    actualCents: null,
+    state,
+    unpaidDates,
+  })
+
+  it('offers the oldest unpaid occurrence when overdue or with no actual figure', () => {
+    expect(
+      markPaidDate(regular({ kind: 'overdue' }, ['2026-10-05', '2026-10-19']))
+    ).toBe('2026-10-05')
+    expect(
+      markPaidDate(regular({ kind: 'no-actual-figure' }, ['2026-10-25']))
+    ).toBe('2026-10-25')
+  })
+
+  it('offers nothing for any other state', () => {
+    expect(
+      markPaidDate(regular({ kind: 'not-paid-yet' }, ['2026-10-25']))
+    ).toBeNull()
+    expect(markPaidDate(regular({ kind: 'paid' }, []))).toBeNull()
   })
 })

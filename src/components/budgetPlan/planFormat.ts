@@ -58,7 +58,7 @@ export function stateLine(item: PlanItem): StateLine {
       return { text: 'overdue', tone: 'warn', icon: 'mdi-alert-outline' }
     case 'no-actual-figure':
       return {
-        text: 'no actual figure · Mark paid',
+        text: 'no actual figure',
         tone: 'muted',
         icon: 'mdi-link-variant-off',
       }
@@ -67,6 +67,18 @@ export function stateLine(item: PlanItem): StateLine {
     case 'not-due':
       return { text: 'not due this month', tone: 'muted' }
   }
+}
+
+/**
+ * The occurrence Mark paid would mark, or `null` when Mark paid isn't offered:
+ * a Regular that is overdue (#212 offers it there) or has no actual figure
+ * (#174: Vantura can't see it paid), at its oldest unpaid occurrence.
+ */
+export function markPaidDate(item: PlanItem): string | null {
+  if (item.type !== 'regular') return null
+  if (item.state.kind !== 'overdue' && item.state.kind !== 'no-actual-figure')
+    return null
+  return item.unpaidDates[0] ?? null
 }
 
 /** True when an item's actual is above its planned. */

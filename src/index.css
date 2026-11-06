@@ -3176,3 +3176,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .plan-card--empty {
   border: 1px dashed var(--bs-border-color);
 }
+.plan-mark-paid {
+  /* A bigger hit area than the 0.72rem text, without moving the line. */
+  padding: 0.6rem 0.4rem;
+  margin: -0.6rem -0.4rem;
+  border: 0;
+  background: none;
+  color: var(--vantura-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

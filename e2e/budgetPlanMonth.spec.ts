@@ -104,6 +104,37 @@ test.describe('Budget Plan month view (#241)', () => {
     await expect(notInABucket).not.toContainText('Groceries')
   })
 
+  test('Mark paid on the bucket page, with Undo; the grid only shows the chip', async ({
+    page,
+  }) => {
+    await open(page)
+    // The grid shows the chips without an action.
+    const notInABucket = page.getByTestId('plan-not-in-a-bucket')
+    await expect(notInABucket).toContainText('no actual figure')
+    await expect(
+      notInABucket.getByRole('button', { name: /Mark .* paid/ })
+    ).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Create your first bucket' }).click()
+    await page.getByPlaceholder('e.g. Household').fill('Bills')
+    await page.getByRole('button', { name: 'Create bucket' }).click()
+    await page.getByRole('link', { name: 'Bills', exact: true }).click()
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('dialog').getByText('Phone', { exact: true }).click()
+
+    // Phone (sample data) is overdue on the 20th.
+    const phone = page.getByTestId('plan-item').filter({ hasText: 'Phone' })
+    await expect(phone).toContainText('overdue')
+    await phone.getByRole('button', { name: /Mark Phone paid for/ }).click()
+    await expect(phone).not.toContainText('overdue')
+    await expect(phone).toContainText('paid')
+
+    const toast = page.locator('.vantura-toast')
+    await expect(toast).toContainText('Phone marked paid')
+    await toast.getByRole('button', { name: 'Undo' }).click()
+    await expect(phone).toContainText('overdue')
+  })
+
   test('tapping Spent unplanned reaches the Unplanned card', async ({
     page,
   }) => {

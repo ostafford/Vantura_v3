@@ -9,6 +9,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
+import { formatShortDate } from '@/lib/format'
 import { getCategoriesWithParent } from '@/services/categories'
 import type { PlanItem, PlanVsActual } from '@/services/planVsActual'
 import type { Unplanned } from '@/services/monthAttribution'
@@ -16,6 +17,7 @@ import {
   UNPLANNED_CARD_ID,
   incomeBarSegments,
   itemBar,
+  markPaidDate,
   monthLabel,
   planMoney,
   stateLine,
@@ -247,15 +249,25 @@ export function MonthSummaryCard({
 
 // ─── Items and bucket cards ──────────────────────────────────────────────────
 
+/** Marks one Regular occurrence paid (the bucket page offers it; the grid doesn't). */
+export type MarkPaidHandler = (
+  regularId: number,
+  date: string,
+  name: string
+) => void
+
 export function PlanItemRow({
   item,
   color,
+  onMarkPaid,
 }: {
   item: PlanItem
   color: string
+  onMarkPaid?: MarkPaidHandler
 }) {
   const line = stateLine(item)
   const pace = item.type === 'tracker' ? item.paceCents : null
+  const markDate = onMarkPaid ? markPaidDate(item) : null
   return (
     <div className="plan-item" data-testid="plan-item">
       <div className="plan-item__head">
@@ -282,6 +294,19 @@ export function PlanItemRow({
       <div className={`plan-item__state ${toneClass[line.tone]}`}>
         {line.icon && <i className={`mdi ${line.icon} me-1`} aria-hidden />}
         {line.text}
+        {markDate && item.type === 'regular' && (
+          <>
+            {' · '}
+            <button
+              type="button"
+              className="plan-mark-paid"
+              aria-label={`Mark ${item.name} paid for ${formatShortDate(markDate)}`}
+              onClick={() => onMarkPaid!(item.regularId, markDate, item.name)}
+            >
+              Mark paid
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -302,6 +327,8 @@ interface BucketPlanCardProps {
   footer?: ReactNode
   empty?: ReactNode
   testId?: string
+  /** Offers Mark paid on overdue and no-actual-figure Regulars. */
+  onMarkPaid?: MarkPaidHandler
 }
 
 export function BucketPlanCard({
@@ -318,6 +345,7 @@ export function BucketPlanCard({
   footer,
   empty,
   testId,
+  onMarkPaid,
 }: BucketPlanCardProps) {
   return (
     <Card
@@ -362,6 +390,7 @@ export function BucketPlanCard({
                 key={`${i.type}-${i.type === 'regular' ? i.regularId : i.trackerId}`}
                 item={i}
                 color={color}
+                onMarkPaid={onMarkPaid}
               />
             ))}
         {footer}

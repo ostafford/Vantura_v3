@@ -10,7 +10,12 @@ import {
   type BudgetBucketRow,
   type BucketUpcomingItem,
 } from '@/services/budgetBuckets'
-import { blankDraft, draftFromTransaction } from '@/services/regulars'
+import {
+  blankDraft,
+  draftFromTransaction,
+  markOccurrencePaid,
+  unmarkOccurrencePaid,
+} from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import {
   getBucketTrackers,
@@ -595,6 +600,28 @@ export function AnalyticsBudgetPlanBucket() {
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
+  // Same Mark paid + Undo as the Dashboard's Still to go out (#214).
+  const handleMarkPaid = useCallback(
+    (regularId: number, date: string, name: string) => {
+      if (!markOccurrencePaid(regularId, date)) {
+        toast.error(`Couldn’t mark ${name} paid.`)
+        refresh()
+        return
+      }
+      refresh()
+      toast.success(`${name} marked paid`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            unmarkOccurrencePaid(regularId, date)
+            refresh()
+          },
+        },
+      })
+    },
+    [refresh]
+  )
+
   const id = bucketId ? Number(bucketId) : null
 
   const bucket: BudgetBucketRow | null = useMemo(
@@ -686,6 +713,7 @@ export function AnalyticsBudgetPlanBucket() {
             plannedCents={planBucket.plannedCents}
             actualCents={planBucket.actualCents}
             items={planBucket.items}
+            onMarkPaid={handleMarkPaid}
             empty={
               <div className="plan-muted small">
                 Add Regulars or Trackers below to plan this bucket.
