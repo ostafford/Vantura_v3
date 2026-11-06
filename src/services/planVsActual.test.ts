@@ -653,6 +653,20 @@ describe('Regular state', () => {
     expect(item(result, 'Gas').state).toEqual({ kind: 'under', cents: 0 })
   })
 
+  it('lists the unpaid occurrence dates, oldest first, for Mark paid', () => {
+    const cleaner = addRegular({
+      name: 'Cleaner',
+      amount: 3000,
+      date: '2026-10-06',
+      frequency: 'WEEKLY',
+    })
+    expect(markOccurrencePaid(cleaner, '2026-10-13')).toBe(true)
+
+    expect(item(read(), 'Cleaner')).toMatchObject({
+      unpaidDates: ['2026-10-06', '2026-10-20', '2026-10-27'],
+    })
+  })
+
   it('shows under once marked paid with no Linked payment', () => {
     const power = addRegular({
       name: 'Power',

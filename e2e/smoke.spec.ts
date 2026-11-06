@@ -63,8 +63,7 @@ test.describe('budget plan', () => {
     await page.getByRole('button', { name: 'Create bucket' }).click()
 
     await expect(page.getByText('Household bills')).toBeVisible()
-    // Income − Committed is Unallocated, not Free spending (#211).
-    await expect(page.getByText(/^Unallocated \(/)).toBeVisible()
-    await expect(page.getByText(/^Free spending/)).toHaveCount(0)
+    // Income − Committed is Unallocated, on the figures line (#211, #241).
+    await expect(page.getByTestId('plan-figures')).toContainText('Unallocated')
   })
 })

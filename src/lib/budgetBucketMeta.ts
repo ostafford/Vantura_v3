@@ -37,12 +37,3 @@ export const BUDGET_FREQUENCIES: { value: string; label: string }[] = [
   { value: 'QUARTERLY', label: 'Quarterly' },
   { value: 'YEARLY', label: 'Yearly' },
 ]
-
-export const BUDGET_DISPLAY_PERIODS: {
-  value: 'WEEKLY' | 'MONTHLY' | 'YEARLY'
-  label: string
-}[] = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'YEARLY', label: 'Yearly' },
-]

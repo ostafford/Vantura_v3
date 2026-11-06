@@ -93,6 +93,8 @@ export interface RegularPlanItem {
   /** Its Linked payments in the month; `null` when it has no actual figure. */
   actualCents: number | null
   state: RegularPlanState
+  /** Its unpaid occurrence dates in the month, oldest first (for Mark paid). */
+  unpaidDates: string[]
 }
 
 export type PlanItem = TrackerPlanItem | RegularPlanItem
@@ -227,6 +229,7 @@ export function getPlanVsActual(month: string): PlanVsActual | null {
       plannedCents: line.plannedCents,
       actualCents: line.actualCents,
       state: regularState(line.plannedCents, line.actualCents, own, today),
+      unpaidDates: own.filter((o) => !o.paid).map((o) => o.date),
     })
   }
 

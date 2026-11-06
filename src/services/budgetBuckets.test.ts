@@ -11,14 +11,8 @@ vi.mock('@/db', () => ({
   schedulePersist: () => {},
 }))
 
-const {
-  deleteBucket,
-  getBucketCardSummary,
-  getBuckets,
-  getIncomeCents,
-  getMonthlyIncomeCents,
-  reorderBuckets,
-} = await import('./budgetBuckets')
+const { deleteBucket, getBuckets, getMonthlyIncomeCents, reorderBuckets } =
+  await import('./budgetBuckets')
 
 beforeAll(async () => {
   SQL = await initSqlJs()
@@ -58,46 +52,6 @@ function insertTracker(
     [budgetAmount, resetFrequency, isActive, bucketId]
   )
 }
-
-describe('getBucketCardSummary', () => {
-  it('sums MONTHLY upcoming charges into plannedCents', () => {
-    insertUpcoming('Rent', 200000, 'MONTHLY')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(200000)
-  })
-
-  it('excludes ONCE-frequency upcoming charges from the planned total', () => {
-    insertUpcoming('One-off gift', 5000, 'ONCE')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(0)
-  })
-
-  it('includes active trackers assigned to the bucket using their own reset_frequency', () => {
-    insertTracker(30000, 'MONTHLY')
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(30000)
-  })
-
-  it('excludes inactive trackers', () => {
-    insertTracker(30000, 'MONTHLY', 1, 0)
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(0)
-  })
-
-  it('excludes trackers assigned to a different bucket', () => {
-    insertTracker(30000, 'MONTHLY', 2)
-    const summary = getBucketCardSummary(1, 'MONTHLY')
-    expect(summary.plannedCents).toBe(0)
-  })
-
-  it('plans exactly its Regulars plus its Trackers, with no hypothetical part (#204)', () => {
-    insertUpcoming('Rent', 200000, 'MONTHLY')
-    insertTracker(30000, 'MONTHLY')
-    expect(getBucketCardSummary(1, 'MONTHLY')).toEqual({
-      plannedCents: 200000 + 30000,
-    })
-  })
-})
 
 describe('reorderBuckets', () => {
   beforeEach(() => {
@@ -154,33 +108,14 @@ describe('getMonthlyIncomeCents', () => {
     }
   )
 
-  it.each(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'])(
-    'per-period MONTHLY Income equals monthly Income for %s pay',
-    (freq) => {
-      appSettings.payday_frequency = freq
-      appSettings.pay_amount_cents = '123457'
-      expect(getIncomeCents('MONTHLY')).toBe(getMonthlyIncomeCents())
-    }
-  )
-
   it.each([[undefined], [''], ['QUARTERLY'], ['PAYDAY']])(
     'returns null (no Income) when Pay frequency is %s — never assumes monthly',
     (freq) => {
       appSettings.pay_amount_cents = '500000'
       if (freq !== undefined) appSettings.payday_frequency = freq
       expect(getMonthlyIncomeCents()).toBeNull()
-      for (const period of ['WEEKLY', 'MONTHLY', 'YEARLY'] as const) {
-        expect(getIncomeCents(period)).toBeNull()
-      }
     }
   )
-
-  it('converts a fortnightly pay into weekly and yearly Income', () => {
-    appSettings.payday_frequency = 'FORTNIGHTLY'
-    appSettings.pay_amount_cents = '240000'
-    expect(getIncomeCents('WEEKLY')).toBe(120000)
-    expect(getIncomeCents('YEARLY')).toBe(6240000)
-  })
 })
 
 describe('deleteBucket', () => {

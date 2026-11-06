@@ -31,7 +31,7 @@ vi.mock('@/db', () => ({
 }))
 
 const { runSchema, runMigrations } = await import('@/db/schema')
-const { getBucketTotalCents } = await import('./budgetBuckets')
+const { getPlanVsActual } = await import('./planVsActual')
 const {
   regularOccurrencesInMonth,
   regularOccurrencesPaidInMonth,
@@ -92,11 +92,12 @@ afterEach(() => {
 
 describe('a former liability repayment after the v55 migration (#209)', () => {
   it('counts in Committed like its plain twin', () => {
-    for (const period of ['WEEKLY', 'MONTHLY', 'YEARLY'] as const) {
-      const loan = getBucketTotalCents(7, period)
-      expect(loan, period).toBeGreaterThan(0)
-      expect(loan, period).toBe(getBucketTotalCents(8, period))
-    }
+    const planned = (bucketId: number) =>
+      getPlanVsActual('2026-11')!.buckets.find((b) => b.bucketId === bucketId)!
+        .plannedCents
+    // Fortnightly from 9 October: 6 and 20 November.
+    expect(planned(7)).toBe(90000)
+    expect(planned(7)).toBe(planned(8))
   })
 
   it("lists the month's occurrences like its plain twin", () => {

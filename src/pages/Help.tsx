@@ -470,8 +470,8 @@ export function Help() {
                     Budget Plan
                   </SectionHeading>
                   <p className="mb-0">
-                    Group your expenses into buckets and see Income vs Committed
-                    vs Unallocated. See <strong>Help → Budget Plan</strong> for
+                    This month&apos;s plan vs actual, with your expenses grouped
+                    into buckets. See <strong>Help → Budget Plan</strong> for
                     full details.
                   </p>
                 </>
@@ -505,33 +505,45 @@ export function Help() {
                     </li>
                   </ul>
 
-                  <SectionHeading icon="mdi-currency-usd">
-                    Summary figures
+                  <SectionHeading icon="mdi-calendar-month-outline">
+                    This month, plan vs actual
                   </SectionHeading>
                   <p className="mb-1">
-                    The card at the bottom shows three figures (toggle Weekly /
-                    Monthly / Yearly):
+                    The page always shows the current calendar month. Every
+                    figure is this month&apos;s: a quarterly bill counts in the
+                    month it&apos;s due.
                   </p>
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
-                      <strong>Income</strong> — your pay amount from Settings
-                      (Pay)
+                      <strong>Free spending so far</strong> — your monthly
+                      Income minus everything that&apos;s gone out this month
                     </li>
                     <li className="mb-1">
-                      <strong>Committed</strong> — total planned spend across
-                      all buckets
+                      <strong>The bar</strong> splits your Income into Spent on
+                      plan, Spent unplanned, Still to go out, and what&apos;s
+                      left if the rest goes to plan. Tap Spent unplanned to see
+                      where it went
+                    </li>
+                    <li className="mb-1">
+                      <strong>Committed</strong> — what your buckets plan this
+                      month
+                    </li>
+                    <li className="mb-1">
+                      <strong>Unallocated</strong> — Income minus Committed: the
+                      Income no bucket plans for
                     </li>
                     <li>
-                      <strong>Unallocated</strong> — Income minus Committed: the
-                      Income no bucket plans for (green = left to plan, red =
-                      more committed than you earn)
+                      <strong>Bucket cards</strong> show what&apos;s gone out
+                      against what&apos;s planned for each Regular and Tracker.
+                      A Tracker&apos;s tick marks where spending would be today
+                      if spread evenly. Only over shows in colour
                     </li>
                   </ul>
                   <Tip>
-                    If any Regulars aren&apos;t assigned to a bucket, a warning
-                    will appear — assign them to keep your totals accurate. Set
-                    your pay amount in <strong>Settings → Pay</strong> to enable
-                    the Income figure.
+                    Regulars and Trackers not in a bucket still count as Spent
+                    on plan, on the dashed Not in a bucket card, but plan
+                    nothing toward Committed. Set your pay amount in{' '}
+                    <strong>Settings → Pay</strong> to see Income and the bar.
                   </Tip>
                 </>
               )}

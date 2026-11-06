@@ -1,17 +1,21 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from 'zustand'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Button, Modal, Form, Badge } from 'react-bootstrap'
 import {
   getBucket,
   getBucketItems,
-  getBucketTotalCents,
   assignUpcomingToBucket,
   getUnassignedUpcoming,
   type BudgetBucketRow,
   type BucketUpcomingItem,
 } from '@/services/budgetBuckets'
-import { blankDraft, draftFromTransaction } from '@/services/regulars'
+import {
+  blankDraft,
+  draftFromTransaction,
+  markOccurrencePaid,
+  unmarkOccurrencePaid,
+} from '@/services/regulars'
 import { useRegularDraft } from '@/components/regulars/useRegularDraft'
 import {
   getBucketTrackers,
@@ -25,17 +29,10 @@ import {
   searchRecentDebits,
   type RecentDebitRow,
 } from '@/services/transactions'
-import {
-  toPeriodCents,
-  type BudgetDisplayPeriod,
-} from '@/lib/monthlyEquivalent'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { toast } from '@/stores/toastStore'
 import { syncStore } from '@/stores/syncStore'
-import {
-  BUDGET_FREQUENCIES,
-  BUDGET_DISPLAY_PERIODS,
-} from '@/lib/budgetBucketMeta'
+import { BUDGET_FREQUENCIES } from '@/lib/budgetBucketMeta'
 import {
   getBucketColor,
   getTrackerColor,
@@ -43,6 +40,9 @@ import {
   type ColorMode,
 } from '@/lib/colorSystem'
 import { themeStore, resolveTheme } from '@/stores/themeStore'
+import { usePlanVsActual } from '@/components/budgetPlan/usePlanVsActual'
+import { BucketPlanCard } from '@/components/budgetPlan/PlanVsActualParts'
+import { monthLabel } from '@/components/budgetPlan/planFormat'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -467,22 +467,11 @@ function AddTrackerModal({
 
 interface UpcomingRowProps {
   item: BucketUpcomingItem
-  period: BudgetDisplayPeriod
-  periodLabel: string
   onUnassign: () => void
 }
 
-function UpcomingRow({
-  item,
-  period,
-  periodLabel,
-  onUnassign,
-}: UpcomingRowProps) {
-  const periodCents =
-    item.frequency !== 'ONCE'
-      ? toPeriodCents(item.amount, item.frequency, period)
-      : 0
-
+/** A Regular in this bucket: its amount per charge and frequency, as stored. */
+function UpcomingRow({ item, onUnassign }: UpcomingRowProps) {
   return (
     <div
       className="d-flex align-items-center justify-content-between py-2 px-3"
@@ -507,18 +496,7 @@ function UpcomingRow({
         </Badge>
       </div>
       <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
-        <div className="text-end">
-          {item.frequency === 'ONCE' ? (
-            <div className="fw-semibold text-muted">One-off</div>
-          ) : (
-            <>
-              <div className="fw-semibold">${formatMoney(periodCents)}</div>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-                /{periodLabel.toLowerCase()}
-              </div>
-            </>
-          )}
-        </div>
+        <div className="fw-semibold text-end">${formatMoney(item.amount)}</div>
         <Button
           variant="link"
           size="sm"
@@ -538,25 +516,17 @@ function UpcomingRow({
 interface TrackerBucketRowProps {
   tracker: BucketTrackerItem
   bucketId: number
-  period: BudgetDisplayPeriod
-  periodLabel: string
   onUnassign: () => void
 }
 
+/** A Tracker in this bucket: its budget per reset period, as stored. */
 function TrackerBucketRow({
   tracker,
   bucketId,
-  period,
-  periodLabel,
   onUnassign,
 }: TrackerBucketRowProps) {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode = resolveTheme(themeMode)
-  const periodCents = toPeriodCents(
-    tracker.budget_amount,
-    tracker.reset_frequency,
-    period
-  )
   const frequencyColors = getFrequencyBadgeColors(
     tracker.reset_frequency as TrackerResetFrequency,
     mode
@@ -597,11 +567,8 @@ function TrackerBucketRow({
         </span>
       </div>
       <div className="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
-        <div className="text-end">
-          <div className="fw-semibold">${formatMoney(periodCents)}</div>
-          <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-            /{periodLabel.toLowerCase()}
-          </div>
+        <div className="fw-semibold text-end">
+          ${formatMoney(tracker.budget_amount)}
         </div>
         <Button
           variant="link"
@@ -626,27 +593,34 @@ export function AnalyticsBudgetPlanBucket() {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const periodParam = searchParams.get('period')
-  const period: BudgetDisplayPeriod =
-    periodParam === 'WEEKLY' || periodParam === 'YEARLY'
-      ? periodParam
-      : 'MONTHLY'
-
-  function setPeriod(p: BudgetDisplayPeriod) {
-    setSearchParams(
-      (prev) => {
-        prev.set('period', p)
-        return prev
-      },
-      { replace: true }
-    )
-  }
+  const plan = usePlanVsActual(version)
 
   const [showAddUpcoming, setShowAddUpcoming] = useState(false)
   const [showAddTracker, setShowAddTracker] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
+
+  // Same Mark paid + Undo as the Dashboard's Still to go out (#214).
+  const handleMarkPaid = useCallback(
+    (regularId: number, date: string, name: string) => {
+      if (!markOccurrencePaid(regularId, date)) {
+        toast.error(`Couldn’t mark ${name} paid.`)
+        refresh()
+        return
+      }
+      refresh()
+      toast.success(`${name} marked paid`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            unmarkOccurrencePaid(regularId, date)
+            refresh()
+          },
+        },
+      })
+    },
+    [refresh]
+  )
 
   const id = bucketId ? Number(bucketId) : null
 
@@ -668,12 +642,6 @@ export function AnalyticsBudgetPlanBucket() {
     [id, version, lastSyncCompletedAt]
   )
 
-  const bucketTotalCents = useMemo(
-    () => (id != null ? getBucketTotalCents(id, period) : 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, period, version, lastSyncCompletedAt]
-  )
-
   if (!bucket) {
     return (
       <div className="grid-margin">
@@ -686,8 +654,7 @@ export function AnalyticsBudgetPlanBucket() {
   }
 
   const hex = getBucketColor(bucket.id, mode)
-  const periodLabel =
-    BUDGET_DISPLAY_PERIODS.find((p) => p.value === period)?.label ?? period
+  const planBucket = plan?.buckets.find((b) => b.bucketId === bucket.id)
 
   function handleUnassignUpcoming(item: BucketUpcomingItem) {
     assignUpcomingToBucket(item.id, null)
@@ -724,27 +691,37 @@ export function AnalyticsBudgetPlanBucket() {
           </span>
           <div>
             <h5 className="mb-0 fw-bold">{bucket.name}</h5>
-            <span className="text-muted small">Budget bucket</span>
+            {plan && (
+              <span className="text-muted small">
+                {monthLabel(plan.month)} · Day {plan.dayOfMonth} of{' '}
+                {plan.daysInMonth}
+              </span>
+            )}
           </div>
         </div>
-        <div
-          className="period-toggle"
-          role="group"
-          aria-label="Select display period"
-        >
-          {BUDGET_DISPLAY_PERIODS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              className={`segment-btn${period === p.value ? ' active' : ''}`}
-              onClick={() => setPeriod(p.value)}
-              aria-pressed={period === p.value}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
       </div>
+
+      {/* This month's plan vs actual */}
+      {planBucket && (
+        <div className="mb-3">
+          <BucketPlanCard
+            testId="plan-bucket"
+            name={planBucket.name}
+            title="This month"
+            icon={planBucket.icon}
+            color={hex}
+            plannedCents={planBucket.plannedCents}
+            actualCents={planBucket.actualCents}
+            items={planBucket.items}
+            onMarkPaid={handleMarkPaid}
+            empty={
+              <div className="plan-muted small">
+                Add Regulars or Trackers below to plan this bucket.
+              </div>
+            }
+          />
+        </div>
+      )}
 
       {/* Upcoming Transactions */}
       <Card className="mb-3">
@@ -774,8 +751,6 @@ export function AnalyticsBudgetPlanBucket() {
               <UpcomingRow
                 key={u.id}
                 item={u}
-                period={period}
-                periodLabel={periodLabel}
                 onUnassign={() => handleUnassignUpcoming(u)}
               />
             ))
@@ -802,9 +777,8 @@ export function AnalyticsBudgetPlanBucket() {
         <Card.Body>
           {trackers.length === 0 ? (
             <p className="text-muted small mb-0">
-              Link a spending tracker to this bucket — its budget will
-              contribute to the bucket total, normalized to your selected
-              period.
+              Link a spending tracker to this bucket — its budget for the month
+              counts toward the bucket’s plan.
             </p>
           ) : (
             id != null &&
@@ -813,26 +787,10 @@ export function AnalyticsBudgetPlanBucket() {
                 key={t.id}
                 tracker={t}
                 bucketId={id}
-                period={period}
-                periodLabel={periodLabel}
                 onUnassign={() => handleUnassignTracker(t)}
               />
             ))
           )}
-        </Card.Body>
-      </Card>
-
-      {/* Bucket total */}
-      <Card style={{ borderLeft: `4px solid ${hex}` }}>
-        <Card.Body>
-          <div className="d-flex align-items-center justify-content-between">
-            <span className="fw-semibold text-muted">
-              {bucket.name} — total outgoing ({periodLabel})
-            </span>
-            <span className="fw-bold fs-5" style={{ color: hex }}>
-              ${formatMoney(bucketTotalCents)}
-            </span>
-          </div>
         </Card.Body>
       </Card>
 
