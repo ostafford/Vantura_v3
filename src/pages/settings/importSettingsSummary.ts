@@ -1,4 +1,4 @@
-import { getPaydayDayLabel } from '@/lib/payday'
+import { PAY_FREQUENCY_LABELS, isPayFrequency } from '@/lib/payFrequency'
 
 /** One-line "Current → New" summary of a backup's settings for the import preview. */
 export function formatSettingsSummary(
@@ -8,24 +8,8 @@ export function formatSettingsSummary(
   const parts: string[] = []
   const freq = settings.payday_frequency
   if (freq) {
-    const label =
-      freq === 'WEEKLY'
-        ? 'Weekly'
-        : freq === 'FORTNIGHTLY'
-          ? 'Fortnightly'
-          : freq === 'MONTHLY'
-            ? 'Monthly'
-            : freq
-    const dayStr = settings.payday_day
-    if (dayStr) {
-      const dayNum = parseInt(dayStr, 10)
-      const dayLabel = Number.isNaN(dayNum)
-        ? dayStr
-        : getPaydayDayLabel(freq, dayNum)
-      parts.push(`${label} payday (${dayLabel})`)
-    } else {
-      parts.push(`${label} payday`)
-    }
+    const label = isPayFrequency(freq) ? PAY_FREQUENCY_LABELS[freq] : freq
+    parts.push(`${label} pay`)
   }
   return parts.length > 0 ? parts.join(', ') : 'Some settings'
 }

@@ -468,7 +468,7 @@ export function AnalyticsBudgetPlan() {
           <HelpPopover
             id="budget-plan-help"
             title="Budget Plan"
-            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Unallocated: the Income no bucket plans for. Set your pay amount in Settings → Payday to enable the Income figure."
+            content="Group your expenses into buckets — like Subscriptions, Household, or Lifestyle. Each bucket holds Regulars and Trackers. The summary at the bottom shows your Income, total Committed spend, and Unallocated: the Income no bucket plans for. Set your pay amount in Settings → Pay to enable the Income figure."
             ariaLabel="How does Budget Plan work?"
           />
         </div>

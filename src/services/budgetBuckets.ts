@@ -4,6 +4,7 @@ import {
   toPeriodCents,
   type BudgetDisplayPeriod,
 } from '@/lib/monthlyEquivalent'
+import { isPayFrequency } from '@/lib/payFrequency'
 
 export interface BudgetBucketRow {
   id: number
@@ -212,13 +213,10 @@ export function getUnassignedUpcoming(): BucketUpcomingItem[] {
   return list
 }
 
-/** The Pay frequencies Income supports. */
-const PAY_FREQUENCIES: readonly string[] = ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY']
-
 /**
  * The stored pay — amount per pay (cents) and Pay frequency — or null when
  * either is unusable: the amount unset, non-numeric or ≤ 0, or the frequency
- * unset or not one of `PAY_FREQUENCIES`. An unset frequency is never assumed
+ * unset or not a Pay frequency (`isPayFrequency`). An unset frequency is never assumed
  * to be monthly.
  */
 function readPay(): { perPay: number; frequency: string } | null {
@@ -227,7 +225,7 @@ function readPay(): { perPay: number; frequency: string } | null {
   const perPay = parseInt(raw, 10)
   if (perPay <= 0) return null
   const frequency = getAppSetting('payday_frequency')
-  if (frequency == null || !PAY_FREQUENCIES.includes(frequency)) return null
+  if (!isPayFrequency(frequency)) return null
   return { perPay, frequency }
 }
 

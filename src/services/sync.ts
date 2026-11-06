@@ -15,55 +15,8 @@ import {
   type UpCategory,
   type UpTag,
 } from '@/api/upBank'
-import { isMonthlyLastWeekday, monthlyPaydayDate } from '@/lib/payday'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import { localDateString } from '@/lib/format'
-
-/**
- * If stored next_payday is in the past, advance it using payday_frequency and payday_day.
- * Call on app init and at start of each sync. Nothing computes from next_payday
- * since #211; Settings still shows it until #195 removes it.
- */
-export function advanceNextPaydayIfNeeded(): void {
-  const frequency = getAppSetting('payday_frequency')
-  const dayStr = getAppSetting('payday_day')
-  if (!frequency) return
-  let nextPayday = getAppSetting('next_payday')
-  if (!nextPayday) return
-  const today = localDateString()
-  const paydayDay = dayStr ? parseInt(dayStr, 10) : 1
-
-  while (today >= nextPayday) {
-    const current = new Date(nextPayday + 'T12:00:00Z')
-    let next: Date
-    if (frequency === 'WEEKLY') {
-      next = new Date(current)
-      next.setUTCDate(next.getUTCDate() + 7)
-    } else if (frequency === 'FORTNIGHTLY') {
-      next = new Date(current)
-      next.setUTCDate(next.getUTCDate() + 14)
-    } else if (frequency === 'MONTHLY') {
-      if (isMonthlyLastWeekday(paydayDay)) {
-        const nextMonthStart = new Date(
-          Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 1)
-        )
-        next = monthlyPaydayDate(
-          paydayDay,
-          nextMonthStart.getUTCFullYear(),
-          nextMonthStart.getUTCMonth()
-        )
-      } else {
-        next = new Date(current)
-        next.setUTCMonth(next.getUTCMonth() + 1)
-        if (paydayDay >= 1 && paydayDay <= 28) next.setUTCDate(paydayDay)
-      }
-    } else {
-      break
-    }
-    nextPayday = next.toISOString().slice(0, 10)
-    setAppSetting('next_payday', nextPayday)
-  }
-}
 
 export type SyncProgress = {
   phase: 'accounts' | 'transactions' | 'held' | 'categories' | 'tags' | 'done'
@@ -435,7 +388,6 @@ export async function performSync(
   apiToken: string,
   progressCallback: (p: SyncProgress) => void
 ): Promise<void> {
-  advanceNextPaydayIfNeeded()
   progressCallback({ phase: 'accounts' })
   const accounts = await fetchAccounts(apiToken)
   for (const a of accounts) upsertAccount(a)
@@ -476,7 +428,6 @@ export async function performFullSync(
   apiToken: string,
   progressCallback: (p: SyncProgress) => void
 ): Promise<void> {
-  advanceNextPaydayIfNeeded()
   progressCallback({ phase: 'accounts' })
   const accounts = await fetchAccounts(apiToken)
   for (const a of accounts) upsertAccount(a)

@@ -2,7 +2,7 @@ import { useSplitNavSection } from '@/hooks/useSplitNavSection'
 import { Form } from 'react-bootstrap'
 import { AboutSection } from './settings/AboutSection'
 import { AppearanceSection } from './settings/AppearanceSection'
-import { PaydaySection } from './settings/PaydaySection'
+import { PaySection } from './settings/PaySection'
 import { DashboardSectionOrderForm } from './settings/DashboardSectionOrderForm'
 import { SecuritySection } from './settings/SecuritySection'
 import { DataSection } from './settings/DataSection'
@@ -14,7 +14,7 @@ function getSettingsSectionKeys(): string[] {
   return [
     'about',
     'appearance',
-    'payday',
+    'pay',
     'dashboard-sections',
     'security',
     'data',
@@ -24,7 +24,7 @@ function getSettingsSectionKeys(): string[] {
 const SETTINGS_SECTION_LABELS: Record<string, string> = {
   about: 'About',
   appearance: 'Appearance',
-  payday: 'Payday',
+  pay: 'Pay',
   'dashboard-sections': 'Dashboard sections',
   security: 'Security',
   data: 'Data',
@@ -33,7 +33,7 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
 const SETTINGS_SECTION_ICONS: Record<string, string> = {
   about: 'mdi-information-outline',
   appearance: 'mdi-palette-outline',
-  payday: 'mdi-calendar-today',
+  pay: 'mdi-cash',
   'dashboard-sections': 'mdi-view-dashboard-outline',
   security: 'mdi-shield-lock-outline',
   data: 'mdi-database-outline',
@@ -50,6 +50,8 @@ export function Settings() {
         // Migrate users who previously landed on the old 'help' section
         const currentRaw = localStorage.getItem(SETTINGS_ACTIVE_SECTION_KEY)
         if (currentRaw === 'help') return 'about'
+        // #195 — Settings → Payday became Settings → Pay
+        if (currentRaw === 'payday') return 'pay'
         const oldRaw = localStorage.getItem(LEGACY_SETTINGS_ACCORDION_KEY)
         if (oldRaw) {
           const parsed = JSON.parse(oldRaw) as unknown
@@ -138,7 +140,7 @@ export function Settings() {
               </h2>
               {activeSection === 'about' && <AboutSection />}
               {activeSection === 'appearance' && <AppearanceSection />}
-              {activeSection === 'payday' && <PaydaySection />}
+              {activeSection === 'pay' && <PaySection />}
               {activeSection === 'dashboard-sections' && (
                 <>
                   <p className="small text-muted mb-3">

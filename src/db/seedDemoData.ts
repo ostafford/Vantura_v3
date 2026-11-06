@@ -93,23 +93,8 @@ export function seedDemoData(): void {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
 
-  // Payday: MONTHLY on the 15th. Derive next_payday so it matches the
-  // payday_day setting.
-  const today = new Date()
-  const payDayNum = 15
-  let nextPayDateObj = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), payDayNum)
-  )
-  if (nextPayDateObj.getTime() <= today.getTime()) {
-    nextPayDateObj = new Date(
-      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, payDayNum)
-    )
-  }
-  const nextPayday = nextPayDateObj.toISOString().slice(0, 10)
-
+  // Pay: $4,500 take-home, monthly.
   setAppSetting('payday_frequency', 'MONTHLY')
-  setAppSetting('payday_day', '15')
-  setAppSetting('next_payday', nextPayday)
   setAppSetting('pay_amount_cents', '450000')
   setAppSetting('last_sync', NOW)
   setAppSetting('onboarding_complete', '1')

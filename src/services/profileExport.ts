@@ -28,9 +28,10 @@ import { readPaidMarks } from '@/services/regulars'
  * v13 (#213): the `onHandSaverIds` section is written. v14 (#214): each
  * Regular carries its `paid_marks`. v15 (#211): the Spendable alert and
  * Essentials Saver settings and the Regulars' `is_reserved` are no longer
- * written.
+ * written. v16 (#195): the payday date settings (`next_payday`,
+ * `payday_day`) are no longer written; import skips them silently.
  */
-const EXPORT_PAYLOAD_VERSION = 15
+const EXPORT_PAYLOAD_VERSION = 16
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -43,8 +44,6 @@ const EXPORT_FILE_VERSION = 1
 export const SETTINGS_WHITELIST: readonly string[] = [
   'theme_mode',
   'payday_frequency',
-  'payday_day',
-  'next_payday',
   'pay_amount_cents',
   'dashboard_tour_completed',
   'dashboard_section_order',
