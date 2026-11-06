@@ -13,6 +13,7 @@ import { TrackersSection } from '@/components/dashboard/TrackersSection'
 import { UpcomingSection } from '@/components/dashboard/UpcomingSection'
 import { MonthSummarySection } from '@/components/dashboard/MonthSummarySection'
 import { HeadroomSection } from '@/components/dashboard/HeadroomSection'
+import { MonthReviewCard } from '@/components/dashboard/MonthReviewCard'
 import {
   shouldShowDashboardTour,
   startDashboardTour,
@@ -359,6 +360,7 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+      <MonthReviewCard />
       <HeadroomSection
         refreshKey={`${lastSyncCompletedAt}|${dataVersion}|${today}`}
         onChange={bumpDataVersion}
