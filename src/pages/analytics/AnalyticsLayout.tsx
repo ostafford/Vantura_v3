@@ -7,13 +7,25 @@ import {
 } from '@/components/PageBreadcrumb'
 import type { AppRouteHandle } from '@/types/appRouteHandle'
 import { getTracker } from '@/services/trackers'
-import { getBucket } from '@/services/budgetBuckets'
+import { bucketInMonth } from '@/components/budgetPlan/planMonth'
 import {
   sidebarPinsStore,
   PINNABLE_ANALYTICS_PAGES,
 } from '@/stores/sidebarPinsStore'
 
-function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
+/** The bucket a `budget/:bucketId` match names, in the month its `?month=` shows (#243). */
+function matchBucket(m: ReturnType<typeof useMatches>[number], search: string) {
+  const raw = m.params.bucketId
+  const id = raw != null ? parseInt(raw, 10) : NaN
+  if (Number.isNaN(id)) return { name: 'Bucket', search: '' }
+  const found = bucketInMonth(id, search)
+  return { name: found.name ?? 'Bucket', search: found.search }
+}
+
+function buildAnalyticsBreadcrumbItems(
+  matches: ReturnType<typeof useMatches>,
+  search: string
+) {
   const items: PageBreadcrumbItem[] = [{ label: 'Dashboard', to: '/' }]
 
   for (const m of matches) {
@@ -21,9 +33,11 @@ function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
     if (!h) continue
 
     if (h.breadcrumbBefore) {
+      // The bucket page's month carries back to the Budget Plan (#243).
+      const carry = h.useBucketName ? matchBucket(m, search).search : ''
       items.push({
         label: h.breadcrumbBefore.label,
-        to: h.breadcrumbBefore.to,
+        to: `${h.breadcrumbBefore.to}${carry}`,
       })
     }
 
@@ -38,12 +52,7 @@ function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
     }
 
     if (h.useBucketName) {
-      const raw = m.params.bucketId
-      const id = raw != null ? parseInt(raw, 10) : NaN
-      const name = !Number.isNaN(id)
-        ? (getBucket(id)?.name ?? 'Bucket')
-        : 'Bucket'
-      items.push({ label: name, to: undefined })
+      items.push({ label: matchBucket(m, search).name, to: undefined })
       continue
     }
 
@@ -60,7 +69,10 @@ function buildAnalyticsBreadcrumbItems(matches: ReturnType<typeof useMatches>) {
   return items
 }
 
-function resolveAnalyticsPageTitle(matches: ReturnType<typeof useMatches>) {
+function resolveAnalyticsPageTitle(
+  matches: ReturnType<typeof useMatches>,
+  search: string
+) {
   const fallbackIcon = 'mdi-chart-box'
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i]
@@ -79,13 +91,8 @@ function resolveAnalyticsPageTitle(matches: ReturnType<typeof useMatches>) {
     }
 
     if (h.useBucketName) {
-      const raw = m.params.bucketId
-      const id = raw != null ? parseInt(raw, 10) : NaN
-      const title = !Number.isNaN(id)
-        ? (getBucket(id)?.name ?? 'Bucket')
-        : 'Bucket'
       return {
-        pageTitle: title,
+        pageTitle: matchBucket(m, search).name,
         pageTitleIcon: h.pageTitleIcon ?? fallbackIcon,
       }
     }
@@ -105,12 +112,12 @@ export function AnalyticsLayout() {
   const pins = useStore(sidebarPinsStore, (s) => s.pins)
 
   const breadcrumbItems = useMemo(
-    () => buildAnalyticsBreadcrumbItems(matches),
-    [matches]
+    () => buildAnalyticsBreadcrumbItems(matches, location.search),
+    [matches, location.search]
   )
   const { pageTitle, pageTitleIcon } = useMemo(
-    () => resolveAnalyticsPageTitle(matches),
-    [matches]
+    () => resolveAnalyticsPageTitle(matches, location.search),
+    [matches, location.search]
   )
 
   const suppressHeader = matches.some(

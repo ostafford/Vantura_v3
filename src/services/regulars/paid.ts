@@ -26,6 +26,7 @@ import {
   isProjectedOccurrence,
   occurrencePaidBy,
 } from './projection'
+import type { RegularsPlanInput } from './plan'
 import { readRegularById, readRegulars, type Regular } from './rows'
 
 export interface RegularOccurrencePaid {
@@ -116,24 +117,42 @@ function readMarks(
   return out
 }
 
+/** The marks in `marks`, keyed by Regular then occurrence date. */
+function marksByRegular(
+  marks: RegularPaidMark[]
+): Map<number, Map<string, string>> {
+  const out = new Map<number, Map<string, string>>()
+  for (const m of marks) {
+    const byDate = out.get(m.regularId) ?? new Map<string, string>()
+    byDate.set(m.occurrenceDate, m.markedAt)
+    out.set(m.regularId, byDate)
+  }
+  return out
+}
+
 /**
  * Every occurrence of every Regular dated in `month` (`YYYY-MM`), by date then
  * Regular id, each with whether it is paid and how. Computed on every call;
- * empty when the DB isn't ready.
+ * empty when the DB isn't ready. `plan` replaces the live Regulars and marks
+ * with a Month-end plan's (#243); Linked payments are still read live.
  */
 export function regularOccurrencesPaidInMonth(
-  month: string
+  month: string,
+  plan?: RegularsPlanInput
 ): RegularOccurrencePaid[] {
   const db = getDb()
   if (!db) return []
   const { first, last } = calendarMonthDayBounds(month)
 
-  const inMonth = readRegulars(db)
+  const rows = plan?.rows ?? readRegulars(db)
+  const inMonth = rows
     .map((row) => ({
       row,
-      dates: getProjectedOccurrencesInRange(row, first, last).map(
-        (o) => o.next_charge_date
-      ),
+      dates: plan
+        ? [...(plan.occurrences.get(row.id) ?? [])]
+        : getProjectedOccurrencesInRange(row, first, last).map(
+            (o) => o.next_charge_date
+          ),
     }))
     .filter((r) => r.dates.length > 0)
   if (inMonth.length === 0) return []
@@ -149,12 +168,14 @@ export function regularOccurrencesPaidInMonth(
     if (span.end > end) end = span.end
   }
   const linked = new Map(
-    linkedPaymentsBetween(start, end).map((l) => [l.regularId, l])
+    linkedPaymentsBetween(start, end, rows).map((l) => [l.regularId, l])
   )
-  const marks = readMarks(
-    db,
-    inMonth.map((r) => r.row.id)
-  )
+  const marks = plan
+    ? marksByRegular(plan.marks)
+    : readMarks(
+        db,
+        inMonth.map((r) => r.row.id)
+      )
 
   const out: RegularOccurrencePaid[] = []
   for (const { row, dates } of inMonth) {

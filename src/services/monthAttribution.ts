@@ -19,7 +19,11 @@ import { addDaysToDateStr, calendarMonthDayBounds } from '@/lib/dateStr'
 import { toPeriodCents } from '@/lib/monthlyEquivalent'
 import { actualSpendingWhere } from '@/services/actualSpending'
 import { displayDaySql } from '@/services/displayDay'
-import { regularsInMonth, type RegularMonth } from '@/services/regulars'
+import {
+  regularsInMonth,
+  type RegularMonth,
+  type RegularsPlanInput,
+} from '@/services/regulars'
 import {
   getTracker,
   getTrackerConfigHistory,
@@ -85,6 +89,16 @@ export interface MonthAttribution {
   /** Every active Tracker, in id order. A deactivated one drops out. */
   trackers: TrackerMonthLine[]
   unplanned: Unplanned
+}
+
+/**
+ * A finished month's plan, read in place of the live one (#243): a Month-end
+ * plan's Regulars and Trackers (`planInputOf` in `@/services/monthEndPlan`).
+ * Transactions are always live, so actuals stay live.
+ */
+export interface MonthPlanInput {
+  regulars: RegularsPlanInput
+  trackers: TrackerMonthPlan[]
 }
 
 interface CountedTransaction {
@@ -247,9 +261,14 @@ function buildUnplanned(transactions: CountedTransaction[]): Unplanned {
 
 /**
  * Where every Actual spending transaction in `month` (`YYYY-MM`) counts, with
- * planned vs actual per Regular and Tracker. Computed on every call.
+ * planned vs actual per Regular and Tracker. Computed on every call. `plan`
+ * judges the month against a Month-end plan instead of the live plan (#243):
+ * its Linked payment matches, Tracker category sets and bucket membership.
  */
-export function getMonthAttribution(month: string): MonthAttribution {
+export function getMonthAttribution(
+  month: string,
+  plan?: MonthPlanInput
+): MonthAttribution {
   const { first, last } = calendarMonthDayBounds(month)
   const counted = readCountedTransactions(first, last)
   const totalActualSpendingCents = counted.reduce(
@@ -258,7 +277,7 @@ export function getMonthAttribution(month: string): MonthAttribution {
   )
 
   // 1. Linked payments go to their Regular.
-  const regulars = regularsInMonth(month)
+  const regulars = regularsInMonth(month, plan?.regulars)
   const countedIds = new Set(counted.map((tx) => tx.id))
   const linkedIds = new Set<string>()
   for (const line of regulars) {
@@ -277,15 +296,17 @@ export function getMonthAttribution(month: string): MonthAttribution {
 
   // 2. The active Tracker whose config in effect on the Display date includes
   // the category. 3. Else Unplanned.
-  const trackers = trackerPlansInMonth(month).map((plan) => ({
-    plan,
-    line: {
-      trackerId: plan.trackerId,
-      bucketId: plan.bucketId,
-      plannedCents: plan.plannedCents,
-      actualCents: 0,
-    } satisfies TrackerMonthLine,
-  }))
+  const trackers = (plan?.trackers ?? trackerPlansInMonth(month)).map(
+    (tracker) => ({
+      plan: tracker,
+      line: {
+        trackerId: tracker.trackerId,
+        bucketId: tracker.bucketId,
+        plannedCents: tracker.plannedCents,
+        actualCents: 0,
+      } satisfies TrackerMonthLine,
+    })
+  )
   const unplanned: CountedTransaction[] = []
   for (const tx of rest) {
     const owners =
