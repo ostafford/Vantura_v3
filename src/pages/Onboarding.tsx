@@ -12,7 +12,12 @@ import {
 } from '@/lib/crypto'
 import { validateUpBankToken } from '@/api/upBank'
 import { performInitialSync, type SyncProgress } from '@/services/sync'
-import { type PaydayFrequency, getPaydayDayOptions } from '@/lib/payday'
+import { INVALID_PAY_AMOUNT_MESSAGE, savePay } from '@/services/pay'
+import {
+  type PayFrequency,
+  PAY_FREQUENCIES,
+  PAY_FREQUENCY_LABELS,
+} from '@/lib/payFrequency'
 
 interface OnboardingProps {
   onComplete: () => void
@@ -25,11 +30,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [passphrase, setPassphrase] = useState('')
   const [passphraseConfirm, setPassphraseConfirm] = useState('')
   const [apiToken, setApiToken] = useState('')
-  const [paydayFrequency, setPaydayFrequency] =
-    useState<PaydayFrequency>('MONTHLY')
-  const [paydayDay, setPaydayDay] = useState(1)
-  const [nextPayday, setNextPayday] = useState('')
-  const [paydayPayAmount, setPaydayPayAmount] = useState('')
+  const [payFrequency, setPayFrequency] = useState<PayFrequency>('MONTHLY')
+  const [payAmount, setPayAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
@@ -82,21 +84,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   function handleStep4Submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!nextPayday) {
-      setError('Please select your next payday.')
+    if (!savePay(payFrequency, payAmount)) {
+      setError(INVALID_PAY_AMOUNT_MESSAGE)
       return
-    }
-    setAppSetting('payday_frequency', paydayFrequency)
-    setAppSetting('payday_day', String(effectivePaydayDay))
-    setAppSetting('next_payday', nextPayday)
-    const payAmtTrimmed = paydayPayAmount.trim()
-    if (payAmtTrimmed === '') {
-      setAppSetting('pay_amount_cents', '')
-    } else {
-      const cents = Math.round(parseFloat(payAmtTrimmed) * 100)
-      if (!Number.isNaN(cents) && cents >= 0) {
-        setAppSetting('pay_amount_cents', String(cents))
-      }
     }
     setStep(5)
     startInitialSync(apiToken)
@@ -146,14 +136,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       setLoading(false)
     }
   }
-
-  const paydayDayOptions = getPaydayDayOptions(paydayFrequency)
-  const currentPaydayDayValid = paydayDayOptions.some(
-    (opt) => opt.value === paydayDay
-  )
-  const effectivePaydayDay = currentPaydayDayValid
-    ? paydayDay
-    : (paydayDayOptions[0]?.value ?? 1)
 
   return (
     <div className="auth-full-bg">
@@ -369,73 +351,47 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
           {step === 4 && (
             <Form onSubmit={handleStep4Submit}>
-              <h6 className="mb-2">When do you get paid?</h6>
+              <h6 className="mb-2">What do you get paid?</h6>
               <p className="text-muted small mb-3">
-                When Monthly, Day is the date in the month (1st–28th) or a
-                relative rule such as Last Friday — useful when your employer
-                pays on the last weekday of each month.
+                Your monthly Income is built from your take-home pay and how
+                often it lands. You can change it later in Settings → Pay.
               </p>
               <Form.Group className="mb-2">
-                <Form.Label htmlFor="onboarding-payday-frequency">
-                  Frequency
+                <Form.Label htmlFor="onboarding-pay-frequency">
+                  Pay frequency
                 </Form.Label>
                 <Form.Select
-                  id="onboarding-payday-frequency"
-                  name="paydayFrequency"
-                  value={paydayFrequency}
+                  id="onboarding-pay-frequency"
+                  name="payFrequency"
+                  value={payFrequency}
                   onChange={(e) =>
-                    setPaydayFrequency(e.target.value as PaydayFrequency)
+                    setPayFrequency(e.target.value as PayFrequency)
                   }
                 >
-                  <option value="WEEKLY">Weekly</option>
-                  <option value="FORTNIGHTLY">Fortnightly</option>
-                  <option value="MONTHLY">Monthly</option>
-                </Form.Select>
-              </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label htmlFor="onboarding-payday-day">Day</Form.Label>
-                <Form.Select
-                  id="onboarding-payday-day"
-                  name="paydayDay"
-                  value={effectivePaydayDay}
-                  onChange={(e) => setPaydayDay(Number(e.target.value))}
-                >
-                  {paydayDayOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {PAY_FREQUENCIES.map((f) => (
+                    <option key={f} value={f}>
+                      {PAY_FREQUENCY_LABELS[f]}
                     </option>
                   ))}
                 </Form.Select>
               </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label htmlFor="onboarding-payday-pay-amount">
+              <Form.Group className="mb-3">
+                <Form.Label htmlFor="onboarding-pay-amount">
                   Take-home pay amount ($)
                 </Form.Label>
                 <Form.Control
-                  id="onboarding-payday-pay-amount"
-                  name="paydayPayAmount"
+                  id="onboarding-pay-amount"
+                  name="payAmount"
                   type="number"
                   min="0"
                   step="0.01"
                   placeholder="Optional"
-                  value={paydayPayAmount}
-                  onChange={(e) => setPaydayPayAmount(e.target.value)}
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
                 />
                 <Form.Text className="text-muted">
                   What lands in your account each pay, after tax.
                 </Form.Text>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label htmlFor="onboarding-next-payday">
-                  Next payday
-                </Form.Label>
-                <Form.Control
-                  id="onboarding-next-payday"
-                  name="nextPayday"
-                  type="date"
-                  value={nextPayday}
-                  onChange={(e) => setNextPayday(e.target.value)}
-                />
               </Form.Group>
               {error && (
                 <div className="text-danger small mb-2" role="alert">
@@ -459,7 +415,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     type="button"
                     variant="outline-secondary"
                     onClick={handleStep4Skip}
-                    aria-label="Skip payday setup"
+                    aria-label="Skip pay setup"
                   >
                     Skip
                   </Button>

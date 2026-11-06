@@ -70,8 +70,6 @@ describe('recalculateTrackers — termination', () => {
 
   it('no longer resolves a PAYDAY tracker from payday settings (#192)', () => {
     appSettings.payday_frequency = 'MONTHLY'
-    appSettings.payday_day = '1'
-    appSettings.next_payday = '2026-04-01'
     insertTracker({
       reset_frequency: 'PAYDAY',
       last_reset_date: '2025-12-01',

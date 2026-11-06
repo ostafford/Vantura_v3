@@ -4,8 +4,8 @@
  * rollover, DST). All of it anchors at noon UTC so a `+/- days` step never
  * lands on a DST boundary, and every result is a plain `YYYY-MM-DD` string.
  *
- * Payday-relative logic still belongs to `@/lib/payday`; this module is the
- * calendar-arithmetic layer shared by the tracker views and `services/trackers`.
+ * This module is the calendar-arithmetic layer shared by the tracker views and
+ * `services/trackers`.
  */
 import type { BudgetDisplayPeriod } from './monthlyEquivalent'
 

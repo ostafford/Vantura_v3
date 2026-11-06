@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(59)
+    expect(SCHEMA_VERSION).toBe(60)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1180,7 +1180,9 @@ describe('v49 migration: PAYDAY trackers move to MONTHLY (#192)', () => {
 })
 
 describe('v50 migration: Payday nomination settings removed (#194)', () => {
-  it('deletes the nominated pay source settings and leaves the pay amount, pay frequency and payday date alone', () => {
+  // v50 left the payday date alone; v60 (#195) removes it, so this checks
+  // only the pay amount and frequency survive to the current version.
+  it('deletes the nominated pay source settings and leaves the pay amount and pay frequency alone', () => {
     const db = new SQL.Database()
     db.run(
       `CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
@@ -1203,8 +1205,6 @@ describe('v50 migration: Payday nomination settings removed (#194)', () => {
     expect(readSetting(db, 'payday_description')).toBeNull()
     expect(readSetting(db, 'pay_amount_cents')).toBe('250000')
     expect(readSetting(db, 'payday_frequency')).toBe('FORTNIGHTLY')
-    expect(readSetting(db, 'payday_day')).toBe('4')
-    expect(readSetting(db, 'next_payday')).toBe('2026-11-12')
     db.close()
   })
 })
@@ -1916,7 +1916,7 @@ describe('v59 migration: Spendable cut (#211)', () => {
       ['spendable_alert_below_pct_pay', '0'],
       ['essentials_saver_account_id', 'saver-1'],
       ['pay_amount_cents', '450000'],
-      ['next_payday', '2026-11-15'],
+      ['payday_frequency', 'MONTHLY'],
       ['spendable_alert_below_cents_extra', 'keep'],
     ]) {
       db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [
@@ -1940,7 +1940,7 @@ describe('v59 migration: Spendable cut (#211)', () => {
     expect(readSetting(db, 'essentials_saver_account_id')).toBeNull()
     // Other settings, including a near-miss key, stay.
     expect(readSetting(db, 'pay_amount_cents')).toBe('450000')
-    expect(readSetting(db, 'next_payday')).toBe('2026-11-15')
+    expect(readSetting(db, 'payday_frequency')).toBe('MONTHLY')
     expect(readSetting(db, 'spendable_alert_below_cents_extra')).toBe('keep')
     db.close()
   })
@@ -1980,6 +1980,53 @@ describe('v59 migration: Spendable cut (#211)', () => {
     const db = new SQL.Database()
     runSchema(db)
     expect(columns(db)).not.toContain('is_reserved')
+    db.close()
+  })
+})
+
+describe('v60 migration: payday date cut (#195)', () => {
+  function buildV59WithPaydayDate(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    for (const [key, value] of [
+      ['payday_day', '104'],
+      ['next_payday', '2026-11-26'],
+      ['pay_amount_cents', '320000'],
+      ['payday_frequency', 'FORTNIGHTLY'],
+      ['next_payday_extra', 'keep'],
+    ]) {
+      db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [
+        key,
+        value,
+      ])
+    }
+    db.run(`UPDATE app_settings SET value = '59' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  it('deletes the payday date rows and keeps the pay amount and frequency', () => {
+    const db = buildV59WithPaydayDate()
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(readSetting(db, 'payday_day')).toBeNull()
+    expect(readSetting(db, 'next_payday')).toBeNull()
+    expect(readSetting(db, 'pay_amount_cents')).toBe('320000')
+    expect(readSetting(db, 'payday_frequency')).toBe('FORTNIGHTLY')
+    // A near-miss key stays.
+    expect(readSetting(db, 'next_payday_extra')).toBe('keep')
+    db.close()
+  })
+
+  it('runs on a v59 database without the rows, and is idempotent', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`UPDATE app_settings SET value = '59' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    db.run(`UPDATE app_settings SET value = '59' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
     db.close()
   })
 })

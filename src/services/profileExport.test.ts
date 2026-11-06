@@ -1387,7 +1387,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(15)
+      expect(payload.version).toBe(16)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1817,7 +1817,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(15)
+      expect(payload.version).toBe(16)
       expect(Object.keys(payload)).not.toContain('manualAccounts')
       expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
       expect(payload.upcomingCharges).toHaveLength(1)
@@ -1941,7 +1941,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Rent', 180000, 'MONTHLY', '2026-03-01', '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(15)
+      expect(payload.version).toBe(16)
       for (const key of CUT_KEYS) {
         expect(payload.settings[key], key).toBeUndefined()
       }
@@ -1997,6 +1997,71 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       payload.settings = { pay_amount_cents: '450000' }
       payload.upcomingCharges = payload.upcomingCharges.slice(0, 1)
       expect(describeSkippedSections(payload)).toBeNull()
+    })
+  })
+
+  // ── #195: the payday date is cut ────────────────────────────────────────
+
+  describe('payday date cut (#195)', () => {
+    const CUT_KEYS = ['next_payday', 'payday_day']
+
+    it('no payday date key is in SETTINGS_WHITELIST; pay amount and frequency are', () => {
+      const wl = new Set(SETTINGS_WHITELIST)
+      for (const key of CUT_KEYS) {
+        expect(wl.has(key), `${key} still whitelisted`).toBe(false)
+      }
+      expect(wl.has('pay_amount_cents')).toBe(true)
+      expect(wl.has('payday_frequency')).toBe(true)
+    })
+
+    it('leaves the payday date out of an export', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.getDb).mockReturnValue(null)
+      vi.mocked(db.getAppSetting).mockImplementation((key) => {
+        if (key === 'next_payday') return '2026-11-26'
+        if (key === 'payday_day') return '104'
+        if (key === 'pay_amount_cents') return '320000'
+        if (key === 'payday_frequency') return 'FORTNIGHTLY'
+        return null
+      })
+
+      const payload = buildExportPayload()
+
+      expect(payload.version).toBe(16)
+      for (const key of CUT_KEYS) {
+        expect(payload.settings).not.toHaveProperty(key)
+      }
+      expect(payload.settings.pay_amount_cents).toBe('320000')
+      expect(payload.settings.payday_frequency).toBe('FORTNIGHTLY')
+    })
+
+    it('silently skips the payday date when importing an older export', async () => {
+      const db = await import('@/db')
+      vi.mocked(db.setAppSetting).mockClear()
+      const older = emptyPayload({
+        version: 15,
+        settings: {
+          next_payday: '2026-11-26',
+          payday_day: '104',
+          pay_amount_cents: '320000',
+          payday_frequency: 'FORTNIGHTLY',
+        },
+      })
+
+      importPayloadWithOptions(older, ALL_ON)
+
+      const written = vi.mocked(db.setAppSetting).mock.calls.map(([key]) => key)
+      for (const key of CUT_KEYS) expect(written, key).not.toContain(key)
+      expect(db.setAppSetting).toHaveBeenCalledWith(
+        'pay_amount_cents',
+        '320000'
+      )
+      expect(db.setAppSetting).toHaveBeenCalledWith(
+        'payday_frequency',
+        'FORTNIGHTLY'
+      )
+      // Silent: no skipped-settings notice for the payday date.
+      expect(describeSkippedSections(older)).toBeNull()
     })
   })
 })

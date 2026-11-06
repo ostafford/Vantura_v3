@@ -23,7 +23,7 @@ export const todayStore = createStore<TodayStore>(() => ({
 
 /**
  * Re-reads the local date. When it has changed, runs `onDayChange` (writes
- * that depend on the date, e.g. rolling payday forward) and then publishes
+ * that depend on the date, e.g. rolling tracker periods forward) and then publishes
  * the new date, so views re-read after those writes. Returns whether the day
  * changed.
  */

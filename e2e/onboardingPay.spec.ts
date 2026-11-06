@@ -41,5 +41,13 @@ test.describe('onboarding pay step', () => {
         exact: true,
       })
     ).toBeVisible()
+
+    // #195 — the step is Pay amount and Pay frequency only: no payday date.
+    await expect(
+      page.getByRole('combobox', { name: 'Pay frequency', exact: true })
+    ).toBeVisible()
+    await expect(page.locator('input[type="date"]')).toHaveCount(0)
+    await expect(page.getByText('Next payday')).toHaveCount(0)
+    await expect(page.getByLabel('Day', { exact: true })).toHaveCount(0)
   })
 })

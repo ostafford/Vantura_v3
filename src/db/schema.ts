@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 59
+const SCHEMA_VERSION = 60
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -1533,6 +1533,18 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['59']
+    )
+  }
+  // #195 — the payday date is cut. Only the pay amount and Pay frequency
+  // remain, so delete the next payday date and the payday day (including the
+  // 100–105 relative codes). pay_amount_cents and payday_frequency stay.
+  if (version < 60) {
+    database.run(
+      `DELETE FROM app_settings WHERE key IN ('next_payday', 'payday_day')`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['60']
     )
   }
 }

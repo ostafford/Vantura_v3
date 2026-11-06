@@ -242,7 +242,7 @@ export function Help() {
                       all synced transactions
                     </li>
                     <li>
-                      <strong>Settings</strong> — sync, payday, appearance,
+                      <strong>Settings</strong> — sync, pay, appearance,
                       security, and more. The <strong>About</strong> section
                       inside Settings links to this user guide and the
                       changelog.
@@ -299,16 +299,16 @@ export function Help() {
                   </p>
 
                   <SectionHeading icon="mdi-numeric-3-circle-outline">
-                    Set your payday schedule
+                    Set your pay
                   </SectionHeading>
                   <p className="mb-0">
                     Choose your pay frequency (weekly, fortnightly, or monthly)
-                    and your next payday date.
+                    and, optionally, your take-home pay amount.
                   </p>
                   <Tip>
-                    You can optionally set your pay amount in Settings → Payday.
-                    This enables Unallocated in Budget Plan and Free spending so
-                    far on the Dashboard.
+                    Your pay amount enables Unallocated in Budget Plan and Free
+                    spending so far on the Dashboard. You can set or change it
+                    any time in Settings → Pay.
                   </Tip>
                 </>
               )}
@@ -515,7 +515,7 @@ export function Help() {
                   <ul className="mb-2 ps-3">
                     <li className="mb-1">
                       <strong>Income</strong> — your pay amount from Settings
-                      (Payday)
+                      (Pay)
                     </li>
                     <li className="mb-1">
                       <strong>Committed</strong> — total planned spend across
@@ -530,8 +530,8 @@ export function Help() {
                   <Tip>
                     If any Regulars aren&apos;t assigned to a bucket, a warning
                     will appear — assign them to keep your totals accurate. Set
-                    your pay amount in <strong>Settings → Payday</strong> to
-                    enable the Income figure.
+                    your pay amount in <strong>Settings → Pay</strong> to enable
+                    the Income figure.
                   </Tip>
                 </>
               )}
@@ -637,7 +637,7 @@ export function Help() {
                     expires or you need to replace it.
                   </p>
 
-                  <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
+                  <SectionHeading icon="mdi-cash">Pay</SectionHeading>
                   <p className="mb-2">
                     Your pay frequency and <strong>pay amount</strong> set your
                     monthly Income, which gives Unallocated in Budget Plan and
@@ -667,8 +667,8 @@ export function Help() {
                   <p className="mb-2">
                     Export your settings to an encrypted, passphrase-protected
                     file and import it on another device. Includes appearance,
-                    payday schedule, lock timeout, trackers, Regulars, and
-                    Budget Plan buckets.{' '}
+                    pay, lock timeout, trackers, Regulars, and Budget Plan
+                    buckets.{' '}
                     <em>
                       Transactions, account data, and API tokens are never
                       exported.

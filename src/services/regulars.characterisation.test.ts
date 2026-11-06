@@ -63,8 +63,8 @@ interface Seed {
 }
 
 /**
- * Today is Sun 2025-02-23 (local = UTC under fake timers); next payday Fri
- * 2025-03-07, monthly. Each Regular exists to pin one case.
+ * Today is Sun 2025-02-23 (local = UTC under fake timers); pay is monthly.
+ * Each Regular exists to pin one case.
  */
 const SEEDS: Seed[] = [
   // MONTHLY, due in 2 days, within its 5-day reminder, linked to transactional payments.
@@ -237,7 +237,6 @@ beforeEach(async () => {
   runSchema(db)
   for (const key of Object.keys(appSettings)) delete appSettings[key]
 
-  appSettings['next_payday'] = '2025-03-07'
   appSettings['payday_frequency'] = 'MONTHLY'
 
   db.run(
