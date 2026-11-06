@@ -13,6 +13,7 @@ import {
   replaceTrackers,
   replaceUpcomingCharges,
   replaceSaverGoals,
+  replaceOnHandSavers,
   importPayloadWithOptions,
   describeSkippedSections,
   IMPORT_ERROR_INVALID_FILE,
@@ -1396,7 +1397,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(12)
+      expect(payload.version).toBe(13)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1511,6 +1512,103 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       expect(t[0].values[0][0]).toBeNull()
     })
   })
+  describe('On hand switch export/import (#213)', () => {
+    function insertAccount(
+      id: string,
+      opts: {
+        type?: string
+        on?: 0 | 1
+        joint?: boolean
+        closed?: boolean
+      } = {}
+    ) {
+      realDb.run(
+        `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at,
+           ownership_type, is_closed, counts_on_hand)
+         VALUES (?, ?, ?, 1000, '2026-01-01', '2026-01-01', ?, ?, ?)`,
+        [
+          id,
+          id,
+          opts.type ?? 'SAVER',
+          opts.joint ? 'JOINT' : 'INDIVIDUAL',
+          opts.closed ? 1 : 0,
+          opts.on ?? 0,
+        ]
+      )
+    }
+    function switchedOn(): string[] {
+      const r = realDb.exec(
+        `SELECT id FROM accounts WHERE counts_on_hand = 1 ORDER BY id`
+      )
+      return r.length ? r[0].values.map((v) => String(v[0])) : []
+    }
+
+    it('exports the ids of the Savers switched on, and no others', () => {
+      insertAccount('spend', { type: 'TRANSACTIONAL' })
+      insertAccount('sav-a', { on: 1 })
+      insertAccount('sav-b')
+      insertAccount('sav-c', { on: 1 })
+
+      const payload = buildExportPayload()
+      expect(payload.onHandSaverIds).toEqual(['sav-a', 'sav-c'])
+    })
+
+    it('round-trips: the switch is restored for accounts that exist, the rest are ignored', () => {
+      insertAccount('sav-a', { on: 1 })
+      insertAccount('sav-b')
+      const exported = buildExportPayload()
+
+      realDb.run(`UPDATE accounts SET counts_on_hand = 0`)
+      realDb.run(`UPDATE accounts SET counts_on_hand = 1 WHERE id = 'sav-b'`)
+      importPayloadWithOptions(
+        emptyPayload({
+          version: 13,
+          onHandSaverIds: [...(exported.onHandSaverIds ?? []), 'not-here'],
+        }),
+        ALL_ON
+      )
+
+      expect(switchedOn()).toEqual(['sav-a'])
+      expect(
+        realDb.exec(`SELECT COUNT(*) FROM accounts WHERE id = 'not-here'`)[0]
+          .values[0][0]
+      ).toBe(0)
+    })
+
+    it('an older export without the section imports with every Saver off', () => {
+      insertAccount('sav-a', { on: 1 })
+      insertAccount('sav-b', { on: 1 })
+
+      const older = emptyPayload({ version: 12 })
+      expect(older.onHandSaverIds).toBeUndefined()
+      importPayloadWithOptions(older, ALL_ON)
+
+      expect(switchedOn()).toEqual([])
+    })
+
+    it('never switches on a joint, closed or non-Saver account', () => {
+      insertAccount('spend', { type: 'TRANSACTIONAL' })
+      insertAccount('joint', { joint: true })
+      insertAccount('closed', { closed: true })
+      insertAccount('sav-a')
+
+      replaceOnHandSavers(['spend', 'joint', 'closed', 'sav-a', '', 42])
+
+      expect(switchedOn()).toEqual(['sav-a'])
+    })
+
+    it('leaves the switch alone when settings are not imported', () => {
+      insertAccount('sav-a', { on: 1 })
+
+      importPayloadWithOptions(emptyPayload({ version: 12 }), {
+        ...ALL_ON,
+        settings: false,
+      })
+
+      expect(switchedOn()).toEqual(['sav-a'])
+    })
+  })
+
   // ── #209: Net Worth is cut ──────────────────────────────────────────────
 
   describe('Net Worth cut (#209)', () => {
@@ -1601,7 +1699,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', 1, '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(12)
+      expect(payload.version).toBe(13)
       expect(Object.keys(payload)).not.toContain('manualAccounts')
       expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
       expect(payload.upcomingCharges).toHaveLength(1)

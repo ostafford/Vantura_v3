@@ -1,7 +1,7 @@
 /**
  * Profile export/import: encrypted file-based transfer of settings, trackers,
- * upcoming charges, budget plan and per-saver goal history between devices.
- * Never exports Up Bank transactions or accounts, the API token, or encryption
+ * upcoming charges, budget plan, per-saver goal history and the Savers switched
+ * on for On hand between devices. Never exports Up Bank transactions or accounts, the API token, or encryption
  * keys. Nothing here makes a network call.
  */
 
@@ -24,8 +24,9 @@ import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
  * notification settings are no longer written. v12 (#209): the
  * `manualAccounts` and `netWorthSnapshots` sections and the Regulars'
  * `charge_type` / `linked_account_name` fields are no longer written.
+ * v13 (#213): the `onHandSaverIds` section is written.
  */
-const EXPORT_PAYLOAD_VERSION = 12
+const EXPORT_PAYLOAD_VERSION = 13
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -73,6 +74,11 @@ export interface ExportPayload {
   budgetBuckets: BudgetBucketExportRow[]
   /** #29 — per-saver goal history. Absent in payloads from before v6. */
   saverGoals?: SaverGoalExportRow[]
+  /**
+   * #213 — the Up account ids of the Savers switched on for On hand. Ids are
+   * cross-database stable, so no remap. Absent in payloads from before v13.
+   */
+  onHandSaverIds?: string[]
 }
 
 /**
@@ -179,6 +185,20 @@ function collectSaverGoals(): SaverGoalExportRow[] {
   }
   stmt.free()
   return rows
+}
+
+/** #213 — ids of the Savers switched on for On hand, in id order. */
+function collectOnHandSaverIds(): string[] {
+  const db = getDb()
+  if (!db) return []
+  const stmt = db.prepare(
+    `SELECT id FROM accounts
+     WHERE account_type = 'SAVER' AND counts_on_hand = 1 ORDER BY id`
+  )
+  const ids: string[] = []
+  while (stmt.step()) ids.push(String(stmt.get()[0]))
+  stmt.free()
+  return ids
 }
 
 function collectTrackers(): TrackerExportRow[] {
@@ -342,6 +362,7 @@ export function buildExportPayload(): ExportPayload {
   const upcomingCharges = collectUpcomingCharges()
   const budgetBuckets = collectBudgetBuckets()
   const saverGoals = collectSaverGoals()
+  const onHandSaverIds = collectOnHandSaverIds()
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -354,6 +375,7 @@ export function buildExportPayload(): ExportPayload {
     upcomingCharges,
     budgetBuckets,
     saverGoals,
+    onHandSaverIds,
   }
 }
 
@@ -962,6 +984,28 @@ export function replaceSaverGoals(saverGoals: SaverGoalExportRow[] = []): void {
 }
 
 /**
+ * #213 — Restore the On hand switch: every Saver goes off, then each listed id
+ * that is an eligible Saver on this device (open, not joint) goes on. Ids for
+ * accounts this device doesn't have are ignored. A pre-v13 payload has no
+ * section, so `undefined` leaves every Saver off (#212).
+ */
+export function replaceOnHandSavers(ids: unknown): void {
+  const db = getDb()
+  if (!db) throw new Error('Database not ready')
+  db.run(`UPDATE accounts SET counts_on_hand = 0 WHERE counts_on_hand <> 0`)
+  if (!Array.isArray(ids)) return
+  for (const id of ids) {
+    if (typeof id !== 'string' || id === '') continue
+    db.run(
+      `UPDATE accounts SET counts_on_hand = 1
+       WHERE id = ? AND account_type = 'SAVER' AND is_closed = 0
+         AND COALESCE(ownership_type, '') <> 'JOINT'`,
+      [id]
+    )
+  }
+}
+
+/**
  * Import payload into the database with optional section selection.
  * Budget plan is applied first so bucket IDs can be remapped for trackers
  * and upcoming charges.
@@ -995,6 +1039,7 @@ export function importPayloadWithOptions(
       if (payload.saverGoals !== undefined) {
         replaceSaverGoals(payload.saverGoals)
       }
+      replaceOnHandSavers(payload.onHandSaverIds)
     }
 
     // Budget plan must be imported before trackers/charges so the ID map is ready.
