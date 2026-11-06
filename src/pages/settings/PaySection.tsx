@@ -1,47 +1,37 @@
 import { useState, useEffect } from 'react'
 import { Button, Form } from 'react-bootstrap'
-import { getAppSetting, setAppSetting } from '@/db'
 import { toast } from '@/stores/toastStore'
 import {
   type PayFrequency,
   PAY_FREQUENCIES,
   PAY_FREQUENCY_LABELS,
-  isPayFrequency,
 } from '@/lib/payFrequency'
+import {
+  INVALID_PAY_AMOUNT_MESSAGE,
+  readPaySettings,
+  savePay,
+} from '@/services/pay'
 import { syncStore } from '@/stores/syncStore'
 
 /** Settings → Pay: the take-home pay amount and Pay frequency (#195). */
 export function PaySection() {
   const [payFrequency, setPayFrequency] = useState<PayFrequency>('MONTHLY')
   const [payAmount, setPayAmount] = useState('')
+  const [payError, setPayError] = useState<string | null>(null)
   const [paySuccess, setPaySuccess] = useState(false)
 
   useEffect(() => {
-    const freq = getAppSetting('payday_frequency')
-    const payAmt = getAppSetting('pay_amount_cents')
-    if (isPayFrequency(freq)) setPayFrequency(freq)
-    if (payAmt != null && payAmt !== '') {
-      const cents = parseInt(payAmt, 10)
-      if (!Number.isNaN(cents) && cents >= 0) {
-        setPayAmount((cents / 100).toFixed(2))
-      }
-    } else {
-      setPayAmount('')
-    }
+    const { frequency, amountInput } = readPaySettings()
+    if (frequency) setPayFrequency(frequency)
+    setPayAmount(amountInput)
   }, [])
 
   function handlePaySubmit(e: React.FormEvent) {
     e.preventDefault()
-    setAppSetting('payday_frequency', payFrequency)
-    const payAmtTrimmed = payAmount.trim()
-    if (payAmtTrimmed === '') {
-      setAppSetting('pay_amount_cents', '')
-    } else {
-      const cents = Math.round(parseFloat(payAmtTrimmed) * 100)
-      setAppSetting(
-        'pay_amount_cents',
-        Number.isNaN(cents) || cents < 0 ? '' : String(cents)
-      )
+    setPayError(null)
+    if (!savePay(payFrequency, payAmount)) {
+      setPayError(INVALID_PAY_AMOUNT_MESSAGE)
+      return
     }
     syncStore.getState().syncCompleted()
     setPaySuccess(true)
@@ -89,6 +79,11 @@ export function PaySection() {
             is built from it.
           </Form.Text>
         </Form.Group>
+        {payError && (
+          <div className="text-danger small mb-2" role="alert">
+            {payError}
+          </div>
+        )}
         {paySuccess && (
           <span className="d-block mb-2 text-success small" role="status">
             Pay settings updated.

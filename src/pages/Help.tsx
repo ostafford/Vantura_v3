@@ -302,12 +302,13 @@ export function Help() {
                     Set your pay
                   </SectionHeading>
                   <p className="mb-0">
-                    Choose your pay frequency (weekly, fortnightly, or monthly).
+                    Choose your pay frequency (weekly, fortnightly, or monthly)
+                    and, optionally, your take-home pay amount.
                   </p>
                   <Tip>
-                    You can optionally set your pay amount in Settings → Pay.
-                    This enables Unallocated in Budget Plan and Free spending so
-                    far on the Dashboard.
+                    Your pay amount enables Unallocated in Budget Plan and Free
+                    spending so far on the Dashboard. You can set or change it
+                    any time in Settings → Pay.
                   </Tip>
                 </>
               )}
