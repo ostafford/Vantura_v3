@@ -21,6 +21,7 @@
 
 import { getDb } from '@/db'
 import { localDateString } from '@/lib/format'
+import { addDaysToDateStr, calendarMonthDayBounds } from '@/lib/dateStr'
 import {
   readRegulars,
   readRegularById,
@@ -32,6 +33,7 @@ import {
   firstOccurrenceOnOrAfter,
   getProjectedOccurrencesInRange,
 } from './projection'
+import { regularOccurrencesPaidInMonth } from './paid'
 
 export type { Regular } from './rows'
 export {
@@ -80,14 +82,17 @@ export {
 
 export interface RegularsByMonth {
   /**
-   * `ONCE` charges whose date has passed with no future occurrence (`#18`). They
-   * need an explicit "was this paid?" resolution, so they are kept out of
-   * `thisMonth` and `later`.
+   * Regulars whose earliest unpaid occurrence this calendar month is before
+   * today, at that occurrence; plus a past-month `ONCE` that isn't paid, at its
+   * stored date (#18). Oldest first.
    */
   overdue: Regular[]
-  /** Next occurrence (on or after today) falls in the current calendar month. */
+  /** Earliest unpaid occurrence this month is today or later, at that date. */
   thisMonth: Regular[]
-  /** Next occurrence falls after the current calendar month. */
+  /**
+   * No unpaid occurrence this month (none dated this month, or all paid), at
+   * its first occurrence after this month.
+   */
   later: Regular[]
 }
 
@@ -105,9 +110,19 @@ function readRegularsByStoredDate(
 }
 
 /**
- * Every Regular grouped by date as Overdue / This month / Later (#193), each
- * at its next occurrence on or after today. Date only: paid status doesn't
- * affect the grouping.
+ * Every Regular, one row each, placed by its **earliest unpaid occurrence**
+ * (#183 decision 4, #217), so Upcoming agrees with Still to go out:
+ *
+ * - **Overdue:** before today, in this calendar month. Past months' unpaid
+ *   occurrences don't count, except a past-month `ONCE`, which stays Overdue
+ *   at its stored date until it's paid (#18).
+ * - **This month:** from today to month end.
+ * - **Later:** no unpaid occurrence this month (none dated this month, or all
+ *   paid), at its first occurrence after this month. A Regular with no
+ *   occurrence after this month is dropped then (a paid `ONCE`, or a recurring
+ *   one past its cancel-by date), never deleted.
+ *
+ * Paid is the per-occurrence read (`regularOccurrencesPaidInMonth`).
  */
 export function regularsByMonth(): RegularsByMonth {
   const db = getDb()
@@ -117,32 +132,63 @@ export function regularsByMonth(): RegularsByMonth {
   const later: Regular[] = []
   const today = localDateString()
   const currentMonth = today.slice(0, 7)
-  const rows = readRegularsByStoredDate(db)
-  for (const row of rows) {
-    const nextOccurrence = firstOccurrenceOnOrAfter(
-      row.next_charge_date,
-      row.frequency,
-      today,
-      row.cancel_by_date
-    )
-    if (!nextOccurrence) {
-      // A recurring charge with an exhausted / cancelled cycle is silently
-      // dropped. A past ONCE charge has nowhere to roll to — surface it as
-      // overdue (at its stored past date) for an explicit "was this paid?"
-      // resolution (#18).
-      if (row.frequency === 'ONCE') overdue.push({ ...row })
-      continue
-    }
-    const projected = { ...row, next_charge_date: nextOccurrence }
-    if (nextOccurrence.slice(0, 7) === currentMonth) {
-      thisMonth.push(projected)
-    } else {
-      later.push(projected)
+  const nextMonthFirst = addDaysToDateStr(
+    calendarMonthDayBounds(currentMonth).last,
+    1
+  )
+
+  // Earliest unpaid occurrence this month, per Regular (the read is in date
+  // order, so the first unpaid one seen is the earliest).
+  const earliestUnpaid = new Map<number, string>()
+  for (const o of regularOccurrencesPaidInMonth(currentMonth)) {
+    if (!o.paid && !earliestUnpaid.has(o.regular.id)) {
+      earliestUnpaid.set(o.regular.id, o.date)
     }
   }
-  overdue.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
-  thisMonth.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
-  later.sort((a, b) => a.next_charge_date.localeCompare(b.next_charge_date))
+  // Past-month ONCE: paid in its own month's read, memoised per month.
+  const paidByMonth = new Map<string, Set<number>>()
+  const isPaidOnceIn = (row: Regular): boolean => {
+    const month = row.next_charge_date.slice(0, 7)
+    let paid = paidByMonth.get(month)
+    if (!paid) {
+      paid = new Set(
+        regularOccurrencesPaidInMonth(month)
+          .filter((o) => o.paid)
+          .map((o) => o.regular.id)
+      )
+      paidByMonth.set(month, paid)
+    }
+    return paid.has(row.id)
+  }
+
+  for (const row of readRegularsByStoredDate(db)) {
+    const unpaid = earliestUnpaid.get(row.id)
+    if (unpaid) {
+      const projected = { ...row, next_charge_date: unpaid }
+      if (unpaid < today) overdue.push(projected)
+      else thisMonth.push(projected)
+      continue
+    }
+    if (
+      row.frequency === 'ONCE' &&
+      row.next_charge_date.slice(0, 7) < currentMonth
+    ) {
+      if (!isPaidOnceIn(row)) overdue.push({ ...row })
+      continue
+    }
+    const next = firstOccurrenceOnOrAfter(
+      row.next_charge_date,
+      row.frequency,
+      nextMonthFirst,
+      row.cancel_by_date
+    )
+    if (next) later.push({ ...row, next_charge_date: next })
+  }
+  const byDate = (a: Regular, b: Regular) =>
+    a.next_charge_date.localeCompare(b.next_charge_date)
+  overdue.sort(byDate)
+  thisMonth.sort(byDate)
+  later.sort(byDate)
   return { overdue, thisMonth, later }
 }
 

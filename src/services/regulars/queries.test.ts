@@ -29,6 +29,8 @@ vi.mock('@/db', () => ({
 
 const {
   regularsByMonth,
+  regularById,
+  markOccurrencePaid,
   regularOccurrencesInMonth,
   dueSoonRegulars,
   reservedBeforePayday,
@@ -118,14 +120,15 @@ describe('regularsByMonth', () => {
     expect(names(regularsByMonth().thisMonth)).toEqual(['Today'])
   })
 
-  it('groups by the next occurrence on or after today, not the stored date', () => {
-    // Stored 10 Jan, monthly: next occurrence 10 Mar (10 Feb has passed) → Later.
+  it('groups by the earliest unpaid occurrence this month, not the stored date', () => {
+    // Stored 10 Jan, monthly: 10 Feb is unpaid and before today → Overdue.
     add({ name: 'Gym', frequency: 'MONTHLY', date: '2025-01-10' })
-    // Stored 25 Jan, monthly: next occurrence 25 Feb → This month.
+    // Stored 25 Jan, monthly: 25 Feb is unpaid, today or later → This month.
     add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-25' })
     const g = regularsByMonth()
+    expect(dated(g.overdue)).toEqual(['2025-02-10 Gym'])
     expect(dated(g.thisMonth)).toEqual(['2025-02-25 Phone'])
-    expect(dated(g.later)).toEqual(['2025-03-10 Gym'])
+    expect(g.later).toHaveLength(0)
   })
 
   it('does not read the next-payday setting', () => {
@@ -149,6 +152,116 @@ describe('regularsByMonth', () => {
   it('returns projected dates, never the stored anchor', () => {
     add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-31' })
     expect(dated(regularsByMonth().thisMonth)).toEqual(['2025-02-28 Phone'])
+  })
+})
+
+describe('regularsByMonth — paid-aware (#217)', () => {
+  // Today: Sun 2025-02-23.
+  const idOf = (name: string) =>
+    Number(
+      db.exec(`SELECT id FROM upcoming_charges WHERE name = '${name}'`)[0]
+        .values[0][0]
+    )
+  const groupsOf = () => {
+    const g = regularsByMonth()
+    return {
+      overdue: dated(g.overdue),
+      thisMonth: dated(g.thisMonth),
+      later: dated(g.later),
+    }
+  }
+
+  it('places a weekly Regular by its earliest unpaid occurrence this month', () => {
+    add({ name: 'Cleaner', frequency: 'WEEKLY', date: '2025-02-03' })
+    expect(groupsOf().overdue).toEqual(['2025-02-03 Cleaner'])
+
+    markOccurrencePaid(idOf('Cleaner'), '2025-02-03')
+    expect(groupsOf().overdue).toEqual(['2025-02-10 Cleaner'])
+
+    markOccurrencePaid(idOf('Cleaner'), '2025-02-10')
+    markOccurrencePaid(idOf('Cleaner'), '2025-02-17')
+    expect(groupsOf()).toEqual({
+      overdue: [],
+      thisMonth: ['2025-02-24 Cleaner'],
+      later: [],
+    })
+  })
+
+  it('marking the overdue occurrence paid moves the Regular to Later, at its first occurrence after this month', () => {
+    add({ name: 'Gym', frequency: 'MONTHLY', date: '2025-01-10' })
+    expect(markOccurrencePaid(idOf('Gym'), '2025-02-10')).toBe(true)
+    expect(groupsOf()).toEqual({
+      overdue: [],
+      thisMonth: [],
+      later: ['2025-03-10 Gym'],
+    })
+  })
+
+  it('a Regular paid early this month goes to Later, not This month', () => {
+    add({ name: 'Phone', frequency: 'MONTHLY', date: '2025-01-25' })
+    markOccurrencePaid(idOf('Phone'), '2025-02-25')
+    expect(groupsOf().later).toEqual(['2025-03-25 Phone'])
+    expect(groupsOf().thisMonth).toEqual([])
+  })
+
+  it('a Linked payment pays the occurrence, the same as a mark', () => {
+    add({
+      name: 'Power',
+      frequency: 'MONTHLY',
+      date: '2025-01-10',
+      amount: 12000,
+      match_description: 'SYNTHETIC POWER',
+    })
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, description, amount, settled_at, created_at)
+       VALUES ('tx-power', 'everyday', 'HELD', 'SYNTHETIC POWER', -12000, NULL, '2025-02-12T09:00:00+11:00')`
+    )
+    expect(groupsOf().later).toEqual(['2025-03-10 Power'])
+  })
+
+  it('month boundaries: the 1st is Overdue, the last day is This month, last month’s unpaid is ignored', () => {
+    add({ name: 'First', frequency: 'MONTHLY', date: '2025-01-01' })
+    add({ name: 'Month end', frequency: 'MONTHLY', date: '2024-12-31' })
+    add({ name: 'Next month', frequency: 'MONTHLY', date: '2025-03-01' })
+    expect(groupsOf()).toEqual({
+      // 1 Jan and 31 Jan were unpaid too, but only this month counts.
+      overdue: ['2025-02-01 First'],
+      thisMonth: ['2025-02-28 Month end'],
+      later: ['2025-03-01 Next month'],
+    })
+  })
+
+  it('a paid ONCE this month is hidden from every group, and not deleted', () => {
+    add({ name: 'Concert', frequency: 'ONCE', date: '2025-02-10' })
+    expect(groupsOf().overdue).toEqual(['2025-02-10 Concert'])
+
+    markOccurrencePaid(idOf('Concert'), '2025-02-10')
+
+    expect(groupsOf()).toEqual({ overdue: [], thisMonth: [], later: [] })
+    expect(regularById(idOf('Concert'))?.name).toBe('Concert')
+  })
+
+  it('a past-month ONCE stays Overdue until it is paid, then is hidden, not deleted', () => {
+    add({ name: 'Rego', frequency: 'ONCE', date: '2025-01-20' })
+    expect(groupsOf().overdue).toEqual(['2025-01-20 Rego'])
+
+    markOccurrencePaid(idOf('Rego'), '2025-01-20')
+
+    expect(groupsOf().overdue).toEqual([])
+    expect(regularById(idOf('Rego'))).not.toBeNull()
+  })
+
+  it('a recurring Regular paid this month with nothing after its cancel-by date drops out', () => {
+    add({
+      name: 'Trial',
+      frequency: 'MONTHLY',
+      date: '2025-01-05',
+      cancel_by: '2025-03-01',
+    })
+    expect(groupsOf().overdue).toEqual(['2025-02-05 Trial'])
+    markOccurrencePaid(idOf('Trial'), '2025-02-05')
+    expect(groupsOf()).toEqual({ overdue: [], thisMonth: [], later: [] })
+    expect(regularById(idOf('Trial'))).not.toBeNull()
   })
 })
 
