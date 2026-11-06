@@ -8,7 +8,7 @@ Vantura is a **local-first** personal finance app for Up Bank customers. All dat
 
 ## Product philosophy
 
-Vantura's product vision, target users, and non-negotiable design principles live in `docs/PRODUCT.md` — read it before making product/UX judgment calls, not just architectural ones. In short: **Headroom** is the Dashboard's safety-net figure, and the Up Bank API is ground truth beneath it.
+Vantura's product vision, target users, and non-negotiable design principles live in `docs/PRODUCT.md` — read it before making product/UX judgment calls, not just architectural ones. In short: Vantura is centred on the Budget Plan, with Headroom as the Dashboard's safety net. Every figure is honest about its limits; Up is ground truth for money that moved, and the user is the source for intent (the plan, the pay, Mark paid).
 
 ## Engineering standards & working agreement
 
