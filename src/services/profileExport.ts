@@ -1,6 +1,6 @@
 /**
  * Profile export/import: encrypted file-based transfer of settings, trackers,
- * upcoming charges, budget plan, per-saver goal history and the Savers switched
+ * upcoming charges, budget plan (with its Month-end plans), per-saver goal history and the Savers switched
  * on for On hand between devices. Never exports Up Bank transactions or accounts, the API token, or encryption
  * keys. Nothing here makes a network call.
  */
@@ -18,6 +18,16 @@ import { SCHEMA_VERSION } from '@/db/schema'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 import { isValidTrackerResetDay, writeTrackerConfigVersion } from './trackers'
 import { readPaidMarks } from '@/services/regulars'
+import { localDateString } from '@/lib/format'
+import {
+  getFirstPlannableMonth,
+  isMonth,
+  parseMonthEndPlanBody,
+  readMonthEndPlanRows,
+  replaceMonthEndPlans,
+  type MonthEndPlanBody,
+  type MonthEndPlanRow,
+} from '@/services/monthEndPlan'
 
 /**
  * Export format version for the encrypted payload. v10 (#204): the
@@ -30,8 +40,10 @@ import { readPaidMarks } from '@/services/regulars'
  * Essentials Saver settings and the Regulars' `is_reserved` are no longer
  * written. v16 (#195): the payday date settings (`next_payday`,
  * `payday_day`) are no longer written; import skips them silently.
+ * v17 (#242): the `monthEndPlans` section and `firstPlannableMonth` are
+ * written, and imported with the Budget Plan.
  */
-const EXPORT_PAYLOAD_VERSION = 16
+const EXPORT_PAYLOAD_VERSION = 17
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -79,6 +91,20 @@ export interface ExportPayload {
    * cross-database stable, so no remap. Absent in payloads from before v13.
    */
   onHandSaverIds?: string[]
+  /**
+   * #242 — every Month-end plan, oldest month first. Plans are
+   * self-contained, so their ids aren't remapped. Absent before v17.
+   */
+  monthEndPlans?: MonthEndPlanExportRow[]
+  /** #242 — the first plannable month, `YYYY-MM`. Absent before v17. */
+  firstPlannableMonth?: string | null
+}
+
+/** #242 — a `month_end_plans` row, with its plan body parsed. */
+export interface MonthEndPlanExportRow {
+  month: string
+  frozen_at: string
+  plan: MonthEndPlanBody
 }
 
 /**
@@ -378,6 +404,11 @@ export function buildExportPayload(): ExportPayload {
   const budgetBuckets = collectBudgetBuckets()
   const saverGoals = collectSaverGoals()
   const onHandSaverIds = collectOnHandSaverIds()
+  const monthEndPlans = readMonthEndPlanRows().map((r) => ({
+    month: r.month,
+    frozen_at: r.frozenAt,
+    plan: r.body,
+  }))
 
   return {
     version: EXPORT_PAYLOAD_VERSION,
@@ -391,6 +422,8 @@ export function buildExportPayload(): ExportPayload {
     budgetBuckets,
     saverGoals,
     onHandSaverIds,
+    monthEndPlans,
+    firstPlannableMonth: getFirstPlannableMonth(),
   }
 }
 
@@ -448,6 +481,16 @@ export const IMPORT_ERROR_INVALID_FILE =
  */
 export const IMPORT_ERROR_INVALID_TRACKER_RESET =
   'This file has a tracker with an invalid reset day. Nothing was imported.'
+
+/**
+ * #242 — user-facing error when the file's Month-end plans aren't valid: a
+ * malformed or repeated plan, a plan for a month that hasn't finished, or a
+ * plan without (or before) its first plannable month. The whole import is
+ * refused, because a past month is judged against these plans and a skipped
+ * one would be re-frozen from today's plan.
+ */
+export const IMPORT_ERROR_INVALID_MONTH_END_PLAN =
+  'This file has a past month’s plan that isn’t valid. Nothing was imported.'
 
 /** User-facing error when the passphrase does not match the file. */
 export const IMPORT_ERROR_WRONG_PASSPHRASE =
@@ -983,6 +1026,54 @@ function restorePaidMarks(
 }
 
 /**
+ * #242 — the payload's Month-end plans and first plannable month, validated.
+ * A payload from before v17 has neither, so it imports with none (and the
+ * next boot starts the first plannable month again). Throws
+ * `IMPORT_ERROR_INVALID_MONTH_END_PLAN` on anything that isn't exactly valid.
+ */
+export function readImportedMonthEndPlans(
+  payload: ExportPayload,
+  today: string = localDateString()
+): { rows: MonthEndPlanRow[]; firstMonth: string | null } {
+  const invalid = () => new Error(IMPORT_ERROR_INVALID_MONTH_END_PLAN)
+  const currentMonth = today.slice(0, 7)
+  const rawFirst = payload.firstPlannableMonth
+  let firstMonth: string | null = null
+  if (rawFirst !== undefined && rawFirst !== null) {
+    if (!isMonth(rawFirst) || rawFirst > currentMonth) throw invalid()
+    firstMonth = rawFirst
+  }
+  const raw = payload.monthEndPlans
+  if (raw === undefined) return { rows: [], firstMonth }
+  if (!Array.isArray(raw)) throw invalid()
+  const rows: MonthEndPlanRow[] = []
+  const months = new Set<string>()
+  for (const r of raw as Partial<MonthEndPlanExportRow>[]) {
+    if (
+      typeof r !== 'object' ||
+      r === null ||
+      !isMonth(r.month) ||
+      r.month >= currentMonth ||
+      firstMonth === null ||
+      r.month < firstMonth ||
+      months.has(r.month) ||
+      typeof r.frozen_at !== 'string' ||
+      r.frozen_at === ''
+    ) {
+      throw invalid()
+    }
+    const body = parseMonthEndPlanBody(r.plan, r.month)
+    if (!body) throw invalid()
+    months.add(r.month)
+    rows.push({ month: r.month, frozenAt: r.frozen_at, body })
+  }
+  return {
+    rows: rows.sort((a, b) => a.month.localeCompare(b.month)),
+    firstMonth,
+  }
+}
+
+/**
  * #29 — Replace saver_goal_history with imported data (full delete-then-reinsert).
  * Rows are keyed by the Up account id (`saver_id`), stable across the export
  * boundary, so no remap. After reinserting, re-mirror `accounts.target_amount_cents`
@@ -1100,6 +1191,10 @@ export function importPayloadWithOptions(
     let bucketIdMap = new Map<number, number>()
     if (options.budgetPlan) {
       bucketIdMap = replaceBudgetPlan(payload.budgetBuckets ?? [])
+      // #242 — past months' plans travel with the Budget Plan. Import never
+      // freezes anything itself; the next boot does.
+      const plans = readImportedMonthEndPlans(payload)
+      replaceMonthEndPlans(plans.rows, plans.firstMonth)
     }
 
     if (options.trackers) {

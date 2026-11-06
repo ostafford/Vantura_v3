@@ -9,7 +9,9 @@
  * One returns stored rows by design: `regularById` (the editor's anchor).
  *
  * Internals: `rows.ts` (the one SELECT), `projection.ts`,
- * `linkedPayments.ts`, `month.ts`, `paid.ts`, `draft.ts`.
+ * `linkedPayments.ts`, `month.ts`, `paid.ts`, `plan.ts`, `draft.ts`.
+ *
+ * `regularPlansInMonth` is the Regulars half of a Month-end plan (#242).
  *
  * Writes (#160): a draft (`blankDraft` / `draftFromRegular` /
  * `draftFromTransaction` / `draftFromSuggestion`) → `validateRegularDraft` →
@@ -55,6 +57,7 @@ export {
   type RegularLinkedPayments,
 } from './linkedPayments'
 export { regularsInMonth, type RegularMonth } from './month'
+export { regularPlansInMonth, type RegularPlanInMonth } from './plan'
 export {
   regularOccurrencesPaidInMonth,
   markOccurrencePaid,

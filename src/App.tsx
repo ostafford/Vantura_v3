@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
-import { recalculateTrackers } from '@/services/sync'
+import { runDateDependentWrites } from '@/services/dateDependentWrites'
 import { watchForDayChange } from '@/stores/todayStore'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import {
@@ -100,11 +100,13 @@ function AppContent() {
         return
       }
       if (cancelled) return
+      // Before sync or anything else: freeze any month that has finished,
+      // then roll tracker periods forward (#242).
+      runDateDependentWrites()
+      if (cancelled) return
       themeStore.getState().hydrateFromDb()
       if (cancelled) return
       sidebarPinsStore.getState().hydrateFromDb()
-      if (cancelled) return
-      recalculateTrackers()
       if (cancelled) return
       reconcileSaverGoalAchievement()
       if (!cancelled) setReady(true)
@@ -115,13 +117,12 @@ function AppContent() {
     }
   }, [])
 
-  // A page left open across midnight: roll tracker periods forward as boot
-  // does, then tell date-based views the day changed (#164).
+  // A page left open across midnight: run boot's date-dependent writes (a
+  // month rollover freezes that month's plan), then tell date-based views the
+  // day changed (#164, #242).
   useEffect(() => {
     if (!ready) return
-    return watchForDayChange(() => {
-      recalculateTrackers()
-    }, document)
+    return watchForDayChange(runDateDependentWrites, document)
   }, [ready])
 
   useEffect(() => {
