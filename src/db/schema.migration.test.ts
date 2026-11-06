@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(57)
+    expect(SCHEMA_VERSION).toBe(58)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -1830,6 +1830,105 @@ describe('v57 migration: Regular paid marks (#214)', () => {
     expect(columns(db)).toEqual(['regular_id', 'occurrence_date', 'marked_at'])
     db.run(`UPDATE app_settings SET value = '56' WHERE key = 'schema_version'`)
     expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+  })
+})
+
+describe('v58 migration: dead tables dropped (#210)', () => {
+  const tableExists = (db: Database, name: string) =>
+    db.exec(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+      name,
+    ]).length > 0
+
+  /** A v57 database that still has both tables, with rows in them. */
+  function buildV57WithDeadTables(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(
+      `CREATE TABLE future_items (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         name TEXT NOT NULL,
+         amount_cents INTEGER NOT NULL,
+         frequency TEXT NOT NULL DEFAULT 'MONTHLY',
+         target_date TEXT,
+         notes TEXT,
+         created_at TEXT NOT NULL
+       )`
+    )
+    db.run(
+      `CREATE TABLE budget_transaction_anchors (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         bucket_id INTEGER NOT NULL,
+         transaction_id TEXT NOT NULL,
+         description_pattern TEXT NOT NULL,
+         frequency TEXT NOT NULL DEFAULT 'MONTHLY',
+         created_at TEXT NOT NULL,
+         FOREIGN KEY (bucket_id) REFERENCES budget_buckets(id) ON DELETE CASCADE,
+         FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+       )`
+    )
+    db.run(
+      `INSERT INTO budget_buckets (id, name, icon, sort_order, created_at)
+       VALUES (2, 'Bills', 'mdi-wallet', 0, '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO transactions (id, account_id, status, description, amount, created_at, source)
+       VALUES ('tx-1', 'acc-1', 'SETTLED', 'Synthetic Power', -9000, '2026-10-01', 'up')`
+    )
+    db.run(
+      `INSERT INTO upcoming_charges (id, name, amount, frequency, next_charge_date, created_at, bucket_id)
+       VALUES (5, 'Synthetic power', 9000, 'MONTHLY', '2026-11-10', '2026-01-01', 2)`
+    )
+    db.run(
+      `INSERT INTO budget_transaction_anchors (bucket_id, transaction_id, description_pattern, created_at)
+       VALUES (2, 'tx-1', 'Synthetic Power', '2026-01-01')`
+    )
+    db.run(
+      `INSERT INTO future_items (name, amount_cents, created_at)
+       VALUES ('Synthetic bike', 120000, '2026-01-01')`
+    )
+    db.run(`UPDATE app_settings SET value = '57' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  it('drops budget_transaction_anchors and future_items, keeping everything else', () => {
+    const db = buildV57WithDeadTables()
+    const keep = (sql: string) => db.exec(sql)[0].values
+    const before = {
+      buckets: keep(`SELECT * FROM budget_buckets`),
+      transactions: keep(`SELECT * FROM transactions`),
+      regulars: keep(`SELECT * FROM upcoming_charges`),
+    }
+
+    runMigrations(db)
+
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    expect(tableExists(db, 'budget_transaction_anchors')).toBe(false)
+    expect(tableExists(db, 'future_items')).toBe(false)
+    expect({
+      buckets: keep(`SELECT * FROM budget_buckets`),
+      transactions: keep(`SELECT * FROM transactions`),
+      regulars: keep(`SELECT * FROM upcoming_charges`),
+    }).toEqual(before)
+    db.close()
+  })
+
+  it('runs on a v57 database without the tables, and is idempotent', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`UPDATE app_settings SET value = '57' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.run(`UPDATE app_settings SET value = '57' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    expect(readSetting(db, 'schema_version')).toBe(String(SCHEMA_VERSION))
+    db.close()
+  })
+
+  it('creates neither table on a fresh database', () => {
+    const db = new SQL.Database()
+    runSchema(db)
+    expect(tableExists(db, 'budget_transaction_anchors')).toBe(false)
+    expect(tableExists(db, 'future_items')).toBe(false)
     db.close()
   })
 })

@@ -119,7 +119,6 @@ export function deleteBucket(id: number): void {
     id,
   ])
   db.run(`UPDATE trackers SET bucket_id = NULL WHERE bucket_id = ?`, [id])
-  db.run(`DELETE FROM budget_transaction_anchors WHERE bucket_id = ?`, [id])
   db.run(`DELETE FROM budget_buckets WHERE id = ?`, [id])
   schedulePersist()
 }

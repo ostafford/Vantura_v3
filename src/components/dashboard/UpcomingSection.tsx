@@ -28,8 +28,8 @@ import { getReservedAmount } from '@/services/balance'
 import { getCategories } from '@/services/categories'
 import {
   searchRecentDebits,
-  type AnchorDebitRow,
-} from '@/services/budgetTransactionAnchors'
+  type RecentDebitRow,
+} from '@/services/transactions'
 import { RecurringChargeSuggestions } from './RecurringChargeSuggestions'
 import type { RecurringChargeSuggestion } from '@/services/recurringChargeDetection'
 import { formatMoney, formatShortDate } from '@/lib/format'
@@ -96,7 +96,7 @@ export function UpcomingSection({
   const [createStep, setCreateStep] = useState<'search' | 'form'>('search')
   const [txSearch, setTxSearch] = useState('')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
-  const [importedFromTx, setImportedFromTx] = useState<AnchorDebitRow | null>(
+  const [importedFromTx, setImportedFromTx] = useState<RecentDebitRow | null>(
     null
   )
   const [showSettlementPicker, setShowSettlementPicker] = useState(false)
@@ -250,7 +250,7 @@ export function UpcomingSection({
   // Prefill the form from a picked past transaction (#22). Picking one also
   // links the Regular to its payments (docs/adr/0020) — reveal "More options"
   // so the resulting auto-clear link is visible rather than silently applied.
-  function applySearchTx(tx: AnchorDebitRow) {
+  function applySearchTx(tx: RecentDebitRow) {
     applyTransaction(tx)
     setImportedFromTx(tx)
     setMoreOptionsOpen(true)
