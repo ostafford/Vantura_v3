@@ -41,13 +41,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   vi.useFakeTimers()
-  // Today: Sun 2025-02-23. Next payday: Fri 2025-03-07.
+  // Today: Sun 2025-02-23.
   vi.setSystemTime(new Date('2025-02-23T12:00:00Z'))
   const { runSchema } = await import('@/db/schema')
   db = new SQL.Database()
   runSchema(db)
   for (const key of Object.keys(appSettings)) delete appSettings[key]
-  appSettings['next_payday'] = '2025-03-07'
   appSettings['payday_frequency'] = 'MONTHLY'
   db.run(
     `INSERT INTO accounts (id, display_name, account_type, balance, created_at, updated_at)

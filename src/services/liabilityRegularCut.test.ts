@@ -49,7 +49,6 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-11-05T12:00:00Z'))
   for (const key of Object.keys(appSettings)) delete appSettings[key]
-  appSettings['next_payday'] = '2026-11-27'
   appSettings['payday_frequency'] = 'MONTHLY'
 
   // A v54 database: today's schema plus the two columns v55 drops and the

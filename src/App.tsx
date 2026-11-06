@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { RouterProvider } from 'react-router-dom'
 import { initDb, getAppSetting } from '@/db'
-import { advanceNextPaydayIfNeeded, recalculateTrackers } from '@/services/sync'
+import { recalculateTrackers } from '@/services/sync'
 import { watchForDayChange } from '@/stores/todayStore'
 import { reconcileSaverGoalAchievement } from '@/services/accounts'
 import {
@@ -104,8 +104,6 @@ function AppContent() {
       if (cancelled) return
       sidebarPinsStore.getState().hydrateFromDb()
       if (cancelled) return
-      advanceNextPaydayIfNeeded()
-      if (cancelled) return
       recalculateTrackers()
       if (cancelled) return
       reconcileSaverGoalAchievement()
@@ -117,12 +115,11 @@ function AppContent() {
     }
   }, [])
 
-  // A page left open across midnight: roll payday and tracker periods forward
-  // as boot does, then tell date-based views the day changed (#164).
+  // A page left open across midnight: roll tracker periods forward as boot
+  // does, then tell date-based views the day changed (#164).
   useEffect(() => {
     if (!ready) return
     return watchForDayChange(() => {
-      advanceNextPaydayIfNeeded()
       recalculateTrackers()
     }, document)
   }, [ready])
