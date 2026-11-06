@@ -12,6 +12,7 @@ import {
 } from '@/lib/crypto'
 import { validateUpBankToken } from '@/api/upBank'
 import { performInitialSync, type SyncProgress } from '@/services/sync'
+import { INVALID_PAY_AMOUNT_MESSAGE, savePay } from '@/services/pay'
 import {
   type PayFrequency,
   PAY_FREQUENCIES,
@@ -83,15 +84,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   function handleStep4Submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    setAppSetting('payday_frequency', payFrequency)
-    const payAmtTrimmed = payAmount.trim()
-    if (payAmtTrimmed === '') {
-      setAppSetting('pay_amount_cents', '')
-    } else {
-      const cents = Math.round(parseFloat(payAmtTrimmed) * 100)
-      if (!Number.isNaN(cents) && cents >= 0) {
-        setAppSetting('pay_amount_cents', String(cents))
-      }
+    if (!savePay(payFrequency, payAmount)) {
+      setError(INVALID_PAY_AMOUNT_MESSAGE)
+      return
     }
     setStep(5)
     startInitialSync(apiToken)

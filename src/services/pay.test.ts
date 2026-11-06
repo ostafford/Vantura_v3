@@ -1,0 +1,80 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+const appSettings: Record<string, string> = {}
+
+vi.mock('@/db', () => ({
+  getAppSetting: (key: string) => appSettings[key] ?? null,
+  setAppSetting: (key: string, value: string) => {
+    appSettings[key] = value
+  },
+}))
+
+const { parsePayAmountInput, readPaySettings, savePay } = await import('./pay')
+
+beforeEach(() => {
+  for (const key of Object.keys(appSettings)) delete appSettings[key]
+})
+
+describe('parsePayAmountInput', () => {
+  it('reads blank (or whitespace) as unset', () => {
+    expect(parsePayAmountInput('')).toEqual({ ok: true, cents: null })
+    expect(parsePayAmountInput('   ')).toEqual({ ok: true, cents: null })
+  })
+
+  it('reads dollars as cents, rounding to the nearest cent', () => {
+    expect(parsePayAmountInput('3200')).toEqual({ ok: true, cents: 320000 })
+    expect(parsePayAmountInput(' 1234.56 ')).toEqual({
+      ok: true,
+      cents: 123456,
+    })
+    expect(parsePayAmountInput('10.005')).toEqual({ ok: true, cents: 1001 })
+    expect(parsePayAmountInput('0')).toEqual({ ok: true, cents: 0 })
+  })
+
+  it('refuses anything that is not a plain non-negative amount', () => {
+    for (const input of ['-5', 'abc', '12abc', '1e3', 'Infinity', '1,000']) {
+      expect(parsePayAmountInput(input), input).toEqual({ ok: false })
+    }
+  })
+})
+
+describe('savePay', () => {
+  it('saves the frequency and the amount in cents', () => {
+    expect(savePay('FORTNIGHTLY', '3200.50')).toBe(true)
+    expect(appSettings.payday_frequency).toBe('FORTNIGHTLY')
+    expect(appSettings.pay_amount_cents).toBe('320050')
+  })
+
+  it('clears the amount when it is left blank', () => {
+    appSettings.pay_amount_cents = '450000'
+    expect(savePay('MONTHLY', '')).toBe(true)
+    expect(appSettings.pay_amount_cents).toBe('')
+    expect(appSettings.payday_frequency).toBe('MONTHLY')
+  })
+
+  it('writes nothing when the amount is invalid', () => {
+    appSettings.pay_amount_cents = '450000'
+    appSettings.payday_frequency = 'MONTHLY'
+    expect(savePay('WEEKLY', '-5')).toBe(false)
+    expect(appSettings.pay_amount_cents).toBe('450000')
+    expect(appSettings.payday_frequency).toBe('MONTHLY')
+  })
+})
+
+describe('readPaySettings', () => {
+  it('reads the stored frequency and the amount as dollars for the form', () => {
+    appSettings.payday_frequency = 'WEEKLY'
+    appSettings.pay_amount_cents = '123456'
+    expect(readPaySettings()).toEqual({
+      frequency: 'WEEKLY',
+      amountInput: '1234.56',
+    })
+  })
+
+  it('is null frequency and blank amount when unset or unusable', () => {
+    expect(readPaySettings()).toEqual({ frequency: null, amountInput: '' })
+    appSettings.payday_frequency = 'PAYDAY'
+    appSettings.pay_amount_cents = 'garbage'
+    expect(readPaySettings()).toEqual({ frequency: null, amountInput: '' })
+  })
+})
