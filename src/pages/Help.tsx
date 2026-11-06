@@ -307,8 +307,8 @@ export function Help() {
                   </p>
                   <Tip>
                     You can optionally set your pay amount in Settings → Payday.
-                    This enables the Free Spending figure in Budget Plan and
-                    Free spending so far on the Dashboard.
+                    This enables Unallocated in Budget Plan and Free spending so
+                    far on the Dashboard.
                   </Tip>
                 </>
               )}
@@ -471,8 +471,8 @@ export function Help() {
                   </SectionHeading>
                   <p className="mb-0">
                     Group your expenses into buckets and see Income vs Committed
-                    vs Free Spending. See <strong>Help → Budget Plan</strong>{' '}
-                    for full details.
+                    vs Unallocated. See <strong>Help → Budget Plan</strong> for
+                    full details.
                   </p>
                 </>
               )}
@@ -522,8 +522,9 @@ export function Help() {
                       all buckets
                     </li>
                     <li>
-                      <strong>Free spending</strong> — Income minus Committed
-                      (green = surplus, red = over budget)
+                      <strong>Unallocated</strong> — Income minus Committed: the
+                      Income no bucket plans for (green = left to plan, red =
+                      more committed than you earn)
                     </li>
                   </ul>
                   <Tip>
@@ -639,8 +640,8 @@ export function Help() {
                   <SectionHeading icon="mdi-calendar">Payday</SectionHeading>
                   <p className="mb-2">
                     Your pay frequency and <strong>pay amount</strong> set your
-                    monthly Income, which gives the Free Spending figure in
-                    Budget Plan and Free spending so far on the Dashboard.
+                    monthly Income, which gives Unallocated in Budget Plan and
+                    Free spending so far on the Dashboard.
                   </p>
 
                   <SectionHeading icon="mdi-palette-outline">
