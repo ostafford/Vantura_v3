@@ -69,6 +69,10 @@ _Avoid_: remaining, available, balance
 Income minus Actual spending for the calendar month to date. Shown in the Headroom card. Not Unallocated, which is Income minus Committed.
 _Avoid_: Unallocated, Headroom, leftover, remaining
 
+**Month review**:
+A card at the top of the Dashboard for the latest finished month that hasn't been reviewed. It shows that month's Saved or Overspent and opens the Budget Plan on it. Mark reviewed marks that month and every earlier one as reviewed.
+_Avoid_: notification, reminder, alert, prompt, Review last month
+
 **Dashboard section**:
 One of the rearrangeable blocks below Headroom: Month at a glance, Trackers, Regulars. Each has a per-browser order, size and visibility. Order is editable on the Dashboard *and* in Settings; size and visibility only on the Dashboard — an intentional split. Headroom is fixed above them.
 _Avoid_: widget, panel, module
@@ -80,7 +84,7 @@ _Avoid_: outdated, expired, old data
 ### Budget Plan
 
 **Budget Plan**:
-The page where Regulars and Trackers are grouped into buckets against Income, with an Income / Committed / Unallocated summary rescaled by a Weekly / Monthly / Yearly toggle.
+The page where Regulars and Trackers are grouped into buckets and compared with what's actually been spent, one calendar month at a time: the current month against today's plan, a finished month against its Month-end plan.
 _Avoid_: budget, planner, forecast
 
 **Bucket**:
@@ -88,11 +92,11 @@ A named group of Regulars and Trackers on the Budget Plan. Being in a bucket dec
 _Avoid_: category, group, envelope, folder
 
 **Committed**:
-The total the buckets' Regulars and Trackers come to for the selected display period. One-off Regulars don't count toward it (`docs/adr/0009`).
+What a month's buckets plan for: each Regular's occurrences dated in that month at their full amount (one-offs included), plus each Tracker's planned amount for the month. Items not in a bucket add nothing. Read from that month's plan: today's plan for the current month, its Month-end plan for a finished one (`docs/adr/0024`).
 _Avoid_: allocated, reserved, budgeted total
 
 **Unallocated**:
-Income minus Committed for the selected display period: the part of Income that no bucket plans for. Shows a prompt instead of a number while Income isn't set. Not Free spending so far, which is Income minus Actual spending.
+Income minus Committed for a calendar month: the part of Income that no bucket plans for. Shows a prompt instead of a number while Income isn't set. Not Free spending so far, which is Income minus Actual spending.
 _Avoid_: Free spending, spare, surplus, disposable income
 
 **Attribution**:
@@ -100,8 +104,27 @@ The rule for where each Actual spending transaction counts in a calendar month: 
 _Avoid_: allocation, categorisation, matching
 
 **Unplanned**:
-Actual spending in a month that no Regular or Tracker took under attribution. It means "not covered by the plan", not "unexpected": a routine grocery shop in a category with no Tracker is Unplanned. Can go negative when refunds exceed purchases.
+Actual spending in a month that no Regular or Tracker took under attribution. It means "not covered by the plan", not "unexpected": a routine grocery shop in a category with no Tracker is Unplanned. Can go negative when refunds exceed purchases. Shown on the Budget Plan's bar as "Spent unplanned".
 _Avoid_: unbudgeted, other, miscellaneous, unexpected
+
+**Spent on plan**:
+Actual spending in a month that a Regular or Tracker took under Attribution, whether or not the item is in a bucket. It isn't measured against Committed, which counts only items in a bucket. Together with Unplanned, it makes up the month's Actual spending.
+_Avoid_: committed spending, budgeted spending, on budget
+
+**If the rest goes to plan**:
+Income minus Actual spending minus Still to go out: where the month ends up if everything still expected goes out and nothing more is unplanned. Current month only; once the month finishes, Saved takes its place. Can go below zero.
+_Avoid_: projected savings, forecast, Headroom, Free spending so far
+
+**Saved**:
+A finished month's Income, taken from its Month-end plan, minus that month's Actual spending. Below zero it's shown as **Overspent**: a positive amount in the over colour. Actuals stay live, so a late sync can still change it. There's no figure when the Month-end plan has no pay. Not Free spending so far, which is for the current month and uses today's pay.
+_Avoid_: surplus, leftover, savings, Free spending so far
+
+**Overspent**:
+Saved below zero, shown as a positive amount. See Saved.
+
+**Month-end plan**:
+The plan as it stood when a calendar month ended: its buckets, its Regulars and their occurrences, its Trackers and the pay. A finished month is judged against it. It never changes afterwards, except that Mark paid can still mark its occurrences paid. Months from before Vantura started keeping them have none.
+_Avoid_: snapshot, history, archive
 
 ### Regulars
 
