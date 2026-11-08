@@ -803,7 +803,8 @@ export function Transactions() {
             </p>
           ) : (
             <p className="text-muted small mb-0">
-              Showing {loadedCount} of {totalCount} transaction(s)
+              Showing {loadedCount} of {totalCount}{' '}
+              {totalCount === 1 ? 'transaction' : 'transactions'}
               {hasMore && ' — load more below'}
             </p>
           )}
@@ -845,15 +846,11 @@ export function Transactions() {
                           {displayDate}
                           {row.category_name ? ` · ${row.category_name}` : ''}
                         </div>
-                        <span
-                          className={`badge mt-1 ${
-                            row.status === 'HELD'
-                              ? 'bg-warning text-dark'
-                              : 'bg-secondary'
-                          }`}
-                        >
-                          {row.status === 'HELD' ? 'Held' : 'Settled'}
-                        </span>
+                        {row.status === 'HELD' && (
+                          <span className="badge mt-1 bg-warning text-dark">
+                            Held
+                          </span>
+                        )}
                       </div>
                       <div className="d-flex flex-column align-items-end gap-1 flex-shrink-0">
                         <div className={isDebit ? '' : 'text-success'}>
@@ -904,7 +901,6 @@ export function Transactions() {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th className="text-center align-middle">Status</th>
                     <th>Merchant</th>
                     <th>Category</th>
                     <th className="text-end">Amount</th>
@@ -934,13 +930,13 @@ export function Transactions() {
                           style={{ cursor: 'pointer' }}
                         >
                           <td>{displayDate}</td>
-                          <td
-                            className={`text-center align-middle ${row.status === 'HELD' ? 'status-held' : ''}`}
-                          >
-                            {row.status === 'HELD' ? 'Held' : 'Settled'}
-                          </td>
                           <td>
                             {row.description || row.raw_text || 'Unknown'}
+                            {row.status === 'HELD' && (
+                              <span className="badge bg-warning text-dark ms-2">
+                                Held
+                              </span>
+                            )}
                           </td>
                           <td>{row.category_name ?? ''}</td>
                           <td
@@ -954,7 +950,6 @@ export function Transactions() {
                         roundUpsByParent.get(row.id) ?? []
                       ).map((ru) => (
                         <tr key={ru.id} className="small text-muted">
-                          <td />
                           <td />
                           <td>
                             Round-up to{' '}
@@ -975,7 +970,7 @@ export function Transactions() {
                           className="transactions-day-separator"
                           aria-hidden="true"
                         >
-                          <td colSpan={5} />
+                          <td colSpan={4} />
                         </tr>
                       ) : null
                     return [...dayRows, separator].filter(Boolean)
@@ -1029,7 +1024,7 @@ export function Transactions() {
                       : 'bg-secondary'
                   }`}
                 >
-                  {editTxRow.status === 'HELD' ? 'Pending' : 'Settled'}
+                  {editTxRow.status === 'HELD' ? 'Held' : 'Settled'}
                 </span>
               </div>
 

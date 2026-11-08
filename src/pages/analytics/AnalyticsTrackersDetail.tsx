@@ -586,7 +586,8 @@ export function AnalyticsTrackersDetail() {
             <Card.Header>
               <Card.Title className="mb-0">Transactions</Card.Title>
               <Card.Text as="div" className="small text-muted mt-1">
-                {totalTransactions} transaction(s)
+                {totalTransactions}{' '}
+                {totalTransactions === 1 ? 'transaction' : 'transactions'}
                 {(dateFrom || dateTo) && ' in selected date range'}
               </Card.Text>
               <div className="d-flex flex-wrap gap-2 mt-2">

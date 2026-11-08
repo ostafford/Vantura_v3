@@ -1017,10 +1017,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   background: var(--vantura-surface);
   pointer-events: none;
 }
-.table td.status-held {
-  background: color-mix(in srgb, var(--vantura-warning) 18%, transparent);
-  color: var(--vantura-text);
-}
 
 /* Dropdown toggle button — consistent radius */
 .dropdown-toggle {
