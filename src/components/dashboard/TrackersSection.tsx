@@ -43,18 +43,17 @@ const FREQUENCY_ORDER = TRACKER_RESET_FREQUENCY_ORDER
 function getTrackerProgressStyle(progress: number): {
   variant: 'primary' | 'warning' | 'danger' | 'success'
   striped: boolean
-  animated: boolean
 } {
   if (progress >= 100) {
-    return { variant: 'danger', striped: true, animated: true }
+    return { variant: 'danger', striped: true }
   }
   if (progress >= 81) {
-    return { variant: 'danger', striped: false, animated: false }
+    return { variant: 'danger', striped: false }
   }
   if (progress > 50) {
-    return { variant: 'warning', striped: false, animated: false }
+    return { variant: 'warning', striped: false }
   }
-  return { variant: 'success', striped: false, animated: false }
+  return { variant: 'success', striped: false }
 }
 
 const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
@@ -416,7 +415,6 @@ export function TrackersSection({
                           )}
                           variant={progressStyle.variant}
                           striped={progressStyle.striped}
-                          animated={progressStyle.animated}
                           label={
                             budgetPct === null ? undefined : `${budgetPct}%`
                           }
