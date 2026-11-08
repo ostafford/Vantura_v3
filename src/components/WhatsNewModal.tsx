@@ -53,7 +53,7 @@ export function WhatsNewModal({ show, onClose }: WhatsNewModalProps) {
         <Modal.Title className="d-flex align-items-center gap-2">
           <i
             className="mdi mdi-rocket-launch-outline"
-            style={{ color: 'var(--vantura-primary)', fontSize: '1.2rem' }}
+            style={{ color: 'var(--vantura-primary-text)', fontSize: '1.2rem' }}
             aria-hidden
           />
           <span>What&apos;s new in v{APP_VERSION}</span>

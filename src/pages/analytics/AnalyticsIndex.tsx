@@ -29,7 +29,7 @@ export function AnalyticsIndex() {
                   </p>
                   <span
                     className="small mt-1 d-inline-block"
-                    style={{ color: 'var(--vantura-primary)' }}
+                    style={{ color: 'var(--vantura-primary-text)' }}
                   >
                     View trackers{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
@@ -62,7 +62,7 @@ export function AnalyticsIndex() {
                   </p>
                   <span
                     className="small mt-1 d-inline-block"
-                    style={{ color: 'var(--vantura-primary)' }}
+                    style={{ color: 'var(--vantura-primary-text)' }}
                   >
                     View savers{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />
@@ -95,7 +95,7 @@ export function AnalyticsIndex() {
                   </p>
                   <span
                     className="small mt-1 d-inline-block"
-                    style={{ color: 'var(--vantura-primary)' }}
+                    style={{ color: 'var(--vantura-primary-text)' }}
                   >
                     View budget plan{' '}
                     <i className="mdi mdi-chevron-right" aria-hidden />

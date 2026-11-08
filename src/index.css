@@ -25,6 +25,8 @@
   --vantura-info-text: var(--vantura-info);
   --vantura-warning-text: var(--vantura-warning);
   --vantura-danger-text: var(--vantura-danger);
+  /* Primary as text, icons and focus rings (fills keep --vantura-primary). */
+  --vantura-primary-text: var(--vantura-primary);
   /* Same, for text inside Bootstrap tooltips, whose surface is inverted
      (white in the dark theme, black in the light theme). */
   --vantura-success-on-tooltip: #2e7d32;
@@ -42,7 +44,7 @@
   --vantura-sidebar-menu-color: #ffffff;
   --vantura-sidebar-icon-color: rgba(180, 175, 200, 0.96);
   --vantura-sidebar-active-bg: #1c1c28;
-  --vantura-sidebar-active-color: var(--vantura-primary);
+  --vantura-sidebar-active-color: var(--vantura-primary-text);
   --vantura-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
   --vantura-navbar-bg: #0f0f18;
   --vantura-bg-elevated: #1c1c28;
@@ -160,6 +162,8 @@
   --vantura-info-text: #1565c0;
   --vantura-warning-text: #9a5b00;
   --vantura-danger-text: #c62828;
+  /* Light Blue 900, same family as #90caf9: 6.7:1 on the page, 7.4:1 on white */
+  --vantura-primary-text: #01579b;
   --vantura-success-on-tooltip: var(--vantura-success);
   --vantura-info-on-tooltip: var(--vantura-info);
   --vantura-warning-on-tooltip: var(--vantura-warning);
@@ -371,11 +375,11 @@ body {
 }
 
 a:not(.btn):not(.nav-link):not(.dropdown-item) {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 @media (hover: hover) and (pointer: fine) {
   a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
     opacity: 0.8;
   }
 }
@@ -510,7 +514,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-color: var(--vantura-border);
 }
 .settings-nav .list-group-item:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: -2px;
 }
 .settings-panel-column {
@@ -577,7 +581,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   background-color: var(--vantura-surface);
 }
 .settings-accordion .accordion-button:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: -2px;
 }
 .settings-accordion .accordion-button::after {
@@ -611,7 +615,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   }
 }
 .accent-swatch:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
 }
 
@@ -1194,7 +1198,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-text-secondary);
 }
 .breadcrumb-item a {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   text-decoration: none;
   transition: color var(--duration-fast) ease;
 }
@@ -1320,13 +1324,13 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-sidebar-active-color);
 }
 .sidebar .nav-item.active .nav-link .menu-icon {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .sidebar .sidebar-footer-btn.active {
   color: var(--vantura-sidebar-active-color);
 }
 .sidebar .sidebar-footer-btn.active .menu-icon {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 @media (hover: hover) and (pointer: fine) {
   .sidebar .nav-item:hover {
@@ -1400,7 +1404,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .sidebar .sidebar-brand .sidebar-brand-block {
   display: flex;
@@ -1428,7 +1432,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .sidebar.collapsed .nav-link {
   justify-content: center;
@@ -1661,7 +1665,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 
 .btn-icon.btn-icon-primary {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   background: color-mix(in srgb, var(--vantura-primary) 8%, transparent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
@@ -1670,14 +1674,14 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   background: color-mix(in srgb, var(--vantura-primary) 16%, transparent);
   box-shadow: 0 2px 6px
     color-mix(in srgb, var(--vantura-primary) 18%, transparent);
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 @media (hover: hover) and (pointer: fine) {
   .btn-icon.btn-icon-primary:hover {
     background: color-mix(in srgb, var(--vantura-primary) 16%, transparent);
     box-shadow: 0 2px 6px
       color-mix(in srgb, var(--vantura-primary) 18%, transparent);
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
   }
 }
 
@@ -1800,10 +1804,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .vantura-navbar .navbar-brand-wrapper .navbar-toggler .navbar-menu-icon {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   display: block;
 }
 .vantura-navbar .navbar-brand-wrapper .navbar-brand-block {
@@ -1820,7 +1824,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .vantura-navbar .navbar-brand-wrapper .navbar-brand-block .navbar-demo-badge {
   font-size: 0.6rem;
@@ -1831,7 +1835,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .vantura-navbar .navbar-collapsed-brand {
   position: absolute;
@@ -1853,7 +1857,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .vantura-navbar .navbar-collapsed-brand .navbar-demo-badge {
   font-size: 0.55rem;
@@ -1864,7 +1868,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .vantura-navbar .navbar-menu-wrapper {
   flex: 1;
@@ -1954,7 +1958,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
     -webkit-background-clip: unset;
     background-clip: unset;
     -webkit-text-fill-color: unset;
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
   }
   .vantura-navbar .navbar-mobile-brand {
     position: absolute;
@@ -1976,7 +1980,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
   }
   .vantura-navbar .navbar-mobile-brand .navbar-demo-badge {
     font-size: 0.5rem;
@@ -1987,7 +1991,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
   }
   .content-wrapper {
     padding-left: 1rem;
@@ -2138,7 +2142,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-text-on-pastel);
 }
 .btn-outline-primary {
-  --bs-btn-color: var(--vantura-primary);
+  --bs-btn-color: var(--vantura-primary-text);
   --bs-btn-border-color: var(--vantura-primary);
   --bs-btn-hover-color: var(--vantura-text-on-pastel);
   --bs-btn-hover-bg: var(--vantura-primary);
@@ -2152,7 +2156,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
     color-mix(in srgb, var(--vantura-primary) 25%, transparent);
 }
 .text-primary {
-  color: var(--vantura-primary) !important;
+  color: var(--vantura-primary-text) !important;
 }
 .text-success {
   color: var(--vantura-success-text) !important;
@@ -2316,7 +2320,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-color: transparent !important;
 }
 .month-summary-legend-toggle.btn:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -2353,7 +2357,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 @media (hover: hover) and (pointer: fine) {
   .onboarding-whats-new-chip:hover {
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
     border-color: var(--vantura-primary);
     background: rgba(var(--vantura-primary-rgb, 0, 150, 255), 0.06);
     text-decoration: none;
@@ -2419,7 +2423,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 @media (hover: hover) and (pointer: fine) {
   .auth-whats-new-link:hover {
-    color: var(--vantura-primary);
+    color: var(--vantura-primary-text);
     text-decoration: none;
   }
 }
@@ -2457,7 +2461,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 .changelog-public-brand .mdi {
   font-size: 1.2rem;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
 }
 .changelog-public-content {
   max-width: 900px;
@@ -2514,7 +2518,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 .changelog-stat-value {
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   line-height: 1.2;
 }
 .changelog-stat-label {
@@ -2762,7 +2766,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border: 1px solid var(--vantura-primary);
   border-radius: 999px;
   background: transparent;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   cursor: pointer;
   transition:
     background var(--duration-fast) ease,
@@ -2873,7 +2877,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 .changelog-item-icon {
   font-size: 1rem;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   flex-shrink: 0;
   margin-top: 0.05rem;
 }
@@ -2959,7 +2963,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 
 .pwa-update-banner__message .mdi {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   font-size: 1.1rem;
 }
 
@@ -3108,7 +3112,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-warning-text);
 }
 .plan-link {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -3386,7 +3390,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   animation: month-review-out var(--duration-fast) var(--ease-out) both;
 }
 .month-review__icon {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   font-size: 1.1rem;
 }
 /* Beats the global `a:not(.btn)…` link colour: the line reads as text, with
@@ -3405,7 +3409,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   }
 }
 .month-review__cta {
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   font-weight: 600;
 }
 .month-review__sep {
@@ -3417,7 +3421,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   margin: -0.6rem -0.4rem;
   border: 0;
   background: none;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   font: inherit;
   font-weight: 600;
 }
@@ -3429,7 +3433,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 .month-review__link:focus-visible,
 .month-review__mark:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -3498,7 +3502,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   transform: scale(0.94);
 }
 .plan-month-nav__chevron:focus-visible {
-  outline: 2px solid var(--vantura-primary);
+  outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
 }
 .plan-month-nav__chevron:disabled {
@@ -3515,7 +3519,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   margin: -0.6rem -0.4rem;
   border: 0;
   background: none;
-  color: var(--vantura-primary);
+  color: var(--vantura-primary-text);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
