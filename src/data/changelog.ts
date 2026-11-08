@@ -24,6 +24,44 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '8 Nov 2026',
+    heading: 'Plan vs Actual & At Home on Your Phone',
+    icon: 'mdi-scale-balance',
+    primaryMonth: '2026-11',
+    version: '0.12.0',
+    color: '#9fa8da',
+    items: [
+      {
+        icon: 'mdi-scale-balance',
+        text: 'The Budget Plan compares your plan with what you have actually spent this month: each bucket, each Regular and Tracker, and where this month’s Income has gone.',
+      },
+      {
+        icon: 'mdi-calendar-arrow-left',
+        text: 'Step back through finished months with ‹ and ›. Each is judged against its Month-end plan, the plan as it stood when the month ended, and shows what you Saved or Overspent.',
+      },
+      {
+        icon: 'mdi-calendar-check',
+        text: 'When a month ends, a Month review line on the Dashboard shows what you Saved or Overspent. Mark reviewed hides it until the next month ends.',
+      },
+      {
+        icon: 'mdi-gesture-swipe-right',
+        text: 'The menu on your phone follows your finger: swipe in from the left edge, let go past halfway or flick, and it opens. Swipe it away to close.',
+      },
+      {
+        icon: 'mdi-numeric',
+        text: 'Amount fields open the number pad with a decimal point, and amounts must be plain numbers like 12.50. Entries like 12,50 or $12 are refused instead of guessed.',
+      },
+      {
+        icon: 'mdi-gesture-tap',
+        text: 'No more grey flash when you tap, buttons dip as you press them, and nothing stays highlighted after a tap.',
+      },
+      {
+        icon: 'mdi-filter-check-outline',
+        text: 'Fixed: the Transactions amount filter now includes exact matches, and a typo in a Saver goal no longer clears it.',
+      },
+    ],
+  },
+  {
     date: '31 Oct 2026',
     heading: 'Simpler Dashboard',
     icon: 'mdi-view-dashboard-outline',
