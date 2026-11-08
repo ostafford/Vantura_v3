@@ -647,7 +647,7 @@ export function UpcomingSection({
                           key={tx.id}
                           role="button"
                           tabIndex={0}
-                          className="d-flex justify-content-between align-items-center py-2 px-2 rounded"
+                          className="d-flex justify-content-between align-items-center py-2 px-2 rounded hover-tint"
                           style={{
                             cursor: 'pointer',
                             borderBottom: '1px solid var(--bs-border-color)',
@@ -655,13 +655,6 @@ export function UpcomingSection({
                           onClick={() => applySearchTx(tx)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') applySearchTx(tx)
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background =
-                              'var(--bs-tertiary-bg)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = ''
                           }}
                         >
                           <div className="min-w-0 me-2">
@@ -1024,7 +1017,7 @@ export function UpcomingSection({
                                     key={tx.id}
                                     role="button"
                                     tabIndex={0}
-                                    className="d-flex justify-content-between align-items-center px-2 py-1"
+                                    className="d-flex justify-content-between align-items-center px-2 py-1 hover-tint"
                                     style={{
                                       cursor: 'pointer',
                                       borderBottom:
@@ -1046,13 +1039,6 @@ export function UpcomingSection({
                                         setShowSettlementPicker(false)
                                         setSettlementSearch('')
                                       }
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background =
-                                        'var(--bs-tertiary-bg)'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = ''
                                     }}
                                   >
                                     <span className="text-truncate me-2">

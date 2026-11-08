@@ -215,7 +215,7 @@ function AddUpcomingTransactionModal({
                       key={c.id}
                       role="button"
                       tabIndex={0}
-                      className="d-flex align-items-center justify-content-between px-3 py-2 rounded"
+                      className="d-flex align-items-center justify-content-between px-3 py-2 rounded hover-tint"
                       style={{
                         cursor: 'pointer',
                         border: '1px solid var(--bs-border-color)',
@@ -223,13 +223,6 @@ function AddUpcomingTransactionModal({
                       onClick={() => handleAssignExisting(c)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleAssignExisting(c)
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          'var(--bs-tertiary-bg)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = ''
                       }}
                     >
                       <div>
@@ -275,7 +268,7 @@ function AddUpcomingTransactionModal({
                       key={tx.id}
                       role="button"
                       tabIndex={0}
-                      className="d-flex justify-content-between align-items-center py-2 px-2 rounded"
+                      className="d-flex justify-content-between align-items-center py-2 px-2 rounded hover-tint"
                       style={{
                         cursor: 'pointer',
                         borderBottom: '1px solid var(--bs-border-color)',
@@ -283,13 +276,6 @@ function AddUpcomingTransactionModal({
                       onClick={() => handleSelectTx(tx)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSelectTx(tx)
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          'var(--bs-tertiary-bg)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = ''
                       }}
                     >
                       <div className="min-w-0 me-3">
@@ -400,7 +386,7 @@ function AddTrackerModal({
                 key={t.id}
                 role="button"
                 tabIndex={0}
-                className="d-flex align-items-center justify-content-between px-3 py-2 rounded"
+                className="d-flex align-items-center justify-content-between px-3 py-2 rounded hover-tint"
                 style={{
                   cursor: 'pointer',
                   border: '1px solid var(--bs-border-color)',
@@ -408,12 +394,6 @@ function AddTrackerModal({
                 onClick={() => handleAssign(t)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAssign(t)
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bs-tertiary-bg)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = ''
                 }}
               >
                 <div className="d-flex align-items-center gap-2 min-w-0">
