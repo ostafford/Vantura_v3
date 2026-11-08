@@ -414,6 +414,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   padding-right: 0;
   background-color: var(--vantura-content-bg);
 }
+/* Desktop: the content's left edge follows the sidebar's width animation. */
+@media (min-width: 769px) {
+  .page-body-wrapper {
+    transition: margin-left var(--duration-base) var(--ease-out);
+  }
+}
 .content-wrapper {
   background: var(--vantura-content-bg);
   padding: 1.25rem 2.25rem 2.75rem;
