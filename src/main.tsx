@@ -13,6 +13,11 @@ window.addEventListener('pageshow', (e) => {
   if (e.persisted) window.location.reload()
 })
 
+// iOS applies :active (all press feedback) only when a touchstart listener
+// exists. Register one explicitly instead of relying on the inactivity lock's
+// listener, which is absent on Unlock/Onboarding.
+document.addEventListener('touchstart', () => {}, { passive: true })
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
