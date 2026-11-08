@@ -19,7 +19,7 @@ export function AboutSection() {
           <i
             className="mdi mdi-information-outline"
             style={{
-              color: 'var(--vantura-primary)',
+              color: 'var(--vantura-primary-text)',
               fontSize: '1.1rem',
             }}
             aria-hidden
@@ -36,7 +36,7 @@ export function AboutSection() {
           <i
             className="mdi mdi-earth"
             style={{
-              color: 'var(--vantura-primary)',
+              color: 'var(--vantura-primary-text)',
               fontSize: '1.1rem',
             }}
             aria-hidden
@@ -110,7 +110,7 @@ export function AboutSection() {
           <i
             className="mdi mdi-book-open-page-variant flex-shrink-0"
             style={{
-              color: 'var(--vantura-primary)',
+              color: 'var(--vantura-primary-text)',
               fontSize: '1.4rem',
             }}
             aria-hidden
@@ -144,7 +144,7 @@ export function AboutSection() {
           <i
             className="mdi mdi-rocket-launch-outline flex-shrink-0"
             style={{
-              color: 'var(--vantura-primary)',
+              color: 'var(--vantura-primary-text)',
               fontSize: '1.4rem',
             }}
             aria-hidden

@@ -122,7 +122,7 @@ function BucketModal({ show, editing, onClose, onSaved }: BucketModalProps) {
                   fontSize: '1.25rem',
                   color:
                     icon === opt.icon
-                      ? 'var(--vantura-primary)'
+                      ? 'var(--vantura-primary-text)'
                       : 'var(--bs-body-color)',
                   transition:
                     'border-color var(--duration-fast) ease, background-color var(--duration-fast) ease',
@@ -413,7 +413,7 @@ export function AnalyticsBudgetPlan() {
                   className="mdi mdi-wallet-outline"
                   style={{
                     fontSize: '2.5rem',
-                    color: 'var(--vantura-primary)',
+                    color: 'var(--vantura-primary-text)',
                     opacity: 0.6,
                   }}
                   aria-hidden

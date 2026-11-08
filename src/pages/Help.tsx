@@ -70,7 +70,7 @@ function SectionHeading({
     >
       <i
         className={`mdi ${icon}`}
-        style={{ color: 'var(--vantura-primary)', fontSize: '1rem' }}
+        style={{ color: 'var(--vantura-primary-text)', fontSize: '1rem' }}
         aria-hidden
       />
       {children}
@@ -86,7 +86,7 @@ function Tip({ children }: { children: React.ReactNode }) {
     >
       <i
         className="mdi mdi-lightbulb-outline flex-shrink-0"
-        style={{ color: 'var(--vantura-primary)', marginTop: 1 }}
+        style={{ color: 'var(--vantura-primary-text)', marginTop: 1 }}
         aria-hidden
       />
       <span>{children}</span>
@@ -197,7 +197,7 @@ export function Help() {
                     <i
                       className="mdi mdi-rocket-launch-outline flex-shrink-0"
                       style={{
-                        color: 'var(--vantura-primary)',
+                        color: 'var(--vantura-primary-text)',
                         fontSize: '1.5rem',
                       }}
                       aria-hidden
@@ -205,7 +205,7 @@ export function Help() {
                     <div>
                       <div
                         className="fw-semibold small"
-                        style={{ color: 'var(--vantura-primary)' }}
+                        style={{ color: 'var(--vantura-primary-text)' }}
                       >
                         See what&apos;s been built
                       </div>
@@ -216,7 +216,7 @@ export function Help() {
                     </div>
                     <i
                       className="mdi mdi-chevron-right ms-auto"
-                      style={{ color: 'var(--vantura-primary)' }}
+                      style={{ color: 'var(--vantura-primary-text)' }}
                       aria-hidden
                     />
                   </Link>
@@ -760,12 +760,15 @@ export function Help() {
       <div className="mt-3 pt-3 border-top d-flex align-items-center gap-2 small text-muted">
         <i
           className="mdi mdi-rocket-launch-outline"
-          style={{ color: 'var(--vantura-primary)' }}
+          style={{ color: 'var(--vantura-primary-text)' }}
           aria-hidden
         />
         <span>
           Curious what&apos;s been built?{' '}
-          <Link to="/changelog" style={{ color: 'var(--vantura-primary)' }}>
+          <Link
+            to="/changelog"
+            style={{ color: 'var(--vantura-primary-text)' }}
+          >
             See what&apos;s new in Vantura
           </Link>
         </span>
