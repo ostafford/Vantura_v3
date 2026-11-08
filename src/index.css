@@ -1614,6 +1614,24 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   box-shadow: none !important;
 }
 
+/* Press feedback: every button acknowledges input on pointer-down
+   (docs/PRODUCT.md, Motion & polish). Owns the full transition list because
+   the variant rules above replace the `transition` shorthand and would drop
+   `transform`. Sidebar footer rows keep their own timing. */
+.btn:not(.btn-link):not(.btn-close):not(.sidebar .btn) {
+  transition:
+    color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
+}
+.btn:not(.btn-link):not(.btn-close):not(.sidebar .btn):not(:disabled):not(
+    .disabled
+  ):active {
+  transform: scale(0.97);
+}
+
 /* Phase 8: Purple React navbar */
 .vantura-navbar {
   height: calc(70px + env(safe-area-inset-top, 0px));
