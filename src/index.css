@@ -39,7 +39,7 @@
   --vantura-surface: #1c1c28;
   --vantura-border: #2c2c3c;
   --vantura-text: #e4e4f0;
-  --vantura-text-secondary: #8888a0;
+  --vantura-text-secondary: #9e9eb6; /* ≥5.09:1 on every dark surface */
   --vantura-sidebar-bg: #0f0f18;
   --vantura-sidebar-menu-color: #ffffff;
   --vantura-sidebar-icon-color: rgba(180, 175, 200, 0.96);
@@ -173,7 +173,7 @@
   --vantura-surface: #ffffff;
   --vantura-border: #e0ddd6;
   --vantura-text: #1a1a2e;
-  --vantura-text-secondary: #6a6a82;
+  --vantura-text-secondary: #5c5c72; /* ≥5.16:1 on every light surface */
   --vantura-sidebar-bg: #eceae2;
   --vantura-sidebar-gradient: linear-gradient(135deg, #f0ede6 0%, #e8e5de 100%);
   --vantura-sidebar-menu-color: #1a1a2e;
@@ -378,7 +378,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-primary-text);
 }
 @media (hover: hover) and (pointer: fine) {
-  a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
+  /* Text links dim on hover. Card links (.text-decoration-none: whole cards
+     wrapped in a link) don't: fading a card took its muted text to 3.99:1. */
+  a:not(.btn):not(.nav-link):not(.dropdown-item):not(
+      .text-decoration-none
+    ):hover {
     color: var(--vantura-primary-text);
     opacity: 0.8;
   }
@@ -2535,11 +2539,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-radius: 999px;
 }
 .changelog-stat-delta--up {
-  color: var(--bs-success);
+  color: var(--vantura-success-text);
   background: rgba(25, 135, 84, 0.12);
 }
 .changelog-stat-delta--down {
-  color: var(--bs-danger);
+  color: var(--vantura-danger-text);
   background: rgba(220, 53, 69, 0.12);
 }
 .changelog-stat-divider {
@@ -2696,7 +2700,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 .changelog-upcoming-verdict--partial {
   background: rgba(255, 224, 130, 0.15);
-  color: #b8981a;
+  color: #d4b13a;
 }
 .changelog-upcoming-chevron {
   font-size: 1rem;
@@ -3545,4 +3549,56 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 .card.tracker-card-hover {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
   transition: box-shadow var(--duration-fast) ease;
+}
+
+/* ── Contrast sweep ────────────────────────────────────────────────────────
+   Every visible text measured against its real background in both themes;
+   these bring the stragglers to 4.5:1. */
+/* Pastel badges (bg-success/primary/info/danger) carried Bootstrap's white
+   text: 1.64:1. Dark ink on a pastel reads at 7.9–10.4:1. */
+.badge.bg-success,
+.badge.bg-primary,
+.badge.bg-info,
+.badge.bg-danger {
+  --bs-badge-color: var(--vantura-text-on-pastel);
+}
+/* Grey outline buttons used Bootstrap's #6c757d: 3.2–4.5:1. */
+.btn-outline-secondary {
+  --bs-btn-color: var(--vantura-text-secondary);
+}
+[data-theme='light'] {
+  /* <code> pink: 4.09:1 → 5.86:1 on the page */
+  --bs-code-color: #ab296a;
+}
+/* The DEMO label is painted with the pastel gradient: unreadable on white.
+   Light theme draws it in solid primary text instead. */
+/* !important: the navbar rules that paint the gradient are 4 classes deep. */
+[data-theme='light'] .navbar-demo-badge,
+[data-theme='light'] .sidebar-demo-badge {
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+/* Changelog, light theme: deeper shades of the same hues (4.7–7.3:1), and
+   headings coloured by their milestone switch to text colour (the icon
+   beside them keeps the colour). */
+[data-theme='light'] .changelog-upcoming-verdict--new {
+  color: #ad1457;
+}
+[data-theme='light'] .changelog-upcoming-verdict--extension {
+  color: #00695c;
+}
+[data-theme='light'] .changelog-upcoming-verdict--revival {
+  color: #7b1fa2;
+}
+[data-theme='light'] .changelog-upcoming-verdict--partial {
+  color: #7a5c00;
+}
+[data-theme='light'] .changelog-stat-delta--up {
+  color: #1b5e20;
+}
+[data-theme='light'] .changelog-stat-delta--down {
+  color: #b71c1c;
+}
+[data-theme='light'] .changelog-accent-heading {
+  color: var(--vantura-text) !important;
 }
