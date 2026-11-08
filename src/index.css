@@ -1902,6 +1902,26 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border: 0;
   cursor: pointer;
   padding: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  touch-action: none; /* a drag on the scrim must not scroll the page behind */
+  /* Hidden after the fade finishes, so it can't be tapped or focused meanwhile */
+  transition:
+    opacity var(--duration-slow) var(--ease-drawer),
+    visibility 0s linear var(--duration-slow);
+}
+.sidebar-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--duration-slow) var(--ease-drawer),
+    visibility 0s;
+}
+/* The open drawer owns its touches: dragging on it never scrolls the page. */
+.sidebar.sidebar-overlay {
+  touch-action: none;
 }
 
 .sidebar.sidebar-overlay {

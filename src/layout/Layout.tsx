@@ -96,11 +96,13 @@ export function Layout() {
       {isMobile && !sidebarMobileOpen && (
         <div className="sidebar-pull-tab" aria-hidden />
       )}
-      {isMobile && sidebarMobileOpen && (
+      {isMobile && (
         <button
           type="button"
-          className="sidebar-backdrop"
+          className={`sidebar-backdrop${sidebarMobileOpen ? ' is-open' : ''}`}
           aria-label="Close menu"
+          aria-hidden={!sidebarMobileOpen}
+          tabIndex={sidebarMobileOpen ? 0 : -1}
           onClick={() => setSidebarMobileOpen(false)}
         />
       )}
@@ -120,7 +122,7 @@ export function Layout() {
       >
         <main
           className="content-wrapper"
-          style={{ minHeight: 'calc(100vh - 70px)' }}
+          style={{ minHeight: 'calc(100dvh - 70px)' }}
         >
           {persistError && (
             <div

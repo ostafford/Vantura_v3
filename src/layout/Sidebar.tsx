@@ -74,8 +74,9 @@ export function Sidebar({
         background: 'var(--vantura-sidebar-gradient)',
         color: 'var(--vantura-sidebar-menu-color)',
         zIndex: overlay ? 1101 : 1040,
-        transition:
-          'width var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out)',
+        transition: overlay
+          ? 'transform var(--duration-slow) var(--ease-drawer), background var(--duration-base) var(--ease-out)'
+          : 'width var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out)',
         display: 'flex',
         flexDirection: 'column',
       }}
