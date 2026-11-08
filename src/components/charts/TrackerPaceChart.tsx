@@ -11,7 +11,7 @@ import {
 } from 'd3'
 import type { TrackerTransactionTimelineRow } from '@/services/trackers'
 import {
-  formatMoney,
+  formatAxisMoney,
   formatSignedMoney,
   formatTransactionAmount,
 } from '@/lib/format'
@@ -224,17 +224,17 @@ export function TrackerPaceChart({
       .ticks(5)
       .tickFormat((d) => {
         const dt = d as unknown as Date
-        const month = dt.toLocaleString('en', {
+        return dt.toLocaleDateString(undefined, {
+          day: 'numeric',
           month: 'short',
           timeZone: 'UTC',
         })
-        return `${month} ${dt.getUTCDate()}`
       })
       .tickSizeOuter(0)
 
     const yAxis = axisLeft(yScale)
       .ticks(5)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g')

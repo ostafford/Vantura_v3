@@ -8,7 +8,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { TrackerPeriodHistoryRow } from '@/services/trackers'
-import { formatMoney, formatSignedMoney } from '@/lib/format'
+import { formatAxisMoney, formatMoney, formatSignedMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -59,7 +59,7 @@ export function TrackerHistoryChart({
     // Abbreviated date labels; fall back to "d MMM" if any month repeats
     const monthLabels = chartData.map((d) => {
       const date = new Date(d.periodStart + 'T12:00:00Z')
-      return date.toLocaleString('en-AU', { month: 'short', timeZone: 'UTC' })
+      return date.toLocaleString(undefined, { month: 'short', timeZone: 'UTC' })
     })
     const hasDuplicateMonths = monthLabels.length !== new Set(monthLabels).size
     const displayLabels = chartData.map((d, i) => {
@@ -234,7 +234,7 @@ export function TrackerHistoryChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(5)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g')

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  formatAxisMoney,
   formatMoney,
   formatSignedMoney,
   formatDeltaMoney,
@@ -123,5 +124,22 @@ describe('formatShortDateWithYear', () => {
   it('returns Invalid Date string for unparseable input', () => {
     const out = formatShortDateWithYear('bad')
     expect(out).toContain('Invalid Date')
+  })
+})
+
+describe('formatAxisMoney', () => {
+  it('drops the cents on a whole-dollar tick', () => {
+    expect(formatAxisMoney(100000)).toBe('$1,000')
+    expect(formatAxisMoney(50000)).toBe('$500')
+    expect(formatAxisMoney(0)).toBe('$0')
+  })
+
+  it('keeps cents when the tick is not a whole dollar', () => {
+    expect(formatAxisMoney(50)).toBe('$0.50')
+    expect(formatAxisMoney(125)).toBe('$1.25')
+  })
+
+  it('shows a negative tick with the UI minus sign outside the dollar sign', () => {
+    expect(formatAxisMoney(-20000)).toBe('−$200')
   })
 })

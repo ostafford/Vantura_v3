@@ -10,7 +10,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { SaverBalanceSnapshot } from '@/services/accounts'
-import { formatMoney } from '@/lib/format'
+import { formatAxisMoney, formatMoney } from '@/lib/format'
 import { estimateLeftAxisValueLabelSpace } from '@/lib/chartLabelSpace'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -180,7 +180,7 @@ export function SaverBalanceChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(4)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g').call(yAxis).style('font-size', '11px')
