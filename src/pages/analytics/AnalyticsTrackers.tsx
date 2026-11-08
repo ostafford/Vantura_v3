@@ -26,15 +26,11 @@ const DISPLAY_PERIODS: { value: BudgetDisplayPeriod; label: string }[] = [
 function getTrackerProgressStyle(progress: number): {
   variant: 'success' | 'warning' | 'danger'
   striped: boolean
-  animated: boolean
 } {
-  if (progress >= 100)
-    return { variant: 'danger', striped: true, animated: true }
-  if (progress >= 81)
-    return { variant: 'danger', striped: false, animated: false }
-  if (progress > 50)
-    return { variant: 'warning', striped: false, animated: false }
-  return { variant: 'success', striped: false, animated: false }
+  if (progress >= 100) return { variant: 'danger', striped: true }
+  if (progress >= 81) return { variant: 'danger', striped: false }
+  if (progress > 50) return { variant: 'warning', striped: false }
+  return { variant: 'success', striped: false }
 }
 
 export function AnalyticsTrackers() {
