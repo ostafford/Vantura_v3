@@ -157,7 +157,18 @@ describe('validateRegularDraft: the editor rules, unchanged (#160)', () => {
   })
 
   it('needs an amount that rounds above 0 cents', () => {
-    for (const amount of ['', '0', '0.004', '-5', 'abc']) {
+    // '12abc' and '12,50' were read as $12 by parseFloat; the amount rule
+    // (src/lib/amountInput.ts) refuses them.
+    for (const amount of [
+      '',
+      '0',
+      '0.004',
+      '-5',
+      'abc',
+      '12abc',
+      '12,50',
+      '$5',
+    ]) {
       expect(validateRegularDraft({ ...valid(), amount })).toHaveProperty(
         'amount'
       )

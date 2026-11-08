@@ -12,6 +12,7 @@
 
 import type { Database } from 'sql.js'
 import { getDb, schedulePersist } from '@/db'
+import { parseAmountInput } from '@/lib/amountInput'
 import { localDateString } from '@/lib/format'
 import { nextChargeDateFromAnchor } from './projection'
 import { readRegularById, type Regular } from './rows'
@@ -176,7 +177,8 @@ export type RegularDraftErrors = Partial<Record<RegularDraftField, string>>
 export function validateRegularDraft(draft: RegularDraft): RegularDraftErrors {
   const errors: RegularDraftErrors = {}
   if (!draft.name.trim()) errors.name = 'Enter a name.'
-  if (!(amountCents(draft) > 0)) errors.amount = 'Enter an amount above $0.'
+  const cents = amountCents(draft)
+  if (cents == null || cents <= 0) errors.amount = 'Enter an amount above $0.'
   if (!draft.nextChargeDate) errors.nextChargeDate = 'Enter a next charge date.'
   const cancelBy = cancelByDate(draft)
   if (cancelBy && cancelBy < draft.nextChargeDate.slice(0, 10)) {
@@ -206,7 +208,8 @@ export function saveRegular(draft: RegularDraft): number {
       : parseInt(draft.reminderDaysBefore, 10)
   const fields = [
     draft.name.trim(),
-    amountCents(draft),
+    // Validated above: the save refuses to run unless this is a positive amount.
+    amountCents(draft) as number,
     draft.frequency,
     nextChargeDateToStore(db, draft),
     draft.categoryId || null,
@@ -250,8 +253,10 @@ export function deleteRegular(id: number): void {
   schedulePersist()
 }
 
-function amountCents(draft: RegularDraft): number {
-  return Math.round(parseFloat(draft.amount || '0') * 100)
+/** The draft's amount in cents, or null when blank or not a plain amount. */
+function amountCents(draft: RegularDraft): number | null {
+  const parsed = parseAmountInput(draft.amount)
+  return parsed.ok ? parsed.cents : null
 }
 
 function cancelByDate(draft: RegularDraft): string | null {

@@ -46,6 +46,7 @@ import {
 } from '@/lib/format'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { MOBILE_MEDIA_QUERY } from '@/lib/constants'
+import { centsToAmountInput, parseAmountInput } from '@/lib/amountInput'
 
 const SORT_OPTIONS: { value: TransactionSort; label: string }[] = [
   { value: 'date', label: 'Date' },
@@ -65,6 +66,17 @@ function cardMethodLabel(method: string): string {
   return CARD_METHOD_LABELS[method] ?? method
 }
 
+/** An amount filter (cents) as the text its field shows. */
+function amountFilterText(cents: number | undefined): string {
+  return cents != null ? centsToAmountInput(cents) : ''
+}
+
+/** Whether a field's text already means this filter value. */
+function draftMatches(text: string, cents: number | undefined): boolean {
+  const parsed = parseAmountInput(text)
+  return parsed.ok && (parsed.cents ?? undefined) === cents
+}
+
 function useFiltersFromSearchParams(): {
   filters: TransactionFilters
   sort: TransactionSort
@@ -80,13 +92,15 @@ function useFiltersFromSearchParams(): {
     let amountMax: number | undefined
     const rawMin = searchParams.get('amountMin')
     const rawMax = searchParams.get('amountMax')
+    // Rounded: links saved before the amount fields used exact cents can
+    // carry float values such as 28.999999999999996.
     if (rawMin != null && rawMin !== '') {
       const n = Number(rawMin)
-      if (!Number.isNaN(n)) amountMin = n
+      if (!Number.isNaN(n)) amountMin = Math.round(n)
     }
     if (rawMax != null && rawMax !== '') {
       const n = Number(rawMax)
-      if (!Number.isNaN(n)) amountMax = n
+      if (!Number.isNaN(n)) amountMax = Math.round(n)
     }
     if (amountMin != null && amountMax != null && amountMin > amountMax) {
       ;[amountMin, amountMax] = [amountMax, amountMin]
@@ -306,6 +320,32 @@ export function Transactions() {
     setFilters({ ...filters, [key]: value }, sort)
   }
 
+  // The Min/Max fields keep the text as typed (so `12.` survives a re-render)
+  // and apply it as a filter only when it parses (src/lib/amountInput.ts).
+  // Desktop and mobile fields for the same bound share one draft.
+  const [amountDrafts, setAmountDrafts] = useState(() => ({
+    amountMin: amountFilterText(filters.amountMin),
+    amountMax: amountFilterText(filters.amountMax),
+  }))
+  // Resync a draft when its filter changes from outside the field (the URL,
+  // the min/max swap), but never overwrite text that still means the filter.
+  useEffect(() => {
+    setAmountDrafts((drafts) => ({
+      amountMin: draftMatches(drafts.amountMin, filters.amountMin)
+        ? drafts.amountMin
+        : amountFilterText(filters.amountMin),
+      amountMax: draftMatches(drafts.amountMax, filters.amountMax)
+        ? drafts.amountMax
+        : amountFilterText(filters.amountMax),
+    }))
+  }, [filters.amountMin, filters.amountMax])
+
+  const changeAmountFilter = (key: 'amountMin' | 'amountMax', text: string) => {
+    setAmountDrafts((drafts) => ({ ...drafts, [key]: text }))
+    const parsed = parseAmountInput(text)
+    if (parsed.ok) updateFilter(key, parsed.cents ?? undefined)
+  }
+
   const updateSort = (s: TransactionSort) => {
     setFilters(filters, s)
   }
@@ -513,40 +553,28 @@ export function Transactions() {
                       <Form.Label>Amount min ($)</Form.Label>
                       <Form.Control
                         id="transactions-filter-amount-min-mobile"
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Min"
-                        value={
-                          filters.amountMin != null
-                            ? filters.amountMin / 100
-                            : ''
+                        value={amountDrafts.amountMin}
+                        isInvalid={!parseAmountInput(amountDrafts.amountMin).ok}
+                        onChange={(e) =>
+                          changeAmountFilter('amountMin', e.target.value)
                         }
-                        onChange={(e) => {
-                          const v = e.target.value
-                          updateFilter(
-                            'amountMin',
-                            v === '' ? undefined : Number(v) * 100
-                          )
-                        }}
                       />
                     </Form.Group>
                     <Form.Group>
                       <Form.Label>Amount max ($)</Form.Label>
                       <Form.Control
                         id="transactions-filter-amount-max-mobile"
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Max"
-                        value={
-                          filters.amountMax != null
-                            ? filters.amountMax / 100
-                            : ''
+                        value={amountDrafts.amountMax}
+                        isInvalid={!parseAmountInput(amountDrafts.amountMax).ok}
+                        onChange={(e) =>
+                          changeAmountFilter('amountMax', e.target.value)
                         }
-                        onChange={(e) => {
-                          const v = e.target.value
-                          updateFilter(
-                            'amountMax',
-                            v === '' ? undefined : Number(v) * 100
-                          )
-                        }}
                       />
                     </Form.Group>
                     <Form.Group>
@@ -681,36 +709,28 @@ export function Transactions() {
                 <Form.Control
                   id="transactions-filter-amount-min"
                   name="amountMin"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Min $"
-                  value={
-                    filters.amountMin != null ? filters.amountMin / 100 : ''
+                  value={amountDrafts.amountMin}
+                  isInvalid={!parseAmountInput(amountDrafts.amountMin).ok}
+                  onChange={(e) =>
+                    changeAmountFilter('amountMin', e.target.value)
                   }
-                  onChange={(e) => {
-                    const v = e.target.value
-                    updateFilter(
-                      'amountMin',
-                      v === '' ? undefined : Number(v) * 100
-                    )
-                  }}
                 />
               </Col>
               <Col md={1}>
                 <Form.Control
                   id="transactions-filter-amount-max"
                   name="amountMax"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Max $"
-                  value={
-                    filters.amountMax != null ? filters.amountMax / 100 : ''
+                  value={amountDrafts.amountMax}
+                  isInvalid={!parseAmountInput(amountDrafts.amountMax).ok}
+                  onChange={(e) =>
+                    changeAmountFilter('amountMax', e.target.value)
                   }
-                  onChange={(e) => {
-                    const v = e.target.value
-                    updateFilter(
-                      'amountMax',
-                      v === '' ? undefined : Number(v) * 100
-                    )
-                  }}
                 />
               </Col>
               <Col md={2}>

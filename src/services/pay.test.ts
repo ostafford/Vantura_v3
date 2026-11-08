@@ -9,34 +9,13 @@ vi.mock('@/db', () => ({
   },
 }))
 
-const { parsePayAmountInput, readPaySettings, savePay } = await import('./pay')
+const { readPaySettings, savePay } = await import('./pay')
 
 beforeEach(() => {
   for (const key of Object.keys(appSettings)) delete appSettings[key]
 })
 
-describe('parsePayAmountInput', () => {
-  it('reads blank (or whitespace) as unset', () => {
-    expect(parsePayAmountInput('')).toEqual({ ok: true, cents: null })
-    expect(parsePayAmountInput('   ')).toEqual({ ok: true, cents: null })
-  })
-
-  it('reads dollars as cents, rounding to the nearest cent', () => {
-    expect(parsePayAmountInput('3200')).toEqual({ ok: true, cents: 320000 })
-    expect(parsePayAmountInput(' 1234.56 ')).toEqual({
-      ok: true,
-      cents: 123456,
-    })
-    expect(parsePayAmountInput('10.005')).toEqual({ ok: true, cents: 1001 })
-    expect(parsePayAmountInput('0')).toEqual({ ok: true, cents: 0 })
-  })
-
-  it('refuses anything that is not a plain non-negative amount', () => {
-    for (const input of ['-5', 'abc', '12abc', '1e3', 'Infinity', '1,000']) {
-      expect(parsePayAmountInput(input), input).toEqual({ ok: false })
-    }
-  })
-})
+// The amount rules themselves are tested in src/lib/amountInput.test.ts.
 
 describe('savePay', () => {
   it('saves the frequency and the amount in cents', () => {

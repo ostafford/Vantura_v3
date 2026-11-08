@@ -382,9 +382,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <Form.Control
                   id="onboarding-pay-amount"
                   name="payAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Optional"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}

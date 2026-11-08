@@ -67,9 +67,8 @@ export function PaySection() {
           </Form.Label>
           <Form.Control
             id="settings-pay-amount"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             placeholder="Optional"
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}

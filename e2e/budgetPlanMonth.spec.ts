@@ -151,7 +151,7 @@ test.describe('Budget Plan month view (#241)', () => {
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('button', { name: 'Pay', exact: true }).click()
     await page
-      .getByRole('spinbutton', {
+      .getByRole('textbox', {
         name: 'Take-home pay amount ($)',
         exact: true,
       })

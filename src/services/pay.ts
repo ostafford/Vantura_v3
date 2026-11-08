@@ -7,37 +7,19 @@
  */
 
 import { getAppSetting, setAppSetting } from '@/db'
+import { parseAmountInput } from '@/lib/amountInput'
 import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 /** Shown by both Pay forms when `savePay` refuses the amount. */
 export const INVALID_PAY_AMOUNT_MESSAGE =
   'Enter your take-home pay as an amount of $0 or more, or leave it blank.'
 
-/** A plain dollar amount: digits, optionally a decimal point and digits. */
-const AMOUNT_PATTERN = /^(\d+(\.\d*)?|\.\d+)$/
-
-/**
- * The Pay amount field's text as cents. Blank is `{ ok: true, cents: null }`
- * (unset). Rounds half up on the decimal string itself, so `10.005` is 1001
- * cents, not the 1000 that float multiplication gives.
- */
-export function parsePayAmountInput(
-  text: string
-): { ok: true; cents: number | null } | { ok: false } {
-  const trimmed = text.trim()
-  if (trimmed === '') return { ok: true, cents: null }
-  if (!AMOUNT_PATTERN.test(trimmed)) return { ok: false }
-  const cents = Math.round(Number(`${trimmed}e2`))
-  if (!Number.isSafeInteger(cents)) return { ok: false }
-  return { ok: true, cents }
-}
-
 /**
  * Saves the Pay frequency and amount. Returns false, writing nothing, when
- * the amount text is invalid (see `parsePayAmountInput`).
+ * the amount text is invalid (see `parseAmountInput`); blank clears it.
  */
 export function savePay(frequency: PayFrequency, amountText: string): boolean {
-  const amount = parsePayAmountInput(amountText)
+  const amount = parseAmountInput(amountText)
   if (!amount.ok) return false
   setAppSetting('payday_frequency', frequency)
   setAppSetting(

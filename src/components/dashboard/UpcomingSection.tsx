@@ -773,9 +773,8 @@ export function UpcomingSection({
                     <Form.Control
                       id="upcoming-charge-amount"
                       name="amount"
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       value={amount}
                       onChange={(e) => update({ amount: e.target.value })}
                     />
@@ -897,6 +896,7 @@ export function UpcomingSection({
                         <Form.Control
                           id="upcoming-charge-reminder"
                           type="number"
+                          inputMode="numeric"
                           min={0}
                           max={90}
                           placeholder="e.g. 3"

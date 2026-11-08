@@ -34,6 +34,8 @@ import { ComparisonDeltaBadge } from '@/components/atAGlance/ComparisonDeltaBadg
 import { buildDeltaTooltip } from '@/components/atAGlance/deltaTooltip'
 import { previousCalendarMonth, monthNameLong } from '@/lib/monthLabels'
 import { getSaverOrder, setSaverOrder } from '@/lib/saverOrder'
+import { saverGoalFromInput } from '@/lib/saverGoalInput'
+import { toast } from '@/stores/toastStore'
 import { HelpPopover } from '@/components/HelpPopover'
 import { deriveMonthlyBalances, computeProjection } from './saverProjection'
 
@@ -352,9 +354,13 @@ export function AnalyticsSavers() {
   }
 
   function saveGoal(id: string) {
-    const dollars = parseFloat(goalDraft.replace(/[^0-9.]/g, ''))
-    const cents =
-      isNaN(dollars) || dollars <= 0 ? null : Math.round(dollars * 100)
+    const goal = saverGoalFromInput(goalDraft)
+    if (goal.kind === 'invalid') {
+      // Keep the editor open with the text as typed, and the old goal intact.
+      toast.error('Enter the goal as digits, like 1500 or 1500.50.')
+      return
+    }
+    const cents = goal.kind === 'set' ? goal.cents : null
     const dateTrimmed = goalDateDraft.trim() || null
     if (startingNewGoal && cents != null) {
       startNewSaverGoal(id, cents, dateTrimmed)
@@ -546,9 +552,8 @@ export function AnalyticsSavers() {
                         >
                           <span className="input-group-text">$</span>
                           <Form.Control
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={goalDraft}
                             onChange={(e) => setGoalDraft(e.target.value)}
