@@ -133,19 +133,8 @@ export function AnalyticsTrackers() {
                     className="text-decoration-none text-reset"
                   >
                     <Card
-                      style={{
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-                        transition: 'box-shadow var(--duration-fast) ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow =
-                          '0 3px 10px rgba(0,0,0,0.11)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow =
-                          '0 1px 4px rgba(0,0,0,0.07)'
-                      }}
+                      className="tracker-card-hover"
+                      style={{ cursor: 'pointer' }}
                     >
                       <Card.Body className="py-3">
                         <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">

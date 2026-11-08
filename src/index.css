@@ -208,18 +208,26 @@
   background: rgba(0, 0, 0, 0.04);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-[data-theme='light'] .btn-icon:hover,
 [data-theme='light'] .btn-icon:focus-visible {
   background: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   color: var(--vantura-text);
 }
+@media (hover: hover) and (pointer: fine) {
+  [data-theme='light'] .btn-icon:hover {
+    background: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    color: var(--vantura-text);
+  }
+}
 [data-theme='light'] .period-toggle {
   background: rgba(0, 0, 0, 0.06);
 }
-[data-theme='light'] .period-toggle .segment-btn:hover:not(.active) {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--vantura-text);
+@media (hover: hover) and (pointer: fine) {
+  [data-theme='light'] .period-toggle .segment-btn:hover:not(.active) {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--vantura-text);
+  }
 }
 [data-theme='light'] .breadcrumb {
   background: rgba(0, 0, 0, 0.04);
@@ -254,10 +262,12 @@
 [data-theme='light'] .app-boot-shell {
   background: linear-gradient(135deg, #f5f4f0 0%, #ffffff 50%, #eceae2 100%);
 }
-[data-theme='light'] .changelog-upcoming-group-header:hover,
-[data-theme='light'] .changelog-upcoming-item:hover,
-[data-theme='light'] .changelog-milestone-toggle:hover {
-  background: rgba(0, 0, 0, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  [data-theme='light'] .changelog-upcoming-group-header:hover,
+  [data-theme='light'] .changelog-upcoming-item:hover,
+  [data-theme='light'] .changelog-milestone-toggle:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
 }
 [data-theme='light'] .changelog-upcoming-grid {
   border-left-color: rgba(0, 0, 0, 0.08);
@@ -363,9 +373,11 @@ body {
 a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: var(--vantura-primary);
 }
-a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
-  color: var(--vantura-primary);
-  opacity: 0.8;
+@media (hover: hover) and (pointer: fine) {
+  a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
+    color: var(--vantura-primary);
+    opacity: 0.8;
+  }
 }
 
 /* Full-screen boot / storage error */
@@ -455,9 +467,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-text);
   border-color: var(--vantura-border);
 }
-.list-group-item:hover {
-  background-color: var(--vantura-table-hover-bg);
-  color: var(--vantura-text);
+@media (hover: hover) and (pointer: fine) {
+  .list-group-item:hover {
+    background-color: var(--vantura-table-hover-bg);
+    color: var(--vantura-text);
+  }
 }
 
 /* Settings — macOS-style sidebar + panel */
@@ -478,9 +492,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-weight: 500;
   padding: 0.75rem 1.25rem;
 }
-.settings-nav .list-group-item:hover {
-  background: var(--vantura-table-hover-bg);
-  color: var(--vantura-text);
+@media (hover: hover) and (pointer: fine) {
+  .settings-nav .list-group-item:hover {
+    background: var(--vantura-table-hover-bg);
+    color: var(--vantura-text);
+  }
 }
 .settings-nav .list-group-item.active {
   background: var(--vantura-table-hover-bg);
@@ -543,9 +559,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   background-color: var(--vantura-surface);
   color: var(--vantura-text);
 }
-.settings-accordion .accordion-button:hover {
-  background-color: var(--vantura-table-hover-bg);
-  color: var(--vantura-text);
+@media (hover: hover) and (pointer: fine) {
+  .settings-accordion .accordion-button:hover {
+    background-color: var(--vantura-table-hover-bg);
+    color: var(--vantura-text);
+  }
 }
 .settings-accordion .accordion-button:focus {
   box-shadow: none;
@@ -581,8 +599,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 
 /* Accent swatch buttons (Settings) — theme-aware hover/focus */
-.accent-swatch:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+@media (hover: hover) and (pointer: fine) {
+  .accent-swatch:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
 }
 .accent-swatch:focus-visible {
   outline: 2px solid var(--vantura-primary);
@@ -875,8 +895,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     background-color var(--duration-fast) ease,
     transform var(--duration-fast) var(--ease-out);
 }
-.headroom-pill--overdue:hover {
-  background: color-mix(in srgb, var(--vantura-danger) 28%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .headroom-pill--overdue:hover {
+    background: color-mix(in srgb, var(--vantura-danger) 28%, transparent);
+  }
 }
 .headroom-pill--overdue:active {
   transform: scale(0.97);
@@ -916,10 +938,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-decoration: underline;
   transition: opacity var(--duration-fast) ease;
 }
-.headroom-link:hover,
-.headroom .headroom-card a.headroom-link:hover {
-  color: var(--vantura-info-text);
-  opacity: 0.8;
+@media (hover: hover) and (pointer: fine) {
+  .headroom-link:hover,
+  .headroom .headroom-card a.headroom-link:hover {
+    color: var(--vantura-info-text);
+    opacity: 0.8;
+  }
 }
 
 .dashboard-grid {
@@ -1013,10 +1037,19 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-text);
   border-radius: 7px;
 }
-.dropdown-item:hover,
 .dropdown-item:focus {
   background-color: color-mix(in srgb, var(--vantura-primary) 18%, transparent);
   color: var(--vantura-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .dropdown-item:hover {
+    background-color: color-mix(
+      in srgb,
+      var(--vantura-primary) 18%,
+      transparent
+    );
+    color: var(--vantura-text);
+  }
 }
 .dropdown-divider {
   border-top-color: var(--vantura-border);
@@ -1035,12 +1068,21 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .transactions-category-menu .dropdown-item {
   color: var(--vantura-text);
 }
-.transactions-category-menu .dropdown-item:hover,
 .transactions-category-menu .dropdown-item:focus,
 .transactions-category-menu .dropdown-item.active,
 .transactions-category-menu .dropdown-item:active {
   background-color: color-mix(in srgb, var(--vantura-primary) 20%, transparent);
   color: var(--vantura-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .transactions-category-menu .dropdown-item:hover {
+    background-color: color-mix(
+      in srgb,
+      var(--vantura-primary) 20%,
+      transparent
+    );
+    color: var(--vantura-text);
+  }
 }
 .transactions-category-menu .dropdown-divider {
   border-top-color: var(--vantura-border);
@@ -1150,9 +1192,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-decoration: none;
   transition: color var(--duration-fast) ease;
 }
-.breadcrumb-item a:hover {
-  color: var(--vantura-text);
-  text-decoration: none;
+@media (hover: hover) and (pointer: fine) {
+  .breadcrumb-item a:hover {
+    color: var(--vantura-text);
+    text-decoration: none;
+  }
 }
 .breadcrumb-item.active {
   color: var(--vantura-text);
@@ -1172,11 +1216,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   border: 0;
   color: var(--vantura-text-on-pastel);
 }
-.btn-gradient-primary:hover,
 .btn-gradient-primary:focus {
   background: var(--vantura-primary-gradient);
   color: var(--vantura-text-on-pastel);
   opacity: 0.9;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-gradient-primary:hover {
+    background: var(--vantura-primary-gradient);
+    color: var(--vantura-text-on-pastel);
+    opacity: 0.9;
+  }
 }
 .btn-gradient-primary:active {
   background: var(--vantura-primary);
@@ -1272,8 +1322,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 .sidebar .sidebar-footer-btn.active .menu-icon {
   color: var(--vantura-primary);
 }
-.sidebar .nav-item:hover {
-  background: var(--vantura-sidebar-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .sidebar .nav-item:hover {
+    background: var(--vantura-sidebar-hover-bg);
+  }
 }
 .sidebar .menu-title {
   font-size: 0.875rem;
@@ -1325,9 +1377,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     background var(--duration-base) ease,
     color var(--duration-base) ease;
 }
-.sidebar-collapse-btn:hover {
-  background: var(--vantura-sidebar-hover-bg);
-  color: var(--vantura-sidebar-menu-color);
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-collapse-btn:hover {
+    background: var(--vantura-sidebar-hover-bg);
+    color: var(--vantura-sidebar-menu-color);
+  }
 }
 .sidebar-collapse-btn .mdi {
   font-size: 1.125rem;
@@ -1354,8 +1408,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 6px;
   transition: background var(--duration-base) ease;
 }
-.sidebar.collapsed .sidebar-brand .sidebar-brand-block:hover {
-  background: var(--vantura-sidebar-hover-bg);
+@media (hover: hover) and (pointer: fine) {
+  .sidebar.collapsed .sidebar-brand .sidebar-brand-block:hover {
+    background: var(--vantura-sidebar-hover-bg);
+  }
 }
 .sidebar .sidebar-brand .sidebar-demo-badge {
   font-size: 0.6rem;
@@ -1439,10 +1495,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: var(--vantura-sidebar-icon-color);
 }
 
-.sidebar .sidebar-footer-btn:hover,
-.sidebar .sidebar-footer .btn:hover {
-  background: var(--vantura-sidebar-hover-bg);
-  color: inherit;
+@media (hover: hover) and (pointer: fine) {
+  .sidebar .sidebar-footer-btn:hover,
+  .sidebar .sidebar-footer .btn:hover {
+    background: var(--vantura-sidebar-hover-bg);
+    color: inherit;
+  }
 }
 
 .sidebar .sidebar-footer-btn .menu-title,
@@ -1541,9 +1599,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     background var(--duration-fast) ease;
 }
 
-.period-toggle .segment-btn:hover:not(.active) {
-  color: var(--vantura-text);
-  background: rgba(255, 255, 255, 0.05);
+@media (hover: hover) and (pointer: fine) {
+  .period-toggle .segment-btn:hover:not(.active) {
+    color: var(--vantura-text);
+    background: rgba(255, 255, 255, 0.05);
+  }
 }
 
 .period-toggle .segment-btn.active {
@@ -1577,13 +1637,21 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     color var(--duration-fast) ease;
 }
 
-.btn-icon:hover,
 .btn-icon:focus-visible {
   background: rgba(255, 255, 255, 0.09);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
   color: var(--vantura-text);
   text-decoration: none;
   outline: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+    color: var(--vantura-text);
+    text-decoration: none;
+    outline: none;
+  }
 }
 
 .btn-icon.btn-icon-primary {
@@ -1592,12 +1660,19 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 
-.btn-icon.btn-icon-primary:hover,
 .btn-icon.btn-icon-primary:focus-visible {
   background: color-mix(in srgb, var(--vantura-primary) 16%, transparent);
   box-shadow: 0 2px 6px
     color-mix(in srgb, var(--vantura-primary) 18%, transparent);
   color: var(--vantura-primary);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-icon.btn-icon-primary:hover {
+    background: color-mix(in srgb, var(--vantura-primary) 16%, transparent);
+    box-shadow: 0 2px 6px
+      color-mix(in srgb, var(--vantura-primary) 18%, transparent);
+    color: var(--vantura-primary);
+  }
 }
 
 .btn-icon:disabled {
@@ -1621,15 +1696,17 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   transition: box-shadow var(--duration-fast) ease;
 }
 
-.btn-primary:hover:not(:disabled),
-.btn-secondary:hover:not(:disabled),
-.btn-success:hover:not(:disabled),
-.btn-danger:hover:not(:disabled),
-.btn-warning:hover:not(:disabled),
-.btn-info:hover:not(:disabled),
-.btn-dark:hover:not(:disabled),
-.btn-light:hover:not(:disabled) {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled),
+  .btn-success:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled),
+  .btn-warning:hover:not(:disabled),
+  .btn-info:hover:not(:disabled),
+  .btn-dark:hover:not(:disabled),
+  .btn-light:hover:not(:disabled) {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+  }
 }
 
 /* Outline buttons — replace border with subtle filled tint */
@@ -1645,12 +1722,14 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     background-color var(--duration-fast) ease;
 }
 
-.btn-outline-primary:not(.month-summary-legend-toggle):hover:not(:disabled),
-.btn-outline-secondary:not(.month-summary-legend-toggle):hover:not(:disabled),
-.btn-outline-danger:not(.month-summary-legend-toggle):hover:not(:disabled),
-.btn-outline-warning:not(.month-summary-legend-toggle):hover:not(:disabled),
-.btn-outline-success:not(.month-summary-legend-toggle):hover:not(:disabled) {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+@media (hover: hover) and (pointer: fine) {
+  .btn-outline-primary:not(.month-summary-legend-toggle):hover:not(:disabled),
+  .btn-outline-secondary:not(.month-summary-legend-toggle):hover:not(:disabled),
+  .btn-outline-danger:not(.month-summary-legend-toggle):hover:not(:disabled),
+  .btn-outline-warning:not(.month-summary-legend-toggle):hover:not(:disabled),
+  .btn-outline-success:not(.month-summary-legend-toggle):hover:not(:disabled) {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+  }
 }
 
 /* Disabled state */
@@ -2139,8 +2218,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-weight: 600;
   transition: background-color var(--duration-fast) ease;
 }
-.vantura-toast__action:hover {
-  background: rgba(255, 255, 255, 0.15);
+@media (hover: hover) and (pointer: fine) {
+  .vantura-toast__action:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
 }
 .vantura-toast__action:active {
   transform: scale(0.97);
@@ -2244,11 +2325,13 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     border-color var(--duration-fast) ease,
     background var(--duration-fast) ease;
 }
-.onboarding-whats-new-chip:hover {
-  color: var(--vantura-primary);
-  border-color: var(--vantura-primary);
-  background: rgba(var(--vantura-primary-rgb, 0, 150, 255), 0.06);
-  text-decoration: none;
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-whats-new-chip:hover {
+    color: var(--vantura-primary);
+    border-color: var(--vantura-primary);
+    background: rgba(var(--vantura-primary-rgb, 0, 150, 255), 0.06);
+    text-decoration: none;
+  }
 }
 
 /* Onboarding — step dots */
@@ -2308,9 +2391,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-decoration: none;
   transition: color var(--duration-fast) ease;
 }
-.auth-whats-new-link:hover {
-  color: var(--vantura-primary);
-  text-decoration: none;
+@media (hover: hover) and (pointer: fine) {
+  .auth-whats-new-link:hover {
+    color: var(--vantura-primary);
+    text-decoration: none;
+  }
 }
 
 /* Public changelog shell (no auth required) */
@@ -2467,8 +2552,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin-left: -0.25rem;
   transition: background var(--duration-fast) ease;
 }
-.changelog-upcoming-group-header:hover {
-  background: rgba(255, 255, 255, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .changelog-upcoming-group-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 .changelog-upcoming-group-chevron {
   font-size: 1rem;
@@ -2520,8 +2607,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   transition: background var(--duration-fast) ease;
   user-select: none;
 }
-.changelog-upcoming-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .changelog-upcoming-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 .changelog-upcoming-icon {
   font-size: 1.05rem;
@@ -2625,10 +2714,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   padding: 0;
   flex-shrink: 0;
 }
-.changelog-nav-btn:hover:not(:disabled) {
-  background: var(--vantura-primary);
-  border-color: var(--vantura-primary);
-  color: var(--vantura-text-on-pastel);
+@media (hover: hover) and (pointer: fine) {
+  .changelog-nav-btn:hover:not(:disabled) {
+    background: var(--vantura-primary);
+    border-color: var(--vantura-primary);
+    color: var(--vantura-text-on-pastel);
+  }
 }
 .changelog-nav-btn:disabled {
   opacity: 0.3;
@@ -2652,9 +2743,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
     color var(--duration-fast) ease;
   margin-left: 0.25rem;
 }
-.changelog-nav-latest:hover {
-  background: var(--vantura-primary);
-  color: var(--vantura-text-on-pastel);
+@media (hover: hover) and (pointer: fine) {
+  .changelog-nav-latest:hover {
+    background: var(--vantura-primary);
+    color: var(--vantura-text-on-pastel);
+  }
 }
 
 /* Timeline */
@@ -2722,8 +2815,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   margin: -0.1rem -0.25rem;
   transition: background var(--duration-fast) ease;
 }
-.changelog-milestone-toggle:hover {
-  background: rgba(255, 255, 255, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .changelog-milestone-toggle:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 .changelog-milestone-chevron {
   font-size: 1rem;
@@ -2860,8 +2955,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-underline-offset: 3px;
 }
 
-.pwa-update-banner__link:hover {
-  color: var(--vantura-text);
+@media (hover: hover) and (pointer: fine) {
+  .pwa-update-banner__link:hover {
+    color: var(--vantura-text);
+  }
 }
 
 .pwa-update-banner__reload {
@@ -2876,8 +2973,10 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   transition: opacity var(--duration-fast) ease;
 }
 
-.pwa-update-banner__reload:hover {
-  opacity: 0.85;
+@media (hover: hover) and (pointer: fine) {
+  .pwa-update-banner__reload:hover {
+    opacity: 0.85;
+  }
 }
 
 /* ── What's New modal ────────────────────────────────────────────────── */
@@ -3231,10 +3330,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   color: inherit;
   text-decoration: none;
 }
-.plan-card .plan-card__link:hover,
 .plan-card .plan-card__link:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .plan-card .plan-card__link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 .plan-card--empty {
   border: 1px dashed var(--bs-border-color);
@@ -3267,10 +3371,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-decoration: none;
   min-width: 0;
 }
-.month-review__link:hover .month-review__cta,
-.month-review__link:hover strong {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (hover: hover) and (pointer: fine) {
+  .month-review__link:hover .month-review__cta,
+  .month-review__link:hover strong {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 .month-review__cta {
   color: var(--vantura-primary);
@@ -3289,9 +3395,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font: inherit;
   font-weight: 600;
 }
-.month-review__mark:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (hover: hover) and (pointer: fine) {
+  .month-review__mark:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 .month-review__link:focus-visible,
 .month-review__mark:focus-visible {
@@ -3354,9 +3462,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   position: absolute;
   inset: -6px;
 }
-.plan-month-nav__chevron:hover {
-  background-color: color-mix(in srgb, var(--bs-body-color) 8%, transparent);
-  color: var(--bs-body-color);
+@media (hover: hover) and (pointer: fine) {
+  .plan-month-nav__chevron:hover {
+    background-color: color-mix(in srgb, var(--bs-body-color) 8%, transparent);
+    color: var(--bs-body-color);
+  }
 }
 .plan-month-nav__chevron:active {
   transform: scale(0.94);
@@ -3384,4 +3494,29 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Touch screens fake :hover on tap and keep it until the next tap. Hold every
+   Bootstrap button at its resting colours there; :active and .active rules are
+   more specific and still apply. Keeps hover off touch screens. */
+@media (hover: none), (pointer: coarse) {
+  .btn:hover {
+    color: var(--bs-btn-color);
+    background-color: var(--bs-btn-bg);
+    border-color: var(--bs-btn-border-color);
+  }
+}
+
+/* Row and card hovers that used onMouseEnter/onMouseLeave.  */
+@media (hover: hover) and (pointer: fine) {
+  .hover-tint:hover {
+    background: var(--bs-tertiary-bg);
+  }
+  .card.tracker-card-hover:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.11);
+  }
+}
+.card.tracker-card-hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  transition: box-shadow var(--duration-fast) ease;
 }
