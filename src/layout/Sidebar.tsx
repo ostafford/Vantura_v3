@@ -5,8 +5,9 @@ import { uiStore } from '@/stores/uiStore'
 import { sidebarPinsStore } from '@/stores/sidebarPinsStore'
 import { getAppSetting } from '@/db'
 import { VanturaLogo } from '@/components/VanturaLogo'
+import { SIDEBAR_WIDTH_PX } from '@/lib/constants'
 
-const SIDEBAR_WIDTH = 260
+const SIDEBAR_WIDTH = SIDEBAR_WIDTH_PX
 const SIDEBAR_COLLAPSED_WIDTH = 70
 
 interface NavItem {
