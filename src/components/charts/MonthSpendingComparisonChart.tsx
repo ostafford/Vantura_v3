@@ -17,7 +17,7 @@ import type {
   MonthSpendingSeriesPoint,
   MonthMetric,
 } from '@/lib/monthSpendingSeries'
-import { formatDollars, formatSignedMoney } from '@/lib/format'
+import { formatAxisMoney, formatSignedMoney } from '@/lib/format'
 import { getMonthComparisonSemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
 import { positionTooltip, setTooltipContent } from '@/lib/chartTooltip'
@@ -237,7 +237,7 @@ export function MonthSpendingComparisonChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(5)
-      .tickFormat((d: NumberValue) => `$${formatDollars(Number(d) / 100)}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g')

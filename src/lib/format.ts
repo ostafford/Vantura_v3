@@ -15,6 +15,20 @@ export function formatMoney(cents: number): string {
 }
 
 /**
+ * A chart axis tick, in cents, as dollars: whole dollars without cents
+ * (`$1,000`), cents only when the tick isn't a whole dollar (`$0.50`). A
+ * negative tick uses the UI's U+2212 minus outside the dollar sign.
+ */
+export function formatAxisMoney(cents: number): string {
+  const whole = Math.abs(cents) % 100 === 0
+  const amount = (Math.abs(cents) / 100).toLocaleString(undefined, {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
+  })
+  return cents < 0 ? `−$${amount}` : `$${amount}`
+}
+
+/**
  * Money for display with the sign *outside* the dollar symbol: `−$12.34`, not
  * `$-12.34`. Use at any balance/amount call site that can go negative (Headroom,
  * On hand). Non-negative values render as a plain `$12.34`; the minus

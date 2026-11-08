@@ -13,7 +13,7 @@ import {
 } from 'd3'
 import type { YearMonthPoint } from '@/services/insights'
 import type { MonthMetric } from '@/lib/monthSpendingSeries'
-import { formatDollars, formatMoney } from '@/lib/format'
+import { formatAxisMoney, formatMoney } from '@/lib/format'
 import { meanOfFiniteNumbers } from '@/lib/yearMonthlyChartMetrics'
 import { getYearMonthlySemanticStrokes } from '@/components/charts/monthComparisonSemanticStrokes'
 import { useChartDimensions } from '@/hooks/useChartDimensions'
@@ -196,7 +196,7 @@ export function YearMonthlyLineChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(5)
-      .tickFormat((d: NumberValue) => `$${formatDollars(Number(d) / 100)}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g')

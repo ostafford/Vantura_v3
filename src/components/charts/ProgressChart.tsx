@@ -8,7 +8,7 @@ import {
   axisBottom,
   axisLeft,
 } from 'd3'
-import { formatMoney } from '@/lib/format'
+import { formatAxisMoney, formatMoney } from '@/lib/format'
 import {
   estimateLeftAxisValueLabelSpace,
   estimateBottomAxisLabelSpace,
@@ -125,7 +125,7 @@ export function ProgressChart({
     g.append('g')
       .call(
         axisLeft(yScale)
-          .tickFormat((v) => `$${formatMoney(Number(v))}`)
+          .tickFormat((v) => formatAxisMoney(Number(v)))
           .tickSizeOuter(0)
       )
       .selectAll('text')

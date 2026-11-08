@@ -11,7 +11,7 @@ import {
 } from 'd3'
 import type { TrackerTransactionTimelineRow } from '@/services/trackers'
 import {
-  formatMoney,
+  formatAxisMoney,
   formatSignedMoney,
   formatTransactionAmount,
 } from '@/lib/format'
@@ -152,7 +152,7 @@ export function TrackerCumulativeChart({
       .tickSizeOuter(0)
 
     const yAxis = axisLeft(yScale)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g')

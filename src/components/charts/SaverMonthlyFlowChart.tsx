@@ -8,7 +8,7 @@ import {
   type NumberValue,
 } from 'd3'
 import type { SaverMonthlyFlowPoint } from '@/services/accounts'
-import { formatMoney } from '@/lib/format'
+import { formatAxisMoney, formatMoney } from '@/lib/format'
 import {
   estimateLeftAxisValueLabelSpace,
   estimateBottomAxisLabelSpace,
@@ -173,7 +173,7 @@ export function SaverMonthlyFlowChart({
 
     const yAxis = axisLeft(yScale)
       .ticks(4)
-      .tickFormat((d: NumberValue) => `$${formatMoney(Number(d))}`)
+      .tickFormat((d: NumberValue) => formatAxisMoney(Number(d)))
       .tickSizeOuter(0)
 
     g.append('g').call(yAxis).style('font-size', '11px')
