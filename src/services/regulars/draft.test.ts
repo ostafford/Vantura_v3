@@ -176,6 +176,19 @@ describe('validateRegularDraft: the editor rules, unchanged (#160)', () => {
     expect(validateRegularDraft({ ...valid(), amount: '0.005' })).toEqual({})
   })
 
+  it('says how to type an amount it cannot read, apart from one at or below $0', () => {
+    for (const amount of ['15,000', '12abc', '$5']) {
+      expect(validateRegularDraft({ ...valid(), amount }).amount, amount).toBe(
+        'Enter the amount as numbers only, without commas, like 15000 or 15000.50.'
+      )
+    }
+    for (const amount of ['', '0', '0.004']) {
+      expect(validateRegularDraft({ ...valid(), amount }).amount, amount).toBe(
+        'Enter an amount above $0.'
+      )
+    }
+  })
+
   it('needs a next charge date', () => {
     expect(
       validateRegularDraft({ ...valid(), nextChargeDate: '' })
