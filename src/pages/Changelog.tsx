@@ -201,7 +201,10 @@ export function Changelog() {
             style={{ color: '#ce93d8', fontSize: '1.1rem' }}
             aria-hidden
           />
-          <h5 className="fw-semibold mb-0" style={{ color: '#ce93d8' }}>
+          <h5
+            className="fw-semibold mb-0 changelog-accent-heading"
+            style={{ color: '#ce93d8' }}
+          >
             What we&apos;re exploring next
           </h5>
         </div>
@@ -386,7 +389,7 @@ export function Changelog() {
                       aria-hidden
                     />
                     <h6
-                      className="fw-semibold mb-0 flex-grow-1"
+                      className="fw-semibold mb-0 flex-grow-1 changelog-accent-heading"
                       style={{ color: milestone.color }}
                     >
                       {milestone.heading}
