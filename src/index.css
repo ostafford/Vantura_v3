@@ -3319,7 +3319,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   text-decoration: none;
   transition:
     background-color var(--duration-fast) ease,
-    transform var(--duration-fast) ease;
+    transform var(--duration-fast) var(--ease-out);
 }
 .plan-month-nav__chevron {
   position: relative;
@@ -3346,14 +3346,6 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
 }
 .plan-month-nav__chevron:disabled:active {
   transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .plan-month-nav__chevron {
-    transition: none;
-  }
-  .plan-month-nav__chevron:active {
-    transform: none;
-  }
 }
 
 .plan-mark-paid {
