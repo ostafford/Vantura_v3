@@ -60,6 +60,7 @@ export function ToastProvider() {
 
   return (
     <div
+      key={id}
       className={`vantura-toast vantura-toast--${variant}${exiting ? ' vantura-toast--exit' : ''}`}
       role="alert"
       aria-live="polite"
