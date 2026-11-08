@@ -231,14 +231,14 @@ export function MonthSummaryCard({
   return (
     <Card className="mb-3" data-testid="plan-summary">
       <Card.Body>
-        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div className="d-flex align-items-center gap-2 flex-wrap">
+        <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap min-w-0">
             {nav}
             <span className="plan-muted small" data-testid="plan-progress">
               {monthProgress(plan)}
             </span>
           </div>
-          {aside}
+          <div className="flex-shrink-0">{aside}</div>
         </div>
 
         {segments === null ? (
@@ -533,7 +533,7 @@ export function UnplannedCard({ unplanned }: { unplanned: Unplanned }) {
     <Card
       id={UNPLANNED_CARD_ID}
       tabIndex={-1}
-      className="h-100 plan-card plan-card--unplanned"
+      className="plan-card plan-card--unplanned"
       data-testid="plan-unplanned"
     >
       <Card.Body className="py-3">

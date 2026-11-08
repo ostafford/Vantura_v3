@@ -749,8 +749,11 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   display: none;
 }
 @container (min-width: 720px) {
+  /* Each card ends where its content ends; the − and = sit on the header
+     row, where the three totals are. */
   .headroom__row {
     flex-direction: row;
+    align-items: flex-start;
   }
   .headroom-card {
     flex: 1 1 0;
@@ -760,6 +763,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
     align-items: center;
     justify-content: center;
     width: 20px;
+    height: 3.25rem; /* the card header's height (52px) at desktop widths */
     flex-shrink: 0;
     font-size: 1.75rem;
     font-weight: 300;
@@ -3369,6 +3373,31 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 .plan-card--empty {
   border: 1px dashed var(--bs-border-color);
 }
+/* No buckets yet: one line that invites a bucket without pushing the
+   month's real figures (Not in a bucket, Unplanned) down the page. */
+.plan-empty-prompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+}
+.plan-empty-prompt .mdi {
+  color: var(--vantura-primary-text);
+  font-size: 1.1rem;
+}
+.plan-empty-prompt strong {
+  color: var(--bs-body-color);
+}
+.plan-empty-prompt__action {
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+}
 /* Month review (#244): one line at the top of the Dashboard. Enters with a
    short fade-and-rise; leaves the same way, reversed, when marked reviewed. */
 .month-review {
@@ -3432,6 +3461,20 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
   border-radius: 4px;
+}
+/* Phones: Mark reviewed gets its own line, rather than wrapping on its own
+   and leaving the separator dangling. */
+@media (max-width: 575.98px) {
+  .month-review__sep {
+    display: none;
+  }
+  .month-review__mark {
+    flex-basis: 100%;
+    text-align: left;
+  }
+  .plan-empty-prompt__sep {
+    display: none;
+  }
 }
 @keyframes month-review-in {
   from {

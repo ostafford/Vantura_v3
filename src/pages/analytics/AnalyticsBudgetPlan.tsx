@@ -385,9 +385,14 @@ export function AnalyticsBudgetPlan() {
               ariaLabel="How does Budget Plan work?"
             />
             {editable && (
-              <Button variant="primary" size="sm" onClick={openCreate}>
-                <i className="mdi mdi-plus me-1" aria-hidden />
-                Add bucket
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={openCreate}
+                aria-label="Add bucket"
+              >
+                <i className="mdi mdi-plus me-sm-1" aria-hidden />
+                <span className="d-none d-sm-inline">Add bucket</span>
               </Button>
             )}
           </div>
@@ -407,32 +412,22 @@ export function AnalyticsBudgetPlan() {
 
         {plan.buckets.length === 0 && editable && (
           <Col xs={12}>
-            <Card className="plan-card--empty">
-              <Card.Body className="text-center py-4">
-                <i
-                  className="mdi mdi-wallet-outline"
-                  style={{
-                    fontSize: '2.5rem',
-                    color: 'var(--vantura-primary-text)',
-                    opacity: 0.6,
-                  }}
-                  aria-hidden
-                />
-                <h3 className="h6 mt-2 mb-1">No buckets yet</h3>
-                <p
-                  className="text-muted small mb-3"
-                  style={{ maxWidth: 440, margin: '0 auto' }}
-                >
-                  Group your Regulars and Trackers into <strong>buckets</strong>{' '}
-                  — like Subscriptions, Household or Lifestyle — to see each
-                  one’s plan vs actual this month.
-                </p>
-                <Button variant="primary" onClick={openCreate}>
-                  <i className="mdi mdi-plus me-1" aria-hidden />
-                  Create your first bucket
-                </Button>
-              </Card.Body>
-            </Card>
+            <div className="plan-empty-prompt">
+              <i className="mdi mdi-wallet-outline" aria-hidden />
+              <span>
+                Group your Regulars and Trackers into <strong>buckets</strong>
+              </span>
+              <span className="plan-empty-prompt__sep" aria-hidden>
+                ·
+              </span>
+              <Button
+                variant="link"
+                className="plan-empty-prompt__action"
+                onClick={openCreate}
+              >
+                Create a bucket
+              </Button>
+            </div>
           </Col>
         )}
 
