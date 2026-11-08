@@ -157,8 +157,13 @@ export function TrackersSection({
 
   function handleSave() {
     const parsedBudget = parseAmountInput(budget)
-    const budgetCents =
-      parsedBudget.ok && parsedBudget.cents != null ? parsedBudget.cents : 0
+    if (!parsedBudget.ok) {
+      toast.error(
+        'Enter the budget as numbers only, without commas, like 500 or 500.50.'
+      )
+      return
+    }
+    const budgetCents = parsedBudget.cents ?? 0
     if (!name.trim() || budgetCents <= 0 || selectedCategoryIds.length === 0) {
       toast.error('Please fill in name, budget, and at least one category.')
       return

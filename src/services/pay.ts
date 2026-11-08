@@ -12,7 +12,7 @@ import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 /** Shown by both Pay forms when `savePay` refuses the amount. */
 export const INVALID_PAY_AMOUNT_MESSAGE =
-  'Enter your take-home pay as an amount of $0 or more, or leave it blank.'
+  'Enter your take-home pay as numbers only, without commas, like 3200 or 3200.50, or leave it blank.'
 
 /**
  * Saves the Pay frequency and amount. Returns false, writing nothing, when

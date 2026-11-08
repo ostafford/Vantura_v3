@@ -177,8 +177,13 @@ export type RegularDraftErrors = Partial<Record<RegularDraftField, string>>
 export function validateRegularDraft(draft: RegularDraft): RegularDraftErrors {
   const errors: RegularDraftErrors = {}
   if (!draft.name.trim()) errors.name = 'Enter a name.'
-  const cents = amountCents(draft)
-  if (cents == null || cents <= 0) errors.amount = 'Enter an amount above $0.'
+  const amount = parseAmountInput(draft.amount)
+  if (!amount.ok) {
+    errors.amount =
+      'Enter the amount as numbers only, without commas, like 15000 or 15000.50.'
+  } else if (amount.cents == null || amount.cents <= 0) {
+    errors.amount = 'Enter an amount above $0.'
+  }
   if (!draft.nextChargeDate) errors.nextChargeDate = 'Enter a next charge date.'
   const cancelBy = cancelByDate(draft)
   if (cancelBy && cancelBy < draft.nextChargeDate.slice(0, 10)) {

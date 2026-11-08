@@ -357,7 +357,9 @@ export function AnalyticsSavers() {
     const goal = saverGoalFromInput(goalDraft)
     if (goal.kind === 'invalid') {
       // Keep the editor open with the text as typed, and the old goal intact.
-      toast.error('Enter the goal as digits, like 1500 or 1500.50.')
+      toast.error(
+        'Enter the goal as numbers only, without commas, like 1500 or 1500.50.'
+      )
       return
     }
     const cents = goal.kind === 'set' ? goal.cents : null
