@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-08
+
+The Budget Plan now shows plan vs actual: each month's plan against what you really spent, including past months, judged against the plan as it stood when they ended. And Vantura feels at home on your phone: no grey flash when you tap, the number pad for amounts, a menu that follows your finger, and amounts you type are read exactly.
+
+### Added
+
+- **The Budget Plan compares your plan with what you've actually spent this month.** Each bucket shows its Regulars and Trackers with what's been spent against what was planned, and a bar shows where this month's Income has gone: spending on plan, Unplanned spending, and what's Still to go out. Spending that no Regular or Tracker covers appears in its own Unplanned card, by category.
+- **Past months on the Budget Plan.** Use ‹ and › next to the month to step back through finished months. Each one is judged against its Month-end plan, the plan as it stood when the month ended, and shows what you Saved or Overspent. Months from before this update have no Month-end plan, so they can't be shown.
+- **A Month review card on the Dashboard.** When a month finishes, a line at the top of the Dashboard shows what you Saved or Overspent and opens that month on the Budget Plan. Mark reviewed hides it until the next month ends.
+- **Mark paid on a bucket's page.** A Regular with no matching payment can be marked paid from its bucket on the Budget Plan, with Undo, as on the Dashboard. On a past month, it's marked paid in that month's plan.
+
+### Changed
+
+- **The Budget Plan is one calendar month at a time.** The Weekly / Monthly / Yearly switch is gone; amounts on a bucket's page show as you entered them.
+- **Regulars that aren't in a bucket** now show in their own "Not in a bucket" card on the Budget Plan, with a link to assign them.
+- **Profile exports now include your Month-end plans and the last month you reviewed.** Importing an export from an earlier version brings in neither.
+- **Buttons respond the moment you press them.** Every button now dips slightly under your finger, instead of reacting only when you let go.
+- **The menu on your phone follows your finger.** Swipe in from the left edge and the menu moves with you; let go past halfway, or flick, and it opens. Swipe it away to close. It slides on a smoother curve, and the page behind no longer scrolls while it's open.
+- **Amount fields open the number pad with a decimal point** on your phone, everywhere you type money: Pay, Regulars, trackers, Saver goals and the Transactions amount filters.
+- **Amounts must be plain numbers, like 12 or 12.50.** Entries such as `12,50`, `$12` or `12abc` are now refused, with a message saying how to type them, instead of being guessed at. Three or more decimal places still round to the nearest cent, as Pay always has.
+- **Windows, tooltips and expanding rows open and close more smoothly and consistently.** Pop-up windows now grow gently into place instead of dropping from above.
+- **Over-budget trackers no longer have moving stripes.** They're still striped red; the stripes just don't move.
+- **On a computer, the page slides along with the sidebar** when you collapse or expand it, instead of jumping.
+
+### Fixed
+
+- **No more grey flash when you tap something on your phone**, and buttons or links no longer stay highlighted after you tap them.
+- **Pulling down on the Dashboard no longer reloads the app** on Android. A reload locked Vantura again mid-task.
+- **Holding a button or menu link no longer selects its text** or opens a link preview. Text such as amounts and descriptions can still be selected and copied.
+- **The Transactions amount filter now includes exact matches.** A Max of $0.29, for example, left out a $0.29 transaction.
+- **A typo in a Saver goal no longer clears the goal.** Typing something that isn't an amount used to remove your goal; now it shows a message and keeps it.
+- **A tracker budget or Regular amount like `12abc` is refused** instead of being saved as $12.
+- **A new message replaces the previous one visibly**, rather than only swapping its text.
+
 ## [0.11.5] - 2026-10-31
 
 A simpler Dashboard: the Net Worth card and the Regulars calendar view are gone, Weekly insights reads more cleanly, and the chart legend and the welcome tour behave in the light theme and when closed.
