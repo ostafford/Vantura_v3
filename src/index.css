@@ -564,6 +564,26 @@ a:not(.btn):not(.nav-link):not(.dropdown-item):hover {
   outline-offset: 2px;
 }
 
+/* Bootstrap's built-in motion (modal, tooltip, popover, collapse), mapped onto
+   the token scale. Bootstrap ships `opacity .15s linear`, `height .35s ease`
+   and a 50px modal drop; see
+   docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md */
+.fade {
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+.collapsing {
+  transition: height var(--duration-slow) var(--ease-out);
+}
+.modal.fade .modal-dialog {
+  transform: scale(0.96);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+/* Must follow the rule above: same specificity, so order decides. Without it the
+   open modal stays at scale(0.96). */
+.modal.show .modal-dialog {
+  transform: none;
+}
+
 /* Modal — elevated surface sits clearly above the darkened backdrop */
 .modal-backdrop.show {
   opacity: 0.72;
