@@ -14,7 +14,7 @@ test.describe('the payday date is cut (#195)', () => {
     ).toHaveCount(0)
     await page.getByRole('button', { name: 'Pay', exact: true }).click()
 
-    const amount = page.getByRole('spinbutton', {
+    const amount = page.getByRole('textbox', {
       name: 'Take-home pay amount ($)',
       exact: true,
     })

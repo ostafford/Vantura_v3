@@ -35,6 +35,7 @@ import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { HelpPopover } from '@/components/HelpPopover'
 import { TransactionAmount } from '@/components/TransactionAmount'
+import { parseAmountInput } from '@/lib/amountInput'
 import type React from 'react'
 
 const RESET_FREQUENCIES = TRACKER_RESET_FREQUENCIES
@@ -155,7 +156,9 @@ export function TrackersSection({
   }
 
   function handleSave() {
-    const budgetCents = Math.round(parseFloat(budget || '0') * 100)
+    const parsedBudget = parseAmountInput(budget)
+    const budgetCents =
+      parsedBudget.ok && parsedBudget.cents != null ? parsedBudget.cents : 0
     if (!name.trim() || budgetCents <= 0 || selectedCategoryIds.length === 0) {
       toast.error('Please fill in name, budget, and at least one category.')
       return
@@ -545,9 +548,8 @@ export function TrackersSection({
               <Form.Control
                 id="tracker-edit-budget"
                 name="budget"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
               />

@@ -30,7 +30,7 @@ test.describe('onboarding pay step', () => {
     await page.locator('#onboarding-api-token').fill('up:yeah:synthetic-e2e')
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    const payAmount = page.getByRole('spinbutton', {
+    const payAmount = page.getByRole('textbox', {
       name: 'Take-home pay amount ($)',
       exact: true,
     })
