@@ -58,7 +58,7 @@ test.describe('budget plan', () => {
     ).toBeVisible()
 
     // Sample data seeds no buckets, so the empty-state CTA is shown first.
-    await page.getByRole('button', { name: 'Create your first bucket' }).click()
+    await page.getByRole('button', { name: 'Create a bucket' }).click()
     await page.getByPlaceholder('e.g. Household').fill('Household bills')
     await page.getByRole('button', { name: 'Create bucket' }).click()
 

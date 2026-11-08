@@ -71,7 +71,7 @@ test.describe('Budget Plan past months (#243)', () => {
       0
     )
     await expect(
-      page.getByRole('button', { name: 'Create your first bucket' })
+      page.getByRole('button', { name: 'Create a bucket' })
     ).toHaveCount(0)
   })
 
@@ -116,7 +116,7 @@ test('the bucket page follows the month, and Mark paid on a finished month write
   await closeDashboardTour(page)
   await goToBudgetPlan(page)
 
-  await page.getByRole('button', { name: 'Create your first bucket' }).click()
+  await page.getByRole('button', { name: 'Create a bucket' }).click()
   await page.getByPlaceholder('e.g. Household').fill('Bills')
   await page.getByRole('button', { name: 'Create bucket' }).click()
   await page.getByRole('link', { name: 'Bills', exact: true }).click()

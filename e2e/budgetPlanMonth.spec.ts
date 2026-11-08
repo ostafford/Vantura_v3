@@ -85,7 +85,7 @@ test.describe('Budget Plan month view (#241)', () => {
     await expect(notInABucket.locator('.plan-bar__pace').first()).toBeVisible()
     await expect(notInABucket).toContainText('overdue')
 
-    await page.getByRole('button', { name: 'Create your first bucket' }).click()
+    await page.getByRole('button', { name: 'Create a bucket' }).click()
     await page.getByPlaceholder('e.g. Household').fill('Food')
     await page.getByRole('button', { name: 'Create bucket' }).click()
     await page.getByRole('link', { name: 'Food', exact: true }).click()
@@ -115,7 +115,7 @@ test.describe('Budget Plan month view (#241)', () => {
       notInABucket.getByRole('button', { name: /Mark .* paid/ })
     ).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'Create your first bucket' }).click()
+    await page.getByRole('button', { name: 'Create a bucket' }).click()
     await page.getByPlaceholder('e.g. Household').fill('Bills')
     await page.getByRole('button', { name: 'Create bucket' }).click()
     await page.getByRole('link', { name: 'Bills', exact: true }).click()
