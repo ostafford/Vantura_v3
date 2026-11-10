@@ -30,6 +30,13 @@ CI (see `.github/workflows/deploy.yml`) runs `npm run validate` plus the unit an
 
 Pre-commit hook (`husky` + `lint-staged`) auto-formats/lints staged `.ts`/`.tsx`/`.css` files.
 
+## Working rules learned the hard way
+
+- **Run e2e in one worktree at a time.** Locally, Playwright reuses any server already on port 4173 (`reuseExistingServer`). So a second worktree's `npm run test:e2e` quietly tests the first worktree's code.
+- **Don't stack PRs.** PRs are squash-merged, so a branch built on another unmerged branch conflicts once that base lands. Branch each PR from `main`, and rebase any open PR onto `main` after each merge.
+- **A release touches three things:** a dated section in `CHANGELOG.md`, a new milestone at the top of `src/data/changelog.ts` (date, heading, icon, colour, version, items), and `npm version X.Y.Z --no-git-tag-version`. All three land as one `chore: release X.Y.Z` PR.
+- **Money typed by the user goes through `parseAmountInput`** (`src/lib/amountInput.ts`, ADR 0026), in a `type="text" inputMode="decimal"` field, never `parseFloat`. **Text colours come from the `-text` tokens** (`--vantura-primary-text`, `--vantura-success-text`, `--vantura-text-secondary`, …), never the fill colour, so text stays at 4.5:1 or better in both themes.
+
 ## Architecture
 
 ### Data layer: sql.js + IndexedDB, no server
