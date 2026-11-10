@@ -156,7 +156,7 @@ export function DataSection() {
         <p
           className="small fw-semibold mb-3"
           style={{
-            color: 'var(--bs-danger)',
+            color: 'var(--vantura-danger-text)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
             fontSize: '0.72rem',
