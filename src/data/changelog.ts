@@ -24,6 +24,32 @@ export interface UpcomingItem {
 
 export const MILESTONES: Milestone[] = [
   {
+    date: '10 Nov 2026',
+    heading: 'Easier to Read',
+    icon: 'mdi-eye-outline',
+    primaryMonth: '2026-11',
+    version: '0.12.1',
+    color: '#80cbc4',
+    items: [
+      {
+        icon: 'mdi-format-color-text',
+        text: 'All text now meets the contrast standard in both themes, including blue links and buttons in the light theme, badges like On track, and muted labels.',
+      },
+      {
+        icon: 'mdi-view-dashboard-outline',
+        text: 'Dashboard cards end where their content ends, and on your phone the Budget Plan header stays on one line.',
+      },
+      {
+        icon: 'mdi-swap-horizontal',
+        text: 'Transactions show a status only when a transaction is Held, and say Held everywhere.',
+      },
+      {
+        icon: 'mdi-chart-line',
+        text: 'Chart axes show whole dollars, and tracker chart dates follow your device’s language and region.',
+      },
+    ],
+  },
+  {
     date: '8 Nov 2026',
     heading: 'Plan vs Actual & At Home on Your Phone',
     icon: 'mdi-scale-balance',

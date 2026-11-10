@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-10
+
+Easier to read in both themes. Every piece of text on the main screens now meets the contrast standard, and a few layouts on the Dashboard, Budget Plan and Transactions are tidier.
+
+### Changed
+
+- **Dashboard cards end where their content ends**, instead of stretching to match the tallest card beside them.
+- **On your phone, the Budget Plan header stays on one line.** Add bucket is now an icon. With no buckets yet, one line ("Create a bucket") replaces the large card, so your plan starts higher up the screen.
+- **Transactions show a status only when a transaction is Held.** "Settled" no longer appears on every row. The transaction window says Held instead of Pending, and counts read "463 transactions" instead of "transaction(s)".
+- **Chart axes show whole dollars**, like $1,000 instead of $1,000.00. Dates on tracker charts follow your device's language and region.
+- **Muted text is slightly darker in the light theme and slightly lighter in the dark theme**, so labels and dates are easier to read.
+
+### Fixed
+
+- **Blue text, links and focus outlines are readable in the light theme.** They were pale blue on white.
+- **All text on the main screens now meets the WCAG AA contrast standard in both themes.** This covers the "On track" and "On pace" badges, grey buttons such as Edit, the DEMO label, and the Changelog page.
+- **Hovering a card, such as the User guide or a tracker, no longer fades its text.**
+- **On your phone, the Month review line no longer ends in a stray dot.** Mark reviewed sits on its own line.
+
 ## [0.12.0] - 2026-11-08
 
 The Budget Plan now shows plan vs actual: each month's plan against what you really spent, including past months, judged against the plan as it stood when they ended. And Vantura feels at home on your phone: no grey flash when you tap, the number pad for amounts, a menu that follows your finger, and amounts you type are read exactly.
