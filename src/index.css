@@ -3609,6 +3609,23 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 .btn-outline-secondary {
   --bs-btn-color: var(--vantura-text-secondary);
 }
+/* Red outline buttons (Delete, Clear all data) used Bootstrap's #dc3545:
+   3.5–4.1:1. The danger text colour reads at 4.5:1 or better. */
+.btn-outline-danger {
+  --bs-btn-color: var(--vantura-danger-text);
+}
+/* Tracker form: a category another tracker uses is a disabled checkbox.
+   Bootstrap fades its label to 0.5 (2.2–2.5:1), which hid the "(already in:
+   …)" reason. The label stays at full opacity in the muted colour instead;
+   the greyed checkbox still says it's unavailable. */
+.tracker-category-list .form-check-input:disabled ~ .form-check-label,
+.tracker-category-list
+  .form-check-input:disabled
+  ~ .form-check-label
+  .text-muted {
+  opacity: 1;
+  color: var(--vantura-text-secondary) !important;
+}
 [data-theme='light'] {
   /* <code> pink: 4.09:1 → 5.86:1 on the page */
   --bs-code-color: #ab296a;

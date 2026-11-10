@@ -605,7 +605,7 @@ export function TrackersSection({
             <Form.Group className="mb-2">
               <Form.Label>Categories</Form.Label>
               <div
-                className="border rounded p-2"
+                className="border rounded p-2 tracker-category-list"
                 style={{ maxHeight: 160, overflowY: 'auto' }}
               >
                 {categories.map((c) => {
