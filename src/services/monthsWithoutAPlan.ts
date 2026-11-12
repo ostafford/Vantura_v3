@@ -5,9 +5,10 @@
  * Budget Plan with no plan: Actual spending, Spending by category and Saved
  * from a Confirmed pay (`confirmedPay.ts`).
  *
- * - **Spending account** = the one `accounts` row with `account_type =
- *   'TRANSACTIONAL'` and an individual (not `JOINT`) `ownership_type`. When
- *   there isn't exactly one, there are no Months without a plan.
+ * - **Spending account** = the one open (`is_closed = 0`) `accounts` row with
+ *   `account_type = 'TRANSACTIONAL'` and `ownership_type = 'INDIVIDUAL'`. A
+ *   missing ownership type isn't assumed individual. When there isn't exactly
+ *   one, there are no Months without a plan.
  * - **Opening month** = the local calendar month of its `created_at`. A
  *   Saver's `created_at` is never used: Up re-uses an underlying account when
  *   a Saver closes.
@@ -21,7 +22,7 @@
  */
 
 import { getDb } from '@/db'
-import { addDaysToDateStr, calendarMonthDayBounds } from '@/lib/dateStr'
+import { addMonthsToMonthStr, calendarMonthDayBounds } from '@/lib/dateStr'
 import { localDateString } from '@/lib/format'
 import { displayDayBetweenSql } from '@/services/displayDay'
 import { getFirstPlannableMonth } from '@/services/monthEndPlan'
@@ -42,17 +43,13 @@ function spendingAccountOpeningDate(): string | null {
   const rows = db.exec(
     `SELECT created_at FROM accounts
      WHERE account_type = 'TRANSACTIONAL'
-       AND COALESCE(ownership_type, '') <> 'JOINT'`
+       AND ownership_type = 'INDIVIDUAL'
+       AND is_closed = 0`
   )
   const values = rows[0]?.values ?? []
   if (values.length !== 1) return null
   const opened = new Date(String(values[0][0]))
   return Number.isNaN(opened.getTime()) ? null : localDateString(opened)
-}
-
-/** The month before `month` (`YYYY-MM`). */
-function previousMonth(month: string): string {
-  return addDaysToDateStr(calendarMonthDayBounds(month).first, -1).slice(0, 7)
 }
 
 /** The range of Months without a plan, or `null` when it's empty. */
@@ -62,7 +59,19 @@ export function getMonthsWithoutAPlan(): MonthsWithoutAPlan | null {
   if (firstPlannable === null || openingDate === null) return null
   const firstMonth = openingDate.slice(0, 7)
   if (firstPlannable <= firstMonth) return null
-  return { openingDate, firstMonth, lastMonth: previousMonth(firstPlannable) }
+  return {
+    openingDate,
+    firstMonth,
+    lastMonth: addMonthsToMonthStr(firstPlannable, -1),
+  }
+}
+
+/** True when `month` (`YYYY-MM`) is in `range`. */
+export function isInRange(
+  month: string,
+  range: MonthsWithoutAPlan | null
+): range is MonthsWithoutAPlan {
+  return range !== null && month >= range.firstMonth && month <= range.lastMonth
 }
 
 /**

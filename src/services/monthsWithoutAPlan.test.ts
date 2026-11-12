@@ -83,17 +83,19 @@ function addAccount(seed: {
   type: 'TRANSACTIONAL' | 'SAVER'
   createdAt: string
   ownership?: 'INDIVIDUAL' | 'JOINT' | null
+  closed?: boolean
 }) {
   db.run(
     `INSERT INTO accounts (id, display_name, account_type, balance, created_at,
-       updated_at, ownership_type)
-     VALUES (?, ?, ?, 0, ?, '2026-11-01T00:00:00+11:00', ?)`,
+       updated_at, ownership_type, is_closed)
+     VALUES (?, ?, ?, 0, ?, '2026-11-01T00:00:00+11:00', ?, ?)`,
     [
       seed.id,
       `Synthetic ${seed.id}`,
       seed.type,
       seed.createdAt,
       seed.ownership === undefined ? 'INDIVIDUAL' : seed.ownership,
+      seed.closed ? 1 : 0,
     ]
   )
 }
@@ -202,9 +204,35 @@ describe('the range of Months without a plan', () => {
       id: 'acc-b',
       type: 'TRANSACTIONAL',
       createdAt: '2026-05-02T10:00:00+10:00',
+    })
+    expect(getMonthsWithoutAPlan()).toBeNull()
+  })
+
+  it('declines when the transactional account’s ownership type is missing', () => {
+    addAccount({
+      id: 'acc-spending',
+      type: 'TRANSACTIONAL',
+      createdAt: '2026-03-14T10:00:00+11:00',
       ownership: null,
     })
     expect(getMonthsWithoutAPlan()).toBeNull()
+  })
+
+  it('skips a closed transactional account', () => {
+    addAccount({
+      id: 'acc-old',
+      type: 'TRANSACTIONAL',
+      createdAt: '2024-02-01T10:00:00+11:00',
+      closed: true,
+    })
+    expect(getMonthsWithoutAPlan()).toBeNull()
+
+    addAccount({
+      id: 'acc-spending',
+      type: 'TRANSACTIONAL',
+      createdAt: '2026-03-14T10:00:00+11:00',
+    })
+    expect(getMonthsWithoutAPlan()?.firstMonth).toBe('2026-03')
   })
 
   it('ignores a joint transactional account', () => {

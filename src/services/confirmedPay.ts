@@ -21,7 +21,7 @@ import { addMonthsToMonthStr } from '@/lib/dateStr'
 import { isPayFrequency, type PayFrequency } from '@/lib/payFrequency'
 import type { Pay } from '@/services/budgetBuckets'
 import { isMonth } from '@/services/monthEndPlan'
-import { getMonthsWithoutAPlan } from '@/services/monthsWithoutAPlan'
+import { getMonthsWithoutAPlan, isInRange } from '@/services/monthsWithoutAPlan'
 
 /** The amount text as a pay, or `null` when Settings → Pay would refuse it. */
 function payOf(amountText: string, frequency: unknown): Pay | null {
@@ -31,8 +31,14 @@ function payOf(amountText: string, frequency: unknown): Pay | null {
   return { perPay: amount.cents, frequency }
 }
 
-/** A stored row's values as a pay, or `null` when malformed. */
-function storedPay(cents: unknown, frequency: unknown): Pay | null {
+/**
+ * A stored or imported row's amount (cents) and frequency as a Confirmed pay,
+ * or `null` when either is invalid.
+ */
+export function parseConfirmedPay(
+  cents: unknown,
+  frequency: unknown
+): Pay | null {
   if (typeof cents !== 'number' || !Number.isSafeInteger(cents) || cents <= 0) {
     return null
   }
@@ -48,7 +54,7 @@ export function getConfirmedPay(month: string): Pay | null {
     [month]
   )
   const row = rows[0]?.values[0]
-  return row ? storedPay(row[0], row[1]) : null
+  return row ? parseConfirmedPay(row[0], row[1]) : null
 }
 
 /**
@@ -79,17 +85,6 @@ export function confirmPayForEarlierMonths(
   return true
 }
 
-/** True when `month` is a Month without a plan. */
-function isMonthWithoutAPlan(month: string): boolean {
-  const range = getMonthsWithoutAPlan()
-  return (
-    range !== null &&
-    isMonth(month) &&
-    month >= range.firstMonth &&
-    month <= range.lastMonth
-  )
-}
-
 /**
  * **Single-month change:** writes (or replaces) `month`'s Confirmed pay only.
  * Returns false, writing nothing, when the pay is invalid or `month` isn't a
@@ -102,7 +97,8 @@ export function changePayForMonth(
 ): boolean {
   const db = getDb()
   const pay = payOf(amountText, frequency)
-  if (!db || !pay || !isMonthWithoutAPlan(month)) return false
+  if (!db || !pay || !isMonth(month)) return false
+  if (!isInRange(month, getMonthsWithoutAPlan())) return false
   db.run(
     `INSERT OR REPLACE INTO confirmed_pays (month, pay_amount_cents, pay_frequency)
      VALUES (?, ?, ?)`,
@@ -127,18 +123,10 @@ export function readConfirmedPayRows(): ConfirmedPayRow[] {
   )
   const out: ConfirmedPayRow[] = []
   for (const [month, cents, frequency] of rows[0]?.values ?? []) {
-    const pay = storedPay(cents, frequency)
+    const pay = parseConfirmedPay(cents, frequency)
     if (isMonth(month) && pay) out.push({ month, pay })
   }
   return out
-}
-
-/** `cents` and `frequency` as a Confirmed pay, or `null` when either is invalid. */
-export function parseConfirmedPay(
-  cents: unknown,
-  frequency: unknown
-): Pay | null {
-  return storedPay(cents, frequency)
 }
 
 /**

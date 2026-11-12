@@ -54,11 +54,11 @@
  */
 
 import { calendarMonthDayBounds } from '@/lib/dateStr'
-import type { PayFrequency } from '@/lib/payFrequency'
 import {
   getBuckets,
   getMonthlyIncomeCents,
   monthlyIncomeFromPay,
+  type Pay,
 } from '@/services/budgetBuckets'
 import { getConfirmedPay } from '@/services/confirmedPay'
 import { getHeadroom } from '@/services/headroom'
@@ -71,6 +71,7 @@ import {
 import { getMonthEndPlan, isMonth, planInputOf } from '@/services/monthEndPlan'
 import {
   getMonthsWithoutAPlan,
+  isInRange,
   usedAClosedSaver,
   type MonthsWithoutAPlan,
 } from '@/services/monthsWithoutAPlan'
@@ -247,7 +248,7 @@ export interface PlanVsActualNoPlan {
    */
   spendingByCategory: Unplanned
   /** The month's Confirmed pay, `null` when there's none. */
-  confirmedPay: { perPay: number; frequency: PayFrequency } | null
+  confirmedPay: Pay | null
   /** Income − Actual spending (negative is Overspent); `null` with a reason. */
   savedCents: number | null
   /** Set exactly when `savedCents` is `null`. */
@@ -416,11 +417,7 @@ export function getPlanVsActual(month: string): PlanVsActual | null {
   if (month === headroom.month) return readInProgress(month, headroom)
   if (!isMonth(month) || month > headroom.month) return null
   const noPlanRange = getMonthsWithoutAPlan()
-  if (
-    noPlanRange &&
-    month >= noPlanRange.firstMonth &&
-    month <= noPlanRange.lastMonth
-  ) {
+  if (isInRange(month, noPlanRange)) {
     return readNoPlan(month, headroom.today, noPlanRange)
   }
   return readFinished(month, headroom.today)
