@@ -41,6 +41,15 @@
  * - A Tracker is *under* or *over*, never *left*.
  * - An unpaid Regular is *no payment found* (Mark paid writes to the plan).
  *
+ * **A Month without a plan** (#282, `monthsWithoutAPlan.ts`) has no plan to
+ * judge: Actual spending, **Spending by category** (the attribution read on
+ * an empty plan, so every counted transaction lands in it and it adds up to
+ * Actual spending), Income from its **Confirmed pay** (`confirmedPay.ts`)
+ * and Saved = Income − Actual. Saved is `null` with a reason, in this order:
+ * the opening month (*Part month*), a transfer to an account Vantura doesn't
+ * hold (*Closed Saver*), no Confirmed pay (*Pay not confirmed*). A month on
+ * or after the First plannable month never falls back to this read.
+ *
  * Computed on every call. Nothing is cached.
  */
 
@@ -49,14 +58,23 @@ import {
   getBuckets,
   getMonthlyIncomeCents,
   monthlyIncomeFromPay,
+  type Pay,
 } from '@/services/budgetBuckets'
+import { getConfirmedPay } from '@/services/confirmedPay'
 import { getHeadroom } from '@/services/headroom'
 import {
   getMonthAttribution,
   type MonthAttribution,
+  type MonthPlanInput,
   type Unplanned,
 } from '@/services/monthAttribution'
 import { getMonthEndPlan, isMonth, planInputOf } from '@/services/monthEndPlan'
+import {
+  getMonthsWithoutAPlan,
+  isInRange,
+  usedAClosedSaver,
+  type MonthsWithoutAPlan,
+} from '@/services/monthsWithoutAPlan'
 import {
   regularById,
   regularOccurrencesPaidInMonth,
@@ -194,9 +212,55 @@ export interface PlanVsActualFinished extends PlanVsActualBase {
   }
 }
 
-export type PlanVsActual = PlanVsActualInProgress | PlanVsActualFinished
+/** Why a Month without a plan has no Saved, in precedence order. */
+export type NoSavedReason =
+  /** The opening month: a part month isn't measured against a full pay. */
+  | 'part-month'
+  /** A transfer to an account Vantura doesn't hold: a since-closed Saver. */
+  | 'closed-saver'
+  /** No Confirmed pay for the month. */
+  | 'pay-not-confirmed'
 
-type MonthState = PlanVsActual['state']
+/**
+ * A **Month without a plan** (#282): a finished month before the First
+ * plannable month. No buckets, Committed, Unallocated, Spent on plan or
+ * Unplanned; only Actual spending, Spending by category and Saved.
+ */
+export interface PlanVsActualNoPlan {
+  state: 'no-plan'
+  /** `YYYY-MM`. */
+  month: string
+  /** Today, `YYYY-MM-DD` (local). */
+  today: string
+  daysInMonth: number
+  /** The Spending account's opening day, local `YYYY-MM-DD`. */
+  openingDate: string
+  figures: {
+    /** From the Confirmed pay; `null` without one. */
+    incomeCents: number | null
+    /** Total Actual spending (ADR 0022). */
+    actualCents: number
+  }
+  /**
+   * Every counted transaction by parent category, subcategory and
+   * Uncategorised (the attribution read on an empty plan). Its total is
+   * Actual spending.
+   */
+  spendingByCategory: Unplanned
+  /** The month's Confirmed pay, `null` when there's none. */
+  confirmedPay: Pay | null
+  /** Income − Actual spending (negative is Overspent); `null` with a reason. */
+  savedCents: number | null
+  /** Set exactly when `savedCents` is `null`. */
+  noSavedReason: NoSavedReason | null
+}
+
+/** A month read against a plan: the live plan or its Month-end plan. */
+export type PlanVsActualWithPlan = PlanVsActualInProgress | PlanVsActualFinished
+
+export type PlanVsActual = PlanVsActualWithPlan | PlanVsActualNoPlan
+
+type MonthState = Exclude<PlanVsActual['state'], 'no-plan'>
 
 function trackerState(
   planned: number | null,
@@ -343,15 +407,58 @@ const daysIn = (month: string) =>
 
 /**
  * Plan vs actual for `month` (`YYYY-MM`): the current month in progress on
- * the live plan, or a finished month against its Month-end plan. `null` for a
- * month after this one, a malformed month, or a finished month with no
- * Month-end plan.
+ * the live plan, a finished month against its Month-end plan, or a Month
+ * without a plan. `null` for a month after this one, a malformed month, a
+ * month before the range of Months without a plan, or a finished month on or
+ * after the First plannable month with no readable Month-end plan.
  */
 export function getPlanVsActual(month: string): PlanVsActual | null {
   const headroom = getHeadroom()
   if (month === headroom.month) return readInProgress(month, headroom)
   if (!isMonth(month) || month > headroom.month) return null
+  const noPlanRange = getMonthsWithoutAPlan()
+  if (isInRange(month, noPlanRange)) {
+    return readNoPlan(month, headroom.today, noPlanRange)
+  }
   return readFinished(month, headroom.today)
+}
+
+/** The attribution read's plan input with no Regulars and no Trackers. */
+const EMPTY_PLAN: MonthPlanInput = {
+  regulars: { rows: [], occurrences: new Map(), marks: [] },
+  trackers: [],
+}
+
+function readNoPlan(
+  month: string,
+  today: string,
+  range: MonthsWithoutAPlan
+): PlanVsActualNoPlan {
+  const attribution = getMonthAttribution(month, EMPTY_PLAN)
+  const actualCents = attribution.totalActualSpendingCents
+  const pay = getConfirmedPay(month)
+  const income = pay ? monthlyIncomeFromPay(pay) : null
+  const noSavedReason: NoSavedReason | null =
+    month === range.firstMonth
+      ? 'part-month'
+      : usedAClosedSaver(month)
+        ? 'closed-saver'
+        : income === null
+          ? 'pay-not-confirmed'
+          : null
+  return {
+    state: 'no-plan',
+    month,
+    today,
+    daysInMonth: daysIn(month),
+    openingDate: range.openingDate,
+    figures: { incomeCents: income, actualCents },
+    spendingByCategory: attribution.unplanned,
+    confirmedPay: pay,
+    savedCents:
+      noSavedReason === null && income !== null ? income - actualCents : null,
+    noSavedReason,
+  }
 }
 
 function readInProgress(
