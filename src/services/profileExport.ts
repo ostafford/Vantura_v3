@@ -29,6 +29,12 @@ import {
   type MonthEndPlanRow,
 } from '@/services/monthEndPlan'
 import {
+  parseConfirmedPay,
+  readConfirmedPayRows,
+  replaceConfirmedPays,
+  type ConfirmedPayRow,
+} from '@/services/confirmedPay'
+import {
   getLastReviewedMonth,
   replaceLastReviewedMonth,
 } from '@/services/monthReview'
@@ -46,9 +52,10 @@ import {
  * `payday_day`) are no longer written; import skips them silently.
  * v17 (#242): the `monthEndPlans` section and `firstPlannableMonth` are
  * written, and imported with the Budget Plan. v18 (#244): `lastReviewedMonth`
- * is written, and imported with them.
+ * is written, and imported with them. v19 (#282): the `confirmedPays`
+ * section is written, and imported with them.
  */
-const EXPORT_PAYLOAD_VERSION = 18
+const EXPORT_PAYLOAD_VERSION = 19
 
 /** File wrapper version for the outer JSON structure */
 const EXPORT_FILE_VERSION = 1
@@ -105,6 +112,18 @@ export interface ExportPayload {
   firstPlannableMonth?: string | null
   /** #244 — the last reviewed month, `YYYY-MM`. Absent before v18. */
   lastReviewedMonth?: string | null
+  /**
+   * #282 — every Confirmed pay, oldest month first. Absent before v19, so
+   * those months import as "Pay not confirmed".
+   */
+  confirmedPays?: ConfirmedPayExportRow[]
+}
+
+/** #282 — a `confirmed_pays` row. */
+export interface ConfirmedPayExportRow {
+  month: string
+  pay_amount_cents: number
+  pay_frequency: string
 }
 
 /** #242 — a `month_end_plans` row, with its plan body parsed. */
@@ -432,6 +451,11 @@ export function buildExportPayload(): ExportPayload {
     monthEndPlans,
     firstPlannableMonth: getFirstPlannableMonth(),
     lastReviewedMonth: getLastReviewedMonth(),
+    confirmedPays: readConfirmedPayRows().map((r) => ({
+      month: r.month,
+      pay_amount_cents: r.pay.perPay,
+      pay_frequency: r.pay.frequency,
+    })),
   }
 }
 
@@ -499,6 +523,15 @@ export const IMPORT_ERROR_INVALID_TRACKER_RESET =
  */
 export const IMPORT_ERROR_INVALID_MONTH_END_PLAN =
   'This file has a past month’s plan that isn’t valid. Nothing was imported.'
+
+/**
+ * #282 — user-facing error when the file has a Confirmed pay that isn't
+ * exactly valid: a malformed or repeated month, a month that isn't before the
+ * file's first plannable month, or an amount or Pay frequency Settings → Pay
+ * would refuse. The whole import is refused, like a Month-end plan.
+ */
+export const IMPORT_ERROR_INVALID_CONFIRMED_PAY =
+  'This file has a confirmed pay that isn’t valid. Nothing was imported.'
 
 /**
  * #244 — user-facing error when the file's last reviewed month isn't a
@@ -1107,6 +1140,43 @@ export function readImportedMonthEndPlans(
 }
 
 /**
+ * #282 — the payload's Confirmed pays, validated against its first plannable
+ * month (`firstMonth`, already validated): every month must be before it, so
+ * none is allowed without one. The opening month isn't known on a device
+ * that hasn't synced yet, so a month earlier than it is kept and simply never
+ * read. A payload from before v19 has none. Throws
+ * `IMPORT_ERROR_INVALID_CONFIRMED_PAY` for anything not exactly valid.
+ */
+export function readImportedConfirmedPays(
+  payload: ExportPayload,
+  firstMonth: string | null
+): ConfirmedPayRow[] {
+  const invalid = () => new Error(IMPORT_ERROR_INVALID_CONFIRMED_PAY)
+  const raw = payload.confirmedPays
+  if (raw === undefined) return []
+  if (!Array.isArray(raw)) throw invalid()
+  const rows: ConfirmedPayRow[] = []
+  const months = new Set<string>()
+  for (const r of raw as Partial<ConfirmedPayExportRow>[]) {
+    if (
+      typeof r !== 'object' ||
+      r === null ||
+      !isMonth(r.month) ||
+      firstMonth === null ||
+      r.month >= firstMonth ||
+      months.has(r.month)
+    ) {
+      throw invalid()
+    }
+    const pay = parseConfirmedPay(r.pay_amount_cents, r.pay_frequency)
+    if (!pay) throw invalid()
+    months.add(r.month)
+    rows.push({ month: r.month, pay })
+  }
+  return rows.sort((a, b) => a.month.localeCompare(b.month))
+}
+
+/**
  * #29 — Replace saver_goal_history with imported data (full delete-then-reinsert).
  * Rows are keyed by the Up account id (`saver_id`), stable across the export
  * boundary, so no remap. After reinserting, re-mirror `accounts.target_amount_cents`
@@ -1229,6 +1299,8 @@ export function importPayloadWithOptions(
       const plans = readImportedMonthEndPlans(payload)
       replaceMonthEndPlans(plans.rows, plans.firstMonth)
       replaceLastReviewedMonth(plans.lastReviewedMonth)
+      // #282 — Confirmed pays travel with the past months they belong to.
+      replaceConfirmedPays(readImportedConfirmedPays(payload, plans.firstMonth))
     }
 
     if (options.trackers) {

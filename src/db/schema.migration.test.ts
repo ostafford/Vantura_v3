@@ -159,7 +159,7 @@ describe('v36 migration: bank-statement-import removal', () => {
       `SELECT value FROM app_settings WHERE key = 'schema_version'`
     )
     expect(versionRow[0].values[0][0]).toBe(String(SCHEMA_VERSION))
-    expect(SCHEMA_VERSION).toBe(61)
+    expect(SCHEMA_VERSION).toBe(62)
 
     // The credit-card-import account is gone.
     const ccAccount = db.exec(`SELECT * FROM accounts WHERE id = 'cc-visa'`)
@@ -2102,6 +2102,80 @@ describe('v61 migration: Month-end plans (#242)', () => {
     const fresh = new SQL.Database()
     runSchema(fresh)
     expect(planColumns(fresh)).toEqual(['month', 'plan_json', 'frozen_at'])
+    fresh.close()
+  })
+})
+
+describe('v62 migration: confirmed_pays (#282)', () => {
+  function columns(db: Database): string[] {
+    const rows = db.exec(`PRAGMA table_info(confirmed_pays)`)
+    return rows[0] ? rows[0].values.map((r) => String(r[1])) : []
+  }
+
+  function buildV61(): Database {
+    const db = new SQL.Database()
+    runSchema(db)
+    db.run(`DROP TABLE confirmed_pays`)
+    db.run(
+      `INSERT INTO app_settings (key, value) VALUES ('pay_amount_cents', '250000')`
+    )
+    db.run(`UPDATE app_settings SET value = '61' WHERE key = 'schema_version'`)
+    return db
+  }
+
+  it('creates confirmed_pays on a v61 database, empty, keeping everything else', () => {
+    const db = buildV61()
+    expect(columns(db)).toEqual([])
+
+    runMigrations(db)
+
+    expect(
+      db.exec(`SELECT value FROM app_settings WHERE key = 'schema_version'`)[0]
+        .values
+    ).toEqual([['62']])
+    expect(columns(db)).toEqual(['month', 'pay_amount_cents', 'pay_frequency'])
+    expect(db.exec(`SELECT COUNT(*) FROM confirmed_pays`)[0].values).toEqual([
+      [0],
+    ])
+    // Settings → Pay is never copied into a Confirmed pay.
+    expect(
+      db.exec(
+        `SELECT value FROM app_settings WHERE key = 'pay_amount_cents'`
+      )[0].values
+    ).toEqual([['250000']])
+    db.close()
+  })
+
+  it('keys a Confirmed pay by month: a second row for the month is refused', () => {
+    const db = buildV61()
+    runMigrations(db)
+    db.run(
+      `INSERT INTO confirmed_pays (month, pay_amount_cents, pay_frequency)
+       VALUES ('2026-03', 250000, 'MONTHLY')`
+    )
+    expect(() =>
+      db.run(
+        `INSERT INTO confirmed_pays (month, pay_amount_cents, pay_frequency)
+         VALUES ('2026-03', 100000, 'WEEKLY')`
+      )
+    ).toThrow()
+    db.close()
+  })
+
+  it('is idempotent, and creates the table on a fresh database', () => {
+    const db = buildV61()
+    runMigrations(db)
+    db.run(`UPDATE app_settings SET value = '61' WHERE key = 'schema_version'`)
+    expect(() => runMigrations(db)).not.toThrow()
+    db.close()
+
+    const fresh = new SQL.Database()
+    runSchema(fresh)
+    expect(columns(fresh)).toEqual([
+      'month',
+      'pay_amount_cents',
+      'pay_frequency',
+    ])
     fresh.close()
   })
 })

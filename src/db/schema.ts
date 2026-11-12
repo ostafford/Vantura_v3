@@ -6,7 +6,7 @@
 import type { Database } from 'sql.js'
 import { localCalendarMonthResetDates } from '@/lib/dateStr'
 
-const SCHEMA_VERSION = 61
+const SCHEMA_VERSION = 62
 
 function tableExists(database: Database, name: string): boolean {
   const stmt = database.prepare(
@@ -147,6 +147,11 @@ const DDL_STATEMENTS = [
     month TEXT PRIMARY KEY,
     plan_json TEXT NOT NULL,
     frozen_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS confirmed_pays (
+    month TEXT PRIMARY KEY,
+    pay_amount_cents INTEGER NOT NULL,
+    pay_frequency TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
@@ -1569,6 +1574,23 @@ export function runMigrations(database: Database): void {
     database.run(
       `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
       ['61']
+    )
+  }
+  // #282 — the Confirmed pay: the pay a Month without a plan's Saved is
+  // worked out from, one row per month (`YYYY-MM`), entered by the user
+  // (`src/services/confirmedPay.ts`). Nothing is backfilled: Settings → Pay
+  // is never copied in, so a month reads "Pay not confirmed" until confirmed.
+  if (version < 62) {
+    database.run(
+      `CREATE TABLE IF NOT EXISTS confirmed_pays (
+        month TEXT PRIMARY KEY,
+        pay_amount_cents INTEGER NOT NULL,
+        pay_frequency TEXT NOT NULL
+      )`
+    )
+    database.run(
+      `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('schema_version', ?)`,
+      ['62']
     )
   }
 }

@@ -1387,7 +1387,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
       insertGoal('sav-1', 400000, { date: '2026-12-01' })
 
       const payload = buildExportPayload()
-      expect(payload.version).toBe(18)
+      expect(payload.version).toBe(19)
       expect(payload.saverGoals).toEqual([
         {
           saver_id: 'sav-1',
@@ -1817,7 +1817,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Mortgage repayment', 250000, 'MONTHLY', '2026-03-01', '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(18)
+      expect(payload.version).toBe(19)
       expect(Object.keys(payload)).not.toContain('manualAccounts')
       expect(Object.keys(payload)).not.toContain('netWorthSnapshots')
       expect(payload.upcomingCharges).toHaveLength(1)
@@ -1941,7 +1941,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
          VALUES ('Rent', 180000, 'MONTHLY', '2026-03-01', '2026-01-01')`
       )
       const payload = buildExportPayload()
-      expect(payload.version).toBe(18)
+      expect(payload.version).toBe(19)
       for (const key of CUT_KEYS) {
         expect(payload.settings[key], key).toBeUndefined()
       }
@@ -2027,7 +2027,7 @@ describe('profile import writers: real-DB coverage (#36)', () => {
 
       const payload = buildExportPayload()
 
-      expect(payload.version).toBe(18)
+      expect(payload.version).toBe(19)
       for (const key of CUT_KEYS) {
         expect(payload.settings).not.toHaveProperty(key)
       }

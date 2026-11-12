@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
 import { formatShortDate } from '@/lib/format'
 import { getCategoriesWithParent } from '@/services/categories'
-import type { PlanItem, PlanVsActual } from '@/services/planVsActual'
+import type { PlanItem, PlanVsActualWithPlan } from '@/services/planVsActual'
 import type { Unplanned } from '@/services/monthAttribution'
 import {
   UNPLANNED_CARD_ID,
@@ -163,7 +163,7 @@ const SEGMENT_CLASS = {
 } as const
 
 interface MonthSummaryProps {
-  plan: PlanVsActual
+  plan: PlanVsActualWithPlan
   /** The month name with its chevrons. */
   nav: ReactNode
   /** Scrolls to the Unplanned card. */
@@ -184,7 +184,7 @@ function SetYourPay() {
  * The month's headline: Free spending so far while it runs; Saved, or
  * Overspent (red, as a positive figure), once it has finished (#243).
  */
-function headline(plan: PlanVsActual): {
+function headline(plan: PlanVsActualWithPlan): {
   cents: number | null
   label: string
   over: boolean
