@@ -27,7 +27,8 @@ import {
   BucketPlanCard,
   MonthNav,
   MonthSummaryCard,
-  UnplannedCard,
+  NoPlanSummaryCard,
+  CategoryBreakdownCard,
 } from '@/components/budgetPlan/PlanVsActualParts'
 import {
   UNPLANNED_CARD_ID,
@@ -262,6 +263,13 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 
+const PLAN_HELP =
+  "Your plan vs what actually went out, for one calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned that month. Committed is what your buckets plan, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar. Use ‹ to look back at a finished month: it's judged against the plan you had when it ended, while its spending stays up to date."
+
+/** #282 — a Month without a plan has no buckets to explain. */
+const NO_PLAN_HELP =
+  "This month is from before your first plan, so there are no buckets to compare. It shows what went out, by Up category, and Saved from the pay you confirmed for it. Saved isn't worked out for the month your account opened, or a month that used a Saver that's since closed."
+
 /** Scrolls to the Unplanned card and moves focus there (the bar's unplanned segment). */
 function showUnplanned() {
   const el = document.getElementById(UNPLANNED_CARD_ID)
@@ -293,7 +301,7 @@ export function AnalyticsBudgetPlan() {
   const [showAssignModal, setShowAssignModal] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
-  const planMonth = usePlanMonth()
+  const planMonth = usePlanMonth({ withMonthsWithoutAPlan: true })
   const plan = usePlanVsActual(version, planMonth.month)
   const editable = planMonth.isCurrent
   const nav = <MonthNav planMonth={planMonth} path="/analytics/budget" />
@@ -349,6 +357,39 @@ export function AnalyticsBudgetPlan() {
     setShowBucketModal(true)
   }
 
+  const help = (
+    <HelpPopover
+      id="budget-plan-help"
+      title="Budget Plan"
+      content={plan?.state === 'no-plan' ? NO_PLAN_HELP : PLAN_HELP}
+      ariaLabel="How does Budget Plan work?"
+    />
+  )
+
+  // #282 — a Month without a plan: its summary and Spending by category only.
+  // No buckets, Not in a bucket or Add bucket, and nothing to edit.
+  if (plan?.state === 'no-plan') {
+    return (
+      <div className="grid-margin">
+        <NoPlanSummaryCard
+          key={plan.month}
+          plan={plan}
+          nav={nav}
+          onPayChanged={refresh}
+          aside={help}
+        />
+        <Row className="g-3 mb-4">
+          <Col xs={12} sm={6} lg={4}>
+            <CategoryBreakdownCard
+              breakdown={plan.spendingByCategory}
+              kind="by-category"
+            />
+          </Col>
+        </Row>
+      </div>
+    )
+  }
+
   if (!plan) {
     if (editable) return null
     return (
@@ -378,12 +419,7 @@ export function AnalyticsBudgetPlan() {
         onShowUnplanned={showUnplanned}
         aside={
           <div className="d-flex align-items-center gap-2">
-            <HelpPopover
-              id="budget-plan-help"
-              title="Budget Plan"
-              content="Your plan vs what actually went out, for one calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned that month. Committed is what your buckets plan, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar. Use ‹ to look back at a finished month: it's judged against the plan you had when it ended, while its spending stays up to date."
-              ariaLabel="How does Budget Plan work?"
-            />
+            {help}
             {editable && (
               <Button
                 variant="primary"
@@ -550,7 +586,7 @@ export function AnalyticsBudgetPlan() {
         )}
 
         <Col xs={12} sm={6} lg={4}>
-          <UnplannedCard unplanned={plan.unplanned} />
+          <CategoryBreakdownCard breakdown={plan.unplanned} kind="unplanned" />
         </Col>
       </Row>
 

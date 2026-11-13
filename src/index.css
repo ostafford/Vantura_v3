@@ -3126,12 +3126,41 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.plan-set-pay {
-  display: flex;
-  align-items: baseline;
+.plan-set-pay,
+.plan-pay-form {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   background: var(--bs-tertiary-bg);
+}
+.plan-set-pay {
+  display: flex;
+  align-items: baseline;
+}
+.plan-pay-form__title {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+/* Amount and Pay frequency side by side from small screens; stacked on a phone. */
+.plan-pay-form__fields {
+  display: grid;
+  gap: 0.5rem;
+}
+@media (min-width: 576px) {
+  .plan-pay-form__fields {
+    grid-template-columns: 1fr 1fr;
+    max-width: 32rem;
+  }
+}
+.plan-pay-form__error {
+  color: var(--vantura-danger-text);
+}
+.plan-change-pay-toggle {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.875rem;
 }
 .income-bar {
   display: flex;
@@ -3220,13 +3249,13 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-style: dashed;
   border-left-style: dashed;
 }
-.plan-card--unplanned {
+.plan-card--breakdown {
   border-left-color: var(--bs-secondary-color);
 }
-.plan-card--unplanned:focus {
+.plan-card--breakdown:focus {
   outline: none;
 }
-.plan-card--unplanned:focus-visible {
+.plan-card--breakdown:focus-visible {
   box-shadow: 0 0 0 3px
     color-mix(in srgb, var(--vantura-primary) 45%, transparent);
 }
@@ -3240,7 +3269,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-radius: 8px;
   font-size: 1.1rem;
 }
-.plan-card__icon--unplanned {
+.plan-card__icon--breakdown {
   background: var(--bs-tertiary-bg);
   color: var(--bs-secondary-color);
 }
@@ -3314,34 +3343,34 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   margin-top: 0.2rem;
   font-size: 0.72rem;
 }
-.plan-unplanned,
-.plan-unplanned__subs {
+.plan-breakdown,
+.plan-breakdown__subs {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.plan-unplanned {
+.plan-breakdown {
   font-size: 0.875rem;
 }
-.plan-unplanned__subs {
+.plan-breakdown__subs {
   padding-left: 1.25rem;
   font-size: 0.78rem;
   color: var(--bs-secondary-color);
 }
-.plan-unplanned__row {
+.plan-breakdown__row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
   min-height: 28px;
 }
-.plan-unplanned__name {
+.plan-breakdown__name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.plan-unplanned__toggle {
+.plan-breakdown__toggle {
   display: inline-flex;
   align-items: center;
   min-width: 0;
@@ -3352,12 +3381,12 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   font: inherit;
   text-align: left;
 }
-.plan-unplanned__chevron {
+.plan-breakdown__chevron {
   margin-left: -0.25rem;
   color: var(--bs-secondary-color);
   transition: transform var(--duration-base) var(--ease-out);
 }
-.plan-unplanned__chevron.is-open {
+.plan-breakdown__chevron.is-open {
   transform: rotate(90deg);
 }
 .plan-card .plan-card__link {

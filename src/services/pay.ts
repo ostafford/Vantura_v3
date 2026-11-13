@@ -7,7 +7,7 @@
  */
 
 import { getAppSetting, setAppSetting } from '@/db'
-import { parseAmountInput } from '@/lib/amountInput'
+import { centsToAmountInput, parseAmountInput } from '@/lib/amountInput'
 import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 /** Shown by both Pay forms when `savePay` refuses the amount. */
@@ -34,14 +34,19 @@ export function savePay(frequency: PayFrequency, amountText: string): boolean {
  * not a Pay frequency) and the amount as a dollars string ('' when unset or
  * not a whole number of cents).
  */
-export function readPaySettings(): {
-  frequency: PayFrequency | null
+/** A pay as a Pay form holds it: the amount as typed and the frequency. */
+export interface PayFormValues {
+  /** Dollars as typed, `''` when empty. */
   amountInput: string
-} {
+  /** `null` when none is chosen. */
+  frequency: PayFrequency | null
+}
+
+export function readPaySettings(): PayFormValues {
   const freq = getAppSetting('payday_frequency')
   const raw = getAppSetting('pay_amount_cents')?.trim() ?? ''
   return {
     frequency: isPayFrequency(freq) ? freq : null,
-    amountInput: /^\d+$/.test(raw) ? (parseInt(raw, 10) / 100).toFixed(2) : '',
+    amountInput: /^\d+$/.test(raw) ? centsToAmountInput(parseInt(raw, 10)) : '',
   }
 }

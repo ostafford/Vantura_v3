@@ -42,7 +42,7 @@ import {
 import { themeStore, resolveTheme } from '@/stores/themeStore'
 import {
   usePlanMonth,
-  usePlanVsActual,
+  usePlanVsActualWithPlan,
 } from '@/components/budgetPlan/usePlanVsActual'
 import {
   BucketPlanCard,
@@ -590,8 +590,9 @@ export function AnalyticsBudgetPlanBucket() {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
-  const planMonth = usePlanMonth()
-  const plan = usePlanVsActual(version, planMonth.month)
+  // A Month without a plan has no buckets, so ‹ stops at the First plannable month.
+  const planMonth = usePlanMonth({ withMonthsWithoutAPlan: false })
+  const plan = usePlanVsActualWithPlan(version, planMonth.month)
   const finished = plan?.state === 'finished'
 
   const [showAddUpcoming, setShowAddUpcoming] = useState(false)
