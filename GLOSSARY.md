@@ -116,15 +116,31 @@ Income minus Actual spending minus Still to go out: where the month ends up if e
 _Avoid_: projected savings, forecast, Headroom, Free spending so far
 
 **Saved**:
-A finished month's Income, taken from its Month-end plan, minus that month's Actual spending. Below zero it's shown as **Overspent**: a positive amount in the over colour. Actuals stay live, so a late sync can still change it. There's no figure when the Month-end plan has no pay. Not Free spending so far, which is for the current month and uses today's pay.
+A finished month's Income minus that month's Actual spending. Income comes from the Month-end plan, or from the Confirmed pay for a Month without a plan. A year's Saved is the sum over its months that have a figure, and is always shown with how many months that covers. Below zero it's shown as **Overspent**: a positive amount in the over colour. Actuals stay live, so a late sync can still change it. A month has no figure when its pay is missing or can't be relied on. Not Free spending so far, which is for the current month and uses today's pay.
 _Avoid_: surplus, leftover, savings, Free spending so far
 
 **Overspent**:
 Saved below zero, shown as a positive amount. See Saved.
 
+**Average Saved**:
+A year's Saved divided by the number of months it covers. Below zero it's shown as Overspent. Always shown with how many months it covers.
+_Avoid_: monthly savings, savings rate
+
 **Month-end plan**:
-The plan as it stood when a calendar month ended: its buckets, its Regulars and their occurrences, its Trackers and the pay. A finished month is judged against it. It never changes afterwards, except that Mark paid can still mark its occurrences paid. Months from before Vantura started keeping them have none.
+The plan as it stood when a calendar month ended: its buckets, its Regulars and their occurrences, its Trackers and the pay. A finished month is judged against it. It never changes afterwards, except that Mark paid can still mark its occurrences paid. Months before the First plannable month have none: see Month without a plan.
 _Avoid_: snapshot, history, archive
+
+**First plannable month**:
+The month Vantura started keeping Month-end plans for you: the month you first opened it with plan keeping in place. Every month from it on has a Month-end plan. Earlier ones are Months without a plan.
+_Avoid_: install month, start month, first month
+
+**Month without a plan**:
+A finished month before the First plannable month. Vantura never kept a plan for it, so it shows Actual spending and spending by category, with no buckets or plan vs actual, and its Saved uses a Confirmed pay. Defined by when it falls, not by a missing plan: a later month whose Month-end plan can't be read is not one, and shows nothing instead.
+_Avoid_: backfilled month, unplanned month, history, earlier month
+
+**Confirmed pay**:
+The Pay amount and Pay frequency you confirm for one Month without a plan, which gives that month its Income. It belongs to that month alone. Changing Settings → Pay never changes it. Without one, the month has no Saved.
+_Avoid_: past pay, historical pay, assumed pay
 
 ### Regulars
 
