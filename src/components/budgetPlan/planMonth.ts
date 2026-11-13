@@ -82,7 +82,7 @@ export function bucketInMonth(
     new URLSearchParams(search).get('month'),
     today,
     getFirstPlannableMonth(),
-    null
+    null // no Months without a plan: the bucket page never shows one
   )
   const name = pm.isCurrent
     ? (getBucket(bucketId)?.name ?? null)

@@ -3,7 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { getFirstPlannableMonth } from '@/services/monthEndPlan'
 import { getMonthsWithoutAPlan } from '@/services/monthsWithoutAPlan'
-import { getPlanVsActual, type PlanVsActual } from '@/services/planVsActual'
+import {
+  getPlanVsActual,
+  type PlanVsActual,
+  type PlanVsActualWithPlan,
+} from '@/services/planVsActual'
 import { syncStore } from '@/stores/syncStore'
 import { todayStore } from '@/stores/todayStore'
 import { resolvePlanMonth, type PlanMonth } from './planMonth'
@@ -15,7 +19,11 @@ import { resolvePlanMonth, type PlanMonth } from './planMonth'
  * back to the opening month (#282): the Budget Plan passes true, the bucket
  * page false, since a Month without a plan has no buckets.
  */
-export function usePlanMonth(withMonthsWithoutAPlan: boolean): PlanMonth {
+export function usePlanMonth({
+  withMonthsWithoutAPlan,
+}: {
+  withMonthsWithoutAPlan: boolean
+}): PlanMonth {
   const today = useStore(todayStore, (s) => s.today)
   const [params] = useSearchParams()
   const requested = params.get('month')
@@ -36,8 +44,8 @@ export function usePlanMonth(withMonthsWithoutAPlan: boolean): PlanMonth {
  * midnight (`todayStore`, #164) and whenever `version` changes (the page
  * bumps it after its own writes). `null` when the read declines: a finished
  * month with no Month-end plan, or the month ticking over mid-read. A Month
- * without a plan (#282) reads as `state: 'no-plan'`; only the Budget Plan
- * reaches one (the bucket page's `usePlanMonth(false)` never does).
+ * without a plan (#282) reads as `state: 'no-plan'`, which only the Budget Plan
+ * reaches; the bucket page reads through `usePlanVsActualWithPlan`.
  */
 export function usePlanVsActual(
   version: number,
@@ -50,4 +58,17 @@ export function usePlanVsActual(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [month, today, lastSyncCompletedAt, version]
   )
+}
+
+/**
+ * `usePlanVsActual` for a page that only shows months with a plan (the
+ * bucket page): a Month without a plan reads as `null`. With
+ * `usePlanMonth({ withMonthsWithoutAPlan: false })` it never gets one.
+ */
+export function usePlanVsActualWithPlan(
+  version: number,
+  month: string
+): PlanVsActualWithPlan | null {
+  const read = usePlanVsActual(version, month)
+  return read?.state === 'no-plan' ? null : read
 }

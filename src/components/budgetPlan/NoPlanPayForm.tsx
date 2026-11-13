@@ -16,19 +16,13 @@ import {
   isPayFrequency,
   type PayFrequency,
 } from '@/lib/payFrequency'
+import type { PayFormValues } from '@/services/pay'
 import {
   INVALID_CONFIRMED_PAY_MESSAGE,
   NO_PAY_FREQUENCY_MESSAGE,
   PAY_NOT_SAVED_MESSAGE,
   payFormError,
 } from './payForm'
-
-export interface PayFormValues {
-  /** Dollars as typed, `''` when empty. */
-  amountInput: string
-  /** `null` leaves the choice empty. */
-  frequency: PayFrequency | null
-}
 
 interface NoPlanPayFormProps {
   initial: PayFormValues

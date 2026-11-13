@@ -1,10 +1,11 @@
 /**
  * The Budget Plan's plan vs actual pieces (#241): the month summary (header,
  * headline, Income bar, legend, figures line), bucket cards with item rows,
- * and the Unplanned card. Layout from #174's resolution: variant C's bar and
- * figures line over variant B's cards. A Month without a plan (#282) has its
- * own summary card, and shows the same breakdown as Spending by category. Every figure comes from
- * `getPlanVsActual` (#240); the display rules are in `./planFormat`.
+ * and the category breakdown card (Unplanned). Layout from #174's resolution:
+ * variant C's bar and figures line over variant B's cards. A Month without a
+ * plan (#282) has its own summary card, and the breakdown card shows its
+ * Spending by category. Every figure comes from `getPlanVsActual` (#240);
+ * the display rules are in `./planFormat`.
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -720,10 +721,10 @@ export function BucketPlanCard({
   )
 }
 
-// ─── Unplanned ───────────────────────────────────────────────────────────────
+// ─── Category breakdown ──────────────────────────────────────────────────────
 
 /** What the breakdown card is showing: a plan's Unplanned, or a Month without a plan's spending. */
-type BreakdownKind = 'unplanned' | 'by-category'
+export type BreakdownKind = 'unplanned' | 'by-category'
 
 const BREAKDOWN = {
   unplanned: {
@@ -744,16 +745,17 @@ const BREAKDOWN = {
 
 /**
  * Spending by Up parent category, subcategory and Uncategorised, folding
- * open per parent. On a plan month it's Unplanned; on a Month without a plan
- * (#282) it's every counted transaction, titled Spending by category, and the
- * word Unplanned never appears.
+ * open per parent. `kind="unplanned"` is a plan month's Unplanned, and the
+ * card the Income bar's unplanned segment jumps to (`UNPLANNED_CARD_ID`).
+ * `kind="by-category"` is a Month without a plan's every counted transaction
+ * (#282), titled Spending by category; the word Unplanned never appears.
  */
-export function UnplannedCard({
-  unplanned,
-  kind = 'unplanned',
+export function CategoryBreakdownCard({
+  breakdown,
+  kind,
 }: {
-  unplanned: Unplanned
-  kind?: BreakdownKind
+  breakdown: Unplanned
+  kind: BreakdownKind
 }) {
   const copy = BREAKDOWN[kind]
   const names = useMemo(
@@ -769,19 +771,20 @@ export function UnplannedCard({
       return next
     })
   const empty =
-    unplanned.parents.length === 0 && unplanned.uncategorisedCents === 0
+    breakdown.parents.length === 0 && breakdown.uncategorisedCents === 0
+  const jumpTarget = kind === 'unplanned'
 
   return (
     <Card
-      id={UNPLANNED_CARD_ID}
-      tabIndex={-1}
-      className="plan-card plan-card--unplanned"
+      id={jumpTarget ? UNPLANNED_CARD_ID : undefined}
+      tabIndex={jumpTarget ? -1 : undefined}
+      className="plan-card plan-card--breakdown"
       data-testid={copy.testId}
     >
       <Card.Body className="py-3">
         <div className="d-flex align-items-center gap-2 mb-1">
           <span
-            className="plan-card__icon plan-card__icon--unplanned"
+            className="plan-card__icon plan-card__icon--breakdown"
             aria-hidden
           >
             <i className={`mdi ${copy.icon}`} />
@@ -791,46 +794,46 @@ export function UnplannedCard({
             className="plan-card__total"
             data-testid={`${copy.testId}-total`}
           >
-            {planMoney(unplanned.totalCents)}
+            {planMoney(breakdown.totalCents)}
           </span>
         </div>
         <div className="plan-muted small mb-2">{copy.caption}</div>
         {empty ? (
           <div className="plan-muted small">{copy.empty}</div>
         ) : (
-          <ul className="plan-unplanned">
-            {unplanned.parents.map((p) => {
+          <ul className="plan-breakdown">
+            {breakdown.parents.map((p) => {
               const name = names.get(p.parentCategoryId) ?? p.parentCategoryId
               const expandable = p.subcategories.length > 0
               const isOpen = open.has(p.parentCategoryId)
               return (
                 <li key={p.parentCategoryId}>
-                  <div className="plan-unplanned__row">
+                  <div className="plan-breakdown__row">
                     {expandable ? (
                       <button
                         type="button"
-                        className="plan-unplanned__toggle"
+                        className="plan-breakdown__toggle"
                         aria-expanded={isOpen}
                         onClick={() => toggle(p.parentCategoryId)}
                       >
                         <i
-                          className={`mdi mdi-chevron-right plan-unplanned__chevron${isOpen ? ' is-open' : ''}`}
+                          className={`mdi mdi-chevron-right plan-breakdown__chevron${isOpen ? ' is-open' : ''}`}
                           aria-hidden
                         />
                         {name}
                       </button>
                     ) : (
-                      <span className="plan-unplanned__name">{name}</span>
+                      <span className="plan-breakdown__name">{name}</span>
                     )}
                     <span className="plan-item__fig">
                       {planMoney(p.totalCents)}
                     </span>
                   </div>
                   {expandable && isOpen && (
-                    <ul className="plan-unplanned__subs">
+                    <ul className="plan-breakdown__subs">
                       {p.subcategories.map((s) => (
-                        <li key={s.categoryId} className="plan-unplanned__row">
-                          <span className="plan-unplanned__name">
+                        <li key={s.categoryId} className="plan-breakdown__row">
+                          <span className="plan-breakdown__name">
                             {names.get(s.categoryId) ?? s.categoryId}
                           </span>
                           <span className="plan-item__fig">
@@ -843,11 +846,11 @@ export function UnplannedCard({
                 </li>
               )
             })}
-            {unplanned.uncategorisedCents !== 0 && (
-              <li className="plan-unplanned__row">
-                <span className="plan-unplanned__name">Uncategorised</span>
+            {breakdown.uncategorisedCents !== 0 && (
+              <li className="plan-breakdown__row">
+                <span className="plan-breakdown__name">Uncategorised</span>
                 <span className="plan-item__fig">
-                  {planMoney(unplanned.uncategorisedCents)}
+                  {planMoney(breakdown.uncategorisedCents)}
                 </span>
               </li>
             )}

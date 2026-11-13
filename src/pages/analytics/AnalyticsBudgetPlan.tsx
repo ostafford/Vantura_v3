@@ -28,7 +28,7 @@ import {
   MonthNav,
   MonthSummaryCard,
   NoPlanSummaryCard,
-  UnplannedCard,
+  CategoryBreakdownCard,
 } from '@/components/budgetPlan/PlanVsActualParts'
 import {
   UNPLANNED_CARD_ID,
@@ -301,7 +301,7 @@ export function AnalyticsBudgetPlan() {
   const [showAssignModal, setShowAssignModal] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
-  const planMonth = usePlanMonth(true)
+  const planMonth = usePlanMonth({ withMonthsWithoutAPlan: true })
   const plan = usePlanVsActual(version, planMonth.month)
   const editable = planMonth.isCurrent
   const nav = <MonthNav planMonth={planMonth} path="/analytics/budget" />
@@ -380,8 +380,8 @@ export function AnalyticsBudgetPlan() {
         />
         <Row className="g-3 mb-4">
           <Col xs={12} sm={6} lg={4}>
-            <UnplannedCard
-              unplanned={plan.spendingByCategory}
+            <CategoryBreakdownCard
+              breakdown={plan.spendingByCategory}
               kind="by-category"
             />
           </Col>
@@ -586,7 +586,7 @@ export function AnalyticsBudgetPlan() {
         )}
 
         <Col xs={12} sm={6} lg={4}>
-          <UnplannedCard unplanned={plan.unplanned} />
+          <CategoryBreakdownCard breakdown={plan.unplanned} kind="unplanned" />
         </Col>
       </Row>
 
