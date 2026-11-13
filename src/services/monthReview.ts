@@ -6,7 +6,8 @@
  *
  * - Only the latest such month is ever shown. Marking it reviewed counts
  *   every earlier month as reviewed too (they stay reachable with ‹).
- * - Its figure is the finished-month read's Saved (`getPlanVsActual`), so the
+ * - Its figure is the finished-month read's Saved (`getFinishedMonthRead`, as
+ *   of the `today` it's given), so the
  *   card and the Budget Plan always agree, and it stays live like Saved does.
  * - In-page only: no OS or push notification, badge, count, history log,
  *   setting or schedule (the cut Notifications feature stays cut).
@@ -15,7 +16,7 @@
 import { getAppSetting, getDb, setAppSetting } from '@/db'
 import { localDateString } from '@/lib/format'
 import { isMonth, readMonthEndPlanRows } from '@/services/monthEndPlan'
-import { getPlanVsActual } from '@/services/planVsActual'
+import { getFinishedMonthRead } from '@/services/planVsActual'
 
 /** `app_settings` key: the last reviewed month, `YYYY-MM`. */
 export const LAST_REVIEWED_MONTH_KEY = 'last_reviewed_month'
@@ -49,7 +50,7 @@ export function getMonthReview(
   const reviewed = getLastReviewedMonth()
   if (reviewed !== null && latest <= reviewed) return null
 
-  const read = getPlanVsActual(latest)
+  const read = getFinishedMonthRead(latest, today)
   if (!read || read.state !== 'finished') return null
   if (read.savedCents === null) return { month: latest, kind: 'no-pay' }
   return read.savedCents < 0

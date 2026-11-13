@@ -93,6 +93,10 @@ describe('getMonthlyIncomeCents', () => {
     ['FORTNIGHTLY', '240000', 520000],
     ['MONTHLY', '500000', 500000],
     ['WEEKLY', '100001', 433338],
+    // 200001 × 26 ÷ 12 is exactly 433335.5. A float multiplier (26/12) gave
+    // 433335.49999999994, which rounded down.
+    ['FORTNIGHTLY', '200001', 433336],
+    ['FORTNIGHTLY', '250005', 541678],
   ])('%s pay of %s cents is %i cents a month', (freq, pay, expected) => {
     appSettings.payday_frequency = freq
     appSettings.pay_amount_cents = pay

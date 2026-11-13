@@ -131,6 +131,18 @@ describe('which month it shows', () => {
     })
   })
 
+  it('reads the month as of the today it was given, not the clock', () => {
+    spend(120000, '2026-10-10')
+    freezeThroughOctober()
+    // The clock says October is still running; the caller says it's 7 November.
+    setToday('2026-10-20')
+    expect(getMonthReview('2026-11-07')).toEqual({
+      month: '2026-10',
+      kind: 'saved',
+      cents: 380000,
+    })
+  })
+
   it('agrees with the Budget Plan’s Saved for that month', () => {
     spend(123456, '2026-10-10')
     freezeThroughOctober()

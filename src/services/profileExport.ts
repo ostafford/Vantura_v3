@@ -21,6 +21,7 @@ import { readPaidMarks } from '@/services/regulars'
 import { localDateString } from '@/lib/format'
 import {
   getFirstPlannableMonth,
+  hasUnreadableMonthEndPlan,
   isMonth,
   parseMonthEndPlanBody,
   readMonthEndPlanRows,
@@ -485,11 +486,23 @@ export async function encryptExportPayload(
 }
 
 /**
- * Export profile to an encrypted file and trigger download.
+ * User-facing error when a stored Month-end plan can't be read. The export is
+ * refused, because a file without that month would let the importing device
+ * re-freeze it from today's plan (`docs/adr/0025`).
+ */
+export const EXPORT_ERROR_UNREADABLE_MONTH_END_PLAN =
+  'A past month’s plan on this device can’t be read, so this profile can’t be exported. Nothing was exported.'
+
+/**
+ * Export profile to an encrypted file and trigger download. Refuses, writing
+ * nothing, when a stored Month-end plan can't be read.
  */
 export async function exportProfile(passphrase: string): Promise<void> {
   const db = getDb()
   if (!db) throw new Error('Database not ready')
+  if (hasUnreadableMonthEndPlan()) {
+    throw new Error(EXPORT_ERROR_UNREADABLE_MONTH_END_PLAN)
+  }
 
   const payload = buildExportPayload()
   const wrapper = await encryptExportPayload(payload, passphrase)

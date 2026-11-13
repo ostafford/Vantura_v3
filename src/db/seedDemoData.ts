@@ -975,7 +975,9 @@ function seedMonthsWithoutAPlan(firstPlannable: string): void {
   run(
     `UPDATE accounts SET created_at = ?, ownership_type = 'INDIVIDUAL'
      WHERE id = ?`,
-    [opened.toISOString(), DEMO_ACCOUNT_ID]
+    // The day leads, as Up's timestamps do: the opening day is read from the
+    // first 10 characters (`monthsWithoutAPlan.ts`).
+    [`${localDateString(opened)}T08:00:00.000Z`, DEMO_ACCOUNT_ID]
   )
   run(`UPDATE accounts SET ownership_type = 'INDIVIDUAL' WHERE id IN (?, ?)`, [
     DEMO_SAVER_ID,

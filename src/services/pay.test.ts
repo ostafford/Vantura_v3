@@ -38,6 +38,17 @@ describe('savePay', () => {
     expect(appSettings.pay_amount_cents).toBe('450000')
     expect(appSettings.payday_frequency).toBe('MONTHLY')
   })
+
+  it.each([['0'], ['0.00'], ['0.004']])(
+    'refuses an amount of %s, which Income would read as no pay',
+    (text) => {
+      appSettings.pay_amount_cents = '450000'
+      appSettings.payday_frequency = 'MONTHLY'
+      expect(savePay('WEEKLY', text)).toBe(false)
+      expect(appSettings.pay_amount_cents).toBe('450000')
+      expect(appSettings.payday_frequency).toBe('MONTHLY')
+    }
+  )
 })
 
 describe('readPaySettings', () => {

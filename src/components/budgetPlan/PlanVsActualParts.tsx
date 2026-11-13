@@ -368,6 +368,8 @@ export function MonthSummaryCard({
             <PlanHeadline {...head} />
 
             <IncomeBar
+              // A different month's bar appears; only a re-read eases.
+              key={plan.month}
               incomeCents={figures.incomeCents}
               segments={segments}
               onShowUnplanned={onShowUnplanned}
@@ -439,6 +441,13 @@ export function NoPlanSummaryCard({
 }: NoPlanSummaryProps) {
   const { figures, confirmedPay } = plan
   const [changingPay, setChangingPay] = useState(false)
+  // A different month closes the change form. The card isn't remounted per
+  // month, because that would also remount ‹ / › and drop keyboard focus.
+  const [shownMonth, setShownMonth] = useState(plan.month)
+  if (shownMonth !== plan.month) {
+    setShownMonth(plan.month)
+    setChangingPay(false)
+  }
   // Closing the change form hands focus back to its toggle.
   const toggleRef = useRef<HTMLButtonElement>(null)
   const returnFocus = useRef(false)
@@ -480,7 +489,11 @@ export function NoPlanSummaryCard({
         {plan.savedCents !== null && segments !== null ? (
           <>
             <PlanHeadline {...savedHeadline(plan.savedCents)} />
-            <IncomeBar incomeCents={figures.incomeCents} segments={segments} />
+            <IncomeBar
+              key={plan.month}
+              incomeCents={figures.incomeCents}
+              segments={segments}
+            />
           </>
         ) : reason !== null ? (
           <div className="plan-set-pay mb-3" data-testid="plan-no-saved">
@@ -489,6 +502,7 @@ export function NoPlanSummaryCard({
           </div>
         ) : (
           <NoPlanPayForm
+            key={plan.month}
             testId="plan-pay-prompt"
             initial={settingsPay}
             submitLabel="Confirm pay for earlier months"

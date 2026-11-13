@@ -9,9 +9,11 @@
  *   `account_type = 'TRANSACTIONAL'` and `ownership_type = 'INDIVIDUAL'`. A
  *   missing ownership type isn't assumed individual. When there isn't exactly
  *   one, there are no Months without a plan.
- * - **Opening month** = the local calendar month of its `created_at`. A
- *   Saver's `created_at` is never used: Up re-uses an underlying account when
- *   a Saver closes.
+ * - **Opening month** = the calendar month of its `created_at` as Up dates
+ *   it: the first 10 characters, the same rule as Display date
+ *   (`displayDay.ts`), so it agrees with the transaction windows whatever
+ *   the device's time zone. A Saver's `created_at` is never used: Up re-uses
+ *   an underlying account when a Saver closes.
  * - **Range** = the opening month through the month before the First
  *   plannable month, with no cap. Empty when the First plannable month is
  *   unset or isn't after the opening month.
@@ -23,8 +25,7 @@
 
 import { getDb } from '@/db'
 import { addMonthsToMonthStr, calendarMonthDayBounds } from '@/lib/dateStr'
-import { localDateString } from '@/lib/format'
-import { displayDayBetweenSql } from '@/services/displayDay'
+import { displayDayBetweenSql, toDayBound } from '@/services/displayDay'
 import { getFirstPlannableMonth } from '@/services/monthEndPlan'
 
 export interface MonthsWithoutAPlan {
@@ -36,7 +37,20 @@ export interface MonthsWithoutAPlan {
   lastMonth: string
 }
 
-/** The Spending account's opening day (local), or `null` when unknown. */
+/** True when `day` is a real calendar day, `YYYY-MM-DD`. */
+function isDay(day: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  if (!match) return false
+  const [y, m, d] = match.slice(1).map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() === m - 1 &&
+    date.getUTCDate() === d
+  )
+}
+
+/** The Spending account's opening day as Up dates it, or `null` when unknown. */
 function spendingAccountOpeningDate(): string | null {
   const db = getDb()
   if (!db) return null
@@ -48,8 +62,8 @@ function spendingAccountOpeningDate(): string | null {
   )
   const values = rows[0]?.values ?? []
   if (values.length !== 1) return null
-  const opened = new Date(String(values[0][0]))
-  return Number.isNaN(opened.getTime()) ? null : localDateString(opened)
+  const day = toDayBound(String(values[0][0]))
+  return isDay(day) ? day : null
 }
 
 /** The range of Months without a plan, or `null` when it's empty. */

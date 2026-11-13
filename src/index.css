@@ -3573,7 +3573,30 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 .plan-month-nav__chevron:active {
   transform: scale(0.94);
 }
-.plan-month-nav__chevron:focus-visible {
+/* A 44px-tall hit area on one-line text controls, as the chevrons' ::before:
+   invisible, so the layout and the focus ring stay on the text itself. */
+.plan-change-pay-toggle,
+.plan-legend__item--button,
+.plan-mark-paid {
+  position: relative;
+}
+.plan-change-pay-toggle::before,
+.plan-legend__item--button::before,
+.plan-mark-paid::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 44px;
+  margin-top: -22px;
+}
+.plan-month-nav__chevron:focus-visible,
+.plan-change-pay-toggle:focus-visible,
+.plan-legend__item--button:focus-visible,
+.plan-breakdown__toggle:focus-visible,
+.plan-mark-paid:focus-visible,
+.mbm-year__toggle:focus-visible {
   outline: 2px solid var(--vantura-primary-text);
   outline-offset: 2px;
 }

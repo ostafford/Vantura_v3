@@ -17,7 +17,8 @@ import { resolvePlanMonth, type PlanMonth } from './planMonth'
  * ‹ / › go (`resolvePlanMonth`). Follows the day signal, so a page left open
  * across a month end moves on with it. `withMonthsWithoutAPlan` lets ‹ reach
  * back to the opening month (#282): the Budget Plan passes true, the bucket
- * page false, since a Month without a plan has no buckets.
+ * page false, since a Month without a plan has no buckets. Re-reads after a
+ * sync too.
  */
 export function usePlanMonth({
   withMonthsWithoutAPlan,
@@ -25,6 +26,9 @@ export function usePlanMonth({
   withMonthsWithoutAPlan: boolean
 }): PlanMonth {
   const today = useStore(todayStore, (s) => s.today)
+  // The range reads `accounts`, which a sync can change (the first sync after
+  // an import creates the Spending account), so it re-reads after one.
+  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   const [params] = useSearchParams()
   const requested = params.get('month')
   return useMemo(
@@ -35,7 +39,8 @@ export function usePlanMonth({
         getFirstPlannableMonth(),
         withMonthsWithoutAPlan ? getMonthsWithoutAPlan() : null
       ),
-    [requested, today, withMonthsWithoutAPlan]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [requested, today, withMonthsWithoutAPlan, lastSyncCompletedAt]
   )
 }
 
