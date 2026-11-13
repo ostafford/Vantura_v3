@@ -1,86 +1,35 @@
-import {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
-import { useStore } from 'zustand'
 import {
   getMonthByMonth,
-  type MonthByMonth,
-  type MonthByMonthMonth,
   type MonthByMonthYear,
+  type MonthResult,
 } from '@/services/monthByMonth'
-import { syncStore } from '@/stores/syncStore'
-import { todayStore } from '@/stores/todayStore'
 import { monthLabel } from './planFormat'
 import {
+  chartScale,
   columnName,
   monthFigure,
   shortMonth,
-  toneOf,
   yearAverage,
   yearCoverage,
+  yearLabelAt,
   yearTitle,
   yearTotal,
 } from './monthByMonthFormat'
-
-/**
- * The Month by month read, re-read after a sync, at local midnight and
- * whenever `version` changes (the page bumps it after its own writes).
- */
-function useMonthByMonth(version: number): MonthByMonth | null {
-  const today = useStore(todayStore, (s) => s.today)
-  const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
-  return useMemo(
-    () => getMonthByMonth(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [today, lastSyncCompletedAt, version]
-  )
-}
+import { useBudgetPlanRead } from './usePlanVsActual'
 
 const monthHref = (month: string) => `/analytics/budget?month=${month}`
-
-/** Brings the page back to the top, where the opened month's summary is. */
-function scrollToTop() {
-  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
-}
-
-/**
- * The column chart's shared scale: one cents-to-height ratio for Saved
- * (above the baseline) and Overspent (below it). The baseline sits where the
- * largest Saved and largest Overspent just fit, so the largest absolute
- * figure fills its side.
- */
-function chartScale(months: MonthByMonthMonth[]) {
-  let up = 0
-  let down = 0
-  for (const m of months) {
-    if (m.savedCents === null) continue
-    if (m.savedCents > 0) up = Math.max(up, m.savedCents)
-    else down = Math.max(down, -m.savedCents)
-  }
-  const span = up + down
-  return {
-    /** The baseline's distance from the top, as a fraction of the plot. */
-    baseline: span === 0 ? 1 : up / span,
-    /** A figure's height, as a fraction of the plot. */
-    height: (cents: number) => (span === 0 ? 0 : Math.abs(cents) / span),
-  }
-}
 
 function Chart({
   months,
   selected,
-  onTap,
+  onColumnTap,
 }: {
-  months: MonthByMonthMonth[]
+  months: MonthResult[]
   selected: readonly string[]
-  onTap: (month: string) => void
+  onColumnTap: (month: string) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   // Open at the newest month, before first paint, with no animation.
@@ -104,13 +53,11 @@ function Chart({
         {months.map((m, i) => {
           const { tone } = monthFigure(m)
           const isSelected = selected.includes(m.month)
-          const yearStart = i === 0 || m.month.endsWith('-01')
-          const barHeight =
-            m.savedCents === null ? 0 : scale.height(m.savedCents)
+          const yearLabel = yearLabelAt(months, i)
           return (
             <li
               key={m.month}
-              className={`mbm-chart__month${yearStart ? ' is-year-start' : ''}`}
+              className={`mbm-chart__month${yearLabel ? ' is-year-start' : ''}`}
             >
               <button
                 type="button"
@@ -120,13 +67,13 @@ function Chart({
                 data-tone={tone}
                 aria-label={columnName(m)}
                 aria-pressed={isSelected}
-                onClick={() => onTap(m.month)}
+                onClick={() => onColumnTap(m.month)}
               >
                 <span className="mbm-col__plot" aria-hidden>
-                  {tone !== 'none' && m.savedCents !== 0 && (
+                  {m.savedCents !== null && m.savedCents !== 0 && (
                     <span
                       className="mbm-col__bar"
-                      style={{ height: `${barHeight * 100}%` }}
+                      style={{ height: `${scale.height(m.savedCents) * 100}%` }}
                     />
                   )}
                 </span>
@@ -135,7 +82,7 @@ function Chart({
                 </span>
               </button>
               <span className="mbm-chart__year" aria-hidden>
-                {yearStart ? m.month.slice(0, 4) : ''}
+                {yearLabel ?? ''}
               </span>
             </li>
           )
@@ -145,33 +92,24 @@ function Chart({
   )
 }
 
-function SelectionLine({
-  month,
-  onOpen,
-}: {
-  month: MonthByMonthMonth | null
-  onOpen: () => void
-}) {
+function SelectionLine({ month }: { month: MonthResult | null }) {
+  const figure = month === null ? null : monthFigure(month)
   return (
     <p
-      className="mbm-selection small mb-0"
+      className="mbm-selection small"
       data-testid="month-by-month-selection"
       aria-live="polite"
     >
-      {month === null ? (
+      {month === null || figure === null ? (
         <span className="plan-muted">Tap a month to see it</span>
       ) : (
         <>
           {monthLabel(month.month)} ·{' '}
-          <span className={`mbm-fig mbm-fig--${monthFigure(month).tone}`}>
-            {monthFigure(month).text}
+          <span className={`mbm-fig mbm-fig--${figure.tone}`}>
+            {figure.text}
           </span>{' '}
           ·{' '}
-          <Link
-            to={monthHref(month.month)}
-            className="plan-link"
-            onClick={onOpen}
-          >
+          <Link to={monthHref(month.month)} className="plan-link">
             Open
           </Link>
         </>
@@ -201,17 +139,15 @@ function YearRow({ year }: { year: MonthByMonthYear }) {
             {yearTitle(year)}
           </span>
           {total && (
-            <span className={`mbm-fig mbm-fig--${toneOf(year.totalCents)}`}>
-              {total}
+            <span className={`mbm-fig mbm-fig--${total.tone}`}>
+              {total.text}
             </span>
           )}
         </span>
         <span className="mbm-year__sub plan-muted small">
           {average && (
-            <span
-              className={`mbm-fig mbm-fig--${toneOf(year.averageSavedCents)}`}
-            >
-              {average}
+            <span className={`mbm-fig mbm-fig--${average.tone}`}>
+              {average.text}
             </span>
           )}
           <span>{yearCoverage(year)}</span>
@@ -227,7 +163,6 @@ function YearRow({ year }: { year: MonthByMonthYear }) {
                   to={monthHref(m.month)}
                   className="mbm-row text-decoration-none"
                   data-testid="month-by-month-row"
-                  onClick={scrollToTop}
                 >
                   <span className="mbm-row__name">
                     {monthLabel(m.month)}
@@ -249,7 +184,7 @@ function YearRow({ year }: { year: MonthByMonthYear }) {
  * Saved or Overspent as one scrolling column chart, then a row per calendar
  * year with its total and Average Saved, folding open to its months. The last
  * card on the Budget Plan, on every month it shows; hidden with no finished
- * month.
+ * month. Re-read after a sync, at local midnight and after the page's writes.
  *
  * Colour: Saved is green and Overspent red, on the columns and on the card's
  * figures. A deliberate exception, for this card only, to the Budget Plan's
@@ -260,20 +195,22 @@ function YearRow({ year }: { year: MonthByMonthYear }) {
  * the month.
  */
 export function MonthByMonthCard({ version }: { version: number }) {
-  const read = useMonthByMonth(version)
+  const monthByMonth = useBudgetPlanRead(getMonthByMonth, version)
   const navigate = useNavigate()
-  const [selected, setSelected] = useState<readonly string[]>([])
-  if (read === null) return null
+  const [picked, setPicked] = useState<readonly string[]>([])
+  if (monthByMonth === null) return null
 
-  const selectedMonth = read.months.find((m) => m.month === selected[0]) ?? null
+  // A picked month that's no longer on the card (a re-read moved the range)
+  // drops out, so nothing stays dimmed with no month selected.
+  const selected = picked.filter((month) =>
+    monthByMonth.months.some((m) => m.month === month)
+  )
+  const selectedMonth =
+    monthByMonth.months.find((m) => m.month === selected[0]) ?? null
 
-  function tap(month: string) {
-    if (selected.includes(month)) {
-      navigate(monthHref(month))
-      scrollToTop()
-    } else {
-      setSelected([month])
-    }
+  function onColumnTap(month: string) {
+    if (selected.includes(month)) navigate(monthHref(month))
+    else setPicked([month])
   }
 
   return (
@@ -283,10 +220,14 @@ export function MonthByMonthCard({ version }: { version: number }) {
         <div className="plan-muted small mb-2">
           What each finished month saved or overspent.
         </div>
-        <Chart months={read.months} selected={selected} onTap={tap} />
-        <SelectionLine month={selectedMonth} onOpen={scrollToTop} />
+        <Chart
+          months={monthByMonth.months}
+          selected={selected}
+          onColumnTap={onColumnTap}
+        />
+        <SelectionLine month={selectedMonth} />
         <ul className="mbm-years">
-          {read.years.map((y) => (
+          {monthByMonth.years.map((y) => (
             <YearRow key={y.year} year={y} />
           ))}
         </ul>

@@ -367,8 +367,6 @@ export function AnalyticsBudgetPlan() {
     />
   )
 
-  // #282 — a Month without a plan: its summary and Spending by category only.
-  // No buckets, Not in a bucket or Add bucket, and nothing to edit.
   // #282 — Month by month is the last card on every month the page shows. It
   // sits after the month's own cards at one place in the tree, so stepping
   // between months keeps its selection and scroll.
@@ -379,6 +377,8 @@ export function AnalyticsBudgetPlan() {
     </div>
   )
 
+  // #282 — a Month without a plan: its summary and Spending by category only.
+  // No buckets, Not in a bucket or Add bucket, and nothing to edit.
   if (plan?.state === 'no-plan') {
     return page(
       <>

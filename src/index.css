@@ -3696,7 +3696,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
    Saved is green and Overspent red, on columns and figures: a deliberate
    exception, for this card only, to the Budget Plan's "colour is for over
    only" rule (#174). Nothing animates on first paint; selection dims the other
-   columns with a short opacity change. */
+   columns with a short opacity change (--duration-fast, the token nearest the
+   spec's ~150ms). */
 .mbm-chart {
   --mbm-plot: 120px;
   overflow-x: auto;
@@ -3747,8 +3748,8 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   color: inherit;
   font: inherit;
   transition:
-    opacity 150ms var(--ease-out),
-    background-color var(--duration-fast) ease;
+    opacity var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
 .mbm-col:focus {
@@ -3818,7 +3819,7 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 }
 .mbm-selection {
   min-height: 1.5rem;
-  margin-bottom: 0.5rem !important;
+  margin-bottom: 0.5rem;
 }
 .mbm-fig {
   font-variant-numeric: tabular-nums;

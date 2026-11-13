@@ -1,15 +1,15 @@
 /**
- * Copy for the Month by month card (#282, slice 3): a month's figure or the
- * reason it has none, the chart's labels and the year rows' lines.
+ * Copy and geometry for the Month by month card (#282, slice 3): a month's
+ * figure or the reason it has none, the chart's scale and labels, and the
+ * year rows' lines.
  */
 
 import type {
-  MonthByMonthMonth,
   MonthByMonthReason,
   MonthByMonthYear,
+  MonthResult,
 } from '@/services/monthByMonth'
-import { planMoney } from './planFormat'
-import { monthLabel } from './planFormat'
+import { monthLabel, planMoney, savedHeadline } from './planFormat'
 
 /** Saved, Overspent, or no figure. */
 export type MonthTone = 'saved' | 'over' | 'none'
@@ -22,24 +22,57 @@ const REASON: Record<MonthByMonthReason, string> = {
   'plan-unreadable': 'Plan can’t be read',
 }
 
-/** "Saved $1.00" / "Overspent $1.00" for a signed Saved figure. */
-function savedOrOverspent(cents: number, prefix = ''): string {
-  return cents < 0
-    ? `${prefix}Overspent ${planMoney(-cents)}`
-    : `${prefix}Saved ${planMoney(cents)}`
+/**
+ * A signed Saved figure as "Saved $1.00" / "Overspent $1.00" (with an
+ * optional prefix) and its tone, or no figure when `null`.
+ */
+function signedFigure(
+  cents: number | null,
+  prefix = ''
+): { text: string; tone: MonthTone } | null {
+  if (cents === null) return null
+  const { label, cents: amount, over } = savedHeadline(cents)
+  return {
+    text: `${prefix}${label} ${planMoney(amount)}`,
+    tone: over ? 'over' : 'saved',
+  }
 }
 
 /** A month's figure ("Saved $397.65", "Overspent $12.00") or its reason. */
-export function monthFigure(m: MonthByMonthMonth): {
+export function monthFigure(m: MonthResult): {
   text: string
   tone: MonthTone
 } {
-  if (m.savedCents === null) {
-    return { text: m.reason ? REASON[m.reason] : '', tone: 'none' }
-  }
+  return (
+    signedFigure(m.savedCents) ?? {
+      text: m.reason ? REASON[m.reason] : '',
+      tone: 'none',
+    }
+  )
+}
+
+/**
+ * The chart's one shared scale (#282): the largest absolute figure across
+ * every month fills its side of the baseline. With Saved and Overspent months
+ * both present, the baseline is in the middle and each side is half the plot;
+ * with only one sign, that side has the whole plot.
+ */
+export function chartScale(months: MonthResult[]): {
+  /** The baseline's distance from the top, as a fraction of the plot. */
+  baseline: number
+  /** A figure's bar height, as a fraction of the plot. */
+  height: (cents: number) => number
+} {
+  const figures = months.flatMap((m) =>
+    m.savedCents === null ? [] : [m.savedCents]
+  )
+  const largest = Math.max(0, ...figures.map(Math.abs))
+  const saved = figures.some((c) => c > 0)
+  const overspent = figures.some((c) => c < 0)
+  const side = saved && overspent ? 0.5 : 1
   return {
-    text: savedOrOverspent(m.savedCents),
-    tone: m.savedCents < 0 ? 'over' : 'saved',
+    baseline: overspent ? 1 - side : 1,
+    height: (cents) => (largest === 0 ? 0 : (Math.abs(cents) / largest) * side),
   }
 }
 
@@ -67,8 +100,18 @@ export function shortMonth(month: string): string {
   return SHORT_MONTHS[Number(month.slice(5, 7)) - 1] ?? ''
 }
 
+/**
+ * The year label under the chart's column `i` ("2026"): at the first month
+ * and at each January, where a divider starts the year. `null` elsewhere.
+ */
+export function yearLabelAt(months: MonthResult[], i: number): string | null {
+  const m = months[i]?.month
+  if (m === undefined) return null
+  return i === 0 || m.endsWith('-01') ? m.slice(0, 4) : null
+}
+
 /** A column's accessible name: "October 2026: Saved $397.65", or the reason. */
-export function columnName(m: MonthByMonthMonth): string {
+export function columnName(m: MonthResult): string {
   return `${monthLabel(m.month)}: ${monthFigure(m).text}`
 }
 
@@ -77,7 +120,8 @@ export function yearTitle(y: MonthByMonthYear): string {
   return y.soFar ? `${y.year} so far` : y.year
 }
 
-const months = (n: number) => `${n} ${n === 1 ? 'month' : 'months'}`
+/** "1 month", "3 months". */
+const monthCount = (n: number) => `${n} ${n === 1 ? 'month' : 'months'}`
 
 /**
  * What a year's total covers: "across 9 of 12 months · 3 not counted",
@@ -85,25 +129,17 @@ const months = (n: number) => `${n} ${n === 1 ? 'month' : 'months'}`
  */
 export function yearCoverage(y: MonthByMonthYear): string {
   const all = y.countedMonths + y.notCountedMonths
-  if (y.countedMonths === 0) return `No total · ${months(all)} not counted`
-  if (y.notCountedMonths === 0) return `across ${months(all)}`
-  return `across ${y.countedMonths} of ${months(all)} · ${y.notCountedMonths} not counted`
+  if (y.countedMonths === 0) return `No total · ${monthCount(all)} not counted`
+  if (y.notCountedMonths === 0) return `across ${monthCount(all)}`
+  return `across ${y.countedMonths} of ${monthCount(all)} · ${y.notCountedMonths} not counted`
+}
+
+/** The year's total, "Saved $1.00" / "Overspent $1.00", or `null`. */
+export function yearTotal(y: MonthByMonthYear) {
+  return signedFigure(y.totalCents)
 }
 
 /** "Average Saved $1.00" / "Average Overspent $1.00", or `null`. */
-export function yearAverage(y: MonthByMonthYear): string | null {
-  return y.averageSavedCents === null
-    ? null
-    : savedOrOverspent(y.averageSavedCents, 'Average ')
-}
-
-/** The year's total as "Saved $1.00" / "Overspent $1.00", or `null`. */
-export function yearTotal(y: MonthByMonthYear): string | null {
-  return y.totalCents === null ? null : savedOrOverspent(y.totalCents)
-}
-
-/** A year's total or average tone. */
-export function toneOf(cents: number | null): MonthTone {
-  if (cents === null) return 'none'
-  return cents < 0 ? 'over' : 'saved'
+export function yearAverage(y: MonthByMonthYear) {
+  return signedFigure(y.averageSavedCents, 'Average ')
 }

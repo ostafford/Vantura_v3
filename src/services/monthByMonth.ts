@@ -37,7 +37,7 @@ export type MonthByMonthReason =
   /** A plan month with no readable Month-end plan. */
   | 'plan-unreadable'
 
-export interface MonthByMonthMonth {
+export interface MonthResult {
   /** `YYYY-MM`. */
   month: string
   /** A Month without a plan. */
@@ -54,7 +54,7 @@ export interface MonthByMonthYear {
   /** The current year, covering only its finished months. */
   soFar: boolean
   /** The year's months on the card, newest first. */
-  months: MonthByMonthMonth[]
+  months: MonthResult[]
   /** Months with a figure. */
   countedMonths: number
   /** Months without one. */
@@ -67,7 +67,7 @@ export interface MonthByMonthYear {
 
 export interface MonthByMonth {
   /** Every finished month on the card, oldest first. */
-  months: MonthByMonthMonth[]
+  months: MonthResult[]
   /** One per calendar year, newest first. */
   years: MonthByMonthYear[]
 }
@@ -78,7 +78,7 @@ export function divideHalfAwayFromZero(total: number, count: number): number {
   return total < 0 ? -magnitude : magnitude
 }
 
-function readMonth(month: string, today: string): MonthByMonthMonth {
+function readMonth(month: string, today: string): MonthResult {
   const read = getFinishedMonthRead(month, today)
   if (read === null) {
     return { month, noPlan: false, savedCents: null, reason: 'plan-unreadable' }
@@ -101,7 +101,7 @@ function readMonth(month: string, today: string): MonthByMonthMonth {
 
 function summariseYear(
   year: string,
-  months: MonthByMonthMonth[],
+  months: MonthResult[],
   soFar: boolean
 ): MonthByMonthYear {
   const counted = months.flatMap((m) =>
@@ -131,12 +131,12 @@ export function getMonthByMonth(): MonthByMonth | null {
     getMonthsWithoutAPlan()?.firstMonth ?? getFirstPlannableMonth() ?? null
   if (start === null || start >= currentMonth) return null
 
-  const months: MonthByMonthMonth[] = []
+  const months: MonthResult[] = []
   for (let m = start; m < currentMonth; m = addMonthsToMonthStr(m, 1)) {
     months.push(readMonth(m, today))
   }
 
-  const byYear = new Map<string, MonthByMonthMonth[]>()
+  const byYear = new Map<string, MonthResult[]>()
   for (const m of months) {
     const year = m.month.slice(0, 4)
     byYear.set(year, [...(byYear.get(year) ?? []), m])
