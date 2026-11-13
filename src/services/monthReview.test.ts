@@ -116,8 +116,42 @@ afterEach(() => {
 })
 
 describe('which month it shows', () => {
-  it('shows nothing before any month has a Month-end plan', () => {
+  it('shows nothing while the First plannable month is this month', () => {
+    // October is then a Month without a plan, which never gets one.
+    set('first_plannable_month', '2026-11')
+    expect(getPlanVsActual('2026-10')?.state).toBe('no-plan')
     expect(getMonthReview()).toBeNull()
+  })
+
+  it('shows nothing without a First plannable month', () => {
+    db.run(`DELETE FROM app_settings WHERE key = 'first_plannable_month'`)
+    expect(getMonthReview()).toBeNull()
+  })
+
+  it('offers the latest finished month when its plan can’t be read (#288)', () => {
+    spend(100000, '2026-09-10')
+    freezeThroughOctober()
+    db.run(`UPDATE month_end_plans SET plan_json = '{' WHERE month = '2026-10'`)
+    // September's plan reads fine, but October is the latest finished month.
+    expect(getMonthReview()).toEqual({
+      month: '2026-10',
+      kind: 'plan-unreadable',
+    })
+  })
+
+  it('marking an unreadable month reviewed covers every earlier one (#288)', () => {
+    freezeThroughOctober()
+    db.run(`UPDATE month_end_plans SET plan_json = '{' WHERE month = '2026-10'`)
+    markMonthReviewed('2026-10')
+    expect(getMonthReview()).toBeNull()
+  })
+
+  it('offers the latest finished month when it has no Month-end plan', () => {
+    // Freeze hasn't run: October has no row, so its plan can't be read.
+    expect(getMonthReview()).toEqual({
+      month: '2026-10',
+      kind: 'plan-unreadable',
+    })
   })
 
   it('shows the latest unreviewed finished month only', () => {
