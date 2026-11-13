@@ -53,7 +53,7 @@
  * Computed on every call. Nothing is cached.
  */
 
-import { calendarMonthDayBounds } from '@/lib/dateStr'
+import { addMonthsToMonthStr, calendarMonthDayBounds } from '@/lib/dateStr'
 import {
   getBuckets,
   getMonthlyIncomeCents,
@@ -235,6 +235,8 @@ export interface PlanVsActualNoPlan {
   daysInMonth: number
   /** The Spending account's opening day, local `YYYY-MM-DD`. */
   openingDate: string
+  /** The month after the last Month without a plan, `YYYY-MM`. */
+  firstPlannableMonth: string
   figures: {
     /** From the Confirmed pay; `null` without one. */
     incomeCents: number | null
@@ -452,6 +454,7 @@ function readNoPlan(
     today,
     daysInMonth: daysIn(month),
     openingDate: range.openingDate,
+    firstPlannableMonth: addMonthsToMonthStr(range.lastMonth, 1),
     figures: { incomeCents: income, actualCents },
     spendingByCategory: attribution.unplanned,
     confirmedPay: pay,

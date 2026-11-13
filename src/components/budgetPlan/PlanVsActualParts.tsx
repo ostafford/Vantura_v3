@@ -2,7 +2,8 @@
  * The Budget Plan's plan vs actual pieces (#241): the month summary (header,
  * headline, Income bar, legend, figures line), bucket cards with item rows,
  * and the Unplanned card. Layout from #174's resolution: variant C's bar and
- * figures line over variant B's cards. Every figure comes from
+ * figures line over variant B's cards. A Month without a plan (#282) has its
+ * own summary card, and shows the same breakdown as Spending by category. Every figure comes from
  * `getPlanVsActual` (#240); the display rules are in `./planFormat`.
  */
 
@@ -11,7 +12,11 @@ import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
 import { formatShortDate } from '@/lib/format'
 import { getCategoriesWithParent } from '@/services/categories'
-import type { PlanItem, PlanVsActualWithPlan } from '@/services/planVsActual'
+import type {
+  PlanItem,
+  PlanVsActualNoPlan,
+  PlanVsActualWithPlan,
+} from '@/services/planVsActual'
 import type { Unplanned } from '@/services/monthAttribution'
 import {
   UNPLANNED_CARD_ID,
@@ -20,9 +25,14 @@ import {
   markPaidDate,
   monthLabel,
   monthProgress,
+  NO_PLAN_NOTE,
+  noPlanBarSegments,
+  noSavedLine,
+  payPromptTitle,
   planMoney,
   savedHeadline,
   stateLine,
+  type IncomeSegment,
   type PlanTone,
 } from './planFormat'
 import { planMonthSearch, type PlanMonth } from './planMonth'
@@ -155,6 +165,7 @@ export function MonthNav({
 // ─── Month summary ───────────────────────────────────────────────────────────
 
 const SEGMENT_CLASS = {
+  actual: 'income-bar__seg--on-plan',
   'on-plan': 'income-bar__seg--on-plan',
   unplanned: 'income-bar__seg--unplanned',
   'to-go': 'income-bar__seg--to-go',
@@ -216,6 +227,96 @@ function NoPayInPlan({ month }: { month: string }) {
   )
 }
 
+/** The month's big figure and its label; red when over. */
+function PlanHeadline({
+  cents,
+  label,
+  over,
+}: {
+  cents: number | null
+  label: string
+  over: boolean
+}) {
+  return (
+    <div className="d-flex align-items-baseline gap-2 flex-wrap mb-3">
+      <span
+        className={`plan-headline${over ? ' plan-over' : ''}`}
+        data-testid="plan-headline"
+      >
+        {planMoney(cents)}
+      </span>
+      <span className="plan-muted" data-testid="plan-headline-label">
+        {label}
+      </span>
+    </div>
+  )
+}
+
+/** The Income bar and its legend; the unplanned segment scrolls to its card. */
+function IncomeBar({
+  incomeCents,
+  segments,
+  onShowUnplanned,
+}: {
+  incomeCents: number | null
+  segments: IncomeSegment[]
+  onShowUnplanned?: () => void
+}) {
+  return (
+    <>
+      <div
+        className="income-bar"
+        role="img"
+        aria-label={`Income ${planMoney(incomeCents)}: ${segments
+          .map((s) => `${s.label} ${planMoney(s.shownCents)}`)
+          .join(', ')}`}
+        data-testid="income-bar"
+      >
+        {segments.map((s) => (
+          <div
+            key={s.key}
+            className={`income-bar__seg ${SEGMENT_CLASS[s.key]}`}
+            style={{ flexBasis: `${s.widthPct}%` }}
+            data-segment={s.key}
+            onClick={s.key === 'unplanned' ? onShowUnplanned : undefined}
+            aria-hidden
+          />
+        ))}
+      </div>
+      <div className="plan-legend">
+        {segments.map((s) => {
+          const content = (
+            <>
+              <span
+                className={`plan-legend__swatch ${SEGMENT_CLASS[s.key]}`}
+                aria-hidden
+              />
+              <span className="plan-legend__name">{s.label}</span>
+              <span className={`plan-legend__fig${s.over ? ' plan-over' : ''}`}>
+                {planMoney(s.shownCents)}
+              </span>
+            </>
+          )
+          return s.key === 'unplanned' && onShowUnplanned ? (
+            <button
+              key={s.key}
+              type="button"
+              className="plan-legend__item plan-legend__item--button"
+              onClick={onShowUnplanned}
+            >
+              {content}
+            </button>
+          ) : (
+            <span key={s.key} className="plan-legend__item">
+              {content}
+            </span>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 export function MonthSummaryCard({
   plan,
   nav,
@@ -255,69 +356,13 @@ export function MonthSummaryCard({
           )
         ) : (
           <>
-            <div className="d-flex align-items-baseline gap-2 flex-wrap mb-3">
-              <span
-                className={`plan-headline${head.over ? ' plan-over' : ''}`}
-                data-testid="plan-headline"
-              >
-                {planMoney(head.cents)}
-              </span>
-              <span className="plan-muted" data-testid="plan-headline-label">
-                {head.label}
-              </span>
-            </div>
+            <PlanHeadline {...head} />
 
-            <div
-              className="income-bar"
-              role="img"
-              aria-label={`Income ${planMoney(figures.incomeCents)}: ${segments
-                .map((s) => `${s.label} ${planMoney(s.shownCents)}`)
-                .join(', ')}`}
-              data-testid="income-bar"
-            >
-              {segments.map((s) => (
-                <div
-                  key={s.key}
-                  className={`income-bar__seg ${SEGMENT_CLASS[s.key]}`}
-                  style={{ flexBasis: `${s.widthPct}%` }}
-                  data-segment={s.key}
-                  onClick={s.key === 'unplanned' ? onShowUnplanned : undefined}
-                  aria-hidden
-                />
-              ))}
-            </div>
-            <div className="plan-legend">
-              {segments.map((s) => {
-                const content = (
-                  <>
-                    <span
-                      className={`plan-legend__swatch ${SEGMENT_CLASS[s.key]}`}
-                      aria-hidden
-                    />
-                    <span className="plan-legend__name">{s.label}</span>
-                    <span
-                      className={`plan-legend__fig${s.over ? ' plan-over' : ''}`}
-                    >
-                      {planMoney(s.shownCents)}
-                    </span>
-                  </>
-                )
-                return s.key === 'unplanned' ? (
-                  <button
-                    key={s.key}
-                    type="button"
-                    className="plan-legend__item plan-legend__item--button"
-                    onClick={onShowUnplanned}
-                  >
-                    {content}
-                  </button>
-                ) : (
-                  <span key={s.key} className="plan-legend__item">
-                    {content}
-                  </span>
-                )
-              })}
-            </div>
+            <IncomeBar
+              incomeCents={figures.incomeCents}
+              segments={segments}
+              onShowUnplanned={onShowUnplanned}
+            />
             {plan.state === 'in-progress' &&
               plan.bar.stillToGoOutCents === null && (
                 <div className="plan-muted small mt-2">
@@ -353,6 +398,89 @@ export function MonthSummaryCard({
             {finished ? 'Actual' : 'Actual so far'}{' '}
             <strong>{planMoney(figures.actualCents)}</strong>
           </span>
+        </div>
+      </Card.Body>
+    </Card>
+  )
+}
+
+// ─── Month without a plan ────────────────────────────────────────────────────
+
+interface NoPlanSummaryProps {
+  plan: PlanVsActualNoPlan
+  /** The month name with its chevrons. */
+  nav: ReactNode
+  /** Help popover beside the month. */
+  aside?: ReactNode
+}
+
+/**
+ * A Month without a plan's summary (#282): Saved or Overspent, or the reason
+ * there isn't one (the pay prompt when no pay is confirmed); the bar,
+ * Actual spending · Saved, only with a Saved; Income · Actual; and a note
+ * that the month has no plan.
+ */
+export function NoPlanSummaryCard({ plan, nav, aside }: NoPlanSummaryProps) {
+  const { figures } = plan
+  const segments = noPlanBarSegments(
+    figures.incomeCents,
+    figures.actualCents,
+    plan.savedCents
+  )
+  const reason =
+    plan.noSavedReason === null
+      ? null
+      : noSavedLine(plan.noSavedReason, plan.openingDate)
+
+  return (
+    <Card className="mb-3" data-testid="plan-summary">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap min-w-0">
+            {nav}
+            <span className="plan-muted small" data-testid="plan-progress">
+              Month finished
+            </span>
+          </div>
+          <div className="flex-shrink-0">{aside}</div>
+        </div>
+
+        {plan.savedCents !== null && segments !== null ? (
+          <>
+            <PlanHeadline {...savedHeadline(plan.savedCents)} />
+            <IncomeBar incomeCents={figures.incomeCents} segments={segments} />
+          </>
+        ) : reason !== null ? (
+          <div className="plan-set-pay mb-3" data-testid="plan-no-saved">
+            <i className="mdi mdi-information-outline me-2" aria-hidden />
+            <span>{reason}</span>
+          </div>
+        ) : (
+          <div className="plan-set-pay mb-3" data-testid="plan-pay-prompt">
+            <i className="mdi mdi-cash me-2" aria-hidden />
+            <span>{payPromptTitle(plan.firstPlannableMonth)}</span>
+          </div>
+        )}
+
+        <hr className="my-3" />
+        <div className="plan-figures" data-testid="plan-figures">
+          <span>
+            Income{' '}
+            {figures.incomeCents === null ? (
+              <span>not confirmed</span>
+            ) : (
+              <strong>{planMoney(figures.incomeCents)}</strong>
+            )}
+          </span>
+          <span>
+            Actual{' '}
+            <strong data-testid="plan-actual">
+              {planMoney(figures.actualCents)}
+            </strong>
+          </span>
+        </div>
+        <div className="plan-muted small mt-2" data-testid="plan-no-plan-note">
+          {NO_PLAN_NOTE}
         </div>
       </Card.Body>
     </Card>
@@ -513,7 +641,40 @@ export function BucketPlanCard({
 
 // ─── Unplanned ───────────────────────────────────────────────────────────────
 
-export function UnplannedCard({ unplanned }: { unplanned: Unplanned }) {
+/** What the breakdown card is showing: a plan's Unplanned, or a Month without a plan's spending. */
+type BreakdownKind = 'unplanned' | 'by-category'
+
+const BREAKDOWN = {
+  unplanned: {
+    title: 'Unplanned',
+    caption: 'Spending that matched no Regular or Tracker.',
+    empty: 'Nothing unplanned this month.',
+    icon: 'mdi-help-circle-outline',
+    testId: 'plan-unplanned',
+  },
+  'by-category': {
+    title: 'Spending by category',
+    caption: 'Every dollar of Actual spending, by Up category.',
+    empty: 'No spending this month.',
+    icon: 'mdi-shape-outline',
+    testId: 'plan-spending-by-category',
+  },
+} as const
+
+/**
+ * Spending by Up parent category, subcategory and Uncategorised, folding
+ * open per parent. On a plan month it's Unplanned; on a Month without a plan
+ * (#282) it's every counted transaction, titled Spending by category, and the
+ * word Unplanned never appears.
+ */
+export function UnplannedCard({
+  unplanned,
+  kind = 'unplanned',
+}: {
+  unplanned: Unplanned
+  kind?: BreakdownKind
+}) {
+  const copy = BREAKDOWN[kind]
   const names = useMemo(
     () => new Map(getCategoriesWithParent().map((c) => [c.id, c.name])),
     []
@@ -534,7 +695,7 @@ export function UnplannedCard({ unplanned }: { unplanned: Unplanned }) {
       id={UNPLANNED_CARD_ID}
       tabIndex={-1}
       className="plan-card plan-card--unplanned"
-      data-testid="plan-unplanned"
+      data-testid={copy.testId}
     >
       <Card.Body className="py-3">
         <div className="d-flex align-items-center gap-2 mb-1">
@@ -542,18 +703,19 @@ export function UnplannedCard({ unplanned }: { unplanned: Unplanned }) {
             className="plan-card__icon plan-card__icon--unplanned"
             aria-hidden
           >
-            <i className="mdi mdi-help-circle-outline" />
+            <i className={`mdi ${copy.icon}`} />
           </span>
-          <h3 className="h6 fw-semibold flex-grow-1 mb-0">Unplanned</h3>
-          <span className="plan-card__total">
+          <h3 className="h6 fw-semibold flex-grow-1 mb-0">{copy.title}</h3>
+          <span
+            className="plan-card__total"
+            data-testid={`${copy.testId}-total`}
+          >
             {planMoney(unplanned.totalCents)}
           </span>
         </div>
-        <div className="plan-muted small mb-2">
-          Spending that matched no Regular or Tracker.
-        </div>
+        <div className="plan-muted small mb-2">{copy.caption}</div>
         {empty ? (
-          <div className="plan-muted small">Nothing unplanned this month.</div>
+          <div className="plan-muted small">{copy.empty}</div>
         ) : (
           <ul className="plan-unplanned">
             {unplanned.parents.map((p) => {

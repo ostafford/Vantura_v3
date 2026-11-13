@@ -591,7 +591,9 @@ export function AnalyticsBudgetPlanBucket() {
   const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
   const planMonth = usePlanMonth(false)
-  const plan = usePlanVsActual(version, planMonth.month)
+  const read = usePlanVsActual(version, planMonth.month)
+  // A Month without a plan has no buckets; usePlanMonth(false) never shows one.
+  const plan = read?.state === 'no-plan' ? null : read
   const finished = plan?.state === 'finished'
 
   const [showAddUpcoming, setShowAddUpcoming] = useState(false)

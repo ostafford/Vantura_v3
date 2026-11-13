@@ -4,6 +4,7 @@ import {
   itemBar,
   markPaidDate,
   NO_PLAN_NOTE,
+  noPlanBarSegments,
   noSavedLine,
   payPromptTitle,
   savedHeadline,
@@ -272,5 +273,44 @@ describe('Month without a plan copy (#282)', () => {
     expect(NO_PLAN_NOTE).toBe(
       'No plan for this month · Saved uses the pay you confirmed'
     )
+  })
+})
+
+describe('noPlanBarSegments (#282)', () => {
+  const shape = (segs: ReturnType<typeof noPlanBarSegments>) =>
+    segs?.map((s) => [
+      s.key,
+      s.label,
+      s.cents,
+      s.shownCents,
+      s.widthPct,
+      s.over,
+    ])
+
+  it('fills Income with Actual spending, then Saved', () => {
+    expect(shape(noPlanBarSegments(100000, 25000, 75000))).toEqual([
+      ['actual', 'Actual spending', 25000, 25000, 25, false],
+      ['saved', 'Saved', 75000, 75000, 75, false],
+    ])
+  })
+
+  it('is full when spending passes Income, with Overspent as a positive figure in the over colour', () => {
+    expect(shape(noPlanBarSegments(450000, 553698, -103698))).toEqual([
+      ['actual', 'Actual spending', 553698, 553698, 100, false],
+      ['saved', 'Overspent', -103698, 103698, 0, true],
+    ])
+  })
+
+  it('draws no fill for net refunds', () => {
+    expect(shape(noPlanBarSegments(100000, -2000, 102000))).toEqual([
+      ['actual', 'Actual spending', -2000, -2000, 0, false],
+      ['saved', 'Saved', 102000, 102000, 100, false],
+    ])
+  })
+
+  it('has no bar without a Saved or an Income', () => {
+    expect(noPlanBarSegments(100000, 25000, null)).toBeNull()
+    expect(noPlanBarSegments(null, 25000, null)).toBeNull()
+    expect(noPlanBarSegments(0, 25000, -25000)).toBeNull()
   })
 })

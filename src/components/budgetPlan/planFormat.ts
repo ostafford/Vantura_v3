@@ -212,6 +212,7 @@ export function itemBar(
 }
 
 export type IncomeSegmentKey =
+  | 'actual'
   | 'on-plan'
   | 'unplanned'
   | 'to-go'
@@ -295,6 +296,38 @@ export function incomeBarSegments(
       over:
         bar.ifTheRestGoesToPlanCents !== null &&
         bar.ifTheRestGoesToPlanCents < 0,
+    },
+  ])
+}
+
+/**
+ * A Month without a plan's bar (#282): Actual spending · Saved, filled up to
+ * Income the same way as other months (full, with Overspent in the over
+ * colour, when spending passes Income). `null`, so no bar, without a Saved
+ * or an Income.
+ */
+export function noPlanBarSegments(
+  incomeCents: number | null,
+  actualCents: number,
+  savedCents: number | null
+): IncomeSegment[] | null {
+  if (incomeCents === null || incomeCents <= 0 || savedCents === null) {
+    return null
+  }
+  const headline = savedHeadline(savedCents)
+  return fill(incomeCents, [
+    {
+      key: 'actual',
+      label: 'Actual spending',
+      cents: actualCents,
+      over: false,
+    },
+    {
+      key: 'saved',
+      label: headline.label,
+      cents: savedCents,
+      shownCents: headline.cents,
+      over: headline.over,
     },
   ])
 }

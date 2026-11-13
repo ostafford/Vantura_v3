@@ -552,6 +552,7 @@ describe('when a Month without a plan declines Saved', () => {
 
     const march = noPlan('2026-03')
     expect(march.openingDate).toBe('2026-03-14')
+    expect(march.firstPlannableMonth).toBe('2026-09')
     expect(march.figures).toEqual({ incomeCents: 300000, actualCents: 2000 })
     expect(march.spendingByCategory.totalCents).toBe(2000)
     expect(march.savedCents).toBeNull()
@@ -637,6 +638,7 @@ describe('which months read as a Month without a plan', () => {
       'confirmedPay',
       'daysInMonth',
       'figures',
+      'firstPlannableMonth',
       'month',
       'noSavedReason',
       'openingDate',
