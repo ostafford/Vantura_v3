@@ -3133,6 +3133,37 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   border-radius: 8px;
   background: var(--bs-tertiary-bg);
 }
+.plan-pay-form {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--bs-tertiary-bg);
+}
+.plan-pay-form__title {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+/* Amount and Pay frequency side by side from small screens; stacked on a phone. */
+.plan-pay-form__fields {
+  display: grid;
+  gap: 0.5rem;
+}
+@media (min-width: 576px) {
+  .plan-pay-form__fields {
+    grid-template-columns: 1fr 1fr;
+    max-width: 32rem;
+  }
+}
+.plan-pay-form__error {
+  color: var(--vantura-danger-text);
+}
+.plan-change-pay-toggle {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.875rem;
+}
 .income-bar {
   display: flex;
   height: 14px;

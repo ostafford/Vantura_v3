@@ -116,6 +116,107 @@ test.describe('a Month without a plan (#282)', () => {
     await expect(byCategory(page)).toBeVisible()
   })
 
+  test('the pay prompt is pre-filled from Settings → Pay, and confirming shows Saved', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await showMonth(page, '2026-08')
+
+    const prompt = page.getByTestId('plan-pay-prompt')
+    const amount = prompt.getByLabel('Take-home pay amount ($)')
+    const frequency = prompt.getByLabel('Pay frequency')
+    // Sample data's Settings → Pay: $4,500 monthly.
+    await expect(amount).toHaveValue('4500.00')
+    await expect(amount).toHaveAttribute('type', 'text')
+    await expect(amount).toHaveAttribute('inputmode', 'decimal')
+    await expect(frequency).toHaveValue('MONTHLY')
+
+    await amount.fill('2000')
+    await frequency.selectOption('FORTNIGHTLY')
+    await prompt
+      .getByRole('button', { name: 'Confirm pay for earlier months' })
+      .click()
+
+    await expect(prompt).toHaveCount(0)
+    await expect(page.getByTestId('plan-headline')).toBeVisible()
+    await expect(page.getByTestId('income-bar')).toBeVisible()
+    // $2,000 fortnightly is $4,333.33 a month (26 pays ÷ 12).
+    await expect(page.getByTestId('plan-figures')).toContainText('$4,333.33')
+  })
+
+  test('the pay prompt refuses an amount that isn’t a pay, saving nothing', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await showMonth(page, '2026-08')
+
+    const prompt = page.getByTestId('plan-pay-prompt')
+    for (const text of ['', '0', '4,500']) {
+      await prompt.getByLabel('Take-home pay amount ($)').fill(text)
+      await prompt
+        .getByRole('button', { name: 'Confirm pay for earlier months' })
+        .click()
+      await expect(prompt.getByRole('alert')).toBeVisible()
+    }
+    await expect(page.getByTestId('plan-headline')).toHaveCount(0)
+  })
+
+  test('"Change pay for this month" changes that month only', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await showMonth(page, '2026-11')
+    const novemberFigures = await page.getByTestId('plan-figures').textContent()
+
+    await showMonth(page, '2026-10')
+    await expect(page.getByTestId('plan-figures')).toContainText('$4,500.00')
+    await page
+      .getByRole('button', { name: 'Change pay for this month' })
+      .click()
+    const form = page.getByTestId('plan-change-pay')
+    // Pre-filled with this month's Confirmed pay.
+    await expect(form.getByLabel('Take-home pay amount ($)')).toHaveValue(
+      '4500.00'
+    )
+    await expect(form.getByLabel('Pay frequency')).toHaveValue('MONTHLY')
+    await form.getByLabel('Take-home pay amount ($)').fill('5200.50')
+    await form.getByRole('button', { name: 'Save pay for October' }).click()
+
+    await expect(form).toHaveCount(0)
+    await expect(page.getByTestId('plan-figures')).toContainText('$5,200.50')
+
+    await showMonth(page, '2026-11')
+    await expect(page.getByTestId('plan-figures')).toHaveText(
+      novemberFigures ?? ''
+    )
+  })
+
+  test('"Change pay for this month" can be cancelled, changing nothing', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await showMonth(page, '2026-10')
+    await page
+      .getByRole('button', { name: 'Change pay for this month' })
+      .click()
+    const form = page.getByTestId('plan-change-pay')
+    await form.getByLabel('Take-home pay amount ($)').fill('1')
+    await form.getByRole('button', { name: 'Cancel' }).click()
+    await expect(form).toHaveCount(0)
+    await expect(page.getByTestId('plan-figures')).toContainText('$4,500.00')
+  })
+
+  test('a month without a Confirmed pay offers no "Change pay for this month"', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await showMonth(page, '2026-08')
+    await expect(page.getByTestId('plan-pay-prompt')).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Change pay for this month' })
+    ).toHaveCount(0)
+  })
+
   test('has no horizontal scroll at phone width', async ({ page }) => {
     await openOn20January(page)
     await page.setViewportSize({ width: 375, height: 812 })

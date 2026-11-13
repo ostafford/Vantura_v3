@@ -365,8 +365,10 @@ export function AnalyticsBudgetPlan() {
     return (
       <div className="grid-margin">
         <NoPlanSummaryCard
+          key={plan.month}
           plan={plan}
           nav={nav}
+          onPayChanged={refresh}
           aside={
             <HelpPopover
               id="budget-plan-help"

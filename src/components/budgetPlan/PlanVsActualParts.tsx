@@ -7,11 +7,17 @@
  * `getPlanVsActual` (#240); the display rules are in `./planFormat`.
  */
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
 import { formatShortDate } from '@/lib/format'
 import { getCategoriesWithParent } from '@/services/categories'
+import {
+  changePayForMonth,
+  confirmPayForEarlierMonths,
+} from '@/services/confirmedPay'
+import { readPaySettings } from '@/services/pay'
+import { toast } from '@/stores/toastStore'
 import type {
   PlanItem,
   PlanVsActualNoPlan,
@@ -35,6 +41,7 @@ import {
   type IncomeSegment,
   type PlanTone,
 } from './planFormat'
+import { NoPlanPayForm } from './NoPlanPayForm'
 import { planMonthSearch, type PlanMonth } from './planMonth'
 
 const toneClass: Record<PlanTone, string> = {
@@ -412,6 +419,8 @@ interface NoPlanSummaryProps {
   nav: ReactNode
   /** Help popover beside the month. */
   aside?: ReactNode
+  /** Re-reads the page after a Confirmed pay is saved. */
+  onPayChanged: () => void
 }
 
 /**
@@ -420,8 +429,29 @@ interface NoPlanSummaryProps {
  * Actual spending · Saved, only with a Saved; Income · Actual; and a note
  * that the month has no plan.
  */
-export function NoPlanSummaryCard({ plan, nav, aside }: NoPlanSummaryProps) {
-  const { figures } = plan
+export function NoPlanSummaryCard({
+  plan,
+  nav,
+  aside,
+  onPayChanged,
+}: NoPlanSummaryProps) {
+  const { figures, confirmedPay } = plan
+  const [changingPay, setChangingPay] = useState(false)
+  // Closing the change form hands focus back to its toggle.
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const returnFocus = useRef(false)
+  useEffect(() => {
+    if (!changingPay && returnFocus.current) {
+      returnFocus.current = false
+      toggleRef.current?.focus()
+    }
+  }, [changingPay])
+  function closeChangePay() {
+    returnFocus.current = true
+    setChangingPay(false)
+  }
+  // Settings → Pay, read once: the prompt starts from it, or empty when unset.
+  const [settingsPay] = useState(readPaySettings)
   const segments = noPlanBarSegments(
     figures.incomeCents,
     figures.actualCents,
@@ -456,10 +486,26 @@ export function NoPlanSummaryCard({ plan, nav, aside }: NoPlanSummaryProps) {
             <span>{reason}</span>
           </div>
         ) : (
-          <div className="plan-set-pay mb-3" data-testid="plan-pay-prompt">
-            <i className="mdi mdi-cash me-2" aria-hidden />
-            <span>{payPromptTitle(plan.firstPlannableMonth)}</span>
-          </div>
+          <NoPlanPayForm
+            testId="plan-pay-prompt"
+            initial={settingsPay}
+            submitLabel="Confirm pay for earlier months"
+            onSave={(amountInput, frequency) => {
+              if (!confirmPayForEarlierMonths(amountInput, frequency)) {
+                return false
+              }
+              toast.success(
+                `Pay confirmed for months before ${monthLabel(plan.firstPlannableMonth)}.`
+              )
+              onPayChanged()
+              return true
+            }}
+          >
+            <div className="plan-pay-form__title">
+              <i className="mdi mdi-cash me-2" aria-hidden />
+              <span>{payPromptTitle(plan.firstPlannableMonth)}</span>
+            </div>
+          </NoPlanPayForm>
         )}
 
         <hr className="my-3" />
@@ -482,6 +528,40 @@ export function NoPlanSummaryCard({ plan, nav, aside }: NoPlanSummaryProps) {
         <div className="plan-muted small mt-2" data-testid="plan-no-plan-note">
           {NO_PLAN_NOTE}
         </div>
+
+        {confirmedPay !== null &&
+          (changingPay ? (
+            <div className="mt-3">
+              <NoPlanPayForm
+                testId="plan-change-pay"
+                autoFocus
+                initial={{
+                  amountInput: (confirmedPay.perPay / 100).toFixed(2),
+                  frequency: confirmedPay.frequency,
+                }}
+                submitLabel={`Save pay for ${monthLabel(plan.month)}`}
+                onCancel={closeChangePay}
+                onSave={(amountInput, frequency) => {
+                  if (!changePayForMonth(plan.month, amountInput, frequency)) {
+                    return false
+                  }
+                  toast.success(`Pay updated for ${monthLabel(plan.month)}.`)
+                  closeChangePay()
+                  onPayChanged()
+                  return true
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              ref={toggleRef}
+              type="button"
+              className="plan-link plan-change-pay-toggle mt-2"
+              onClick={() => setChangingPay(true)}
+            >
+              Change pay for this month
+            </button>
+          ))}
       </Card.Body>
     </Card>
   )
