@@ -70,7 +70,7 @@ Income minus Actual spending for the calendar month to date. Shown in the Headro
 _Avoid_: Unallocated, Headroom, leftover, remaining
 
 **Month review**:
-A card at the top of the Dashboard for the latest finished month that hasn't been reviewed. It shows that month's Saved or Overspent and opens the Budget Plan on it. Mark reviewed marks that month and every earlier one as reviewed.
+The Dashboard's look back at the latest finished month from the First plannable month on, until it's marked reviewed. It shows that month's Saved or Overspent when it has one, and opens the Budget Plan on it. Mark reviewed marks that month and every earlier one as reviewed. Months without a plan never get one.
 _Avoid_: notification, reminder, alert, prompt, Review last month
 
 **Dashboard section**:
@@ -84,7 +84,7 @@ _Avoid_: outdated, expired, old data
 ### Budget Plan
 
 **Budget Plan**:
-The page where Regulars and Trackers are grouped into buckets and compared with what's actually been spent, one calendar month at a time: the current month against today's plan, a finished month against its Month-end plan.
+The page where Regulars and Trackers are grouped into buckets and compared with what's actually been spent, one calendar month at a time: the current month against today's plan, a finished month against its Month-end plan. A Month without a plan has no plan to compare, so it shows only its spending and Saved.
 _Avoid_: budget, planner, forecast
 
 **Bucket**:
