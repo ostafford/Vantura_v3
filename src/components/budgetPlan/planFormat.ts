@@ -12,6 +12,7 @@
 
 import { formatSignedMoney } from '@/lib/format'
 import type {
+  NoSavedReason,
   PlanItem,
   PlanVsActualFinished,
   PlanVsActualInProgress,
@@ -20,13 +21,60 @@ import type {
 /** The Unplanned card's element id, the target of the bar's unplanned segment. */
 export const UNPLANNED_CARD_ID = 'budget-unplanned'
 
-/** "November 2026" for `2026-11`. */
-export function monthLabel(month: string): string {
+/**
+ * "November 2026" for `2026-11`, in the device's locale (`locale` is for
+ * tests).
+ */
+export function monthLabel(month: string, locale?: string): string {
   const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, {
+  return new Date(y, m - 1, 1).toLocaleDateString(locale, {
     month: 'long',
     year: 'numeric',
   })
+}
+
+/**
+ * "14 March" for `2026-03-14`, in the device's locale. Built from the
+ * calendar date's parts, so the day never shifts with the time zone.
+ */
+function dayMonthLabel(day: string, locale?: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+/** The note on a Month without a plan (#282). */
+export const NO_PLAN_NOTE =
+  'No plan for this month · Saved uses the pay you confirmed'
+
+/**
+ * The line shown in place of Saved on a Month without a plan (#282), or
+ * `null` for Pay not confirmed, which shows the pay prompt instead.
+ * `openingDate` is the Spending account's opening day, `YYYY-MM-DD`.
+ */
+export function noSavedLine(
+  reason: NoSavedReason,
+  openingDate: string,
+  locale?: string
+): string | null {
+  switch (reason) {
+    case 'part-month':
+      return `Your account opened on ${dayMonthLabel(openingDate, locale)} · Saved isn’t worked out for a part month`
+    case 'closed-saver':
+      return 'This month used a Saver that’s since closed. Its spending can’t be seen, so Saved isn’t worked out'
+    case 'pay-not-confirmed':
+      return null
+  }
+}
+
+/** The pay prompt's title (#282), naming the First plannable month. */
+export function payPromptTitle(
+  firstPlannableMonth: string,
+  locale?: string
+): string {
+  return `Confirm your pay for months before ${monthLabel(firstPlannableMonth, locale)} to see Saved`
 }
 
 /** "Day N of M" while the month runs, or "Month finished" (#243). */

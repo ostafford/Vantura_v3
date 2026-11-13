@@ -3,6 +3,9 @@ import {
   incomeBarSegments,
   itemBar,
   markPaidDate,
+  NO_PLAN_NOTE,
+  noSavedLine,
+  payPromptTitle,
   savedHeadline,
   stateLine,
 } from './planFormat'
@@ -221,5 +224,53 @@ describe('markPaidDate', () => {
       markPaidDate(regular({ kind: 'not-paid-yet' }, ['2026-10-25']))
     ).toBeNull()
     expect(markPaidDate(regular({ kind: 'paid' }, []))).toBeNull()
+  })
+})
+
+describe('Month without a plan copy (#282)', () => {
+  it('a Part month gives the opening date, day then month in en-AU', () => {
+    expect(noSavedLine('part-month', '2026-03-14', 'en-AU')).toBe(
+      'Your account opened on 14 March · Saved isn’t worked out for a part month'
+    )
+  })
+
+  it('follows the locale’s day/month order, with no leading zero', () => {
+    expect(noSavedLine('part-month', '2026-03-04', 'en-US')).toBe(
+      'Your account opened on March 4 · Saved isn’t worked out for a part month'
+    )
+  })
+
+  it('reads the opening day as a calendar date, never shifting it by time zone', () => {
+    expect(noSavedLine('part-month', '2026-01-01', 'en-AU')).toBe(
+      'Your account opened on 1 January · Saved isn’t worked out for a part month'
+    )
+    expect(noSavedLine('part-month', '2026-12-31', 'en-AU')).toBe(
+      'Your account opened on 31 December · Saved isn’t worked out for a part month'
+    )
+  })
+
+  it('a Closed Saver says why there is no Saved', () => {
+    expect(noSavedLine('closed-saver', '2026-03-14', 'en-AU')).toBe(
+      'This month used a Saver that’s since closed. Its spending can’t be seen, so Saved isn’t worked out'
+    )
+  })
+
+  it('Pay not confirmed has no line: the pay prompt shows instead', () => {
+    expect(noSavedLine('pay-not-confirmed', '2026-03-14', 'en-AU')).toBeNull()
+  })
+
+  it('the pay prompt names the First plannable month with its year', () => {
+    expect(payPromptTitle('2026-09', 'en-AU')).toBe(
+      'Confirm your pay for months before September 2026 to see Saved'
+    )
+    expect(payPromptTitle('2027-01', 'en-AU')).toBe(
+      'Confirm your pay for months before January 2027 to see Saved'
+    )
+  })
+
+  it('the note says there is no plan and Saved uses the confirmed pay', () => {
+    expect(NO_PLAN_NOTE).toBe(
+      'No plan for this month · Saved uses the pay you confirmed'
+    )
   })
 })
