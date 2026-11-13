@@ -79,4 +79,26 @@ describe('NoPlanSummaryCard pay prompt (#282)', () => {
     expect(html).toContain('Change pay for this month')
     expect(html).not.toContain('data-testid="plan-pay-prompt"')
   })
+
+  it('a Closed Saver month says why there’s no Saved, with no bar and no pay prompt', () => {
+    settings.clear()
+    const html = render({
+      ...august,
+      month: '2026-09',
+      figures: { incomeCents: 450_000, actualCents: 123_400 },
+      confirmedPay: { perPay: 450_000, frequency: 'MONTHLY' },
+      savedCents: null,
+      noSavedReason: 'closed-saver',
+    })
+    const line = html.match(
+      /data-testid="plan-no-saved"[^>]*>.*?<span>([^<]*)<\/span>/
+    )?.[1]
+    expect(line).toBe(
+      'This month used a Saver that’s since closed. Its spending can’t be seen, so Saved isn’t worked out'
+    )
+    expect(html).not.toContain('data-testid="plan-headline"')
+    expect(html).not.toContain('data-testid="income-bar"')
+    expect(html).not.toContain('data-testid="plan-pay-prompt"')
+    expect(html).toContain('data-testid="plan-no-plan-note"')
+  })
 })

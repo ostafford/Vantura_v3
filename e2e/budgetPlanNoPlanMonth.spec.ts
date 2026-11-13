@@ -217,6 +217,31 @@ test.describe('a Month without a plan (#282)', () => {
     ).toHaveCount(0)
   })
 
+  test('the bucket page shows the current month for a Month without a plan', async ({
+    page,
+  }) => {
+    await openOn20January(page)
+    await page.getByRole('button', { name: 'Create a bucket' }).click()
+    await page.getByPlaceholder('e.g. Household').fill('Bills')
+    await page.getByRole('button', { name: 'Create bucket' }).click()
+    await page.getByRole('link', { name: 'Bills', exact: true }).click()
+    await expect(page).toHaveURL(/\/analytics\/budget\/(\d+)$/)
+    const bucketPath = new URL(page.url()).pathname
+
+    // October 2026 is a Month without a plan: no buckets to show.
+    await page.evaluate((to) => {
+      window.history.pushState({}, '', to)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }, `${bucketPath}?month=2026-10`)
+
+    await expect(page.getByTestId('plan-month')).toHaveText('January 2027')
+    await expect(page.getByTestId('plan-progress')).not.toHaveText(
+      'Month finished'
+    )
+    await expect(page.getByTestId('plan-no-plan-note')).toHaveCount(0)
+    await expect(page.getByTestId('plan-spending-by-category')).toHaveCount(0)
+  })
+
   test('has no horizontal scroll at phone width', async ({ page }) => {
     await openOn20January(page)
     await page.setViewportSize({ width: 375, height: 812 })
