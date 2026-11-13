@@ -135,7 +135,12 @@ describe('the months on the card', () => {
     const card = getMonthByMonth()
 
     expect(card?.months).toEqual([
-      { month: '2026-03', noPlan: true, savedCents: null, reason: 'part-month' },
+      {
+        month: '2026-03',
+        noPlan: true,
+        savedCents: null,
+        reason: 'part-month',
+      },
       { month: '2026-04', noPlan: true, savedCents: 300000, reason: null },
       { month: '2026-05', noPlan: true, savedCents: 200000, reason: null },
       { month: '2026-06', noPlan: true, savedCents: 300000, reason: null },

@@ -3691,3 +3691,230 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
 [data-theme='light'] .changelog-accent-heading {
   color: var(--vantura-text) !important;
 }
+
+/* ── Month by month (#282) ─────────────────────────────────────────────────────
+   Saved is green and Overspent red, on columns and figures: a deliberate
+   exception, for this card only, to the Budget Plan's "colour is for over
+   only" rule (#174). Nothing animates on first paint; selection dims the other
+   columns with a short opacity change. */
+.mbm-chart {
+  --mbm-plot: 120px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  margin: 0 -0.25rem 0.5rem;
+  padding: 0 0.25rem 0.25rem;
+}
+.mbm-chart__months {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbm-chart__month {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 0 0 44px;
+}
+.mbm-chart__month.is-year-start {
+  border-left: 1px solid var(--bs-border-color);
+  padding-left: 4px;
+  flex-basis: 49px;
+}
+.mbm-chart__month.is-year-start:first-child {
+  border-left: 0;
+  padding-left: 0;
+  flex-basis: 44px;
+}
+.mbm-chart__year {
+  min-height: 1.1rem;
+  font-size: 0.7rem;
+  color: var(--vantura-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.mbm-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  transition:
+    opacity 150ms var(--ease-out),
+    background-color var(--duration-fast) ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.mbm-col:focus {
+  outline: none;
+}
+.mbm-col:focus-visible {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--vantura-primary) 45%, transparent);
+}
+.mbm-col.is-dimmed {
+  opacity: 0.4;
+}
+.mbm-col.is-selected {
+  background: var(--bs-tertiary-bg);
+}
+.mbm-col__plot {
+  position: relative;
+  display: block;
+  height: var(--mbm-plot);
+  margin: 0 8px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.mbm-col:active .mbm-col__plot {
+  transform: scale(0.97);
+}
+/* The baseline: solid under a figure, dashed for a month without one. */
+.mbm-col__plot::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: var(--mbm-baseline);
+  border-top: 1px solid var(--bs-border-color);
+}
+.mbm-col[data-tone='none'] .mbm-col__plot::after {
+  border-top: 1px dashed var(--vantura-text-secondary);
+}
+.mbm-col__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 2px;
+}
+.mbm-col[data-tone='saved'] .mbm-col__bar {
+  bottom: calc(100% - var(--mbm-baseline));
+  border-radius: 3px 3px 0 0;
+  background: var(--vantura-success-text);
+}
+.mbm-col[data-tone='over'] .mbm-col__bar {
+  top: var(--mbm-baseline);
+  border-radius: 0 0 3px 3px;
+  background: var(--vantura-danger-text);
+}
+.mbm-col__label {
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--vantura-text-secondary);
+}
+.mbm-col.is-selected .mbm-col__label {
+  color: var(--bs-body-color);
+  font-weight: 600;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mbm-col:hover {
+    background: var(--bs-tertiary-bg);
+  }
+}
+.mbm-selection {
+  min-height: 1.5rem;
+  margin-bottom: 0.5rem !important;
+}
+.mbm-fig {
+  font-variant-numeric: tabular-nums;
+}
+.mbm-fig--saved {
+  color: var(--vantura-success-text);
+}
+.mbm-fig--over {
+  color: var(--vantura-danger-text);
+}
+.mbm-fig--none {
+  color: var(--vantura-text-secondary);
+}
+.mbm-years,
+.mbm-year__months {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbm-year + .mbm-year {
+  border-top: 1px solid var(--bs-border-color);
+}
+.mbm-year__toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.mbm-year__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.mbm-year__title {
+  display: inline-flex;
+  align-items: center;
+}
+.mbm-year__sub {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.4rem;
+  padding-left: 1.25rem;
+}
+.mbm-year__sub > span {
+  white-space: nowrap;
+}
+.mbm-year__months {
+  padding: 0 0 0.5rem 1.25rem;
+  font-size: 0.875rem;
+}
+.mbm a.mbm-row:not(.btn) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  column-gap: 0.5rem;
+  min-height: 36px;
+  padding: 0.25rem 0;
+  color: var(--bs-body-color);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.mbm-row .mbm-fig {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.mbm-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--vantura-primary) 45%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .mbm-row:hover .mbm-row__name {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+.mbm-row__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.mbm-tag {
+  padding: 0 0.35rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--vantura-text-secondary);
+  white-space: nowrap;
+}

@@ -35,6 +35,7 @@ import {
   monthLabel,
 } from '@/components/budgetPlan/planFormat'
 import { planMonthSearch } from '@/components/budgetPlan/planMonth'
+import { MonthByMonthCard } from '@/components/budgetPlan/MonthByMonthCard'
 
 // ─── Bucket modal ────────────────────────────────────────────────────────────
 
@@ -368,9 +369,19 @@ export function AnalyticsBudgetPlan() {
 
   // #282 — a Month without a plan: its summary and Spending by category only.
   // No buckets, Not in a bucket or Add bucket, and nothing to edit.
+  // #282 — Month by month is the last card on every month the page shows. It
+  // sits after the month's own cards at one place in the tree, so stepping
+  // between months keeps its selection and scroll.
+  const page = (body: React.ReactNode) => (
+    <div className="grid-margin">
+      {body}
+      <MonthByMonthCard version={version} />
+    </div>
+  )
+
   if (plan?.state === 'no-plan') {
-    return (
-      <div className="grid-margin">
+    return page(
+      <>
         <NoPlanSummaryCard
           key={plan.month}
           plan={plan}
@@ -386,14 +397,14 @@ export function AnalyticsBudgetPlan() {
             />
           </Col>
         </Row>
-      </div>
+      </>
     )
   }
 
   if (!plan) {
     if (editable) return null
-    return (
-      <div className="grid-margin">
+    return page(
+      <>
         <Card className="mb-3" data-testid="plan-summary">
           <Card.Body>
             <div className="mb-2">{nav}</div>
@@ -403,7 +414,7 @@ export function AnalyticsBudgetPlan() {
             </p>
           </Card.Body>
         </Card>
-      </div>
+      </>
     )
   }
   const monthSearch = planMonthSearch(planMonth.month, planMonth.current)
@@ -411,8 +422,8 @@ export function AnalyticsBudgetPlan() {
   const rowsByBucket = new Map(buckets.map((b) => [b.id, b]))
   const { notInABucket } = plan
 
-  return (
-    <div className="grid-margin">
+  return page(
+    <>
       <MonthSummaryCard
         plan={plan}
         nav={nav}
@@ -608,6 +619,6 @@ export function AnalyticsBudgetPlan() {
         onClose={() => setDeletingBucket(null)}
         onDeleted={refresh}
       />
-    </div>
+    </>
   )
 }
