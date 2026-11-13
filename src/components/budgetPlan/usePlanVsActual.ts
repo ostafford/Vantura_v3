@@ -51,12 +51,25 @@ export function usePlanVsActual(
   version: number,
   month: string
 ): PlanVsActual | null {
+  return useBudgetPlanRead(() => getPlanVsActual(month), version, month)
+}
+
+/**
+ * Runs a Budget Plan read, and re-runs it after a sync, at local midnight
+ * (`todayStore`, #164), when `version` changes (the page bumps it after its
+ * own writes) and when `key` changes (the month it reads).
+ */
+export function useBudgetPlanRead<T>(
+  read: () => T,
+  version: number,
+  key?: string
+): T {
   const today = useStore(todayStore, (s) => s.today)
   const lastSyncCompletedAt = useStore(syncStore, (s) => s.lastSyncCompletedAt)
   return useMemo(
-    () => getPlanVsActual(month),
+    () => read(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [month, today, lastSyncCompletedAt, version]
+    [key, today, lastSyncCompletedAt, version]
   )
 }
 

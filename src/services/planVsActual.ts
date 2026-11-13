@@ -418,11 +418,26 @@ export function getPlanVsActual(month: string): PlanVsActual | null {
   const headroom = getHeadroom()
   if (month === headroom.month) return readInProgress(month, headroom)
   if (!isMonth(month) || month > headroom.month) return null
+  return getFinishedMonthRead(month, headroom.today)
+}
+
+/**
+ * The read for a finished `month` (`YYYY-MM`, before `today`'s month): its
+ * Month-end plan, or a Month without a plan when it's in that range. `null`
+ * as `getPlanVsActual`. The caller has already ruled out the current month,
+ * so the Month by month card can read every finished month without working
+ * out Headroom for each.
+ */
+export function getFinishedMonthRead(
+  month: string,
+  today: string
+): PlanVsActualFinished | PlanVsActualNoPlan | null {
+  if (!isMonth(month) || month >= today.slice(0, 7)) return null
   const noPlanRange = getMonthsWithoutAPlan()
   if (isInRange(month, noPlanRange)) {
-    return readNoPlan(month, headroom.today, noPlanRange)
+    return readNoPlan(month, today, noPlanRange)
   }
-  return readFinished(month, headroom.today)
+  return readFinished(month, today)
 }
 
 /** The attribution read's plan input with no Regulars and no Trackers. */
