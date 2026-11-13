@@ -263,6 +263,13 @@ function DeleteModal({ bucket, onClose, onDeleted }: DeleteModalProps) {
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 
+const PLAN_HELP =
+  "Your plan vs what actually went out, for one calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned that month. Committed is what your buckets plan, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar. Use ‹ to look back at a finished month: it's judged against the plan you had when it ended, while its spending stays up to date."
+
+/** #282 — a Month without a plan has no buckets to explain. */
+const NO_PLAN_HELP =
+  "This month is from before your first plan, so there are no buckets to compare. It shows what went out, by Up category, and Saved from the pay you confirmed for it. Saved isn't worked out for the month your account opened, or a month that used a Saver that's since closed."
+
 /** Scrolls to the Unplanned card and moves focus there (the bar's unplanned segment). */
 function showUnplanned() {
   const el = document.getElementById(UNPLANNED_CARD_ID)
@@ -354,7 +361,7 @@ export function AnalyticsBudgetPlan() {
     <HelpPopover
       id="budget-plan-help"
       title="Budget Plan"
-      content="Your plan vs what actually went out, for one calendar month. Group Regulars and Trackers into buckets: each shows what's gone out against what's planned that month. Committed is what your buckets plan, and Unallocated is the Income no bucket plans for. Spending that matched no Regular or Tracker is Unplanned. Set your pay amount in Settings → Pay to see Income, Free spending so far and the bar. Use ‹ to look back at a finished month: it's judged against the plan you had when it ended, while its spending stays up to date."
+      content={plan?.state === 'no-plan' ? NO_PLAN_HELP : PLAN_HELP}
       ariaLabel="How does Budget Plan work?"
     />
   )
@@ -369,14 +376,7 @@ export function AnalyticsBudgetPlan() {
           plan={plan}
           nav={nav}
           onPayChanged={refresh}
-          aside={
-            <HelpPopover
-              id="budget-plan-help"
-              title="Budget Plan"
-              content="This month is from before your first plan, so there are no buckets to compare. It shows what went out, by Up category, and Saved from the pay you confirmed for it. Saved isn't worked out for the month your account opened, or a month that used a Saver that's since closed."
-              ariaLabel="How does Budget Plan work?"
-            />
-          }
+          aside={help}
         />
         <Row className="g-3 mb-4">
           <Col xs={12} sm={6} lg={4}>

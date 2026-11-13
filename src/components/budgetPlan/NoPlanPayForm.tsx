@@ -3,8 +3,9 @@
  * confirm and "Change pay for this month". An amount field (`type="text"
  * inputMode="decimal"`, read by `parseAmountInput` in the service, ADR 0026)
  * and a Pay frequency choice. The save itself is the caller's
- * (`confirmPayForEarlierMonths` or `changePayForMonth`), which refuses
- * anything Settings → Pay would; the form only says why.
+ * (`confirmPayForEarlierMonths` or `changePayForMonth`). The form checks the
+ * pay first with the same rule (`payFormError`), so a refused save it can't
+ * explain says so plainly instead of blaming the amount.
  */
 
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
@@ -15,13 +16,12 @@ import {
   isPayFrequency,
   type PayFrequency,
 } from '@/lib/payFrequency'
-
-/** Shown when the amount is blank, zero, or not a plain dollar amount. */
-export const INVALID_CONFIRMED_PAY_MESSAGE =
-  'Enter your take-home pay as numbers only, without commas, like 3200 or 3200.50.'
-
-/** Shown when no Pay frequency is chosen. */
-export const NO_PAY_FREQUENCY_MESSAGE = 'Choose how often you’re paid.'
+import {
+  INVALID_CONFIRMED_PAY_MESSAGE,
+  NO_PAY_FREQUENCY_MESSAGE,
+  PAY_NOT_SAVED_MESSAGE,
+  payFormError,
+} from './payForm'
 
 export interface PayFormValues {
   /** Dollars as typed, `''` when empty. */
@@ -60,11 +60,12 @@ export function NoPlanPayForm({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (frequency === '') {
-      setError(NO_PAY_FREQUENCY_MESSAGE)
+    const invalid = payFormError(amount, frequency)
+    if (invalid !== null || frequency === '') {
+      setError(invalid)
       return
     }
-    if (!onSave(amount, frequency)) setError(INVALID_CONFIRMED_PAY_MESSAGE)
+    if (!onSave(amount, frequency)) setError(PAY_NOT_SAVED_MESSAGE)
   }
 
   return (

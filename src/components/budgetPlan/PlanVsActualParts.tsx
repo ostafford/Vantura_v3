@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from 'react-bootstrap'
+import { centsToAmountInput } from '@/lib/amountInput'
 import { formatShortDate } from '@/lib/format'
 import { getCategoriesWithParent } from '@/services/categories'
 import {
@@ -536,7 +537,7 @@ export function NoPlanSummaryCard({
                 testId="plan-change-pay"
                 autoFocus
                 initial={{
-                  amountInput: (confirmedPay.perPay / 100).toFixed(2),
+                  amountInput: centsToAmountInput(confirmedPay.perPay),
                   frequency: confirmedPay.frequency,
                 }}
                 submitLabel={`Save pay for ${monthLabel(plan.month)}`}

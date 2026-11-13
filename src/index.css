@@ -3126,17 +3126,15 @@ a:not(.btn):not(.nav-link):not(.dropdown-item) {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.plan-set-pay {
-  display: flex;
-  align-items: baseline;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  background: var(--bs-tertiary-bg);
-}
+.plan-set-pay,
 .plan-pay-form {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   background: var(--bs-tertiary-bg);
+}
+.plan-set-pay {
+  display: flex;
+  align-items: baseline;
 }
 .plan-pay-form__title {
   display: flex;
