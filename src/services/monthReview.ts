@@ -32,7 +32,7 @@ export type MonthReview =
   /** The month's plan had no pay, so there's no figure. */
   | { month: string; kind: 'no-pay' }
   /** The month's Month-end plan can't be read, so there's no figure. */
-  | { month: string; kind: 'unreadable' }
+  | { month: string; kind: 'plan-unreadable' }
 
 /** The stored last reviewed month, or `null` when unset or malformed. */
 export function getLastReviewedMonth(): string | null {
@@ -55,9 +55,10 @@ export function getMonthReview(
   if (reviewed !== null && latest <= reviewed) return null
 
   const read = getFinishedMonthRead(latest, today)
-  // From the First plannable month on, the read is `finished` or, when the
-  // Month-end plan can't be read (or has no row), `null`.
-  if (read?.state !== 'finished') return { month: latest, kind: 'unreadable' }
+  // From the First plannable month on, a `null` read means the Month-end plan
+  // can't be read (or has no row). Any other state isn't defined here: decline.
+  if (read === null) return { month: latest, kind: 'plan-unreadable' }
+  if (read.state !== 'finished') return null
   if (read.savedCents === null) return { month: latest, kind: 'no-pay' }
   return read.savedCents < 0
     ? { month: latest, kind: 'overspent', cents: -read.savedCents }

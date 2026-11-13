@@ -133,7 +133,10 @@ describe('which month it shows', () => {
     freezeThroughOctober()
     db.run(`UPDATE month_end_plans SET plan_json = '{' WHERE month = '2026-10'`)
     // September's plan reads fine, but October is the latest finished month.
-    expect(getMonthReview()).toEqual({ month: '2026-10', kind: 'unreadable' })
+    expect(getMonthReview()).toEqual({
+      month: '2026-10',
+      kind: 'plan-unreadable',
+    })
   })
 
   it('marking an unreadable month reviewed covers every earlier one (#288)', () => {
@@ -143,9 +146,12 @@ describe('which month it shows', () => {
     expect(getMonthReview()).toBeNull()
   })
 
-  it('offers the latest finished month when it has no Month-end plan row', () => {
+  it('offers the latest finished month when it has no Month-end plan', () => {
     // Freeze hasn't run: October has no row, so its plan can't be read.
-    expect(getMonthReview()).toEqual({ month: '2026-10', kind: 'unreadable' })
+    expect(getMonthReview()).toEqual({
+      month: '2026-10',
+      kind: 'plan-unreadable',
+    })
   })
 
   it('shows the latest unreviewed finished month only', () => {

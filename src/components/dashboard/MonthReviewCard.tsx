@@ -33,7 +33,7 @@ function ReviewText({ review }: { review: MonthReview }) {
         </span>
       )
     case 'no-pay':
-    case 'unreadable':
+    case 'plan-unreadable':
       return (
         <>
           {name} is finished · <span className="month-review__cta">Review</span>

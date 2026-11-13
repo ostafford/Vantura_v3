@@ -48,7 +48,7 @@ describe('MonthReviewCard (#244)', () => {
   })
 
   it('has no figure when the month’s plan can’t be read (#288)', () => {
-    const html = render({ month: '2026-10', kind: 'unreadable' })
+    const html = render({ month: '2026-10', kind: 'plan-unreadable' })
     expect(text(html)).toContain('October is finished · Review')
     expect(text(html)).not.toMatch(/\$/)
     expect(html).toContain('/analytics/budget?month=2026-10')
