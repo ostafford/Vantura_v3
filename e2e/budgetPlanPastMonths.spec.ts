@@ -7,7 +7,9 @@ import {
 
 // #243: finished months on the Budget Plan, judged against their Month-end
 // plan (#242). Sample data seeds a plan for last month and sets it as the
-// first plannable month.
+// first plannable month. Its Spending account opened 180 days before today
+// (#282), so on 20 January 2027 the Months without a plan run from July 2026
+// (opened 24 July) to November 2026.
 
 const summary = (page: Page) => page.getByTestId('plan-summary')
 const prev = (page: Page) => page.getByTestId('plan-month-prev')
@@ -21,7 +23,7 @@ async function openOn20January(page: Page) {
 }
 
 test.describe('Budget Plan past months (#243)', () => {
-  test('opens on the current month; ‹ / › stop at the first plannable month and the current month', async ({
+  test('opens on the current month; ‹ / › stop at the opening month and the current month', async ({
     page,
   }) => {
     await openOn20January(page)
@@ -33,10 +35,34 @@ test.describe('Budget Plan past months (#243)', () => {
     await prev(page).click()
     await expect(page).toHaveURL(/\/analytics\/budget\?month=2026-12$/)
     await expect(page.getByTestId('plan-month')).toHaveText('December 2026')
-    // December is the first plannable month (sample data).
-    await expect(prev(page)).toBeDisabled()
+    // December is the first plannable month; ‹ carries on into the Months
+    // without a plan (#282), back to the opening month.
     await expect(next(page)).toBeEnabled()
+    for (const month of [
+      'November',
+      'October',
+      'September',
+      'August',
+      'July',
+    ]) {
+      await expect(prev(page)).toBeEnabled()
+      await prev(page).click()
+      await expect(page.getByTestId('plan-month')).toHaveText(`${month} 2026`)
+    }
+    await expect(page).toHaveURL(/\/analytics\/budget\?month=2026-07$/)
+    await expect(prev(page)).toBeDisabled()
 
+    // › walks back to the current month.
+    for (const month of [
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ]) {
+      await next(page).click()
+      await expect(page.getByTestId('plan-month')).toHaveText(`${month} 2026`)
+    }
     await next(page).click()
     await expect(page).toHaveURL(/\/analytics\/budget$/)
     await expect(page.getByTestId('plan-month')).toHaveText('January 2027')
@@ -95,7 +121,8 @@ test.describe('Budget Plan past months (#243)', () => {
     page,
   }) => {
     await openOn20January(page)
-    for (const month of ['2026-11', '2027-02', 'nope']) {
+    // June 2026 is before the opening month.
+    for (const month of ['2026-06', '2027-02', 'nope']) {
       await page.evaluate((to) => {
         window.history.pushState({}, '', to)
         window.dispatchEvent(new PopStateEvent('popstate'))

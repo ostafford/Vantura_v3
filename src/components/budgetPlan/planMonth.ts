@@ -4,15 +4,18 @@
  * page shows the current month, so it always opens there.
  *
  * - **›** is disabled on the current month.
- * - **‹** is disabled on the first plannable month (#242): Vantura never
- *   shows a month it can't judge. With no first plannable month stored (it
- *   is set at onboarding or first boot), there is no earlier month.
+ * - **‹** is disabled on the earliest month there's a read for: the opening
+ *   month when there are Months without a plan (#282), else the first
+ *   plannable month (#242). With no first plannable month stored (it is set
+ *   at onboarding or first boot), there is no earlier month. The bucket page
+ *   passes no range: a Month without a plan has no buckets to show.
  * - A `?month=` outside that range, or malformed, shows the current month.
  */
 
 import { addMonthsToMonthStr } from '@/lib/dateStr'
 import { localDateString } from '@/lib/format'
 import { getBucket } from '@/services/budgetBuckets'
+import type { MonthsWithoutAPlan } from '@/services/monthsWithoutAPlan'
 import {
   getFirstPlannableMonth,
   getMonthEndPlan,
@@ -34,13 +37,18 @@ export interface PlanMonth {
 export function resolvePlanMonth(
   requested: string | null,
   today: string,
-  firstPlannable: string | null
+  firstPlannable: string | null,
+  noPlanRange: Pick<MonthsWithoutAPlan, 'firstMonth'> | null
 ): PlanMonth {
   const current = today.slice(0, 7)
-  const first =
+  const firstWithAPlan =
     firstPlannable !== null && firstPlannable < current
       ? firstPlannable
       : current
+  const first =
+    noPlanRange !== null && noPlanRange.firstMonth < firstWithAPlan
+      ? noPlanRange.firstMonth
+      : firstWithAPlan
   const month =
     isMonth(requested) && requested >= first && requested <= current
       ? requested
@@ -73,7 +81,8 @@ export function bucketInMonth(
   const pm = resolvePlanMonth(
     new URLSearchParams(search).get('month'),
     today,
-    getFirstPlannableMonth()
+    getFirstPlannableMonth(),
+    null
   )
   const name = pm.isCurrent
     ? (getBucket(bucketId)?.name ?? null)

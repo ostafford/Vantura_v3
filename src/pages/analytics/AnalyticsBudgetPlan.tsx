@@ -293,7 +293,7 @@ export function AnalyticsBudgetPlan() {
   const [showAssignModal, setShowAssignModal] = useState(false)
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
-  const planMonth = usePlanMonth()
+  const planMonth = usePlanMonth(true)
   const plan = usePlanVsActual(version, planMonth.month)
   const editable = planMonth.isCurrent
   const nav = <MonthNav planMonth={planMonth} path="/analytics/budget" />

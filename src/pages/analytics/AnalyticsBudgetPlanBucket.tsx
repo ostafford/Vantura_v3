@@ -590,7 +590,7 @@ export function AnalyticsBudgetPlanBucket() {
   const themeMode = useStore(themeStore, (s) => s.mode)
   const mode: ColorMode = resolveTheme(themeMode)
   const [version, setVersion] = useState(0)
-  const planMonth = usePlanMonth()
+  const planMonth = usePlanMonth(false)
   const plan = usePlanVsActual(version, planMonth.month)
   const finished = plan?.state === 'finished'
 

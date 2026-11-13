@@ -8,7 +8,8 @@ import {
   FIRST_PLANNABLE_MONTH_KEY,
   freezeMonthEndPlans,
 } from '@/services/monthEndPlan'
-import { addDaysToDateStr } from '@/lib/dateStr'
+import { addDaysToDateStr, addMonthsToMonthStr } from '@/lib/dateStr'
+import { changePayForMonth } from '@/services/confirmedPay'
 import { writeTrackerConfigVersion } from '@/services/trackers'
 import { localDateString } from '@/lib/format'
 
@@ -954,4 +955,75 @@ export function seedDemoData(): void {
   const lastMonth = addDaysToDateStr(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
   setAppSetting(FIRST_PLANNABLE_MONTH_KEY, lastMonth)
   freezeMonthEndPlans(today)
+
+  seedMonthsWithoutAPlan(lastMonth)
+}
+
+/**
+ * Months without a plan (#282): the Spending account opened 180 days ago,
+ * just before the oldest sample transaction, so the months from then to the
+ * First plannable month (last month) can be viewed with no plan. That's four
+ * or five months, depending on the day: the opening month (a Part month)
+ * plus at least three full months. The oldest full month is left without a
+ * Confirmed pay, so the pay prompt shows; the next has a one-off flight that
+ * makes it Overspent; the rest are confirmed at the sample pay.
+ */
+function seedMonthsWithoutAPlan(firstPlannable: string): void {
+  const opened = new Date()
+  opened.setDate(opened.getDate() - 180)
+  opened.setHours(8, 0, 0, 0)
+  run(
+    `UPDATE accounts SET created_at = ?, ownership_type = 'INDIVIDUAL'
+     WHERE id = ?`,
+    [opened.toISOString(), DEMO_ACCOUNT_ID]
+  )
+  run(`UPDATE accounts SET ownership_type = 'INDIVIDUAL' WHERE id IN (?, ?)`, [
+    DEMO_SAVER_ID,
+    DEMO_SAVER_2_ID,
+  ])
+
+  const openingMonth = localDateString(opened).slice(0, 7)
+  const fullMonths: string[] = []
+  for (
+    let m = addMonthsToMonthStr(openingMonth, 1);
+    m < firstPlannable;
+    m = addMonthsToMonthStr(m, 1)
+  ) {
+    fullMonths.push(m)
+  }
+  const [unconfirmed, overspent, ...saved] = fullMonths
+  if (unconfirmed === undefined || overspent === undefined) return
+
+  const flightDay = new Date(`${overspent}-15T12:00:00`)
+  run(
+    `INSERT OR REPLACE INTO transactions (
+      id, account_id, status, raw_text, description, message, is_categorizable,
+      category_id, parent_category_id, amount, currency, settled_at, created_at,
+      is_round_up, round_up_parent_id, transfer_account_id, transfer_type, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'demo-flight-overspent',
+      DEMO_ACCOUNT_ID,
+      'SETTLED',
+      null,
+      'Qantas',
+      null,
+      1,
+      'demo-cat-transport',
+      'demo-cat-spending',
+      -420000,
+      'AUD',
+      flightDay.toISOString(),
+      flightDay.toISOString(),
+      0,
+      null,
+      null,
+      null,
+      NOW,
+    ]
+  )
+
+  for (const month of [openingMonth, overspent, ...saved]) {
+    changePayForMonth(month, '4500', 'MONTHLY')
+  }
 }

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { getFirstPlannableMonth } from '@/services/monthEndPlan'
+import { getMonthsWithoutAPlan } from '@/services/monthsWithoutAPlan'
 import {
   getPlanVsActual,
   type PlanVsActualWithPlan,
@@ -13,15 +14,23 @@ import { resolvePlanMonth, type PlanMonth } from './planMonth'
 /**
  * The month the page shows (`?month=`, else the current month) and where
  * ‹ / › go (`resolvePlanMonth`). Follows the day signal, so a page left open
- * across a month end moves on with it.
+ * across a month end moves on with it. `withMonthsWithoutAPlan` lets ‹ reach
+ * back to the opening month (#282): the Budget Plan passes true, the bucket
+ * page false, since a Month without a plan has no buckets.
  */
-export function usePlanMonth(): PlanMonth {
+export function usePlanMonth(withMonthsWithoutAPlan: boolean): PlanMonth {
   const today = useStore(todayStore, (s) => s.today)
   const [params] = useSearchParams()
   const requested = params.get('month')
   return useMemo(
-    () => resolvePlanMonth(requested, today, getFirstPlannableMonth()),
-    [requested, today]
+    () =>
+      resolvePlanMonth(
+        requested,
+        today,
+        getFirstPlannableMonth(),
+        withMonthsWithoutAPlan ? getMonthsWithoutAPlan() : null
+      ),
+    [requested, today, withMonthsWithoutAPlan]
   )
 }
 
