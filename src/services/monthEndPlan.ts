@@ -401,6 +401,19 @@ export function readMonthEndPlanRows(): MonthEndPlanRow[] {
   return out
 }
 
+/**
+ * True when a stored Month-end plan row can't be read. Profile export refuses
+ * then: a file without that month would let the next boot on the importing
+ * device re-freeze it from today's plan (`docs/adr/0025`).
+ */
+export function hasUnreadableMonthEndPlan(): boolean {
+  const db = getDb()
+  if (!db) return false
+  const stored = db.exec(`SELECT COUNT(*) FROM month_end_plans`)
+  const count = Number(stored[0]?.values[0]?.[0] ?? 0)
+  return count !== readMonthEndPlanRows().length
+}
+
 /** The Month-end plan for `month` (`YYYY-MM`), or `null` when there's none. */
 export function getMonthEndPlan(month: string): MonthEndPlan | null {
   const row = readMonthEndPlanRows().find((r) => r.month === month)

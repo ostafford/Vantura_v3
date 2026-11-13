@@ -1,8 +1,9 @@
 /**
  * Pay: the take-home Pay amount and the Pay frequency, as set in Onboarding
  * and Settings → Pay. One rule for both screens: a blank amount clears it, a
- * plain non-negative dollar amount is saved in cents (rounded to the nearest
- * cent), and anything else is refused with nothing written. Monthly Income is
+ * plain dollar amount above zero is saved in cents (rounded to the nearest
+ * cent), and anything else is refused with nothing written. Zero is refused
+ * because Income reads it as no pay. Monthly Income is
  * read from these settings by `getMonthlyIncomeCents` (`budgetBuckets.ts`).
  */
 
@@ -12,15 +13,17 @@ import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 /** Shown by both Pay forms when `savePay` refuses the amount. */
 export const INVALID_PAY_AMOUNT_MESSAGE =
-  'Enter your take-home pay as numbers only, without commas, like 3200 or 3200.50, or leave it blank.'
+  'Enter your take-home pay above zero, as numbers only, without commas, like 3200 or 3200.50, or leave it blank.'
 
 /**
  * Saves the Pay frequency and amount. Returns false, writing nothing, when
- * the amount text is invalid (see `parseAmountInput`); blank clears it.
+ * the amount text is invalid (see `parseAmountInput`) or zero; blank clears
+ * it.
  */
 export function savePay(frequency: PayFrequency, amountText: string): boolean {
   const amount = parseAmountInput(amountText)
   if (!amount.ok) return false
+  if (amount.cents !== null && amount.cents <= 0) return false
   setAppSetting('payday_frequency', frequency)
   setAppSetting(
     'pay_amount_cents',

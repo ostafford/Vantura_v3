@@ -1,5 +1,4 @@
 import { getDb, getAppSetting, schedulePersist } from '@/db'
-import { monthlyEquivalentMultiplier } from '@/lib/monthlyEquivalent'
 import { type PayFrequency, isPayFrequency } from '@/lib/payFrequency'
 
 export interface BudgetBucketRow {
@@ -192,7 +191,7 @@ export function readPay(): Pay | null {
 
 /**
  * Monthly Income: Pay amount × pays per month (52/12 weekly, 26/12
- * fortnightly, 1 monthly — `monthlyEquivalentMultiplier`). The same every
+ * fortnightly, 1 monthly — `monthlyIncomeFromPay`). The same every
  * month; needs no payday date. Null (not $0) when the pay amount or Pay
  * frequency is unusable (see `readPay`).
  */
@@ -201,7 +200,19 @@ export function getMonthlyIncomeCents(): number | null {
   return pay ? monthlyIncomeFromPay(pay) : null
 }
 
-/** Monthly Income from a pay: the rule `getMonthlyIncomeCents` applies. */
+/** Pays per year, by Pay frequency: Income is pay × this ÷ 12. */
+const PAYS_PER_YEAR: Record<Pay['frequency'], number> = {
+  WEEKLY: 52,
+  FORTNIGHTLY: 26,
+  MONTHLY: 12,
+}
+
+/**
+ * Monthly Income from a pay: the rule `getMonthlyIncomeCents` applies, the
+ * nearest cent with halves rounded up. Worked as pay × pays a year ÷ 12 so
+ * the product stays an exact integer; multiplying by a float 26/12 put
+ * 433335.5 at 433335.49999999994 and rounded it down.
+ */
 export function monthlyIncomeFromPay(pay: Pay): number {
-  return Math.round(pay.perPay * monthlyEquivalentMultiplier(pay.frequency))
+  return Math.round((pay.perPay * PAYS_PER_YEAR[pay.frequency]) / 12)
 }

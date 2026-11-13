@@ -49,7 +49,9 @@ const { runDateDependentWrites } = await import('./dateDependentWrites')
 const { watchForDayChange, todayStore } = await import('@/stores/todayStore')
 const {
   buildExportPayload,
+  exportProfile,
   importPayloadWithOptions,
+  EXPORT_ERROR_UNREADABLE_MONTH_END_PLAN,
   IMPORT_ERROR_INVALID_MONTH_END_PLAN,
 } = await import('./profileExport')
 
@@ -525,6 +527,19 @@ describe('profile export', () => {
     addTracker({ name: 'Groceries', budget: 60000, categories: ['groceries'] })
     freezeMonthEndPlans()
   }
+
+  it('refuses to export when a stored plan can’t be read, so the month isn’t re-frozen elsewhere', async () => {
+    seedFrozenOctober()
+    db.run(
+      `UPDATE month_end_plans SET plan_json = '{"version":99}' WHERE month = '2026-09'`
+    )
+    expect(EXPORT_ERROR_UNREADABLE_MONTH_END_PLAN).toBe(
+      'A past month’s plan on this device can’t be read, so this profile can’t be exported. Nothing was exported.'
+    )
+    await expect(exportProfile('synthetic-passphrase')).rejects.toThrow(
+      new Error(EXPORT_ERROR_UNREADABLE_MONTH_END_PLAN)
+    )
+  })
 
   it('round-trips every plan and the first plannable month', () => {
     seedFrozenOctober()

@@ -383,7 +383,6 @@ export function AnalyticsBudgetPlan() {
     return page(
       <>
         <NoPlanSummaryCard
-          key={plan.month}
           plan={plan}
           nav={nav}
           onPayChanged={refresh}
@@ -483,7 +482,9 @@ export function AnalyticsBudgetPlan() {
           const row = rowsByBucket.get(b.bucketId)
           return (
             <Col
-              key={b.bucketId}
+              // Keyed by month too: stepping ‹ / › shows a different month,
+              // so its bars appear rather than easing from the last one's.
+              key={`${plan.month}:${b.bucketId}`}
               xs={12}
               sm={6}
               lg={4}
@@ -493,11 +494,24 @@ export function AnalyticsBudgetPlan() {
                   handleDragStart(e, b.bucketId),
                 onDragOver: (e: React.DragEvent) =>
                   handleDragOver(e, b.bucketId),
-                onDragLeave: () => setDragOverId(null),
+                // Moving over a child card fires dragleave on the column;
+                // only leaving the column itself clears the target.
+                onDragLeave: (e: React.DragEvent) => {
+                  if (
+                    e.relatedTarget instanceof Node &&
+                    e.currentTarget.contains(e.relatedTarget)
+                  ) {
+                    return
+                  }
+                  setDragOverId(null)
+                },
                 onDrop: (e: React.DragEvent) => handleBucketDrop(e, b.bucketId),
                 onDragEnd: () => setDragOverId(null),
               })}
-              style={{ opacity: dragOverId === b.bucketId ? 0.6 : 1 }}
+              style={{
+                opacity: dragOverId === b.bucketId ? 0.6 : 1,
+                transition: 'opacity var(--duration-fast) var(--ease-out)',
+              }}
             >
               <BucketPlanCard
                 testId="plan-bucket"
@@ -566,7 +580,7 @@ export function AnalyticsBudgetPlan() {
         })}
 
         {notInABucket.items.length > 0 && (
-          <Col xs={12} sm={6} lg={4}>
+          <Col key={plan.month} xs={12} sm={6} lg={4}>
             <BucketPlanCard
               testId="plan-not-in-a-bucket"
               name="Not in a bucket"

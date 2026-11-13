@@ -298,18 +298,24 @@ describe('the range of Months without a plan', () => {
     })
   })
 
-  it('takes the opening month in local time when created_at is near midnight', () => {
-    // 28 Feb 13:30 UTC is 1 March 00:30 in Sydney (AEDT, +11).
+  it('takes the opening day from Up’s own date, as Display date does, never the device’s time zone', () => {
+    // 31 March 23:30 at −12:00 is 1 April in every device zone from −11 to
+    // +14, but Up's date (and every transaction window) says 31 March.
     addAccount({
       id: 'acc-spending',
       type: 'TRANSACTIONAL',
-      createdAt: '2026-02-28T13:30:00Z',
+      createdAt: '2026-03-31T23:30:00-12:00',
     })
     expect(getMonthsWithoutAPlan()).toEqual({
-      openingDate: '2026-03-01',
+      openingDate: '2026-03-31',
       firstMonth: '2026-03',
       lastMonth: '2026-08',
     })
+  })
+
+  it('has no Months without a plan when created_at isn’t a date', () => {
+    addAccount({ id: 'acc-spending', type: 'TRANSACTIONAL', createdAt: 'soon' })
+    expect(getMonthsWithoutAPlan()).toBeNull()
   })
 
   it('has no cap: an account opened years earlier reaches back to its opening month', () => {
