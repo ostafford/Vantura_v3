@@ -14,7 +14,7 @@ Vantura's product vision, target users, and non-negotiable design principles liv
 
 - **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Headroom miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
-- **Docs are collaborative, not autonomous.** Propose the change and get explicit confirmation before editing any `*.md` file (this file, `docs/*`, `Reference_Docs/*`, README, ROADMAP, CHANGELOG, SECURITY) — never edit one directly first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask for it in your own words rather than inferring it. `GLOSSARY.md` specifically needs an actual discussion, not just a draft to rubber-stamp — see the docs-collaboration memory.
+- **Docs can be edited directly — but don't guess their content.** Any `*.md` file (this file included) may be changed without asking first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment, `GLOSSARY.md` terms — ask rather than inferring it.
 
 ## Commands
 
