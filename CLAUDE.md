@@ -14,7 +14,17 @@ Vantura's product vision, target users, and non-negotiable design principles liv
 
 - **Accuracy bar: 99%+, applied equally across the entire codebase.** No tiered rigor — a UI bug and a Headroom miscalculation are held to the same standard. If a feature can't be built to this bar with strict, well-defined conditions, pause it rather than ship a partial/best-effort version. For the *feel* half of that bar — motion, interaction, component polish — the standard is `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md` and `docs/PRODUCT.md`'s *Motion & polish* section; the `emil-design-eng` / `apple-design` / `animate` skills carry it.
 - **No assumptions.** Every calculation and conditional must be based on an explicitly-defined rule. If the correct behavior for a case isn't known, don't guess — ask, or make the feature decline to run for that case rather than produce an unverified answer.
-- **Docs can be edited directly — but don't guess their content.** Any `*.md` file (this file included) may be changed without asking first. When the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment, `GLOSSARY.md` terms — ask rather than inferring it.
+- **Markdown edits: only the glossary and ADRs need confirmation.** Edits to `GLOSSARY.md` and ADRs (`docs/adr/`) need explicit confirmation first, even when a skill says to update them inline (see `docs/agents/domain.md`). All other markdown, this file included, can be edited directly. Either way, when the correct content isn't derivable from code — product intent, calculation edge cases, UX judgment — ask rather than inferring it.
+
+## Working mode: grill first, Pstack as the quality bar
+
+- **New work starts with Matt Pocock's grill-first flow** (user-level skills in `~/.claude/skills/`): `grill-with-docs` or `grill-me`, then `to-spec`, then `to-tickets`, then implement with `tdd` at the agreed seams, then `code-review`.
+- **Pstack's poteto-mode principles are the build-quality bar** during implementation and review. In Claude Code it's `/pstack:poteto-mode` (install with `/plugin marketplace add cursor/plugins`, then `/plugin install pstack@cursor-plugins`); in Cursor it's `/poteto-mode`.
+- **This section overrides Pstack's defaults. Where Pstack disagrees, this section wins:**
+  - Ask before any irreversible work.
+  - Don't update tickets/issues or post to chat without asking.
+  - Don't land PRs alone: no merging, no arming auto-merge. Pstack's Shipping and Autopilot playbooks don't apply here.
+- Pstack doesn't loosen the rules elsewhere in this file: **No assumptions** (above) and **Don't stack PRs** (*Working rules learned the hard way*) still apply as written.
 
 ## Commands
 
@@ -97,8 +107,8 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 ### Domain docs
 
-Single-context layout: a repo-root `GLOSSARY.md` + `docs/adr/`, the canonical home for domain "why". Edits to either need explicit confirmation first, even when a skill says to update them inline. See `docs/agents/domain.md`.
+Single-context layout: a repo-root `GLOSSARY.md` + `docs/adr/`, the canonical home for domain "why". Edits to either need explicit confirmation first, even when a skill says to update them inline; they're the only markdown that does (see *Engineering standards & working agreement*). See `docs/agents/domain.md`.
 
 ### Design engineering
 
-Motion, interaction, and UI-polish work uses Emil Kowalski's design-engineering skills (`emil-design-eng`, `apple-design`, `animate`, `improve-animations`, vendored from `emilkowalski/skills`, pinned in `skills-lock.json`). Presentation tier only; domain/correctness/testing/docs stay with the Matt Pocock engineering skills (installed user-level in `~/.claude/skills/`: `tdd`, `code-review`, `domain-modeling`, `triage`, etc.) and the practice above. See `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`.
+Motion, interaction, and UI-polish work uses Emil Kowalski's design-engineering skills (`emil-design-eng`, `apple-design`, `animate`, `improve-animations`, vendored from `emilkowalski/skills`, pinned in `skills-lock.json`). Presentation tier only. Planning and process for domain, correctness, testing and docs stay with the Matt Pocock engineering skills (installed user-level in `~/.claude/skills/`: `tdd`, `code-review`, `domain-modeling`, `triage`, etc.), and Pstack's poteto-mode is the build-quality bar during implementation and review (see *Working mode*). See `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`.
