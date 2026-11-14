@@ -122,4 +122,4 @@ pass). Don't skip it.
 - `npm run validate` and `npm run test` — confirm clean before reporting done.
 - Report in the established shape: **Bugs fixed** (`file:line`, what broke, the fix), **Confirmed correct / not touched** (so the next audit knows what was checked), **Known open items NOT fixed** (flagged, with why).
 - A structural finding that's a genuine, hard-to-reverse trade-off → propose a `docs/adr/` entry.
-- Doc drift found → propose the specific `OVERVIEW.md` / `GLOSSARY.md` / `DATABASE.md` edit and get explicit confirmation. Never edit a `*.md` autonomously (`CLAUDE.md` docs-collaboration rule).
+- Doc drift found → fix the `OVERVIEW.md` / `GLOSSARY.md` / `DATABASE.md` directly and list it in the report. If the right content depends on product intent rather than code, ask first (`CLAUDE.md` docs rule).
