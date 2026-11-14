@@ -37,7 +37,7 @@ For a whole-codebase pass, each domain agent (section 5) reads its own feature f
 
 **Rules for using the docs:**
 
-- **Code is ground truth on conflict** (`CLAUDE.md`). If code and doc disagree, trust the code — but flag the drift, propose the specific doc edit, and get explicit confirmation before writing it. Never edit a `*.md` autonomously.
+- **Code is ground truth on conflict** (`CLAUDE.md`). If code and doc disagree, trust the code and flag the drift. A fix to `GLOSSARY.md` or an ADR (`docs/adr/`) needs explicit confirmation before you write it; any other doc can be fixed directly (`CLAUDE.md` markdown rule).
 - **An ADR that explains a deliberate divergence is a "do not fix this" signal, not a finding.** E.g. `docs/adr/0005` — the net-worth projection excludes `LIABILITY_REPAYMENT` while Spendable's Reserved includes them, on purpose. A lens that flags this as an inconsistency is wrong; check the ADRs before reporting any "these two should match" finding.
 - If the correct behaviour for an edge case isn't defined anywhere — code, docs, or ADRs — do **not** guess. Section 6.
 
@@ -49,11 +49,7 @@ These have recurred across multiple audits. Check for each explicitly — don't 
 - Local calendar strings compared against UTC timestamps in a range filter (shifts every range by the UTC offset). Use `localDateStartUtc` / `localDateEndUtc`.
 - Unpadded day-of-month strings (`2026-3-5`) breaking string comparison.
 - `setUTCMonth(-1)` on a Date still carrying a large day-of-month — rolls a short month (Feb) back into itself. Compute target year/month by arithmetic instead.
-- Local-time vs UTC-noon inconsistency between modules (e.g. `getWeekRange` is local; payday/tracker maths is UTC-noon).
-
-**Payday & periods**
-- `PAYDAY` frequency hardcoded as `MONTHLY` in a period conversion — grep for literal `MONTHLY` near PAYDAY handling.
-- Relative payday codes (100–105) reaching a code path that treats `payday_day` as a plain 1–28 day.
+- Local-time vs UTC-noon inconsistency between modules that have to agree on the same dates.
 
 **Sync reactivity**
 - A component/memo that reads synced data but doesn't depend on `syncStore.lastSyncCompletedAt` — goes stale after a background sync.
@@ -70,7 +66,7 @@ These have recurred across multiple audits. Check for each explicitly — don't 
 - Substring `LIKE '%name%'` matching where a name can be a substring of another ("Gym" vs "Anytime Gym Membership"). Anchor the pattern.
 
 **Unenforced invariants across a seam**
-- A loop or function whose termination / correctness depends on a caller having done something first (`recalculateTrackers` assumed `advanceNextPaydayIfNeeded` already ran — an infinite loop when it hadn't). Make the function self-guaranteeing: only mark "changed" / recurse when a value actually changed.
+- A loop or function whose termination / correctness depends on a caller having done something first (an infinite loop when the caller hadn't). Make the function self-guaranteeing: only mark "changed" / recurse when a value actually changed.
 
 **Money & sign conventions**
 - Negative amounts rendered as `$-1,234.56` instead of `−$1,234.56`. Check every `formatMoney` call site, including ones using a field that can *unexpectedly* go negative (a HOME_LOAN in credit; `upBankLiabilitiesCents`).
@@ -87,7 +83,7 @@ own docs first (section 3).
 
 1. **Correctness** — every calculation and conditional vs. the intended behaviour in `OVERVIEW.md` / `GLOSSARY.md`, and vs. section 4's checklist. Report each failure as `file:line`, what breaks, the input that triggers it.
 2. **Spec / doc fidelity** — does the behaviour match `OVERVIEW.md`, the glossary term definitions, and the originating issue? Report: missing/partial requirements; behaviour not asked for (scope creep); things that look implemented but wrong. Quote the doc/issue line per finding.
-3. **Standards & structure** — documented repo standards (`CLAUDE.md`, any `CONTRIBUTING`), **plus the Fowler smell baseline** (paste the 12 smells from `.claude/plugins/.../code-review/SKILL.md` step 3 into the agent prompt — it has no other access), **plus deep-module checks**: a shallow module (interface nearly as complex as its implementation); calc-critical logic not extracted into a pure, directly-testable core (see the `calculateReservedAmount` / `computeProjectedNetWorth` / `calculateForecastSpendable` pattern — pure function + thin DB wrapper); an interface whose invariants/ordering/error-modes aren't enforced by the module itself. Distinguish **hard violations** (a documented standard breached) from **judgement calls** (baseline smells — always heuristics). A documented repo standard overrides the baseline. Skip anything tooling already enforces.
+3. **Standards & structure** — documented repo standards (`CLAUDE.md`, any `CONTRIBUTING`), **plus the Fowler smell baseline** (paste the 12 smells from `~/.claude/skills/code-review/SKILL.md` step 3 into the agent prompt — it has no other access), **plus deep-module checks**: a shallow module (interface nearly as complex as its implementation); calc-critical logic not extracted into a pure, directly-testable core (see the `calculateReservedAmount` / `computeProjectedNetWorth` / `calculateForecastSpendable` pattern — pure function + thin DB wrapper); an interface whose invariants/ordering/error-modes aren't enforced by the module itself. Distinguish **hard violations** (a documented standard breached) from **judgement calls** (baseline smells — always heuristics). A documented repo standard overrides the baseline. Skip anything tooling already enforces.
 4. **Feel** — *only when the feature ships or changes an interactive surface* (a component, modal, drawer, gesture, transition, animation). Motion and interaction against the design-engineering bar: `docs/adr/0017-design-engineering-is-the-presentation-tier-standard.md`, `docs/PRODUCT.md`'s *Motion & polish* section, and the eight categories in `.claude/skills/improve-animations/AUDIT.md`. Load the `emil-design-eng` and `animate` skills into the agent. Check: anything animating that shouldn't (keyboard-initiated / 100+-per-day actions)? `ease-in` on UI, or a bespoke curve/duration instead of the `--ease-*` / `--duration-*` tokens? a `@keyframes` where a retargetable transition belongs (rapidly-triggered or reversible UI)? an entrance with no matching exit? `width`/`height`/`top`/`left` animated instead of `transform`/`opacity`? no `prefers-reduced-motion` branch? Report each as `file:line`, what feels wrong, and the interaction that surfaces it. If the feature ships no interactive surface, say so in one line and skip the lens.
 
 **Aggregate the reports (three, or four when the feel lens ran) under their own headings. Do not merge or rerank across lenses** — the separation is the point (correct code that drifts from the doc; on-spec code with a structural smell; etc.).
@@ -102,7 +98,7 @@ decision.
 
 ## 7. Fix, with regression tests for anything calc-critical
 
-For a fix to payday, tracker periods, Spendable, Reserved, Forecast, balances, or
+For a fix to tracker periods, Spendable, Reserved, Forecast, balances, or
 net worth:
 
 - **Extract the logic into a pure function** if it isn't already — no DB, no I/O — and test it directly through that interface. Follow the `__test__` export-bag pattern (`trackers.ts`, `sync.ts`) for internals that need direct coverage.
@@ -122,4 +118,4 @@ pass). Don't skip it.
 - `npm run validate` and `npm run test` — confirm clean before reporting done.
 - Report in the established shape: **Bugs fixed** (`file:line`, what broke, the fix), **Confirmed correct / not touched** (so the next audit knows what was checked), **Known open items NOT fixed** (flagged, with why).
 - A structural finding that's a genuine, hard-to-reverse trade-off → propose a `docs/adr/` entry.
-- Doc drift found → fix the `OVERVIEW.md` / `GLOSSARY.md` / `DATABASE.md` directly and list it in the report. If the right content depends on product intent rather than code, ask first (`CLAUDE.md` docs rule).
+- Doc drift found → fix the `OVERVIEW.md` / `DATABASE.md` directly and list it in the report. A `GLOSSARY.md` or ADR fix: propose it and get explicit confirmation before writing it. Either way, if the right content depends on product intent rather than code, ask first (`CLAUDE.md` markdown rule).
