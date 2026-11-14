@@ -40,7 +40,7 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 
 ## Writing to the glossary and ADRs
 
-Never edit `GLOSSARY.md` or a `docs/adr/*` file directly, even when a skill says to update them inline as terms are resolved. Propose the exact change in the conversation (the new or changed glossary entry, or the full ADR text) and write it only after the user explicitly confirms.
+Never edit `GLOSSARY.md` or a `docs/adr/*` file directly, even when a skill says to update them inline as terms are resolved. Propose the exact change in the conversation (the new or changed glossary entry, or the full ADR text) and write it only after the user explicitly confirms. These are the only markdown files that need confirmation; all other markdown can be edited directly (root `CLAUDE.md`, *Engineering standards & working agreement*).
 
 `GLOSSARY.md` changes need an actual discussion, not a finished entry for the user to approve. Ask what the term should mean in your own words, settle it together, then propose the entry.
 
